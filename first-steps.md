@@ -28,6 +28,8 @@ Versiones que fija el propio proyecto (no hace falta instalarlas a mano):
 | Node en el contenedor del frontend | 24 (`node:24-alpine`) |
 | Servidor web del frontend | nginx (`nginx:stable-alpine`) |
 | React + Vite | las de `frontend/package.json` |
+| Pruebas del frontend | Vitest y React Testing Library (en `frontend/package.json`) |
+| Pruebas del backend | JUnit, Spring Boot Test y Testcontainers (en `backend/pom.xml`) |
 
 Requisitos mínimos reales, por si tu versión difiere un poco: Node 20.19 o 22.12 o superior (Vite), Java 17 o superior (Spring Boot 4 llega hasta Java 25; el proyecto está configurado para 25) y Maven 3.6.3 o superior. Aun así, intentá igualar las versiones de la tabla.
 
@@ -69,11 +71,15 @@ git config --global user.email "tu-email@ejemplo.com"
 
 ```
 A-Mano/
-├── .github/workflows/   ← automatizaciones de GitHub Actions (próximamente)
+├── .github/workflows/
+│   └── ci.yml           ← verificaciones automáticas (GitHub Actions)
 ├── backend/             ← Spring Boot + Maven (Java)
+│   ├── src/main/        ← código de la aplicación
+│   ├── src/test/        ← pruebas (*Test rápidas, *IT de integración)
 │   ├── Dockerfile       ← cómo se construye la imagen del backend
 │   └── .dockerignore
 ├── frontend/            ← React + Vite
+│   ├── src/             ← código y pruebas (*.test.jsx)
 │   ├── Dockerfile       ← cómo se construye la imagen del frontend
 │   ├── nginx.conf       ← configuración de nginx (sirve la app y reenvía /api)
 │   └── .dockerignore
@@ -154,13 +160,15 @@ cd backend
 
 Los paréntesis hacen que las variables existan solo durante ese comando, sin ensuciar tu terminal.
 
-Cuando veas `Started BackendApplication in ... seconds`, el backend está corriendo en http://localhost:8080. Mostrar una página de error 404 en esa dirección es normal por ahora: todavía no hay rutas definidas. Detenelo con `Ctrl+C`.
-
-Para correr las pruebas del backend (con la base levantada):
+Cuando veas `Started BackendApplication in ... seconds`, el backend está corriendo en http://localhost:8080. Para comprobar que responde:
 
 ```bash
-(set -a; source ../.env; set +a; mvn test)
+curl http://localhost:8080/api/health
 ```
+
+Debería devolver `{"status":"UP"}`. Detené el backend con `Ctrl+C`.
+
+Las pruebas del backend **no necesitan** que cargues el `.env` ni que la base esté levantada (ver la sección 10).
 
 ## 8. Modo desarrollo: levantar el frontend
 
@@ -195,14 +203,20 @@ Dónde se ve cada cosa:
 | Qué | Dirección |
 |---|---|
 | Aplicación (frontend) | http://localhost:8081 |
-| API (a través de nginx) | http://localhost:8081/api/... |
+| API (a través de nginx) | http://localhost:8081/api/... (por ejemplo `/api/health`) |
 | Base de datos (para herramientas externas) | `127.0.0.1:5432` (o tu `POSTGRES_PORT`) |
 
 El backend **no** publica un puerto propio: se accede a él solo a través de nginx, que reenvía a `/api/`. Por eso no choca con el `mvn spring-boot:run` del modo desarrollo.
 
+Una buena prueba de punta a punta, que pasa por nginx, el proxy y el backend:
+
+```bash
+curl -i http://localhost:8081/api/health
+```
+
 Cómo funciona por dentro (para entender qué pasa):
 
-- **Backend:** una imagen en dos etapas. La primera compila con Maven (sin ejecutar tests; los tests los correrá GitHub Actions) y la segunda ejecuta solo el `.jar` con Java 25.
+- **Backend:** una imagen en dos etapas. La primera compila con Maven (sin ejecutar tests; los tests los corre GitHub Actions) y la segunda ejecuta solo el `.jar` con Java 25.
 - **Frontend:** otra imagen en dos etapas. La primera compila la aplicación con Vite y la segunda la sirve con nginx.
 - **Conexión a la base:** dentro de la red de Compose, el backend encuentra la base con el nombre `db` (variable `DB_HOST=db`). No se toca el código para eso.
 
@@ -221,9 +235,76 @@ Para volver al modo desarrollo después de usar el stack completo, apagá los co
 docker compose stop backend frontend
 ```
 
-## 10. Flujo de trabajo en equipo
+## 10. Pruebas
 
-La idea es que `main` siempre contenga código que compila y pasa las pruebas. Para eso:
+Hay distintos tipos de prueba, de más rápidas a más completas:
+
+| Tipo | Qué levanta | ¿Necesita base de datos? | Dónde vive |
+|---|---|---|---|
+| **Unitaria** | Solo tu clase, con JUnit | No | `backend/src/test`, nombre `*Test` |
+| **Web** (`@WebMvcTest`) | Solo la capa web de Spring | No | `backend/src/test`, nombre `*Test` |
+| **Integración** (`@SpringBootTest`) | La aplicación completa, con una PostgreSQL real que levanta Testcontainers | Sí, pero se crea sola | `backend/src/test`, nombre `*IT` |
+| **Componente (frontend)** | Un componente React en un navegador simulado | No | `frontend/src`, nombre `*.test.jsx` |
+
+### Backend
+
+Desde `backend/`, **sin cargar el `.env` y sin base levantada**:
+
+```bash
+mvn test       # solo las rápidas (*Test), sin Docker
+mvn verify     # rápidas + integración (*IT); necesita Docker en ejecución
+```
+
+Las pruebas de integración usan Testcontainers: crean su propio contenedor de PostgreSQL (`postgres:18-alpine`), lo usan y lo borran. No tocan tu base de desarrollo. Lo único que piden es que Docker esté funcionando.
+
+Convención: lo que termina en `Test` corre con `mvn test`; lo que termina en `IT` corre solo con `mvn verify`.
+
+### Frontend
+
+Desde `frontend/`:
+
+```bash
+npm test               # ejecuta las pruebas una vez
+npm run test:watch     # queda escuchando y re-ejecuta al guardar
+npm run lint           # revisa el estilo y errores comunes con ESLint
+npm run build          # compila para producción (comprueba que todo arma)
+```
+
+### Antes de abrir un Pull Request
+
+Corré en tu máquina lo mismo que va a correr GitHub, así evitás ver el check en rojo:
+
+```bash
+cd backend && mvn -B verify
+cd ../frontend && npm ci && npm run lint && npm test && npm run build
+```
+
+## 11. Integración continua (GitHub Actions)
+
+El archivo `.github/workflows/ci.yml` hace que GitHub verifique el código en una máquina limpia cada vez que abrís o actualizás un Pull Request, y también cuando algo llega a `main`.
+
+| Job | Qué ejecuta |
+|---|---|
+| `backend` | Java 25 y `mvn -B verify` (pruebas rápidas, de integración y empaquetado) |
+| `frontend` | Node 24, `npm ci`, `npm run lint`, `npm test` y `npm run build` |
+
+Los dos corren en paralelo. En el Pull Request aparecen como **backend** y **frontend**. Si alguno queda en rojo:
+
+1. Entrá a **Details** del check que falló.
+2. Buscá el primer paso con una cruz roja y leé el final de su log.
+3. Reproducí el error en tu máquina con los comandos de la sección anterior.
+
+Esto es **CI** (integración continua): verificar que el código compila y pasa las pruebas. Todavía no hay **CD** (despliegue continuo); se incorporará cuando prepararemos la Raspberry Pi.
+
+## 12. Flujo de trabajo en equipo
+
+La rama `main` está **protegida**: nadie puede subir commits directo, ni siquiera quien administra el repositorio. Todo cambio entra por un Pull Request que cumpla estas reglas:
+
+- Los checks `backend` y `frontend` tienen que estar en verde.
+- La rama tiene que estar actualizada respecto de `main` (si no lo está, GitHub ofrece el botón **Update branch**).
+- Los comentarios de revisión tienen que estar resueltos.
+
+Pasos:
 
 1. Antes de empezar, actualizá `main`:
    ```bash
@@ -234,19 +315,28 @@ La idea es que `main` siempre contenga código que compila y pasa las pruebas. P
    ```bash
    git checkout -b feat/crear-grupo
    ```
-3. Hacé commits chicos y claros. Seguimos el formato *Conventional Commits*: `feat:` (funcionalidad nueva), `fix:` (corrección), `docs:` (documentación), `chore:` (tareas de mantenimiento), `test:` (pruebas).
+3. Hacé commits chicos y claros. Seguimos el formato *Conventional Commits*: `feat:` (funcionalidad nueva), `fix:` (corrección), `docs:` (documentación), `chore:` (tareas de mantenimiento), `test:` (pruebas), `ci:` (automatizaciones).
    ```bash
    git add archivo1 archivo2
    git commit -m "feat: add group creation endpoint"
    ```
    Preferí `git add` con archivos concretos antes que `git add .`, para no subir algo por accidente.
-4. Subí tu rama y abrí un **Pull Request** hacia `main` desde GitHub:
+4. Subí tu rama:
    ```bash
    git push -u origin feat/crear-grupo
    ```
-5. Alguien del grupo lo revisa. Se integra a `main` cuando está aprobado.
+   En la salida, GitHub imprime un enlace para abrir el Pull Request. Abrilo, poné un título claro y creá el Pull Request hacia `main`.
+5. Esperá a que los checks queden en verde. Si fallan, corregí en tu rama y volvé a subir: el check se vuelve a ejecutar solo.
+6. Pedí a alguien del grupo que lo revise. Por ahora GitHub no lo exige con un número mínimo de aprobaciones, pero es la costumbre del equipo.
+7. Cuando esté todo en verde y revisado, integralo con **Merge pull request**.
+8. Actualizá tu copia local y borrá la rama:
+   ```bash
+   git checkout main
+   git pull
+   git branch -d feat/crear-grupo
+   ```
 
-No hagas commits directos a `main`. Cuando se active la protección de la rama, GitHub lo va a impedir de todos modos.
+Si intentás subir directo a `main`, GitHub lo rechaza con un mensaje de `Repository rule violations`. Es lo esperado: pasá tu commit a una rama y abrí un Pull Request.
 
 ### Qué nunca debe subirse
 
@@ -280,6 +370,15 @@ Tu contraseña tiene un carácter que el shell interpreta. Generá una nueva con
 **`permission denied` al usar `docker`**
 Mirá el final de la sección 1 (grupo `docker`).
 
+**Las pruebas de integración (`mvn verify`) fallan con un error de Docker o de Testcontainers**
+Comprobá que Docker esté funcionando con `docker ps`. Las pruebas de integración necesitan Docker, aunque no necesitan que tu base de desarrollo esté levantada. Si el error menciona `client version ... is too old`, es una incompatibilidad entre versiones de Docker y Testcontainers: avisá al grupo.
+
+**Un check queda en rojo en el Pull Request**
+Mirá la sección 11: entrá a **Details**, buscá el paso que falló y reproducí el error local con los comandos de "Antes de abrir un Pull Request".
+
+**El Pull Request dice que la rama está desactualizada**
+Otro Pull Request se integró antes. Apretá **Update branch** en la página del Pull Request (o hacé `git merge origin/main` en tu rama) y esperá a que los checks corran de nuevo.
+
 **El puerto 5432 ya está en uso**
 Tenés otro PostgreSQL corriendo en tu máquina. Podés apagarlo o cambiar `POSTGRES_PORT` en tu `.env` (por ejemplo a `5433`) y volver a levantar. El backend en modo desarrollo usa esa misma variable.
 
@@ -301,22 +400,21 @@ La primera vez descarga imágenes y dependencias, y depende de tu conexión. Si 
 **La base no persiste datos o el contenedor no arranca**
 La imagen de PostgreSQL 18 guarda los datos en una ruta distinta a la de versiones anteriores. No cambies el volumen de `compose.yaml` a `/var/lib/postgresql/data`: tiene que ser `/var/lib/postgresql`.
 
-**El test `contextLoads` falla al correr `mvn test`**
-Es esperado si no cargaste las variables o la base está apagada. Ese test levanta toda la aplicación. Se va a reorganizar cuando incorporemos las pruebas y GitHub Actions.
-
 ## Estado del proyecto
 
 Hecho:
 
 - Repositorio con monorepo (`frontend/` y `backend/`).
-- Frontend React + Vite funcionando.
-- Backend Spring Boot conectado a PostgreSQL (JPA y Flyway para las migraciones).
+- Frontend React + Vite funcionando, con pruebas (Vitest y React Testing Library).
+- Backend Spring Boot conectado a PostgreSQL (JPA y Flyway para las migraciones), con el endpoint `/api/health`.
+- Pruebas del backend en tres niveles: unitarias, web y de integración con PostgreSQL real (Testcontainers).
 - `compose.yaml` con los tres servicios: base de datos, backend y frontend (con nginx).
 - Imágenes Docker multi-etapa para backend y frontend, compatibles con ARM64 (pensadas para la Raspberry Pi).
+- GitHub Actions: CI que corre las pruebas del backend y del frontend en cada Pull Request.
+- Rama `main` protegida: solo se integra con Pull Request, checks en verde y rama actualizada.
 
 Pendiente (esta guía se va a actualizar a medida que avance):
 
-- Reorganización de las pruebas y GitHub Actions.
-- Protección de la rama `main` y obligatoriedad de Pull Requests.
+- Exigir al menos una aprobación por Pull Request, cuando todo el grupo tenga acceso al repositorio.
 - Primeras migraciones de base de datos y modelo de datos.
-- Despliegue en una Raspberry Pi.
+- Despliegue en una Raspberry Pi (y despliegue continuo desde `main`).
