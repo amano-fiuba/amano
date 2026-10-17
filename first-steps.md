@@ -8,61 +8,61 @@ Los comandos están pensados para **Fedora Linux**. En otros sistemas la idea es
 
 Para evitar el clásico "en mi compu funciona", todos usamos estas versiones:
 
-| Herramienta | Versión | Cómo verificarla |
-|---|---|---|
-| Git | cualquiera reciente | `git --version` |
-| Node.js | 24.18.0 | `node -v` |
-| npm | 11.16.0 | `npm -v` |
-| Java (OpenJDK) | 25 | `java -version` |
-| Maven | 3.9.11 | `mvn -v` |
-| Docker | 29.9.1 | `docker --version` |
-| Docker Compose | 5.6.0 | `docker compose version` |
+| Herramienta    | Versión             | Cómo verificarla         |
+| -------------- | ------------------- | ------------------------ |
+| Git            | cualquiera reciente | `git --version`          |
+| Node.js        | 24.18.0             | `node -v`                |
+| npm            | 11.16.0             | `npm -v`                 |
+| Java (OpenJDK) | 25                  | `java -version`          |
+| Maven          | 3.9.11              | `mvn -v`                 |
+| Docker         | 29.9.1              | `docker --version`       |
+| Docker Compose | 5.6.0               | `docker compose version` |
 
 Versiones que fija el propio proyecto (no hace falta instalarlas a mano):
 
-| Componente | Versión |
-|---|---|
-| Spring Boot | 4.1.1 |
-| PostgreSQL (imagen Docker) | 18 (`postgres:18-alpine`) |
-| Java en el contenedor del backend | 25 (`eclipse-temurin:25-jdk` y `25-jre`) |
-| Node en el contenedor del frontend | 24 (`node:24-alpine`) |
-| Servidor web del frontend | nginx (`nginx:stable-alpine`) |
-| React + Vite | las de `frontend/package.json` |
-| Pruebas del frontend | Vitest y React Testing Library (en `frontend/package.json`) |
-| Pruebas del backend | JUnit, Spring Boot Test y Testcontainers (en `backend/pom.xml`) |
+| Componente                         | Versión                                                         |
+| ---------------------------------- | --------------------------------------------------------------- |
+| Spring Boot                        | 4.1.1                                                           |
+| PostgreSQL (imagen Docker)         | 18 (`postgres:18-alpine`)                                       |
+| Java en el contenedor del backend  | 25 (`eclipse-temurin:25-jdk` y `25-jre`)                        |
+| Node en el contenedor del frontend | 24 (`node:24-alpine`)                                           |
+| Servidor web del frontend          | nginx (`nginx:stable-alpine`)                                   |
+| React + Vite                       | las de `frontend/package.json`                                  |
+| Pruebas del frontend               | Vitest y React Testing Library (en `frontend/package.json`)     |
+| Pruebas del backend                | JUnit, Spring Boot Test y Testcontainers (en `backend/pom.xml`) |
 
 Requisitos mínimos reales, por si tu versión difiere un poco: Node 20.19 o 22.12 o superior (Vite), Java 17 o superior (Spring Boot 4 llega hasta Java 25; el proyecto está configurado para 25) y Maven 3.6.3 o superior. Aun así, intentá igualar las versiones de la tabla.
 
 Tu usuario tiene que poder usar Docker sin `sudo`. Comprobalo con:
 
-```bash
+```
 docker ps
 ```
 
 Si dice `permission denied`, agregá tu usuario al grupo `docker` y reiniciá la sesión:
 
-```bash
+```
 sudo usermod -aG docker $USER
 ```
 
 ## 2. Clonar el repositorio
 
-```bash
+```
 mkdir -p ~/proyectos
 cd ~/proyectos
-git clone git@github.com:ifabregat/A-Mano.git
-cd A-Mano
+git clone git@github.com:amano-fiuba/amano.git
+cd amano
 ```
 
 Si todavía no configuraste una clave SSH con GitHub, podés clonar por HTTPS:
 
-```bash
-git clone https://github.com/ifabregat/A-Mano.git
+```
+git clone https://github.com/amano-fiuba/amano.git
 ```
 
 Configurá tu identidad de Git si no lo hiciste (se verá en tus commits):
 
-```bash
+```
 git config --global user.name "Tu Nombre"
 git config --global user.email "tu-email@ejemplo.com"
 ```
@@ -70,7 +70,7 @@ git config --global user.email "tu-email@ejemplo.com"
 ## 3. Estructura del repositorio
 
 ```
-A-Mano/
+amano/
 ├── .github/workflows/
 │   └── ci.yml           ← verificaciones automáticas (GitHub Actions)
 ├── backend/             ← Spring Boot + Maven (Java)
@@ -95,19 +95,19 @@ El archivo `.env` guarda tu configuración local, incluida la contraseña de la 
 
 Desde la raíz del repositorio:
 
-```bash
+```
 cp .env.example .env
 ```
 
 Después generá una contraseña y escribila en `.env`:
 
-```bash
+```
 openssl rand -hex 16
 ```
 
 Abrí `.env` y reemplazá el valor de `POSTGRES_PASSWORD` por lo que generó el comando, sin comillas ni espacios:
 
-```dotenv
+```
 POSTGRES_DB=amano
 POSTGRES_USER=amano
 POSTGRES_PASSWORD=la_contraseña_que_generaste
@@ -122,10 +122,10 @@ POSTGRES_PORT=5432
 
 El proyecto se puede ejecutar de dos maneras. Vas a usar las dos:
 
-| Modo | Para qué sirve | Qué corre en contenedores |
-|---|---|---|
-| **Desarrollo** (secciones 6 a 8) | Programar con recarga automática y cambios rápidos | Solo la base de datos |
-| **Stack completo** (sección 9) | Probar todo junto, igual que en producción | Base de datos, backend y frontend |
+| Modo                             | Para qué sirve                                     | Qué corre en contenedores         |
+| -------------------------------- | -------------------------------------------------- | --------------------------------- |
+| **Desarrollo** (secciones 6 a 8) | Programar con recarga automática y cambios rápidos | Solo la base de datos             |
+| **Stack completo** (sección 9)   | Probar todo junto, igual que en producción         | Base de datos, backend y frontend |
 
 Regla práctica: para el trabajo diario usá el modo desarrollo. Antes de abrir un Pull Request, o para ver cómo se comporta todo integrado, probá el stack completo.
 
@@ -133,7 +133,7 @@ Regla práctica: para el trabajo diario usá el modo desarrollo. Antes de abrir 
 
 Desde la raíz del repositorio:
 
-```bash
+```
 docker compose up -d db
 docker compose ps
 ```
@@ -142,7 +142,7 @@ Indicar `db` levanta **solo** la base de datos (sin él, Compose levantaría los
 
 Comandos útiles (valen para todos los servicios):
 
-```bash
+```
 docker compose logs db       # ver los logs de la base
 docker compose stop          # apagar sin borrar nada
 docker compose down          # borrar los contenedores, conserva los datos
@@ -153,16 +153,16 @@ docker compose down -v       # borrar contenedores Y DATOS (empezar de cero)
 
 Spring Boot necesita las variables de `.env`, pero Maven no lee ese archivo por sí solo. Por eso las cargamos en el momento. Desde `backend/`:
 
-```bash
+```
 cd backend
 (set -a; source ../.env; set +a; mvn spring-boot:run)
 ```
 
 Los paréntesis hacen que las variables existan solo durante ese comando, sin ensuciar tu terminal.
 
-Cuando veas `Started BackendApplication in ... seconds`, el backend está corriendo en http://localhost:8080. Para comprobar que responde:
+Cuando veas `Started BackendApplication in ... seconds`, el backend está corriendo en <http://localhost:8080>. Para comprobar que responde:
 
-```bash
+```
 curl http://localhost:8080/api/health
 ```
 
@@ -174,13 +174,13 @@ Las pruebas del backend **no necesitan** que cargues el `.env` ni que la base es
 
 Desde `frontend/`:
 
-```bash
+```
 cd frontend
 npm install
 npm run dev
 ```
 
-La aplicación queda en http://localhost:5173. Detenela con `Ctrl+C`.
+La aplicación queda en <http://localhost:5173>. Detenela con `Ctrl+C`.
 
 `npm install` solo hace falta la primera vez y cada vez que cambie `package.json`.
 
@@ -190,7 +190,7 @@ La aplicación queda en http://localhost:5173. Detenela con `Ctrl+C`.
 
 Levanta los tres servicios (base de datos, backend y frontend) como contenedores. Desde la raíz del repositorio:
 
-```bash
+```
 docker compose up -d --build
 docker compose ps
 ```
@@ -200,17 +200,17 @@ docker compose ps
 
 Dónde se ve cada cosa:
 
-| Qué | Dirección |
-|---|---|
-| Aplicación (frontend) | http://localhost:8081 |
-| API (a través de nginx) | http://localhost:8081/api/... (por ejemplo `/api/health`) |
-| Base de datos (para herramientas externas) | `127.0.0.1:5432` (o tu `POSTGRES_PORT`) |
+| Qué                                        | Dirección                                                   |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| Aplicación (frontend)                      | <http://localhost:8081>                                     |
+| API (a través de nginx)                    | <http://localhost:8081/api/>... (por ejemplo `/api/health`) |
+| Base de datos (para herramientas externas) | `127.0.0.1:5432` (o tu `POSTGRES_PORT`)                     |
 
 El backend **no** publica un puerto propio: se accede a él solo a través de nginx, que reenvía a `/api/`. Por eso no choca con el `mvn spring-boot:run` del modo desarrollo.
 
 Una buena prueba de punta a punta, que pasa por nginx, el proxy y el backend:
 
-```bash
+```
 curl -i http://localhost:8081/api/health
 ```
 
@@ -222,7 +222,7 @@ Cómo funciona por dentro (para entender qué pasa):
 
 Comandos útiles:
 
-```bash
+```
 docker compose logs -f backend   # seguir los logs del backend (Ctrl+C para salir)
 docker compose logs frontend     # logs de nginx
 docker compose restart frontend  # reiniciar solo el frontend
@@ -231,7 +231,7 @@ docker compose down              # apagar todo conservando los datos
 
 Para volver al modo desarrollo después de usar el stack completo, apagá los contenedores de la aplicación y dejá solo la base:
 
-```bash
+```
 docker compose stop backend frontend
 ```
 
@@ -239,18 +239,18 @@ docker compose stop backend frontend
 
 Hay distintos tipos de prueba, de más rápidas a más completas:
 
-| Tipo | Qué levanta | ¿Necesita base de datos? | Dónde vive |
-|---|---|---|---|
-| **Unitaria** | Solo tu clase, con JUnit | No | `backend/src/test`, nombre `*Test` |
-| **Web** (`@WebMvcTest`) | Solo la capa web de Spring | No | `backend/src/test`, nombre `*Test` |
-| **Integración** (`@SpringBootTest`) | La aplicación completa, con una PostgreSQL real que levanta Testcontainers | Sí, pero se crea sola | `backend/src/test`, nombre `*IT` |
-| **Componente (frontend)** | Un componente React en un navegador simulado | No | `frontend/src`, nombre `*.test.jsx` |
+| Tipo                                | Qué levanta                                                                | ¿Necesita base de datos? | Dónde vive                          |
+| ----------------------------------- | -------------------------------------------------------------------------- | ------------------------ | ----------------------------------- |
+| **Unitaria**                        | Solo tu clase, con JUnit                                                   | No                       | `backend/src/test`, nombre `*Test`  |
+| **Web** (`@WebMvcTest`)             | Solo la capa web de Spring                                                 | No                       | `backend/src/test`, nombre `*Test`  |
+| **Integración** (`@SpringBootTest`) | La aplicación completa, con una PostgreSQL real que levanta Testcontainers | Sí, pero se crea sola    | `backend/src/test`, nombre `*IT`    |
+| **Componente (frontend)**           | Un componente React en un navegador simulado                               | No                       | `frontend/src`, nombre `*.test.jsx` |
 
 ### Backend
 
 Desde `backend/`, **sin cargar el `.env` y sin base levantada**:
 
-```bash
+```
 mvn test       # solo las rápidas (*Test), sin Docker
 mvn verify     # rápidas + integración (*IT); necesita Docker en ejecución
 ```
@@ -263,7 +263,7 @@ Convención: lo que termina en `Test` corre con `mvn test`; lo que termina en `I
 
 Desde `frontend/`:
 
-```bash
+```
 npm test               # ejecuta las pruebas una vez
 npm run test:watch     # queda escuchando y re-ejecuta al guardar
 npm run lint           # revisa el estilo y errores comunes con ESLint
@@ -274,7 +274,7 @@ npm run build          # compila para producción (comprueba que todo arma)
 
 Corré en tu máquina lo mismo que va a correr GitHub, así evitás ver el check en rojo:
 
-```bash
+```
 cd backend && mvn -B verify
 cd ../frontend && npm ci && npm run lint && npm test && npm run build
 ```
@@ -283,10 +283,10 @@ cd ../frontend && npm ci && npm run lint && npm test && npm run build
 
 El archivo `.github/workflows/ci.yml` hace que GitHub verifique el código en una máquina limpia cada vez que abrís o actualizás un Pull Request, y también cuando algo llega a `main`.
 
-| Job | Qué ejecuta |
-|---|---|
-| `backend` | Java 25 y `mvn -B verify` (pruebas rápidas, de integración y empaquetado) |
-| `frontend` | Node 24, `npm ci`, `npm run lint`, `npm test` y `npm run build` |
+| Job        | Qué ejecuta                                                               |
+| ---------- | ------------------------------------------------------------------------- |
+| `backend`  | Java 25 y `mvn -B verify` (pruebas rápidas, de integración y empaquetado) |
+| `frontend` | Node 24, `npm ci`, `npm run lint`, `npm test` y `npm run build`           |
 
 Los dos corren en paralelo. En el Pull Request aparecen como **backend** y **frontend**. Si alguno queda en rojo:
 
@@ -307,30 +307,41 @@ La rama `main` está **protegida**: nadie puede subir commits directo, ni siquie
 Pasos:
 
 1. Antes de empezar, actualizá `main`:
-   ```bash
+
+   ```
    git checkout main
    git pull
    ```
+
 2. Creá una rama para tu tarea. Usá un nombre descriptivo con prefijo:
-   ```bash
+
+   ```
    git checkout -b feat/crear-grupo
    ```
+
 3. Hacé commits chicos y claros. Seguimos el formato *Conventional Commits*: `feat:` (funcionalidad nueva), `fix:` (corrección), `docs:` (documentación), `chore:` (tareas de mantenimiento), `test:` (pruebas), `ci:` (automatizaciones).
-   ```bash
+
+   ```
    git add archivo1 archivo2
    git commit -m "feat: add group creation endpoint"
    ```
+
    Preferí `git add` con archivos concretos antes que `git add .`, para no subir algo por accidente.
+
 4. Subí tu rama:
-   ```bash
+
+   ```
    git push -u origin feat/crear-grupo
    ```
+
    En la salida, GitHub imprime un enlace para abrir el Pull Request. Abrilo, poné un título claro y creá el Pull Request hacia `main`.
+
 5. Esperá a que los checks queden en verde. Si fallan, corregí en tu rama y volvé a subir: el check se vuelve a ejecutar solo.
 6. Pedí a alguien del grupo que lo revise. Por ahora GitHub no lo exige con un número mínimo de aprobaciones, pero es la costumbre del equipo.
 7. Cuando esté todo en verde y revisado, integralo con **Merge pull request**.
 8. Actualizá tu copia local y borrá la rama:
-   ```bash
+
+   ```
    git checkout main
    git pull
    git branch -d feat/crear-grupo
@@ -345,7 +356,7 @@ Si intentás subir directo a `main`, GitHub lo rechaza con un mensaje de `Reposi
 
 Antes de cada commit, mirá qué estás por subir:
 
-```bash
+```
 git status --short
 ```
 
@@ -358,10 +369,12 @@ No cargaste las variables. Usá el comando de la sección 7, con `source ../.env
 
 **`FATAL: password authentication failed for user "amano"`**
 La contraseña que envía el backend no coincide con la que tiene la base. PostgreSQL toma la contraseña solo la primera vez que crea el volumen, así que si cambiaste `.env` después, hay que recrear la base (esto borra tus datos locales):
-```bash
+
+```
 docker compose down -v
 docker compose up -d db
 ```
+
 Si el problema persiste, revisá que la contraseña no tenga caracteres especiales.
 
 **`.env:4: parse error near '&'`** (o similar con otro símbolo)
@@ -387,7 +400,8 @@ En modo desarrollo, el backend usa el 8080: si hay otro programa ahí, no arranc
 
 **`502 Bad Gateway` al entrar a `/api/...` en el stack completo**
 Nginx no pudo llegar al backend. Puede pasar si el backend todavía está arrancando (esperá unos segundos y mirá `docker compose logs backend`) o si lo reconstruiste sin reiniciar el frontend. En ese caso:
-```bash
+
+```
 docker compose restart frontend
 ```
 
