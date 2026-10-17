@@ -1,0 +1,17 @@
+# Variables de entorno reales (nunca se suben)
+.env
+.env.*
+!.env.example
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores e IDEs
+.idea/
+.vscode/
+*.swp
+*.iml
+
+# Logs
+*.log
