@@ -1,4 +1,4 @@
-# Amano
+# A Mano
 
 Aplicación web para dividir gastos compartidos entre un grupo de personas, inspirada en Splitwise.
 
