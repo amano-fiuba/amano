@@ -24,6 +24,9 @@ Versiones que fija el propio proyecto (no hace falta instalarlas a mano):
 |---|---|
 | Spring Boot | 4.1.1 |
 | PostgreSQL (imagen Docker) | 18 (`postgres:18-alpine`) |
+| Java en el contenedor del backend | 25 (`eclipse-temurin:25-jdk` y `25-jre`) |
+| Node en el contenedor del frontend | 24 (`node:24-alpine`) |
+| Servidor web del frontend | nginx (`nginx:stable-alpine`) |
 | React + Vite | las de `frontend/package.json` |
 
 Requisitos mínimos reales, por si tu versión difiere un poco: Node 20.19 o 22.12 o superior (Vite), Java 17 o superior (Spring Boot 4 llega hasta Java 25; el proyecto está configurado para 25) y Maven 3.6.3 o superior. Aun así, intentá igualar las versiones de la tabla.
@@ -68,9 +71,14 @@ git config --global user.email "tu-email@ejemplo.com"
 A-Mano/
 ├── .github/workflows/   ← automatizaciones de GitHub Actions (próximamente)
 ├── backend/             ← Spring Boot + Maven (Java)
+│   ├── Dockerfile       ← cómo se construye la imagen del backend
+│   └── .dockerignore
 ├── frontend/            ← React + Vite
+│   ├── Dockerfile       ← cómo se construye la imagen del frontend
+│   ├── nginx.conf       ← configuración de nginx (sirve la app y reenvía /api)
+│   └── .dockerignore
 ├── .env.example         ← modelo de variables de entorno (sin secretos)
-├── compose.yaml         ← servicios para desarrollo local (PostgreSQL)
+├── compose.yaml         ← los tres servicios: db, backend y frontend
 ├── first-steps.md       ← esta guía
 └── README.md
 ```
@@ -100,30 +108,42 @@ POSTGRES_PASSWORD=la_contraseña_que_generaste
 POSTGRES_PORT=5432
 ```
 
+`POSTGRES_PORT` es el puerto de **tu máquina** donde se publica la base. Si el 5432 ya lo usa otro programa, cambialo (por ejemplo a `5433`). Entre contenedores, el puerto interno siempre es 5432.
+
 > **Importante:** usá una contraseña solo con letras y números. Caracteres como `&`, `$`, `#`, `!`, `^` o espacios rompen la lectura del archivo desde la terminal (el shell los interpreta como comandos). Es la causa de un error que ya tuvimos.
 
-## 5. Levantar la base de datos
+## 5. Dos formas de ejecutar el proyecto
+
+El proyecto se puede ejecutar de dos maneras. Vas a usar las dos:
+
+| Modo | Para qué sirve | Qué corre en contenedores |
+|---|---|---|
+| **Desarrollo** (secciones 6 a 8) | Programar con recarga automática y cambios rápidos | Solo la base de datos |
+| **Stack completo** (sección 9) | Probar todo junto, igual que en producción | Base de datos, backend y frontend |
+
+Regla práctica: para el trabajo diario usá el modo desarrollo. Antes de abrir un Pull Request, o para ver cómo se comporta todo integrado, probá el stack completo.
+
+## 6. Modo desarrollo: levantar la base de datos
 
 Desde la raíz del repositorio:
 
 ```bash
-docker compose up -d
+docker compose up -d db
 docker compose ps
 ```
 
-Esperá a que el servicio `db` aparezca como `healthy` (tarda unos segundos). La base escucha **solo en tu máquina** (`127.0.0.1`), no en la red.
+Indicar `db` levanta **solo** la base de datos (sin él, Compose levantaría los tres servicios). Esperá a que aparezca como `healthy` (tarda unos segundos). La base escucha **solo en tu máquina** (`127.0.0.1`), no en la red.
 
-Comandos útiles:
+Comandos útiles (valen para todos los servicios):
 
 ```bash
 docker compose logs db       # ver los logs de la base
 docker compose stop          # apagar sin borrar nada
-docker compose up -d         # volver a encender
 docker compose down          # borrar los contenedores, conserva los datos
 docker compose down -v       # borrar contenedores Y DATOS (empezar de cero)
 ```
 
-## 6. Levantar el backend
+## 7. Modo desarrollo: levantar el backend
 
 Spring Boot necesita las variables de `.env`, pero Maven no lee ese archivo por sí solo. Por eso las cargamos en el momento. Desde `backend/`:
 
@@ -142,7 +162,7 @@ Para correr las pruebas del backend (con la base levantada):
 (set -a; source ../.env; set +a; mvn test)
 ```
 
-## 7. Levantar el frontend
+## 8. Modo desarrollo: levantar el frontend
 
 Desde `frontend/`:
 
@@ -156,7 +176,52 @@ La aplicación queda en http://localhost:5173. Detenela con `Ctrl+C`.
 
 `npm install` solo hace falta la primera vez y cada vez que cambie `package.json`.
 
-## 8. Flujo de trabajo en equipo
+> Todavía el frontend no hace llamadas a la API. Cuando agreguemos la primera, habrá que configurar Vite para reenviar `/api` al backend local (hoy esa tarea la hace nginx en el stack completo).
+
+## 9. Stack completo con Docker
+
+Levanta los tres servicios (base de datos, backend y frontend) como contenedores. Desde la raíz del repositorio:
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+- `--build` reconstruye las imágenes si cambió código. La **primera vez tarda varios minutos** porque descarga Java, Node y todas las dependencias; las siguientes son mucho más rápidas.
+- `ps` debería mostrar `db` como `healthy` y `backend` y `frontend` como `running`.
+
+Dónde se ve cada cosa:
+
+| Qué | Dirección |
+|---|---|
+| Aplicación (frontend) | http://localhost:8081 |
+| API (a través de nginx) | http://localhost:8081/api/... |
+| Base de datos (para herramientas externas) | `127.0.0.1:5432` (o tu `POSTGRES_PORT`) |
+
+El backend **no** publica un puerto propio: se accede a él solo a través de nginx, que reenvía a `/api/`. Por eso no choca con el `mvn spring-boot:run` del modo desarrollo.
+
+Cómo funciona por dentro (para entender qué pasa):
+
+- **Backend:** una imagen en dos etapas. La primera compila con Maven (sin ejecutar tests; los tests los correrá GitHub Actions) y la segunda ejecuta solo el `.jar` con Java 25.
+- **Frontend:** otra imagen en dos etapas. La primera compila la aplicación con Vite y la segunda la sirve con nginx.
+- **Conexión a la base:** dentro de la red de Compose, el backend encuentra la base con el nombre `db` (variable `DB_HOST=db`). No se toca el código para eso.
+
+Comandos útiles:
+
+```bash
+docker compose logs -f backend   # seguir los logs del backend (Ctrl+C para salir)
+docker compose logs frontend     # logs de nginx
+docker compose restart frontend  # reiniciar solo el frontend
+docker compose down              # apagar todo conservando los datos
+```
+
+Para volver al modo desarrollo después de usar el stack completo, apagá los contenedores de la aplicación y dejá solo la base:
+
+```bash
+docker compose stop backend frontend
+```
+
+## 10. Flujo de trabajo en equipo
 
 La idea es que `main` siempre contenga código que compila y pasa las pruebas. Para eso:
 
@@ -198,14 +263,14 @@ Si aparece `.env`, `node_modules` o `target`, no los agregues y avisá.
 
 ## Problemas frecuentes
 
-**`Could not resolve placeholder 'POSTGRES_PASSWORD'`** al arrancar el backend.
-No cargaste las variables. Usá el comando de la sección 6, con `source ../.env`.
+**`Could not resolve placeholder 'POSTGRES_PASSWORD'`** al arrancar el backend en modo desarrollo.
+No cargaste las variables. Usá el comando de la sección 7, con `source ../.env`.
 
 **`FATAL: password authentication failed for user "amano"`**
 La contraseña que envía el backend no coincide con la que tiene la base. PostgreSQL toma la contraseña solo la primera vez que crea el volumen, así que si cambiaste `.env` después, hay que recrear la base (esto borra tus datos locales):
 ```bash
 docker compose down -v
-docker compose up -d
+docker compose up -d db
 ```
 Si el problema persiste, revisá que la contraseña no tenga caracteres especiales.
 
@@ -216,7 +281,22 @@ Tu contraseña tiene un carácter que el shell interpreta. Generá una nueva con
 Mirá el final de la sección 1 (grupo `docker`).
 
 **El puerto 5432 ya está en uso**
-Tenés otro PostgreSQL corriendo en tu máquina. Podés apagarlo o cambiar `POSTGRES_PORT` en tu `.env` (por ejemplo a `5433`) y volver a levantar con `docker compose up -d`. El backend usa esa misma variable.
+Tenés otro PostgreSQL corriendo en tu máquina. Podés apagarlo o cambiar `POSTGRES_PORT` en tu `.env` (por ejemplo a `5433`) y volver a levantar. El backend en modo desarrollo usa esa misma variable.
+
+**El puerto 8080 o 8081 ya está en uso**
+En modo desarrollo, el backend usa el 8080: si hay otro programa ahí, no arrancará. En el stack completo el frontend usa el 8081 de tu máquina; si está ocupado, cambiá `"127.0.0.1:8081:80"` en `compose.yaml` por otro puerto libre, por ejemplo `"127.0.0.1:8082:80"`.
+
+**`502 Bad Gateway` al entrar a `/api/...` en el stack completo**
+Nginx no pudo llegar al backend. Puede pasar si el backend todavía está arrancando (esperá unos segundos y mirá `docker compose logs backend`) o si lo reconstruiste sin reiniciar el frontend. En ese caso:
+```bash
+docker compose restart frontend
+```
+
+**El backend del stack completo no arranca**
+Mirá los logs con `docker compose logs backend` y buscá las líneas `Caused by`. Si es un error de contraseña, aplica lo de arriba.
+
+**La primera construcción falla o es muy lenta**
+La primera vez descarga imágenes y dependencias, y depende de tu conexión. Si falla por un corte de red, volvé a ejecutar `docker compose up -d --build`: Docker reutiliza lo que ya descargó.
 
 **La base no persiste datos o el contenedor no arranca**
 La imagen de PostgreSQL 18 guarda los datos en una ruta distinta a la de versiones anteriores. No cambies el volumen de `compose.yaml` a `/var/lib/postgresql/data`: tiene que ser `/var/lib/postgresql`.
@@ -231,7 +311,8 @@ Hecho:
 - Repositorio con monorepo (`frontend/` y `backend/`).
 - Frontend React + Vite funcionando.
 - Backend Spring Boot conectado a PostgreSQL (JPA y Flyway para las migraciones).
-- PostgreSQL local con Docker Compose.
+- `compose.yaml` con los tres servicios: base de datos, backend y frontend (con nginx).
+- Imágenes Docker multi-etapa para backend y frontend, compatibles con ARM64 (pensadas para la Raspberry Pi).
 
 Pendiente (esta guía se va a actualizar a medida que avance):
 
