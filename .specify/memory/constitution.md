@@ -76,10 +76,13 @@ especificación. Cuando una modificación afecte funcionalidades existentes, MUS
 verificarse que las pruebas de regresión pertinentes continúen pasando. Una
 funcionalidad no debe considerarse terminada si las verificaciones obligatorias
 fallan o si el resultado de alguna verificación relevante no ha sido
-comprobado. Mientras la verificación automática de cobertura no esté
-configurada en la herramienta correspondiente, MUST implementarse o señalarse
-explícitamente como una limitación pendiente; no debe asumirse que existe un
-control que no haya sido comprobado.
+comprobado. La verificación de cobertura MUST ejecutarse con las herramientas
+configuradas en el proyecto: JaCoCo en el backend, dentro de `mvn verify`, y el
+proveedor de cobertura de Vitest en el frontend, mediante
+`npm run test:coverage`. La exclusión de puntos de entrada (por ejemplo, la clase
+de arranque de Spring Boot y `main.jsx`) MUST estar justificada y documentada; no
+se admite excluir código arbitrariamente para alcanzar el umbral. No debe
+asumirse que existe un control de cobertura que no haya sido comprobado.
 
 _Rationale_: las pruebas y la cobertura son el respaldo verificable de que el
 comportamiento implementado cumple la especificación.
@@ -219,9 +222,11 @@ REST. La persistencia usa PostgreSQL con JPA y migraciones gestionadas por
 Flyway. La construcción del backend es con Maven y las pruebas usan JUnit,
 Spring Boot Test y Testcontainers (pruebas rápidas `*Test` y de integración
 `*IT`); en el frontend las pruebas usan Vitest y React Testing Library
-(`*.test.jsx`). La ejecución integrada usa Docker Compose y la integración
-continua se ejecuta con GitHub Actions. Las versiones vigentes son las que fijen
-los archivos del repositorio; esta constitución no fija versiones nuevas.
+(`*.test.jsx`). La cobertura se mide con JaCoCo en el backend (integrado en
+`mvn verify`) y con el proveedor de cobertura de Vitest en el frontend. La
+ejecución integrada usa Docker Compose y la integración continua se ejecuta con
+GitHub Actions. Las versiones vigentes son las que fijen los archivos del
+repositorio; esta constitución no fija versiones nuevas.
 
 **Idiomas y convenciones de nombres.** Las especificaciones, planes, tareas y
 demás artefactos SDD se escriben en español. El código fuente, los
@@ -249,9 +254,10 @@ una migración nueva.
 
 **Verificaciones locales y de CI.** Antes de abrir un Pull Request deben
 ejecutarse, cuando correspondan, las mismas verificaciones configuradas en el
-repositorio: `mvn -B verify` en `backend/` y `npm ci && npm run lint && npm test
-&& npm run build` en `frontend/`. Las verificaciones obligatorias deben estar en
-verde antes de integrar.
+repositorio: `mvn -B verify` en `backend/` y `npm ci && npm run lint && npm run
+test:coverage && npm run build` en `frontend/`. Ambas incluyen la verificación de
+cobertura mínima del 85 %. Las verificaciones obligatorias deben estar en verde
+antes de integrar.
 
 ## Definición de Listo y Terminado (DoR y DoD)
 
@@ -331,4 +337,4 @@ constitución MUST permanecer lo suficientemente general como para aplicarse a
 las diferentes historias del backlog, sin reemplazar sus especificaciones
 particulares.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
+**Version**: 1.0.1 | **Ratified**: 2026-10-18 | **Last Amended**: 2026-10-18
