@@ -1,4 +1,4 @@
-# Primeros pasos con Amano
+# Primeros pasos con A Mano
 
 Guía para que todo el grupo tenga el mismo entorno y pueda levantar el proyecto en su computadora. Seguí los pasos en orden. Si algo falla, mirá la sección [Problemas frecuentes](#problemas-frecuentes) antes de pedir ayuda.
 
@@ -72,7 +72,8 @@ git config --global user.email "tu-email@ejemplo.com"
 ```
 amano/
 ├── .github/workflows/
-│   └── ci.yml           ← verificaciones automáticas (GitHub Actions)
+│   ├── ci.yml                ← verificaciones automáticas (GitHub Actions)
+│   └── publish-images.yml    ← publica las imágenes de producción (ARM64)
 ├── backend/             ← Spring Boot + Maven (Java)
 │   ├── src/main/        ← código de la aplicación
 │   ├── src/test/        ← pruebas (*Test rápidas, *IT de integración)
@@ -84,7 +85,9 @@ amano/
 │   ├── nginx.conf       ← configuración de nginx (sirve la app y reenvía /api)
 │   └── .dockerignore
 ├── .env.example         ← modelo de variables de entorno (sin secretos)
-├── compose.yaml         ← los tres servicios: db, backend y frontend
+├── Caddyfile            ← proxy HTTPS de producción (Caddy)
+├── compose.yaml         ← desarrollo: db, backend y frontend (se construyen acá)
+├── compose.prod.yaml    ← producción (Raspberry Pi): imágenes publicadas + Caddy
 ├── first-steps.md       ← esta guía
 └── README.md
 ```
@@ -115,6 +118,8 @@ POSTGRES_PORT=5432
 ```
 
 `POSTGRES_PORT` es el puerto de **tu máquina** donde se publica la base. Si el 5432 ya lo usa otro programa, cambialo (por ejemplo a `5433`). Entre contenedores, el puerto interno siempre es 5432.
+
+El `.env.example` también trae unas variables de producción comentadas (`COMPOSE_FILE`, `DATA_DIR` y `DOMAIN`). **Dejalas comentadas en tu computadora**: son para la Raspberry Pi. Si activaras `COMPOSE_FILE`, `docker compose` usaría el archivo de producción en lugar del de desarrollo.
 
 > **Importante:** usá una contraseña solo con letras y números. Caracteres como `&`, `$`, `#`, `!`, `^` o espacios rompen la lectura del archivo desde la terminal (el shell los interpreta como comandos). Es la causa de un error que ya tuvimos.
 
@@ -294,7 +299,9 @@ Los dos corren en paralelo. En el Pull Request aparecen como **backend** y **fro
 2. Buscá el primer paso con una cruz roja y leé el final de su log.
 3. Reproducí el error en tu máquina con los comandos de la sección anterior.
 
-Esto es **CI** (integración continua): verificar que el código compila y pasa las pruebas. Todavía no hay **CD** (despliegue continuo); se incorporará cuando prepararemos la Raspberry Pi.
+Esto es **CI** (integración continua): verificar que el código compila y pasa las pruebas.
+
+Hay un segundo workflow, `publish-images.yml`, que **no** corre en los Pull Requests: se ejecuta solo cuando algo llega a `main`. Construye las imágenes de backend y frontend para ARM64 (la arquitectura de la Raspberry Pi) y las publica en GHCR, el registro de imágenes de GitHub, con los tags `latest` y `sha-<commit>`. Es el primer paso del **CD** (despliegue continuo), que se explica en la sección 13.
 
 ## 12. Flujo de trabajo en equipo
 
@@ -319,7 +326,7 @@ Pasos:
    git checkout -b feat/crear-grupo
    ```
 
-3. Hacé commits chicos y claros. Seguimos el formato *Conventional Commits*: `feat:` (funcionalidad nueva), `fix:` (corrección), `docs:` (documentación), `chore:` (tareas de mantenimiento), `test:` (pruebas), `ci:` (automatizaciones).
+3. Hacé commits chicos y claros. Seguimos el formato _Conventional Commits_: `feat:` (funcionalidad nueva), `fix:` (corrección), `docs:` (documentación), `chore:` (tareas de mantenimiento), `test:` (pruebas), `ci:` (automatizaciones).
 
    ```
    git add archivo1 archivo2
@@ -338,7 +345,7 @@ Pasos:
 
 5. Esperá a que los checks queden en verde. Si fallan, corregí en tu rama y volvé a subir: el check se vuelve a ejecutar solo.
 6. Pedí a alguien del grupo que lo revise. Por ahora GitHub no lo exige con un número mínimo de aprobaciones, pero es la costumbre del equipo.
-7. Cuando esté todo en verde y revisado, integralo con **Merge pull request**.
+7. Cuando esté todo en verde y revisado, integralo con **Merge pull request**. Recordá que **todo lo que llega a `main` se despliega solo en la Raspberry Pi** (sección 13): no integres nada que no estés dispuesto a ver publicado.
 8. Actualizá tu copia local y borrá la rama:
 
    ```
@@ -361,6 +368,36 @@ git status --short
 ```
 
 Si aparece `.env`, `node_modules` o `target`, no los agregues y avisá.
+
+## 13. Despliegue en la Raspberry Pi
+
+La aplicación corre en una Raspberry Pi y se actualiza sola cada vez que se integra algo a `main`. Dirección pública: <https://amano-fiuba.duckdns.org>.
+
+Cómo viaja un cambio:
+
+1. Se integra un Pull Request a `main`.
+2. GitHub Actions ejecuta `publish-images.yml`: construye las imágenes de backend y frontend para ARM64 y las publica en GHCR (`ghcr.io/amano-fiuba/amano-backend` y `ghcr.io/amano-fiuba/amano-frontend`). Tarda unos minutos.
+3. La Raspberry revisa cada 5 minutos si hay novedades: descarga el código y las imágenes nuevas y reinicia solo los servicios que cambiaron.
+
+En total, un cambio se ve publicado unos 10 minutos después del merge. Podés seguir el primer paso en la pestaña **Actions** del repositorio, en el workflow **Publish images**.
+
+Qué archivo es para qué:
+
+| Archivo             | Qué hace                                                                                                 | Dónde se usa   |
+| ------------------- | -------------------------------------------------------------------------------------------------------- | -------------- |
+| `compose.yaml`      | Construye todo desde el código y publica la app en `localhost:8081`                                      | Tu computadora |
+| `compose.prod.yaml` | Usa las imágenes ya publicadas, sin construir nada. Solo Caddy abre puertos (80 y 443) y maneja el HTTPS | Raspberry Pi   |
+| `Caddyfile`         | Configuración de Caddy: reenvía todo al frontend                                                         | Raspberry Pi   |
+
+**No uses `compose.prod.yaml` en tu computadora**: las imágenes son ARM64 y no corren en una PC común, y además intentaría abrir los puertos 80 y 443.
+
+Qué **no** está en el repositorio, a propósito: el `.env` de producción (con contraseñas), los datos (base de datos y certificados) y el script que hace la actualización automática. Viven solo en la Raspberry.
+
+Cosas que conviene saber:
+
+- **Todo lo que llega a `main` queda publicado en Internet.** Hoy la app no tiene login: no se deben cargar datos reales de personas hasta que lo resolvamos.
+- Las migraciones de Flyway corren solas cuando arranca el backend. Una migración con errores impide que el backend arranque, y por lo tanto rompe el despliegue. No edites migraciones que ya se integraron: creá una nueva.
+- Si un despliegue sale mal, avisá a quien administra la Raspberry. Se puede volver a una versión anterior fijando el tag `sha-...` de la imagen.
 
 ## Problemas frecuentes
 
@@ -426,9 +463,13 @@ Hecho:
 - Imágenes Docker multi-etapa para backend y frontend, compatibles con ARM64 (pensadas para la Raspberry Pi).
 - GitHub Actions: CI que corre las pruebas del backend y del frontend en cada Pull Request.
 - Rama `main` protegida: solo se integra con Pull Request, checks en verde y rama actualizada.
+- Aplicación desplegada en una Raspberry Pi, con HTTPS automático (Caddy): <https://amano-fiuba.duckdns.org>.
+- Imágenes ARM64 publicadas en GHCR por GitHub Actions en cada integración a `main`.
+- Despliegue continuo: la Raspberry se actualiza sola unos minutos después de cada integración a `main`.
+- Exigir al menos una aprobación por Pull Request, cuando todo el grupo tenga acceso al repositorio.
 
 Pendiente (esta guía se va a actualizar a medida que avance):
 
-- Exigir al menos una aprobación por Pull Request, cuando todo el grupo tenga acceso al repositorio.
+- Autenticación (login) antes de guardar datos reales de personas.
 - Primeras migraciones de base de datos y modelo de datos.
-- Despliegue en una Raspberry Pi (y despliegue continuo desde `main`).
+- Copias de seguridad (backups) de la base de datos.
