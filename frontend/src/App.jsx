@@ -5,6 +5,8 @@ import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
 import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
+import RegisterPage from './pages/RegisterPage'
+import DashboardPage from './pages/DashboardPage'
 import './App.css'
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
@@ -120,21 +122,18 @@ function Home() {
   )
 }
 
-// Rutas base del shell de la SPA (task T015): '/', '/register' y '/dashboard'
-// (pantalla protegida). Las pantallas concretas llegan con cada historia
-// (RegisterPage/DashboardPage en US1); se colocan placeholders vacíos.
+// Rutas base del shell de la SPA (T015 + US1): '/', '/register' y '/dashboard'
+// (pantalla protegida). Home sigue siendo el landing provisorio del scaffold.
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
-      {/* Placeholder de US1 (RegisterPage, T023). */}
-      <Route path="/register" element={<div />} />
-      {/* Placeholder de US1 (DashboardPage, T024), protegido por sesión. */}
+      <Route path="/register" element={<RegisterPage />} />
       <Route
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <div />
+            <DashboardPage />
           </ProtectedRoute>
         }
       />

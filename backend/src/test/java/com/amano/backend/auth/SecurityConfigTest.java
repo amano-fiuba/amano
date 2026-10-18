@@ -44,8 +44,8 @@ class SecurityConfigTest {
 
     @Test
     void registerEndpointIsReachableWithoutSession() throws Exception {
-        // permitAll: the request reaches the dispatcher (404 here, no /api/auth/register
-        // controller yet in Phase 2) instead of being blocked by security (401/403).
+        // permitAll: the request reaches the dispatcher — 404 because this @WebMvcTest
+        // slice does not load AuthController (a security block would be 401/403).
         mockMvc.perform(post("/api/auth/register"))
                 .andExpect(status().isNotFound());
     }

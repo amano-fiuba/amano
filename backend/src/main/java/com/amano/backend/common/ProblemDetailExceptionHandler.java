@@ -15,6 +15,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import com.amano.backend.common.FieldValidationException;
 
 /**
  * Global REST error handling following RFC 7807 ProblemDetail, as defined in
@@ -50,7 +51,7 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.BAD_REQUEST, "La solicitud contiene campos inválidos");
         problem.setTitle("Validación fallida");
-        problem.setProperty(FIELDS_PROPERTY, fields);
+        problem.setProperty("properties", Map.of(FIELDS_PROPERTY, fields));
         return problem;
     }
 
@@ -60,7 +61,7 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT, EMAIL_ALREADY_REGISTERED);
         problem.setTitle("Conflicto");
-        problem.setProperty(FIELDS_PROPERTY, Map.of("email", EMAIL_ALREADY_REGISTERED));
+        problem.setProperty("properties", Map.of(FIELDS_PROPERTY, Map.of("email", EMAIL_ALREADY_REGISTERED)));
         return problem;
     }
 
@@ -69,6 +70,16 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.PAYLOAD_TOO_LARGE, "El archivo es demasiado grande (máximo 2 MB)");
         problem.setTitle("Payload demasiado grande");
+        return problem;
+    }
+
+    /** Service-level validations after normalization (Q3/Q4): same 400 shape (FR-018). */
+    @ExceptionHandler(FieldValidationException.class)
+    public ProblemDetail handleFieldValidation(FieldValidationException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Validación fallida");
+        problem.setProperty("properties", Map.of(FIELDS_PROPERTY, exception.getFields()));
         return problem;
     }
 

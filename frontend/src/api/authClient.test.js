@@ -1,0 +1,137 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { NETWORK_ERROR_MESSAGE, me, register } from './authClient'
+
+beforeEach(() => {
+  vi.unstubAllGlobals()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('register(endpoint: POST /api/auth/register, contracts/auth-api.md)', () => {
+  it('201 devuelve ok con el perfil creado', async () => {
+    const profile = { id: 1, firstName: 'Ana', email: 'ana.perez@example.com' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(profile),
+      }),
+    )
+
+    const formData = new FormData()
+    const result = await register(formData)
+
+    expect(result).toEqual({ ok: true, profile })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/register', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    })
+  })
+
+  it('4xx parsea el ProblemDetail (detail + properties.fields)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve({
+            detail: 'La solicitud contiene campos inválidos',
+            properties: { fields: { email: 'El correo...' } },
+          }),
+      }),
+    )
+
+    const result = await register(new FormData())
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      detail: 'La solicitud contiene campos inválidos',
+      fields: { email: 'El correo...' },
+    })
+  })
+
+  it('409 sin properties devuelve detalle vacío y fields vacíos', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: () => Promise.resolve({ detail: 'El correo electrónico ya se encuentra registrado' }),
+      }),
+    )
+
+    const result = await register(new FormData())
+
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      detail: 'El correo electrónico ya se encuentra registrado',
+      fields: {},
+    })
+  })
+
+  it('5xx se tratata como fallo de red (FR-019)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({}) }),
+    )
+
+    const result = await register(new FormData())
+
+    expect(result).toEqual({ ok: false, network: true })
+  })
+
+  it('fallo de red devuelve network:true', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+
+    const result = await register(new FormData())
+
+    expect(result).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('me(endpoint: GET /api/users/me, contracts/users-api.md)', () => {
+  it('200 devuelve ok con el perfil', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ id: 7, firstName: 'Ana' }),
+      }),
+    )
+
+    const result = await me()
+
+    expect(result).toEqual({ ok: true, profile: { id: 7, firstName: 'Ana' } })
+    expect(fetch).toHaveBeenCalledWith('/api/users/me', { credentials: 'include' })
+  })
+
+  it('401 devuelve ok:false con el estado', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+
+    expect(await me()).toEqual({ ok: false, status: 401 })
+  })
+
+  it('fallo de red devuelve ok:false + network flag', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+
+    const result = await me()
+
+    expect(result.ok).toBe(false)
+    expect(result.network).toBe(true)
+  })
+})
+
+describe('NETWORK_ERROR_MESSAGE (FR-019, contrato)', () => {
+  it('es el mensaje fijo contratado', () => {
+    expect(NETWORK_ERROR_MESSAGE).toBe(
+      'No se pudo completar el registro. Intenta nuevamente',
+    )
+  })
+})
