@@ -1,10 +1,20 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-describe('App', () => {
-  it('incrementa el contador al hacer clic en el botón', async () => {
+// AuthProvider consulta /api/users/me al montar; en pruebas offline devuelve 401.
+beforeEach(() => {
+  vi.unstubAllGlobals()
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+describe('App (T015)', () => {
+  it('incrementa el contador al hacer clic en el botón (landing en /)', async () => {
     const user = userEvent.setup()
     render(<App />)
 
