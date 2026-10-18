@@ -47,7 +47,7 @@ Espera esperado:
 1. Navegar a `http://localhost:8081` y entrar a la pantalla de Registro.
 2. Completar: nombre `Ana`, correo `Ana.Perez@Example.COM `, contraseña `Password123!`
    (más la confirmación idéntica), aceptar Términos y Condiciones; opcionalmente apellido,
-   CBU `285-05910-0123456789012345 ` (con separadores, para probar la normalización Q3),
+   CBU `285-05910-0123 4567890123` (con separadores, para probar la normalización Q3),
    imagen JPG/PNG < 2 MB y monedas `USD` + `EUR` (multiselección Q1).
 3. Presionar **Registrarse**.
 
