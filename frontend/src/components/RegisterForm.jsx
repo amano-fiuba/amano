@@ -1,28 +1,58 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
+  normalizeCbu,
+  normalizeEmail,
+  trim,
+  validateAcceptTerms,
+  validateCbu,
+  validateConfirmPassword,
+  validateEmail,
   validateFirstName,
   validateLastName,
-  validateEmail,
-  normalizeEmail,
   validatePassword,
-  validateConfirmPassword,
-  validateAcceptTerms,
 } from '../validation/registerValidation'
 import { NETWORK_ERROR_MESSAGE, register } from '../api/authClient'
+import TextField from './TextField'
 
-// Registration form (task T022; FR-001, FR-012, FR-015, FR-018, FR-019):
-// rules come from registerValidation.js; server messages arrive via ProblemDetail
-// fields and are shown without wiping the already-entered data.
+// Registration form (tasks T022 + T030; FR-001, FR-008, FR-009, FR-012, FR-013,
+// FR-015, FR-017, FR-018): live rules from registerValidation.js shown on blur
+// without wiping validated data; server messages arrive via ProblemDetail
+// fields; the submit button is disabled during flight and re-enabled on any
+// outcome. Optional fields (lastName, CBU/CVU) never block the rest when left
+// empty (FR-003).
 export default function RegisterForm({ onRegistered }) {
   const {
     handleSubmit,
+    watch,
     register: bindField,
     setError,
+    setValue,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm({ mode: 'onBlur' })
 
   const [formError, setFormError] = useState('')
+  const password = watch('password') ?? ''
+  const confirmation = watch('confirmPassword') ?? ''
+
+  // Live password match (FR-013): revalidate the confirmation whenever the
+  // password changes after both fields were touched.
+  useEffect(() => {
+    if (confirmation) {
+      trigger('confirmPassword')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password])
+
+  /** Q4/Q3 blur transform: trim names / strip CBU separators, then revalidate. */
+  const blurTransform = (field, transform) => (event) => {
+    const normalized = transform(event.target.value)
+    if (normalized !== event.target.value) {
+      event.target.value = normalized
+    }
+    setValue(field, normalized, { shouldValidate: true })
+  }
 
   const rules = (validate) => ({
     validate: (value) => {
@@ -39,6 +69,7 @@ export default function RegisterForm({ onRegistered }) {
     formData.append('email', normalizeEmail(values.email))
     formData.append('password', values.password)
     formData.append('confirmPassword', values.confirmPassword)
+    formData.append('cbuCvu', values.cbuCvu ? normalizeCbu(values.cbuCvu) : '')
     formData.append('acceptTerms', values.acceptTerms ? 'true' : 'false')
 
     const result = await register(formData)
@@ -48,7 +79,7 @@ export default function RegisterForm({ onRegistered }) {
       return
     }
     if (result.network) {
-      // FR-019: fixed message, keep the data, button re-enabled by isSubmitting=false.
+      // FR-019/FR-017: fixed message, keep the data, button re-enabled.
       setFormError(NETWORK_ERROR_MESSAGE)
       return
     }
@@ -68,72 +99,62 @@ export default function RegisterForm({ onRegistered }) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
-      <div>
-        <label htmlFor="firstName">Nombre</label>
-        <input
-          id="firstName"
-          {...bindField('firstName', {
-            required: 'El nombre es obligatorio',
-            ...rules(validateFirstName),
-          })}
-        />
-        {errors.firstName && <p role="alert">{errors.firstName.message}</p>}
-      </div>
+      <TextField
+        label="Nombre"
+        transformOnBlur={blurTransform('firstName', trim)}
+        error={errors.firstName?.message}
+        {...bindField('firstName', {
+          required: 'El nombre es obligatorio',
+          ...rules(validateFirstName),
+        })}
+      />
 
-      <div>
-        <label htmlFor="lastName">Apellido</label>
-        <input
-          id="lastName"
-          {...bindField('lastName', rules(validateLastName))}
-        />
-        {errors.lastName && <p role="alert">{errors.lastName.message}</p>}
-      </div>
+      <TextField
+        label="Apellido"
+        transformOnBlur={blurTransform('lastName', trim)}
+        error={errors.lastName?.message}
+        {...bindField('lastName', rules(validateLastName))}
+      />
 
-      <div>
-        <label htmlFor="email">Correo electrónico</label>
-        <input
-          id="email"
-          type="email"
-          {...bindField('email', {
-            required: 'El correo electrónico es obligatorio',
-            ...rules(validateEmail),
-          })}
-        />
-        {errors.email && <p role="alert">{errors.email.message}</p>}
-      </div>
+      <TextField
+        label="Correo electrónico"
+        type="email"
+        error={errors.email?.message}
+        {...bindField('email', {
+          required: 'El correo electrónico es obligatorio',
+          ...rules(validateEmail),
+        })}
+      />
 
-      <div>
-        <label htmlFor="password">Contraseña</label>
-        <input
-          id="password"
-          /* FR-008: hidden by default. */
-          type="password"
-          autoComplete="new-password"
-          {...bindField('password', {
-            required: 'La contraseña es obligatoria',
-            ...rules(validatePassword),
-          })}
-        />
-        {errors.password && <p role="alert">{errors.password.message}</p>}
-      </div>
+      {/* FR-008: hidden by default; TextField offers the Mostrar/Ocultar toggle. */}
+      <TextField
+        label="Contraseña"
+        type="password"
+        autoComplete="new-password"
+        error={errors.password?.message}
+        {...bindField('password', {
+          required: 'La contraseña es obligatoria',
+          ...rules(validatePassword),
+        })}
+      />
 
-      <div>
-        <label htmlFor="confirmPassword">Confirmar contraseña</label>
-        <input
-          id="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          {...bindField('confirmPassword', {
-            required: 'Debes confirmar la contraseña',
-            validate: () =>
-              validateConfirmPassword(
-                document.getElementById('password')?.value,
-                document.getElementById('confirmPassword')?.value,
-              ) || true,
-          })}
-        />
-        {errors.confirmPassword && <p role="alert">{errors.confirmPassword.message}</p>}
-      </div>
+      <TextField
+        label="Confirmar contraseña"
+        type="password"
+        autoComplete="new-password"
+        error={errors.confirmPassword?.message}
+        {...bindField('confirmPassword', {
+          required: 'Debes confirmar la contraseña',
+          validate: () => validateConfirmPassword(password, confirmation) || true,
+        })}
+      />
+
+      <TextField
+        label="CBU/CVU"
+        transformOnBlur={blurTransform('cbuCvu', normalizeCbu)}
+        error={errors.cbuCvu?.message}
+        {...bindField('cbuCvu', rules(validateCbu))}
+      />
 
       <div>
         <label>

@@ -60,7 +60,44 @@ class ProblemDetailExceptionHandlerTest {
         assertThat(problem.getStatus()).isEqualTo(409);
         assertThat(problem.getTitle()).isEqualTo("Conflicto");
         assertThat(problem.getDetail()).isEqualTo("El correo electrónico ya se encuentra registrado");
-        assertThat(problem.getProperties()).containsKey("properties");
+        assertThat(problem.getProperties()).isEqualTo(java.util.Map.of(
+                "properties", java.util.Map.of(
+                        "fields", java.util.Map.of("email", "El correo electrónico ya se encuentra registrado"))));
+    }
+
+    @Test
+    void severalInvalidFieldsAreReportedInOne400Response() throws Exception {
+        BindingHolder holder = new BindingHolder();
+        BeanPropertyBindingResult bindingResult =
+                new BeanPropertyBindingResult(holder, "registerRequest");
+        bindingResult.addError(new org.springframework.validation.FieldError(
+                "registerRequest", "firstName", "", true, null, null,
+                "El nombre debe tener entre 2 y 50 caracteres"));
+        bindingResult.addError(new org.springframework.validation.FieldError(
+                "registerRequest", "password", "debil", true, null, null,
+                "La contraseña debe tener al menos 8 caracteres"));
+
+        ProblemDetail problem = handler.handleValidation(new MethodArgumentNotValidException(
+                dummyParameter(), bindingResult));
+
+        assertThat(problem.getStatus()).isEqualTo(400);
+        assertThat(problem.getTitle()).isEqualTo("Validación fallida");
+        assertThat(problem.getProperties().get("properties")).isEqualTo(
+                java.util.Map.of("fields", java.util.Map.of(
+                        "firstName", "El nombre debe tener entre 2 y 50 caracteres",
+                        "password", "La contraseña debe tener al menos 8 caracteres")));
+    }
+
+    @Test
+    void unexpectedErrorNeverExposesInternalDetailsOrFieldProperties() {
+        ProblemDetail problem = handler.handleUnexpected(
+                new RuntimeException("org.postgresql: relation users does not exist; SQL: insert into"));
+
+        assertThat(problem.getStatus()).isEqualTo(500);
+        assertThat(problem.getTitle()).isEqualTo("Error interno");
+        assertThat(problem.getDetail()).isEqualTo("Ocurrió un error inesperado. Intenta nuevamente.");
+        assertThat(String.valueOf(problem)).doesNotContain("SQL").doesNotContain("postgresql");
+        assertThat(problem.getProperties()).isNullOrEmpty(); // Constitution VIII: no leaks
     }
 
     @Test
@@ -69,7 +106,8 @@ class ProblemDetailExceptionHandlerTest {
 
         assertThat(problem.getStatus()).isEqualTo(413);
         assertThat(problem.getTitle()).isEqualTo("Payload demasiado grande");
-        assertThat(problem.getDetail()).contains("2 MB");
+        // Exact contract text (FR-010/FR-013/T028 backend limit alignment).
+        assertThat(problem.getDetail()).isEqualTo("El archivo es demasiado grande (máximo 2 MB)");
     }
 
     @Test
