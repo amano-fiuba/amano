@@ -7,20 +7,28 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.user.AvatarValidator;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.User;
+import com.amano.backend.user.UserAvatar;
+import com.amano.backend.user.UserAvatarRepository;
 import com.amano.backend.user.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Atomic account creation (task T018): nothing is persisted when anything fails
- * (FR-014). Normalization before validation is mandated by the clarifications:
- * names trimmed (Q4), email trim+lowercase (FR-004), password policy (FR-006 + Q2),
- * CBU separators stripped before the 22-digit check (Q3), consent required (FR-012).
- * The unique index uq_users_email is the race-proof backstop (409 via T010, SC-004).
+ * Atomic account creation (tasks T018 + T033): nothing is persisted when
+ * anything fails (FR-014). Normalization before validation is mandated by the
+ * clarifications: names trimmed (Q4), email trim+lowercase (FR-004), password
+ * policy (FR-006 + Q2), CBU separators stripped before the 22-digit check
+ * (Q3), consent required (FR-012). The unique index uq_users_email is the
+ * race-proof backstop (409 via T010, SC-004). US3: the optional avatar joins
+ * the same validation pass and is persisted (magic-byte true content type, D6)
+ * only when the whole request is valid.
  */
 @Service
 public class RegistrationService {
@@ -29,14 +37,19 @@ public class RegistrationService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AvatarValidator avatarValidator;
+    private final UserAvatarRepository userAvatarRepository;
 
-    public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+            AvatarValidator avatarValidator, UserAvatarRepository userAvatarRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.avatarValidator = avatarValidator;
+        this.userAvatarRepository = userAvatarRepository;
     }
 
     @Transactional
-    public User register(RegisterRequest request) {
+    public User register(RegisterRequest request, MultipartFile avatar) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
 
         String firstName = Optional.ofNullable(request.firstName()).map(String::trim).orElse(null);
@@ -80,10 +93,14 @@ public class RegistrationService {
             fieldErrors.put("acceptTerms", "Debes aceptar los Términos y Condiciones para registrarte");
         }
 
-        Set<Currency> currencies =
-                parseCurrencies(request.currencies(), fieldErrors);
-
+        Set<Currency> currencies = parseCurrencies(request.currencies(), fieldErrors);
         String cbu = normalizeCbu(request.cbuCvu(), fieldErrors);
+
+        // US3 (T033): the optional avatar joins the same atomic 400 pass.
+        String avatarError = avatarValidator.validationError(avatar);
+        if (avatarError != null) {
+            fieldErrors.put("avatar", avatarError);
+        }
 
         if (!fieldErrors.isEmpty()) {
             throw new FieldValidationException(fieldErrors);
@@ -100,7 +117,36 @@ public class RegistrationService {
         // selection persists nothing (ARS is just the read-time default).
         user.getCurrencies().addAll(currencies);
 
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        persistAvatar(avatar, saved);
+        return saved;
+    }
+
+    /**
+     * US3 (T033): one row in user_avatars with the TRUE content type (derived
+     * from magic bytes, decision D6). The association is loaded lazily (D5):
+     * no binaries participate in the usual profile reads, only here at creation.
+     */
+    private void persistAvatar(MultipartFile avatar, User user) {
+        if (avatar == null || avatar.isEmpty()) {
+            return;
+        }
+        String contentType = avatarValidator.realContentType(avatar);
+        if (contentType == null) {
+            return; // defensive: validationError already rejected this case
+        }
+        UserAvatar stored = new UserAvatar();
+        stored.setId(user.getId()); // PK = user_id (data-model: one-to-one shared key)
+        // NOTE: the read-only `user` association is NOT set here — the row is
+        // written by its @Id column; Hibernate resolves the association on load.
+        stored.setContentType(contentType);
+        try {
+            stored.setData(avatar.getBytes());
+        }
+        catch (java.io.IOException exception) {
+            throw new java.io.UncheckedIOException(exception);
+        }
+        userAvatarRepository.save(stored);
     }
 
     /** FR-006 + Q2: 8-64 chars, at least one uppercase/lowercase/digit/special. */

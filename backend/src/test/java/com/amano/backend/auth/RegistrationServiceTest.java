@@ -35,20 +35,22 @@ class RegistrationServiceTest {
         userRepository = Mockito.mock(UserRepository.class);
         when(userRepository.save(any(User.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0, User.class));
-        service = new RegistrationService(userRepository, new BCryptPasswordEncoder());
+        service = new RegistrationService(userRepository, new BCryptPasswordEncoder(),
+                new com.amano.backend.user.AvatarValidator(),
+                Mockito.mock(com.amano.backend.user.UserAvatarRepository.class));
     }
 
     private static RegisterRequest request(
             String firstName, String lastName, String email, String password,
             String confirmPassword, Boolean acceptTerms, List<String> currencies, String cbu) {
         return new RegisterRequest(firstName, lastName, email, password, confirmPassword,
-                acceptTerms, currencies, cbu, new MockMultipartFile("avatar", new byte[0]));
+                acceptTerms, currencies, cbu);
     }
 
     /** Runs register() expecting a FieldValidationException; returns its field map. */
     private Map<String, String> errorFieldsOf(RegisterRequest failingRequest) {
         try {
-            service.register(failingRequest);
+            service.register(failingRequest, emptyAvatar());
             throw new AssertionError("request must not be valid: " + failingRequest);
         }
         catch (FieldValidationException exception) {
@@ -56,11 +58,15 @@ class RegistrationServiceTest {
         }
     }
 
+    private static org.springframework.web.multipart.MultipartFile emptyAvatar() {
+        return new MockMultipartFile("avatar", new byte[0]);
+    }
+
     @Test
     void savesNormalizedUserWithHashedPassword() {
         User saved = service.register(request("  Ana  ", " Pérez ", "  Ana.Perez@Example.COM ",
                 "Password123!", "Password123!", true, List.of("ARS", "USD"),
-                "285-05910-0123456789 0123"));
+                "285-05910-0123456789 0123"), emptyAvatar());
 
         assertThat(saved.getFirstName()).isEqualTo("Ana");                 // Q4 trim
         assertThat(saved.getLastName()).isEqualTo("Pérez");
@@ -90,7 +96,7 @@ class RegistrationServiceTest {
     @Test
     void treatsBlankLastNameAsAbsent() {
         User saved = service.register(request("Ana", "   ", "ana@example.com",
-                "Password123!", "Password123!", true, null, null));
+                "Password123!", "Password123!", true, null, null), emptyAvatar());
         assertThat(saved.getLastName()).isNull();
     }
 

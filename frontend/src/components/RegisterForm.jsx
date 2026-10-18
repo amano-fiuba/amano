@@ -13,6 +13,8 @@ import {
   validatePassword,
 } from '../validation/registerValidation'
 import { NETWORK_ERROR_MESSAGE, register } from '../api/authClient'
+import AvatarUploader from './AvatarUploader'
+import CurrencySelector from './CurrencySelector'
 import TextField from './TextField'
 
 // Registration form (tasks T022 + T030; FR-001, FR-008, FR-009, FR-012, FR-013,
@@ -33,6 +35,9 @@ export default function RegisterForm({ onRegistered }) {
   } = useForm({ mode: 'onBlur' })
 
   const [formError, setFormError] = useState('')
+  // US3 optional parts (T036): kept out of RHF so they never block the rest.
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [currencies, setCurrencies] = useState([])
   const password = watch('password') ?? ''
   const confirmation = watch('confirmPassword') ?? ''
 
@@ -71,6 +76,13 @@ export default function RegisterForm({ onRegistered }) {
     formData.append('confirmPassword', values.confirmPassword)
     formData.append('cbuCvu', values.cbuCvu ? normalizeCbu(values.cbuCvu) : '')
     formData.append('acceptTerms', values.acceptTerms ? 'true' : 'false')
+    // US3 optional parts: only appended when chosen (empty ⇒ nothing, FR-003/Q1).
+    for (const code of currencies) {
+      formData.append('currencies', code)
+    }
+    if (avatarFile) {
+      formData.append('avatar', avatarFile, avatarFile.name)
+    }
 
     const result = await register(formData)
 
@@ -166,6 +178,10 @@ export default function RegisterForm({ onRegistered }) {
         </label>
         {errors.acceptTerms && <p role="alert">{errors.acceptTerms.message}</p>}
       </div>
+
+      {/* US3 optional parts (FR-003): empty ⇒ nothing persisted, never blocking. */}
+      <AvatarUploader onFileSelected={setAvatarFile} />
+      <CurrencySelector onChange={setCurrencies} />
 
       {formError && (
         <p role="alert" data-testid="form-error">

@@ -39,8 +39,10 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<UserAccountResponse> register(
             @ModelAttribute RegisterRequest request,
+            @org.springframework.web.bind.annotation.RequestPart(value = "avatar", required = false)
+            org.springframework.web.multipart.MultipartFile avatar,
             HttpServletRequest httpRequest) {
-        User user = registrationService.register(request);
+        User user = registrationService.register(request, avatar);
 
         HttpHeaders headers = new HttpHeaders();
         // 201 contract block: Location + session cookie; Secure only over HTTPS.
