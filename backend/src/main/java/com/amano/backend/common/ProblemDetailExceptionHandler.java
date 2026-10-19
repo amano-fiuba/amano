@@ -58,6 +58,20 @@ public class ProblemDetailExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrity(DataIntegrityViolationException exception) {
         log.warn("Data integrity violation: {}", exception.getMostSpecificCause().getMessage());
+        return emailConflict();
+    }
+
+    /**
+     * Service-level duplicate detection: a verified account already owns the email
+     * (feature 002, FR-016). Same 409 shape as the unique-index race above.
+     */
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ProblemDetail handleEmailAlreadyRegistered(EmailAlreadyRegisteredException exception) {
+        log.info("Registration attempt for an already verified email (FR-016)");
+        return emailConflict();
+    }
+
+    private static ProblemDetail emailConflict() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT, EMAIL_ALREADY_REGISTERED);
         problem.setTitle("Conflicto");

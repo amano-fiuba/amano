@@ -10,21 +10,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('register(endpoint: POST /api/auth/register, contracts/auth-api.md)', () => {
-  it('201 devuelve ok con el perfil creado', async () => {
-    const profile = { id: 1, firstName: 'Ana', email: 'ana.perez@example.com' }
+describe('register(endpoint: POST /api/auth/register, contracts/email-verification-api.md)', () => {
+  // Feature 002 (task T013): the 201 body is {email} — no profile, no session cookie.
+  it('201 devuelve ok con el correo normalizado (sin perfil)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(profile),
+        json: () => Promise.resolve({ email: 'ana.perez@example.com' }),
       }),
     )
 
     const formData = new FormData()
     const result = await register(formData)
 
-    expect(result).toEqual({ ok: true, profile })
+    expect(result).toEqual({ ok: true, email: 'ana.perez@example.com' })
     expect(fetch).toHaveBeenCalledWith('/api/auth/register', {
       method: 'POST',
       credentials: 'include',

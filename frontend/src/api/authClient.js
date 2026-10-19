@@ -21,8 +21,8 @@ async function parseProblem(response) {
 
 /**
  * Single atomic multipart submit of the registration form.
- * Returns { ok: true, profile } on 201, otherwise
- * { ok: false, status, detail, fields } or { ok: false, network: true }.
+ * Returns { ok: true, email } on 201 (feature 002: no profile, no session),
+ * otherwise { ok: false, status, detail, fields } or { ok: false, network: true }.
  */
 export async function register(formData) {
   try {
@@ -32,7 +32,8 @@ export async function register(formData) {
       body: formData,
     })
     if (response.ok) {
-      return { ok: true, profile: await response.json() }
+      const body = await response.json()
+      return { ok: true, email: body.email }
     }
     if (response.status >= 500) {
       return { ok: false, network: true }

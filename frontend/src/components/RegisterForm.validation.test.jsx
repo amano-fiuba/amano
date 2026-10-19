@@ -26,8 +26,8 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function renderForm() {
-  return render(<RegisterForm onRegistered={vi.fn()} />)
+function renderForm(onRegistered = vi.fn()) {
+  return render(<RegisterForm onRegistered={onRegistered} />)
 }
 
 async function fillValidForm(user) {
@@ -116,6 +116,19 @@ describe('RegisterForm — validación en vivo (T027)', () => {
     releaseResponse()
     await screen.findByText('No se pudo completar el registro. Intenta nuevamente')
     expect(authClient.register).toHaveBeenCalledTimes(1)
+  })
+
+  it('éxito ⇒ onRegistered recibe el correo (no el perfil) y no hay sesión (FR-001, T015)', async () => {
+    const user = userEvent.setup()
+    const onRegistered = vi.fn()
+    authClient.register.mockResolvedValue({ ok: true, email: 'ana.perez@example.com' })
+    renderForm(onRegistered)
+
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: /crear cuenta/i }))
+
+    expect(onRegistered).toHaveBeenCalledTimes(1)
+    expect(onRegistered).toHaveBeenCalledWith('ana.perez@example.com')
   })
 
   it.each([

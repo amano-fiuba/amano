@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,11 +24,18 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import com.amano.backend.config.JwtService;
+
+import jakarta.servlet.http.Cookie;
+
 /**
- * US3 contract integration tests (task T032), written BEFORE the avatar
- * implementation per TDD. Replicates contracts/auth-api.md + users-api.md with
- * a real PostgreSQL: FR-003, FR-009, FR-010, FR-011, FR-021, FR-022 and the
- * five quickstart §5 scenarios.
+ * US3 contract integration tests (task T032, updated for feature 002 in task
+ * T026): replicates contracts/auth-api.md + users-api.md with a real
+ * PostgreSQL. Since the registration no longer starts a session (FR-001), every
+ * test verifies the account first via {@link #verifiedSessionOf(String)} and
+ * then reads the profile with a session cookie (FR-004: only verified accounts
+ * reach protected resources). The helper is provisional until US2 (token
+ * redemption) and US3 (simulated login) replace its manual steps.
  */
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
@@ -42,6 +50,12 @@ class RegistrationProfileIT {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private JwtService jwtService;
 
     private static final byte[] JPEG_BYTES = {
             (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10,
@@ -73,31 +87,46 @@ class RegistrationProfileIT {
         return new MockMultipartFile("avatar", filename, contentType, bytes);
     }
 
+    private long userIdOf(String normalizedEmail) {
+        return jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class,
+                normalizedEmail);
+    }
+
+    /**
+     * Feature 002 (task T026): the account created by the registration is verified
+     * straight in the database (the token redemption lands in US2) and a session
+     * cookie is issued for it, so the protected reads can be asserted as before.
+     */
+    private Cookie verifiedSessionOf(String normalizedEmail) {
+        jdbcTemplate.update(
+                "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?",
+                normalizedEmail);
+        return new Cookie("amano_auth", jwtService.issueToken(userIdOf(normalizedEmail)));
+    }
+
     @Test
     void registersWithRealJpegAndServesOwnAvatarBinary() throws Exception {
+        String email = "ana.conavatar@example.com";
         MvcResult created = mockMvc.perform(multipart("/api/auth/register")
                         .file(avatarPart("ana.jpg", "image/jpeg", JPEG_BYTES))
                         .part(mandatoryFields("Ana.ConAvatar@Example.COM")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.hasCustomAvatar").value(true))
-                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.email").value(email))
+                .andExpect(jsonPath("$.hasCustomAvatar").doesNotExist()) // profile needs a verified session now
                 .andReturn();
 
-        int userId = ((Number) com.jayway.jsonpath.JsonPath.read(
-                created.getResponse().getContentAsString(), "$.id")).intValue();
-        assertThat(created.getResponse().getContentAsString())
-                .contains("\"avatarUrl\":\"/api/users/" + userId + "/avatar\"");
+        Cookie session = verifiedSessionOf(email);
+        long userId = userIdOf(email);
 
-        mockMvc.perform(get("/api/users/" + userId + "/avatar")
-                        .cookie(created.getResponse().getCookie("amano_auth")))
+        mockMvc.perform(get("/api/users/" + userId + "/avatar").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes(JPEG_BYTES))
                 .andExpect(content().contentType("image/jpeg"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Cache-Control", "private, max-age=3600"));
 
-        // Owner sees the profile with avatar metadata (FR-021).
-        mockMvc.perform(get("/api/users/me").cookie(created.getResponse().getCookie("amano_auth")))
+        // Owner sees the profile with avatar metadata (FR-021, after verifying).
+        mockMvc.perform(get("/api/users/me").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasCustomAvatar").value(true))
                 .andExpect(jsonPath("$.avatarUrl").value("/api/users/" + userId + "/avatar"));
@@ -105,18 +134,17 @@ class RegistrationProfileIT {
 
     @Test
     void registersWithRealPngAndServesImagePng() throws Exception {
-        MvcResult created = mockMvc.perform(multipart("/api/auth/register")
+        String email = "ana.png@example.com";
+        mockMvc.perform(multipart("/api/auth/register")
                         .file(avatarPart("ana.png", "image/png", PNG_BYTES))
                         .part(mandatoryFields("Ana.Png@Example.COM")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.hasCustomAvatar").value(true))
-                .andReturn();
+                .andExpect(jsonPath("$.email").value(email));
 
-        int userId = ((Number) com.jayway.jsonpath.JsonPath.read(
-                created.getResponse().getContentAsString(), "$.id")).intValue();
+        Cookie session = verifiedSessionOf(email);
+        long userId = userIdOf(email);
 
-        mockMvc.perform(get("/api/users/" + userId + "/avatar")
-                        .cookie(created.getResponse().getCookie("amano_auth")))
+        mockMvc.perform(get("/api/users/" + userId + "/avatar").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes(PNG_BYTES))
                 .andExpect(content().contentType("image/png"))
@@ -125,39 +153,48 @@ class RegistrationProfileIT {
 
     @Test
     void withoutAvatarReturns404ForTheBinaryAndDefaultProfile() throws Exception {
-        MvcResult created = mockMvc.perform(multipart("/api/auth/register")
+        String email = "ana.sinavatar@example.com";
+        mockMvc.perform(multipart("/api/auth/register")
                         .part(mandatoryFields("Ana.SinAvatar@Example.COM")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.hasCustomAvatar").value(false))
-                .andExpect(jsonPath("$.avatarUrl").doesNotExist())
-                .andReturn();
+                .andExpect(jsonPath("$.email").value(email));
 
-        int userId = ((Number) com.jayway.jsonpath.JsonPath.read(
-                created.getResponse().getContentAsString(), "$.id")).intValue();
+        Cookie session = verifiedSessionOf(email);
+        long userId = userIdOf(email);
 
-        mockMvc.perform(get("/api/users/" + userId + "/avatar")
-                        .cookie(created.getResponse().getCookie("amano_auth")))
+        mockMvc.perform(get("/api/users/" + userId + "/avatar").cookie(session))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("Recurso no encontrado"));
+
+        mockMvc.perform(get("/api/users/me").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasCustomAvatar").value(false))
+                .andExpect(jsonPath("$.avatarUrl").doesNotExist());
     }
 
     /** Lying declared MIME is detected via magic bytes (FR-010/FR-022, D6). */
     @Test
     void lyingAvatarContentTypeIsRejectedAtomically() throws Exception {
-        String email = "Ana.Mentirosa@Example.COM";
+        String email = "ana.mentirosa@example.com";
         mockMvc.perform(multipart("/api/auth/register")
                         .file(avatarPart("trampa.jpg", "image/jpeg", GIF_BYTES_LYING_AS_JPEG))
-                        .part(mandatoryFields(email)))
+                        .part(mandatoryFields("Ana.Mentirosa@Example.COM")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("Validación fallida"))
                 .andExpect(jsonPath("$.properties.fields.avatar")
                         .value("El archivo debe ser una imagen JPG o PNG válida"));
 
         // FR-014 atomicity: the failed attempt left no user row behind.
-        mockMvc.perform(multipart("/api/auth/register")
-                        .part(mandatoryFields(email)))
+        MvcResult retried = mockMvc.perform(multipart("/api/auth/register")
+                        .part(mandatoryFields("Ana.Mentirosa@Example.COM")))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email))
+                .andReturn();
+
+        mockMvc.perform(get("/api/users/me").cookie(verifiedSessionOf(email)))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasCustomAvatar").value(false));
+        assertThat(retried.getResponse().getCookie("amano_auth")).isNull(); // FR-001: no session on register
     }
 
     /** Oversize avatar rejected BEFORE persisting, with the contract's 413
@@ -168,10 +205,10 @@ class RegistrationProfileIT {
         byte[] oversized = new byte[2 * 1024 * 1024 + 1];
         System.arraycopy(JPEG_BYTES, 0, oversized, 0, JPEG_BYTES.length);
 
-        String email = "Ana.Grande@Example.COM";
+        String email = "ana.grande@example.com";
         mockMvc.perform(multipart("/api/auth/register")
                         .file(avatarPart("grande.jpg", "image/jpeg", oversized))
-                        .part(mandatoryFields(email)))
+                        .part(mandatoryFields("Ana.Grande@Example.COM")))
                 .andExpect(status().is(413))
                 .andExpect(jsonPath("$.title").value("Payload demasiado grande"))
                 .andExpect(jsonPath("$.detail")
@@ -179,14 +216,16 @@ class RegistrationProfileIT {
 
         // Atomicity again: same email can be used right after the rejection.
         mockMvc.perform(multipart("/api/auth/register")
-                        .part(mandatoryFields(email)))
-                .andExpect(status().isCreated());
+                        .part(mandatoryFields("Ana.Grande@Example.COM")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value(email));
     }
 
     /** Optional profile data: currencies multi (Q1) and normalized CBU (Q3). */
     @Test
     void currenciesAndNormalizedCbuArePersistedAndExposed() throws Exception {
-        MvcResult created = mockMvc.perform(multipart("/api/auth/register")
+        String email = "ana.completa@example.com";
+        mockMvc.perform(multipart("/api/auth/register")
                         .part(mandatoryFields("Ana.Completa@Example.COM"))
                         .part(part("lastName", "Pérez"),
                                 part("currencies", "ARS"),
@@ -194,13 +233,12 @@ class RegistrationProfileIT {
                                 part("currencies", "EUR"),
                                 part("cbuCvu", "285-05910-0123 4567890123")))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.lastName").value("Pérez"))
-                .andExpect(jsonPath("$.currencies.length()").value(3))
-                .andExpect(jsonPath("$.cbuCvu").value("2850591001234567890123"))
-                .andReturn();
+                .andExpect(jsonPath("$.email").value(email));
 
-        mockMvc.perform(get("/api/users/me").cookie(created.getResponse().getCookie("amano_auth")))
+        // The profile (lastName, currencies, CBU) is read after verifying (FR-004).
+        mockMvc.perform(get("/api/users/me").cookie(verifiedSessionOf(email)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastName").value("Pérez"))
                 .andExpect(jsonPath("$.currencies.length()").value(3))
                 .andExpect(jsonPath("$.cbuCvu").value("2850591001234567890123"))
                 .andExpect(jsonPath("$.password").doesNotExist());

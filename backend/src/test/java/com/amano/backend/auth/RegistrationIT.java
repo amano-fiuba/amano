@@ -1,7 +1,5 @@
 package com.amano.backend.auth;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.empty;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -15,20 +13,22 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import jakarta.servlet.http.Cookie;
-
 /**
- * Contract integration tests for POST /api/auth/register (task T016), written
- * BEFORE the implementation per TDD/US1. Replicates contracts/auth-api.md with a
- * real PostgreSQL (Testcontainers): FR-001, FR-002, FR-004, FR-005, FR-006, FR-012,
- * FR-014, FR-016, FR-018, FR-021, FR-022, SC-001, SC-002, SC-004.
+ * Contract integration tests for POST /api/auth/register after feature 002
+ * (task T010, TDD: written BEFORE the implementation). Replicates the "Cambio
+ * sobre contrato de 001" of contracts/email-verification-api.md with a real
+ * PostgreSQL (Testcontainers): FR-001 (account created unverified, no session,
+ * no Location), FR-004, FR-012, FR-014, FR-015 (duplicate over PENDING is
+ * replaced, not rejected), FR-016 (409 only for a VERIFIED duplicate),
+ * FR-018, FR-021, FR-022, SC-002. The GreenMail delivery is covered by
+ * RegistrationVerificationIT (task T016).
  */
 @SpringBootTest(properties = {
         // SecurityConfig (T011) requires a valid JWT_SECRET to bootstrap JwtService.
@@ -45,6 +45,9 @@ class RegistrationIT {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static MockPart part(String name, String value) {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
@@ -60,48 +63,46 @@ class RegistrationIT {
         };
     }
 
-    /** Happy path (FR-001, FR-002, FR-004, FR-014, FR-016, FR-021, SC-001, SC-002). */
-    @Test
-    void registrationHappyPathCreatesAccountAndLogsIn() throws Exception {
-        MvcResult result = mockMvc.perform(multipart("/api/auth/register")
-                        .part(mandatoryFields("Ana.Perez@Example.COM ")))
-                .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/api/users/me"))
-                .andExpect(jsonPath("$.firstName").value("Ana"))               // Q4: stored trimmed
-                .andExpect(jsonPath("$.lastName").value("Pérez"))
-                .andExpect(jsonPath("$.email").value("ana.perez@example.com")) // FR-004 normalized
-                .andExpect(jsonPath("$.currencies").value(empty()))            // FR-011/Q1: 0 filas → ARS at display
-                .andExpect(jsonPath("$.hasCustomAvatar").value(false))
-                .andExpect(jsonPath("$.password").doesNotExist())
-                .andExpect(jsonPath("$.passwordHash").doesNotExist())          // FR-007: never exposed
-                .andReturn();
-
-        // Session contract (Set-Cookie table): HttpOnly, SameSite=Strict, Max-Age=86400.
-        Cookie sessionCookie = result.getResponse().getCookie("amano_auth");
-        assertThat(sessionCookie).isNotNull();
-        assertThat(sessionCookie.getMaxAge()).isEqualTo(86400);
-        assertThat(sessionCookie.isHttpOnly()).isTrue();
-        assertThat(result.getResponse().getHeader("Set-Cookie"))
-                .contains("SameSite=Strict")
-                .doesNotContain("Secure"); // local HTTP deployment (compose / Vite proxy)
-
-        // FR-016: the session is usable right away with the issued cookie (FR-021, SC-002).
-        mockMvc.perform(get("/api/users/me").cookie(sessionCookie))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("Ana"))
-                .andExpect(jsonPath("$.email").value("ana.perez@example.com"))
-                .andExpect(jsonPath("$.currencies").value(empty()))
-                .andExpect(jsonPath("$.cbuCvu").doesNotExist())
-                .andExpect(jsonPath("$.password").doesNotExist());
+    /** Marks the account verified straight in the database (the token redemption endpoint lands in US2). */
+    private void markVerified(String normalizedEmail) {
+        jdbcTemplate.update(
+                "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?",
+                normalizedEmail);
     }
 
-    /** Duplicate email, another casing/spacing (SC-004): 409 with the exact message. */
+    /** 201 contract (FR-001, SC-001, SC-002): unverified account, NO session, only {email}. */
     @Test
-    void duplicateEmailReturnsConflictWithExactMessage() throws Exception {
+    void registrationCreatesUnverifiedAccountWithoutSession() throws Exception {
+        mockMvc.perform(multipart("/api/auth/register")
+                        .part(mandatoryFields("Ana.Perez@Example.COM ")))
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist("Set-Cookie"))     // no auto-login (FR-001, replaces FR-016 of 001)
+                .andExpect(header().doesNotExist("Location"))       // there is no session resource to point at
+                .andExpect(jsonPath("$.email").value("ana.perez@example.com")) // FR-004 normalized
+                .andExpect(jsonPath("$.id").doesNotExist())         // the profile is NOT exposed here anymore
+                .andExpect(jsonPath("$.firstName").doesNotExist())
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.passwordHash").doesNotExist()); // FR-007: never exposed
+
+        // The account exists and is blocked (email_verified_at NULL, FR-001/FR-004).
+        Integer unverified = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM users WHERE email = ? AND email_verified_at IS NULL",
+                Integer.class, "ana.perez@example.com");
+        org.assertj.core.api.Assertions.assertThat(unverified).isEqualTo(1);
+
+        // No cookie was issued: protected resources stay closed (SC-002).
+        mockMvc.perform(get("/api/users/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("No autorizado"));
+    }
+
+    /** Duplicate email over a VERIFIED account, another casing/spacing (FR-016, SC-004): 409 with the exact message. */
+    @Test
+    void duplicateOverVerifiedEmailReturnsConflictWithExactMessage() throws Exception {
         mockMvc.perform(multipart("/api/auth/register")
                         .part(mandatoryFields("Duplicada.Example@Example.COM")))
-                .andExpect(status().isCreated())
-                .andReturn();
+                .andExpect(status().isCreated());
+        markVerified("duplicada.example@example.com");
 
         mockMvc.perform(multipart("/api/auth/register")
                         .part(mandatoryFields("  DUPLICADA.EXAMPLE@EXAMPLE.COM ")))
@@ -111,6 +112,34 @@ class RegistrationIT {
                 .andExpect(jsonPath("$.detail").value("El correo electrónico ya se encuentra registrado"))
                 .andExpect(jsonPath("$.properties.fields.email")
                         .value("El correo electrónico ya se encuentra registrado"));
+    }
+
+    /** Duplicate email over a PENDING account (FR-015): replaced, never a second account. */
+    @Test
+    void duplicateOverPendingEmailIsReplacedNotRejected() throws Exception {
+        mockMvc.perform(multipart("/api/auth/register")
+                        .part(mandatoryFields("Pendiente.Example@Example.COM")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.email").value("pendiente.example@example.com"));
+
+        // Same address, different casing and another password: still 201, still one row.
+        mockMvc.perform(multipart("/api/auth/register")
+                        .part(new MockPart[] {
+                                part("firstName", "Otro"),
+                                part("lastName", "Nombre"),
+                                part("email", "  PENDIENTE.EXAMPLE@EXAMPLE.COM "),
+                                part("password", "OtraClave123!"),
+                                part("confirmPassword", "OtraClave123!"),
+                                part("acceptTerms", "true"),
+                        }))
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(jsonPath("$.email").value("pendiente.example@example.com"));
+
+        Integer accounts = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM users WHERE email = ?", Integer.class,
+                "pendiente.example@example.com");
+        org.assertj.core.api.Assertions.assertThat(accounts).isEqualTo(1);
     }
 
     /** Field-level validation failures (FR-018): 400 ProblemDetail with properties.fields per field. */

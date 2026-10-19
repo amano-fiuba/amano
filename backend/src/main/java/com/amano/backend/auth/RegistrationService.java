@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import com.amano.backend.common.EmailAlreadyRegisteredException;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.user.AvatarValidator;
 import com.amano.backend.user.Currency;
@@ -15,19 +16,26 @@ import com.amano.backend.user.User;
 import com.amano.backend.user.UserAvatar;
 import com.amano.backend.user.UserAvatarRepository;
 import com.amano.backend.user.UserRepository;
+import com.amano.backend.verification.VerificationMailService;
+import com.amano.backend.verification.VerificationTokenService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Atomic account creation (tasks T018 + T033): nothing is persisted when
- * anything fails (FR-014). Normalization before validation is mandated by the
- * clarifications: names trimmed (Q4), email trim+lowercase (FR-004), password
- * policy (FR-006 + Q2), CBU separators stripped before the 22-digit check
- * (Q3), consent required (FR-012). The unique index uq_users_email is the
- * race-proof backstop (409 via T010, SC-004). US3: the optional avatar joins
- * the same validation pass and is persisted (magic-byte true content type, D6)
+ * Atomic account creation (tasks T018 + T033, feature 002 in T020): nothing is
+ * persisted when anything fails (FR-014). Normalization before validation is
+ * mandated by the clarifications: names trimmed (Q4), email trim+lowercase
+ * (FR-004), password policy (FR-006 + Q2), CBU separators stripped before the
+ * 22-digit check (Q3), consent required (FR-012). A valid registration creates
+ * the account "no verificada" with a single-use token and triggers the
+ * verification email; it never starts a session (FR-001, replaces FR-016 of
+ * 001). A duplicate email only conflicts when the existing account is
+ * VERIFIED (FR-016); over a PENDING account the data is replaced (FR-015). The
+ * unique index uq_users_email remains the race-proof backstop (409 via the
+ * DataIntegrityViolation handler, SC-004). US3: the optional avatar joins the
+ * same validation pass and is persisted (magic-byte true content type, D6)
  * only when the whole request is valid.
  */
 @Service
@@ -39,13 +47,19 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final AvatarValidator avatarValidator;
     private final UserAvatarRepository userAvatarRepository;
+    private final VerificationTokenService verificationTokenService;
+    private final VerificationMailService verificationMailService;
 
     public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-            AvatarValidator avatarValidator, UserAvatarRepository userAvatarRepository) {
+            AvatarValidator avatarValidator, UserAvatarRepository userAvatarRepository,
+            VerificationTokenService verificationTokenService,
+            VerificationMailService verificationMailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.avatarValidator = avatarValidator;
         this.userAvatarRepository = userAvatarRepository;
+        this.verificationTokenService = verificationTokenService;
+        this.verificationMailService = verificationMailService;
     }
 
     @Transactional
@@ -106,7 +120,7 @@ public class RegistrationService {
             throw new FieldValidationException(fieldErrors);
         }
 
-        User user = new User();
+        User user = resolveAccount(email);
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setEmail(email);
@@ -115,11 +129,38 @@ public class RegistrationService {
         user.setTermsAcceptedAt(OffsetDateTime.now());
         // Q1/FR-011: only the subset chosen by the user is persisted; an empty
         // selection persists nothing (ARS is just the read-time default).
+        user.getCurrencies().clear();
         user.getCurrencies().addAll(currencies);
 
         User saved = userRepository.save(user);
         persistAvatar(avatar, saved);
+        // FR-001/FR-003/D2: the account is created "no verificada" and gets a
+        // single-use token; only its SHA-256 hash is persisted (T018).
+        String clearToken = verificationTokenService.issueFor(saved);
+        // FR-003/D1: fired @Async so the request never waits on SMTP; FR-019: a
+        // send failure never fails the registration. FR-011/Q3: the first
+        // registration always sends immediately — the resend limit only applies
+        // to resend requests, added in US4.
+        verificationMailService.sendVerificationEmail(saved, clearToken);
         return saved;
+    }
+
+    /**
+     * Feature 002 (FR-015/FR-016): a VERIFIED duplicate keeps the 001 conflict;
+     * a PENDING duplicate is the same account to be replaced, and a new email
+     * starts a fresh unverified account.
+     */
+    private User resolveAccount(String email) {
+        return userRepository.findByEmail(email)
+                .map(existing -> {
+                    if (existing.getEmailVerifiedAt() != null) {
+                        // FR-016: verified accounts keep 409 "ya se encuentra registrado".
+                        throw new EmailAlreadyRegisteredException();
+                    }
+                    // FR-015: same account, data and password replaced by the new form.
+                    return existing;
+                })
+                .orElseGet(User::new);
     }
 
     /**
