@@ -1,10 +1,17 @@
+import { BrowserRouter, Route, Routes } from 'react-router'
 import { useState } from 'react'
 import heroImg from './assets/hero.png'
 import reactLogo from './assets/react.svg'
 import viteLogo from './assets/vite.svg'
+import { AuthProvider } from './auth/AuthContext'
+import ProtectedRoute from './auth/ProtectedRoute'
+import RegisterPage from './pages/RegisterPage'
+import DashboardPage from './pages/DashboardPage'
 import './App.css'
 
-function App() {
+// Landing provisoria (equipo base); remplazada por las pantallas definitivas
+// conforme avance el feature de registro.
+function Home() {
   const [count, setCount] = useState(0)
 
   return (
@@ -41,52 +48,61 @@ function App() {
           <p>Your questions, answered</p>
           <ul>
             <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
+              <a href="https://vite.dev/" target="_blank" rel="noreferrer">
+                <img className="logo" src={viteLogo} alt="Vite" />
                 Explore Vite
               </a>
             </li>
             <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
+              <a href="https://react.dev" target="_blank" rel="noreferrer">
+                <img
+                  className="button-icon"
+                  src={reactLogo}
+                  alt="React"
+                />
+              </a>
+            </li>
+            <li>
+              <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
+                <svg
+                  className="button-icon"
+                  role="presentation"
+                  aria-hidden="true"
+                >
+                  <use href="/icons.svg#vite-icon"></use>
+                </svg>
               </a>
             </li>
           </ul>
         </div>
+
         <div id="social">
           <svg className="icon" role="presentation" aria-hidden="true">
             <use href="/icons.svg#social-icon"></use>
           </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
+          <h2>Social</h2>
+          <p>Stay in touch</p>
           <ul>
             <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
+              <a href="https://github.com/vitejs/vite" target="_blank" rel="noreferrer">
+                <img
                   className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
+                  src="/icons.svg#github-icon"
+                  alt="GitHub"
+                />
               </a>
             </li>
             <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
+              <a href="https://discord.gg/vite" target="_blank" rel="noreferrer">
+                <img
                   className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
+                  src="/icons.svg#discord-icon"
+                  alt="Discord"
+                />
               </a>
             </li>
             <li>
-              <a href="https://x.com/vite_js" target="_blank">
+              <a href="https://x.com/vite_js" target="_blank" rel="noreferrer">
                 <svg
                   className="button-icon"
                   role="presentation"
@@ -94,19 +110,6 @@ function App() {
                 >
                   <use href="/icons.svg#x-icon"></use>
                 </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
               </a>
             </li>
           </ul>
@@ -119,4 +122,31 @@ function App() {
   )
 }
 
-export default App
+// Rutas base del shell de la SPA (T015 + US1): '/', '/register' y '/dashboard'
+// (pantalla protegida). Home sigue siendo el landing provisorio del scaffold.
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
