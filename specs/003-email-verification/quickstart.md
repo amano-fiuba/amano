@@ -140,3 +140,30 @@ cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build
 - Cuentas no verificadas eliminadas a los 3 días, correo liberado (SC-007).
 - Correo emitido en < 5 s (SC-001); canje y reenvío responden en < 2 s (SC-008).
 - `mvn -B verify` y las verificaciones de frontend en verde con cobertura ≥ 85 %.
+
+## Resultado de la validación (Modo B, 2026-10-19)
+
+Validación ejecutada en la rama `feat/email-verification` con el stack de desarrollo:
+PostgreSQL 18 en Docker + GreenMail standalone (`greenmail/standalone:2.1.3`) en
+`localhost:3025`, backend con `./mvnw spring-boot:run` (`MAIL_HOST=localhost`,
+`MAIL_PORT=3025`, STARTTLS/AUTH desactivados, **sin Gmail real**) y `npm run dev` (Vite en
+`http://localhost:5173`, `APP_BASE_URL` correspondiente). Todos los correos se recibieron y
+leyeron de GreenMail por IMAP; ningún correo salió hacia Gmail.
+
+| Secciones del quickstart | Alcance verificado | Resultado |
+|---|---|---|
+| 1 y 5 | 201 `{email}` sin cookie; correo en español con enlace `…/verify-email?token=`; canje 200 + sesión; doble canje 409; token alterado 400 y vencido 410; login de cuenta no verificada 403 con el detalle exacto y `action: RESEND_VERIFICATION` sin cookie; `/api/users/me` sin sesión 401; tras verificar, `/me` y login 200 | 20/20 |
+| 3, 4 y 6 | clic nuevo → `remainingSeconds=300` y correo; plazo vigente → restante real y sin correo; respuesta neutra idéntica para cuenta existente, inexistente y verificada; plazo vencido → reenvío real; re-registro: una sola cuenta, contraseña y token reemplazados, envío si no hay límite (y ese envío inicia el plazo), sin envío si el límite está vigente (Q2) y 409 sobre verificada | 39/39 |
+| 7 | con plazos acortados (token 3 s, cuenta 6 s, cron cada 5 s): cuenta y token eliminados en cascada, enlace anterior 400, reenvío neutro sin correo y correo liberado para un re-registro completo | 11/11 |
+| 8 | con GreenMail apagado: registro 201 igual, cuenta creada, fallo de envío registrado en el log y reenvío de reintento 200 neutro | 7/7 |
+
+Total: 77 comprobaciones, 0 fallos. **Observación**: la limpieza exige que el último token
+esté además vencido (`expires_at <= now()`), condición que siempre se cumple con los plazos
+reales (token 24 h ≪ cuenta 3 días); por eso, al acortar solo `verification.account-expiration`
+por debajo de `verification.token-expiration`, la cuenta sobrevive hasta que su token vence, y
+la demo acortó **ambos** plazos.
+
+Los pasos puramente de interfaz (redirección a `/check-email`, botón de reenvío siempre
+habilitado y cuenta regresiva visible) quedan cubiertos por la suite de frontend
+(`ResendCountdown.test.jsx`, `CheckEmailPage.test.jsx`, etc.); además se verificó que Vite
+sirve las rutas de la SPA y proxya `/api` al backend.

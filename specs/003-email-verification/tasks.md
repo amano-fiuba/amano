@@ -154,11 +154,11 @@
 
 **Purpose**: Requisitos transversales y verificación final. El primer task es un requisito de la spec (FR-017/FR-018), no una mejora opcional.
 
-- [ ] T055 Crear `backend/src/main/java/com/amano/backend/verification/UnverifiedAccountCleanupScheduler.java` (`@Scheduled` con el cron de `VerificationProperties`): elimina cuentas con `email_verified_at IS NULL` sin token vigente cuyo token más reciente tenga `created_at < now() - accountExpiration` (tokens en cascada; los límites de reenvío persisten); test unitario/IT con plazo acortado y datos de prueba — FR-017, FR-018, SC-007, D6
-- [ ] T056 [P] Verificar regresiones sin cambios previstos: `backend/src/test/java/com/amano/backend/auth/JwtServiceTest.java`, `frontend/src/auth/AuthContext.test.jsx` y `frontend/src/auth/ProtectedRoute.test.jsx` siguen pasando (research.md §5); ajustar solo si el entorno lo exige
-- [ ] T057 Ejecutar la guía de validación end-to-end de `specs/003-email-verification/quickstart.md` (Modo A o Modo B) y corregir desviaciones; documentar el resultado
-- [ ] T058 Ejecutar las verificaciones obligatorias completas y dejarlas en verde: `cd backend && ./mvnw -B verify` (JaCoCo LINE ≥ 85 %) y `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build` (V8 lines/statements ≥ 85 %); sin borrar ni excluir pruebas para alcanzar el umbral — constitución V, XI
-- [ ] T059 Revisar coherencia de artefactos SDD tras la implementación (`specs/003-email-verification/contracts/email-verification-api.md`, `data-model.md`, `research.md`): actualizar si el diseño final difirió, y marcar las tareas completadas en este `tasks.md` — constitución II, DoD
+- [X] T055 Crear `backend/src/main/java/com/amano/backend/verification/UnverifiedAccountCleanupScheduler.java` (`@Scheduled` con el cron de `VerificationProperties`): elimina cuentas con `email_verified_at IS NULL` sin token vigente cuyo token más reciente tenga `created_at < now() - accountExpiration` (tokens en cascada; los límites de reenvío persisten); test unitario/IT con plazo acortado y datos de prueba — FR-017, FR-018, SC-007, D6
+- [X] T056 [P] Verificar regresiones sin cambios previstos: `backend/src/test/java/com/amano/backend/auth/JwtServiceTest.java`, `frontend/src/auth/AuthContext.test.jsx` y `frontend/src/auth/ProtectedRoute.test.jsx` siguen pasando (research.md §5); ajustar solo si el entorno lo exige
+- [X] T057 Ejecutar la guía de validación end-to-end de `specs/003-email-verification/quickstart.md` (Modo A o Modo B) y corregir desviaciones; documentar el resultado
+- [X] T058 Ejecutar las verificaciones obligatorias completas y dejarlas en verde: `cd backend && ./mvnw -B verify` (JaCoCo LINE ≥ 85 %) y `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build` (V8 lines/statements ≥ 85 %); sin borrar ni excluir pruebas para alcanzar el umbral — constitución V, XI
+- [X] T059 Revisar coherencia de artefactos SDD tras la implementación (`specs/003-email-verification/contracts/email-verification-api.md`, `data-model.md`, `research.md`): actualizar si el diseño final difirió, y marcar las tareas completadas en este `tasks.md` — constitución II, DoD
 
 ---
 

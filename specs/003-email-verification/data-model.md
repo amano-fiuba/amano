@@ -65,7 +65,7 @@ la UNIQUE de `token_hash`.
 | Columna | Tipo | Regla | Fuente |
 |---|---|---|---|
 | `email_hash` | `VARCHAR(64) NOT NULL PK` | SHA-256 en hex del correo normalizado (trim + minúsculas). No se guarda el correo en claro: la fila existe aunque no haya cuenta. | D4, FR-011 |
-| `last_resend_at` | `TIMESTAMPTZ NOT NULL` | Instante del último clic en "reenviar" que procesó (no el del correo del primer registro). Un clic durante el límite NO la actualiza. | FR-011, FR-013 |
+| `last_resend_at` | `TIMESTAMPTZ NOT NULL` | Instante del último reenvío procesado (clic en "reenviar" o re-registro que **sí** envía; nunca el del correo del primer registro). Un clic durante el límite NO la actualiza. Inicia el plazo de 5 min; la respuesta devuelve el plazo completo al iniciarlo (300 s) y el restante real mientras siga vigente. | FR-011, FR-013, FR-015 |
 
 Sin FK hacia `users`: el límite es por dirección de correo, exista o no la cuenta asociada
 (FR-011) y con independencia de la sesión o el dispositivo (supuesto de la spec).
@@ -86,10 +86,17 @@ registrado (privacidad).
   upsert de `email_resend_limits` cuando corresponde; el envío del correo ocurre después,
   `@Async` (D1), nunca dentro de la transacción.
 - **Límite de reenvío**: `now() - last_resend_at < 5 min` ⇒ no se envía y se devuelve el
-  tiempo restante; si el clic se procesa (no había límite), se actualiza
-  `last_resend_at = now()` (el reenvío cuenta desde el clic, FR-011).
-- **Correo del primer registro**: nunca toca `email_resend_limits` (no cuenta para el
-  límite, FR-011 y clarificación Q3).
+  tiempo restante real; si el clic se procesa (no había límite), se actualiza
+  `last_resend_at = now()` (el reenvío cuenta desde el clic, FR-011) y la respuesta devuelve el
+  plazo completo (300 s) para que la cuenta regresiva arranque (FR-010). El servidor es la
+  fuente de verdad del tiempo.
+- **Correo del primer registro**: nunca toca `email_resend_limits` y se envía siempre de
+  inmediato, aunque exista un límite previo de la dirección (FR-011, clarificación Q3).
+- **Re-registro sobre cuenta pendiente (FR-015/Q2)**: reemplaza los datos y re-emite el token
+  siempre; el envío respeta el límite de reenvío (con plazo vigente no envía hasta que venza).
+  Si **sí** envía (no había plazo), se trata como un reenvío y fija `last_resend_at = now()` —
+  concesión de privacidad menor (escribe una fila por hash de la dirección) a cambio de impedir
+  el spam por re-registro (SC-004).
 - **Limpieza (3 días)**: `DELETE` (o cascade) de cuentas con `email_verified_at IS NULL` y
   sin ningún token vigente y cuyo token más reciente tiene `created_at < now() - 3 días`.
   Los límites de reenvío de esas direcciones NO se eliminan (siguen conteniendo el

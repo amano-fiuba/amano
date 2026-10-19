@@ -19,6 +19,12 @@ Reemplaza el comportamiento de FR-016/SC-002 de 001 (sin sesión automática).
   - Efectos: cuenta creada/actualizada como "no verificada", token emitido (invalida el
     anterior si lo hubiera) y correo enviado `@Async` si corresponde por el límite de reenvío
     (FR-015, Q2: con límite vigente no se envía hasta que venza).
+  - El cuerpo `{"email": ...}` **no** trae `remainingSeconds`: la cuenta regresiva de 5 minutos
+    se muestra al hacer clic en "Reenviar correo de verificación", cuya respuesta es la fuente
+    de verdad del tiempo (FR-010, FR-015); el registro no la adelanta.
+  - Cuando el re-registro sobre una cuenta pendiente **sí** envía (no había límite vigente),
+    también inicia el plazo (`last_resend_at = now()`), como un reenvío manual: es la concesión
+    de privacidad menor documentada en D4, que evita el spam por re-registro (SC-004).
 - **409 Conflict**: el correo ya está registrado **y verificada** (FR-016 de 003) — mismo ProblemDetail
   de 001: `title: "Conflicto"`, `detail: "El correo electrónico ya se encuentra registrado"`.
 - **400 / 413 / 500**: idénticos a 001 (validación, avatar, error interno).
@@ -62,8 +68,10 @@ esté o no verificada, y con límite vigente o no** (FR-012, SC-005) — la úni
     "remainingSeconds": 127
   }
   ```
-  - `remainingSeconds`: segundos restantes del límite de 5 minutos desde el momento de la
-    respuesta; `0` cuando no hay límite vigente (FR-012).
+  - `remainingSeconds`: `300` (el plazo completo) cuando el clic **inicia** un plazo nuevo, para
+    que la cuenta regresiva de la pantalla arranque de inmediato (FR-010); el restante real
+    cuando ya había un plazo vigente (FR-012/FR-013); `0` solo en el caso degenerado de que no
+    exista ningún plazo al responder. El servidor es la fuente de verdad del tiempo.
   - Efectos internos, **no reflejados en la respuesta**:
     - Sin límite vigente y con cuenta no verificada → se emite token nuevo (invalida el
       anterior) y se envía el correo; `last_resend_at = now()`.

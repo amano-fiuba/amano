@@ -86,6 +86,12 @@ Fuente primaria: BOM del parent `spring-boot-starter-parent:4.1.1` y verificaci�
   `remainingSeconds` (SC-005). El límite se aplica por dirección con independencia de la
   sesión o el dispositivo (supuesto documentado en la spec); por eso se guarda el hash del
   correo y no una referencia a la cuenta.
+  - `remainingSeconds` del clic procesado = plazo completo (300 s), para que la cuenta regresiva
+    de la pantalla arranque desde el clic (FR-010); con plazo vigente = restante real (FR-013).
+  - El re-registro sobre una cuenta pendiente que **sí** envía (no había plazo) se trata como un
+    reenvío y también fija `last_resend_at`: concesión de privacidad menor (una fila hash-only
+    por dirección re-registrada) deliberada para evitar el spam por re-registro (SC-004). La
+    respuesta de `/register` sigue siendo `{"email"}` y no expone el límite.
 - **Rationale**: Cumple la privacidad (no se puede discernir si la cuenta existe: la
   respuesta y el temporizador son idénticos) y el límite "exista o no la cuenta" (FR-011).
   Guardar hash en lugar del correo evita retener direcciones de cuentas inexistentes en la
@@ -115,8 +121,8 @@ Fuente primaria: BOM del parent `spring-boot-starter-parent:4.1.1` y verificaci�
   `UnverifiedAccountCleanupScheduler` con `@Scheduled` (cadencia horaria) que elimina las
   cuentas con `email_verified_at IS NULL` cuyo último token tiene más de 3 días. La
   eliminación es en runtime (JPA/BD), nunca en la migración V2 (sin DELETE en migraciones,
-  regla del equipo). Los tokens y límites asociados se eliminan en cascada por FK
-  (data-model.md).
+  regla del equipo). Los tokens asociados se eliminan en cascada por FK; los **límites de
+  reenvío NO** se eliminan (no tienen FK: son filas hash-only que persisten, data-model.md).
 - **Rationale**: Cumple FR-017 sin datos de producción que migrar; la cadencia horaria da
   una ventana efectiva de 3–4 días que es consistente con el criterio "se elimina a los 3
   días" y evita escanear la tabla continuamente. El usuario eliminado puede re-registrarse
@@ -137,7 +143,10 @@ Fuente primaria: BOM del parent `spring-boot-starter-parent:4.1.1` y verificaci�
   `PROVISORIO`) que valida credenciales contra BCrypt y aplica FR-014 (cuenta no verificada →
   403 con el mensaje exacto más el indicador `properties.action: RESEND_VERIFICATION`, que la
   feature real de login usará para ofrecer el enlace de reenvío; la UI de login queda fuera de
-  alcance de esta feature); será reemplazado por la feature real de login.
+  alcance de esta feature). El registro responde solo `{"email"}`: la cuenta regresiva de
+  reenvío (FR-010/FR-015) se obtiene al hacer clic en "reenviar", cuya respuesta es la fuente de
+  verdad del tiempo; el registro no la adelanta. El stub será reemplazado por la feature real de
+  login.
 - **Rationale**: Reutiliza los mecanismos de sesión y cookie ya probados por 001 (arquitectura
   y constitución IX); el stub permite validar la regla de bloqueo hoy sin implementar el
   login completo (fuera de alcance).
