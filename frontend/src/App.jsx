@@ -8,6 +8,7 @@ import ProtectedRoute from './auth/ProtectedRoute'
 import RegisterPage from './pages/RegisterPage'
 import CheckEmailPage from './pages/CheckEmailPage'
 import DashboardPage from './pages/DashboardPage'
+import ProfilePage from './pages/ProfilePage'
 import './App.css'
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
@@ -137,6 +138,15 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Ruta protegida del perfil (T005; FR-001, FR-008): sin sesión redirige. */}
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         }
       />
