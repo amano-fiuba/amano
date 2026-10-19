@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
 
@@ -40,6 +41,10 @@ export default function DashboardPage() {
       {/* FR-009: the CBU/CVU is only shown to the session owner (FR-021), here. */}
       {user.cbuCvu && <p data-testid="dashboard-cbu">CBU/CVU: {user.cbuCvu}</p>}
       <p data-testid="dashboard-currencies">Monedas: {currencies.join(', ')}</p>
+      <nav>
+        {/* T007 (specs/002-user-profile): acceso al perfil a 1 clic de distancia (SC-001). */}
+        <Link to="/profile">Mi perfil</Link>
+      </nav>
     </main>
   )
 }
