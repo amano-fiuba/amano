@@ -100,7 +100,9 @@ backend/
     │   │   └── RegistrationService.java          # crea cuenta no verificada, emite token, dispara correo @Async; re-registro sobre pendiente
     │   ├── verification/
     │   │   ├── EmailVerificationController.java  # POST /api/auth/verify-email, POST /api/auth/resend-verification
-    │   │   ├── EmailVerificationService.java     # ciclo de token, canje, límite de reenvío, respuestas neutras
+    │   │   ├── EmailVerificationService.java     # canje del token y verificación de la cuenta
+    │   │   ├── VerificationTokenService.java     # emisión/invalidación de tokens (hash, vencimiento, uso)
+    │   │   ├── EmailResendService.java           # límite de reenvío y respuesta neutra
     │   │   ├── VerificationToken.java            # entidad JPA (hash, vencimiento, uso)
     │   │   ├── VerificationTokenRepository.java
     │   │   ├── EmailResendLimit.java             # entidad JPA (hash de correo + último clic)
@@ -134,7 +136,7 @@ frontend/
     │   ├── ExpiredLinkPage.jsx                   # NUEVO: enlace vencido + formulario de reenvío (ingresa correo)
     │   └── DashboardPage.jsx                     # sin cambios estructurales; muestra bienvenida tras verificación
     ├── components/
-    │   ├── ResendCountdown.jsx                   # NUEVO: botón deshabilitado con cuenta regresiva (remainingSeconds del servidor)
+    │   ├── ResendCountdown.jsx                   # NUEVO: botón siempre habilitado + cuenta regresiva (remainingSeconds del servidor, fuente de verdad)
     │   └── ...
     ├── App.jsx                                   # + rutas /check-email, /verify-email, /verify-email/expired
     └── (tests *.test.jsx nuevos y actualizados — ver research.md §5)
@@ -150,8 +152,8 @@ compose.prod.yaml                                # backend: + vars de correo (se
 
 > Sin violaciones constitucionales que justificar.
 
-Observación consciente (no bloqueante, fuera de alcance): `compose.prod.yaml` no pasa
-`JWT_SECRET`/`JWT_EXPIRATION` al backend pese a que el backend falla sin ellos (brecha
-preexistente de 001, documentada en research.md §6 como riesgo operativo). Este plan sí agrega
-las variables de correo a ambos compose, pero no corrige la brecha de JWT porque es un cambio
-ajeno a la historia; se deja señalada para el equipo.
+Brecha preexistente de 001 resuelta: `compose.prod.yaml` no propagaba
+`JWT_SECRET`/`JWT_EXPIRATION` al backend pese a que el backend falla sin ellos. Se cerró en un
+fix aparte, integrado en la rama `feat/email-verification` mediante el PR #8
+(`fix/compose-prod-jwt-env`, commit `ee3f8ce`), sin relación con esta historia. Este plan
+agrega además las variables de correo a ambos compose.

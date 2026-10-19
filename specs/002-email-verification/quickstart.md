@@ -50,7 +50,7 @@ implementación; los comandos y valores esperados son los que deben observarse.
 2. Hacer clic en "Reenviar correo de verificación".
    **Esperado**: mensaje neutro "Si el correo existe y no ha sido verificado, se enviará un
    nuevo enlace de confirmación"; correo nuevo recibido con token que invalida al anterior;
-   botón deshabilitado con cuenta regresiva de 5 min (FR-010, FR-012, FR-009).
+   cuenta regresiva de 5 min visible y botón aún habilitado (FR-010, FR-012, FR-009).
 3. Recargar la página durante el límite y volver a hacer clic.
    **Esperado**: no llega correo nuevo; la pantalla muestra la cuenta regresiva con el tiempo
    restante real (FR-013, SC-006).
@@ -65,7 +65,7 @@ implementación; los comandos y valores esperados son los que deben observarse.
    **Esperado**: ambas respuestas idénticas en forma y mensaje (solo puede variar
    `remainingSeconds`); ninguna genera correo (SC-005).
 5. Esperar a que venza el plazo (o manipular `last_resend_at` en la BD para la demo).
-   **Esperado**: el botón se habilita y un clic procesa un reenvío real.
+   **Esperado**: la cuenta regresiva llega a cero y un clic procesa un reenvío real.
 
 ## 4. Enlaces vencidos, inválidos y cuenta inexistente
 

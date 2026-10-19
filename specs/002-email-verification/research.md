@@ -135,8 +135,9 @@ Fuente primaria: BOM del parent `spring-boot-starter-parent:4.1.1` y verificaci�
   `AuthCookie` de 001 (D1 de 001) emitiendo la cookie en la respuesta del POST de canje.
   `POST /api/auth/login` es un stub (`SimulatedLoginController`, claramente marcado
   `PROVISORIO`) que valida credenciales contra BCrypt y aplica FR-014 (cuenta no verificada →
-  403 con el mensaje exacto y opción de reenvío); será reemplazado por la feature real de
-  login.
+  403 con el mensaje exacto más el indicador `properties.action: RESEND_VERIFICATION`, que la
+  feature real de login usará para ofrecer el enlace de reenvío; la UI de login queda fuera de
+  alcance de esta feature); será reemplazado por la feature real de login.
 - **Rationale**: Reutiliza los mecanismos de sesión y cookie ya probados por 001 (arquitectura
   y constitución IX); el stub permite validar la regla de bloqueo hoy sin implementar el
   login completo (fuera de alcance).
@@ -195,7 +196,7 @@ Fuente primaria: BOM del parent `spring-boot-starter-parent:4.1.1` y verificaci�
 | Gmail bloquea o limita el envío (límites de cuentas Google) | Correos no entregados en dev/demo | D1: fallo no bloquea el registro; botón de reenvío; GreenMail para pruebas; documentar límites en `.env.example` |
 | `@Async` sin executor propio satura el thread pool por defecto | Degradación bajo carga | El envío es O(1) por registro/reenvío y el límite de 5 min acota reenvíos; se documenta la posibilidad de un `ThreadPoolTaskExecutor` dedicado si se requiere (decisión de implementación, sin cambio de spec) |
 | Caducidad de 3 días ejecuta DELETE sobre datos relacionados | Pérdida accidental | Solo `email_verified_at IS NULL`; cascada FK limitada a tokens y avatars/monedas de esa cuenta; IT de limpieza con datos de prueba; sin DELETE en migraciones (regla del equipo) |
-| `compose.prod.yaml` no pasa `JWT_SECRET` (brecha preexistente de 001) | Backend no arranca en prod | Fuera de alcance de esta historia; documentado en plan.md y §6 para que el equipo lo trate en un fix aparte |
+| `compose.prod.yaml` no pasaba `JWT_SECRET` (brecha preexistente de 001) | Backend no arranca en prod | ✅ Cerrada fuera de esta historia en el PR #8 (`fix/compose-prod-jwt-env`, commit `ee3f8ce`), ya integrado en la rama `feat/email-verification`; ver plan.md |
 | Cookie de sesión emitida por el canje en dispositivo distinto al registro | Sin riesgo añadido: el token es de un solo uso y de 24 h; el enlace solo puede canjearse una vez | Tests de doble canje (segundo canje → 409) |
 
 ## 4. Supuestos técnicos incorporados
@@ -223,7 +224,7 @@ cuentas verificadas. Estos tests de 001 deben actualizarse:
 | `auth/RegistrationProfileIT.java` | Usa la cookie del registro para probar avatar/monedas vía `/me` | Helper de test que crea la cuenta verificada (o canjea el token vía GreenMail) antes de usar `/me` |
 | `auth/RegistrationServiceTest.java` | Verifica que `register()` devuelve `User` con sesión; ahora también debe emitir token y disparar correo | Ampliar mocks (`VerificationTokenRepository`, servicio de correo); asertar estado no verificado y emisión de token; cubrir rama de re-registro sobre pendiente |
 | `auth/SecurityConfigTest.java` | Reglas `permitAll` cambian (verify-email, resend, login stub) y `/api/users/**` ahora también debe rechazar cuentas no verificadas | ActualizarMatchers y agregar casos 401/403 de cuenta no verificada |
-| `config/JwtServiceTest.java` | Sin cambio funcional previsto | Verificar que sigue pasando sin ajustes (regresión) |
+| `auth/JwtServiceTest.java` | Sin cambio funcional previsto | Verificar que sigue pasando sin ajustes (regresión) |
 | `user/UserEntitiesTest.java` | `User` gana `emailVerifiedAt` | Agregar round-trip del campo nuevo |
 
 ### Frontend (`frontend/src/`)

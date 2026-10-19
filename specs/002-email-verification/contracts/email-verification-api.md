@@ -19,7 +19,7 @@ Reemplaza el comportamiento de FR-016/SC-002 de 001 (sin sesión automática).
   - Efectos: cuenta creada/actualizada como "no verificada", token emitido (invalida el
     anterior si lo hubiera) y correo enviado `@Async` si corresponde por el límite de reenvío
     (FR-015, Q2: con límite vigente no se envía hasta que venza).
-- **409 Conflict**: el correo ya está registrado **y verificada** (FR-016) — mismo ProblemDetail
+- **409 Conflict**: el correo ya está registrado **y verificada** (FR-016 de 002) — mismo ProblemDetail
   de 001: `title: "Conflicto"`, `detail: "El correo electrónico ya se encuentra registrado"`.
 - **400 / 413 / 500**: idénticos a 001 (validación, avatar, error interno).
 
@@ -89,7 +89,9 @@ FR-014.
 - **403 Forbidden**: credenciales válidas pero cuenta **no verificada** (FR-014):
   - `title: "Cuenta no verificada"`,
     `detail: "Tu cuenta aún no ha sido verificada. Por favor, revisa tu correo electrónico"`.
-  - El frontend ofrece la opción de ir a reenviar el enlace.
+  - Además, el ProblemDetail incluye un indicador legible por máquina en `properties`
+    (`{"action": "RESEND_VERIFICATION"}`) para que la feature de login real ofrezca el enlace
+    de reenvío. La interfaz de login queda fuera de alcance de esta feature.
 
 ## Endpoints existentes sin cambios
 
@@ -98,6 +100,10 @@ FR-014.
   tenga la cuenta **verificada** para acceder a `/api/users/**`; una cookie emitida antes de
   verificar (por ejemplo, simulada en un test) recibe 401 con el ProblemDetail de
   "No autorizado" de 001. El stub de login jamás emite cookie para cuentas no verificadas.
+- **Herencia de la regla (FR-004)**: todo endpoint protegido, presente o futuro, hereda la
+  exigencia de cuenta verificada. La comprobación se aplica en el servidor sobre el conjunto
+  autenticado, no por enumeración de rutas, de modo que cualquier ruta nueva bajo un ámbito
+  protegido queda cubierta sin cambios adicionales en el contrato.
 
 ## Consideraciones de comportamiento compartidas
 
