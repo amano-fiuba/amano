@@ -33,6 +33,13 @@ public class ProblemDetailExceptionHandler {
     /** Properties key carrying the per-field validation messages map (contract "Errores"). */
     public static final String FIELDS_PROPERTY = "fields";
 
+    /**
+     * Machine-readable indicator of the 403 raised when a pending account tries to
+     * log in (feature 003, FR-014): the real login feature uses it to offer the
+     * resend link (contracts/email-verification-api.md).
+     */
+    public static final String RESEND_VERIFICATION_ACTION = "RESEND_VERIFICATION";
+
     @ExceptionHandler({ MethodArgumentNotValidException.class, HandlerMethodValidationException.class })
     public ProblemDetail handleValidation(Exception exception) {
         Map<String, String> fields = new LinkedHashMap<>();
@@ -106,6 +113,33 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.GONE, exception.getMessage());
         problem.setTitle("Enlace expirado");
+        return problem;
+    }
+
+    /**
+     * Provisional login stub with bad credentials (feature 003, FR-014): wrong
+     * password or unknown account share the 401 of the session filter of 001, so
+     * the existence of the account is never disclosed.
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, exception.getMessage());
+        problem.setTitle("No autorizado");
+        return problem;
+    }
+
+    /**
+     * Provisional login stub with valid credentials on a PENDING account (feature
+     * 003, FR-004/FR-014): 403 with the exact message plus the machine-readable
+     * resend indicator the real login feature will consume. No session is issued.
+     */
+    @ExceptionHandler(UnverifiedAccountException.class)
+    public ProblemDetail handleUnverifiedAccount(UnverifiedAccountException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Cuenta no verificada");
+        problem.setProperty("properties", Map.of("action", RESEND_VERIFICATION_ACTION));
         return problem;
     }
 
