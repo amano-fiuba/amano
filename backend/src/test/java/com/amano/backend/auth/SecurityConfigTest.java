@@ -92,6 +92,14 @@ class SecurityConfigTest {
     }
 
     @Test
+    void resendVerificationEndpointIsReachableWithoutSession() throws Exception {
+        // permitAll (feature 003, FR-011): the resend is a public, neutral endpoint.
+        // 404 = no EmailVerificationController in this slice.
+        mockMvc.perform(post("/api/auth/resend-verification"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void usersEndpointsWithoutSessionReturn401ProblemDetail() throws Exception {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isUnauthorized())

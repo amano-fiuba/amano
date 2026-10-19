@@ -3,6 +3,7 @@ package com.amano.backend.verification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -273,5 +275,74 @@ class RegistrationVerificationIT {
 
         // Await the async send so no delivery is left in flight for the next test.
         awaitMailsFor("solo-correo@ejemplo.com", 1);
+    }
+
+    /**
+     * Q2 (FR-015, task T044): a re-registration over a PENDING account respects an
+     * active resend term — the data and the token are replaced, but no mail goes
+     * out until the term expires.
+     */
+    @Test
+    void reRegistrationOverPendingRespectsAnActiveResendLimit() throws Exception {
+        String email = "q2@ejemplo.com";
+        mockMvc.perform(multipart("/api/auth/register").part(mandatoryFields(email)))
+                .andExpect(status().isCreated());
+        awaitMailsFor(email, 1);
+
+        // A resend click sends (no term yet) and starts the 5-minute window.
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isOk());
+        String resentToken = extractClearToken(awaitMailsFor(email, 2).get(1));
+
+        // Re-registration inside the term: data replaced, new token issued, no mail.
+        mockMvc.perform(multipart("/api/auth/register").part(new MockPart[] {
+                        part("firstName", "Nueva"),
+                        part("email", email),
+                        part("password", "OtraClave123!"),
+                        part("confirmPassword", "OtraClave123!"),
+                        part("acceptTerms", "true"),
+                }))
+                .andExpect(status().isCreated())
+                .andExpect(header().doesNotExist("Set-Cookie"));
+
+        assertThat(mailsFor(email)).hasSize(2); // Q2: no third mail while the term is in force
+        String name = jdbcTemplate.queryForObject(
+                "SELECT first_name FROM users WHERE email = ?", String.class, email);
+        assertThat(name).isEqualTo("Nueva"); // FR-015: the pending data was replaced
+
+        // FR-009/FR-015: the token of the resend was invalidated and a fresh one is current.
+        Integer resentUsed = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM email_verification_tokens WHERE token_hash = ? AND used_at IS NOT NULL",
+                Integer.class, sha256Hex(resentToken));
+        assertThat(resentUsed).isEqualTo(1);
+        String current = jdbcTemplate.queryForObject(
+                "SELECT token_hash FROM email_verification_tokens evt JOIN users u ON u.id = evt.user_id "
+                        + "WHERE u.email = ? AND evt.used_at IS NULL",
+                String.class, email);
+        assertThat(current).isNotEqualTo(sha256Hex(resentToken));
+    }
+
+    /**
+     * Q3 (FR-011, task T044): the mail of the FIRST registration always goes out
+     * immediately, even when the address already carries an active resend term.
+     */
+    @Test
+    void firstRegistrationSendsEvenWhenTheAddressHasAnActiveResendLimit() throws Exception {
+        String email = "q3@ejemplo.com";
+
+        // A resend click for an address with no account starts the term and sends nothing.
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isOk());
+        assertThat(mailsFor(email)).isEmpty();
+
+        mockMvc.perform(multipart("/api/auth/register").part(mandatoryFields(email)))
+                .andExpect(status().isCreated());
+
+        // FR-011/Q3: the first registration ignores the prior term and sends at once.
+        assertThat(extractClearToken(awaitMailsFor(email, 1).get(0))).isNotBlank();
     }
 }

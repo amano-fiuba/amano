@@ -85,3 +85,27 @@ export async function me() {
     return { ok: false, network: true }
   }
 }
+
+/**
+ * Requests a new verification email (feature 003, POST /api/auth/resend-verification).
+ * The endpoint is always 200 with the neutral message and the remaining seconds of
+ * the 5-minute limit (FR-012/SC-005), so a 4xx never carries domain meaning: only
+ * network failures and 5xx come back as { ok: false, network: true }.
+ */
+export async function resendVerification(email) {
+  try {
+    const response = await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, message: body.message, remainingSeconds: body.remainingSeconds }
+    }
+    return { ok: false, network: response.status >= 500 }
+  } catch {
+    return { ok: false, network: true }
+  }
+}

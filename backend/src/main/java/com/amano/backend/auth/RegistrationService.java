@@ -16,6 +16,7 @@ import com.amano.backend.user.User;
 import com.amano.backend.user.UserAvatar;
 import com.amano.backend.user.UserAvatarRepository;
 import com.amano.backend.user.UserRepository;
+import com.amano.backend.verification.EmailResendService;
 import com.amano.backend.verification.VerificationMailService;
 import com.amano.backend.verification.VerificationTokenService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -49,17 +50,20 @@ public class RegistrationService {
     private final UserAvatarRepository userAvatarRepository;
     private final VerificationTokenService verificationTokenService;
     private final VerificationMailService verificationMailService;
+    private final EmailResendService emailResendService;
 
     public RegistrationService(UserRepository userRepository, PasswordEncoder passwordEncoder,
             AvatarValidator avatarValidator, UserAvatarRepository userAvatarRepository,
             VerificationTokenService verificationTokenService,
-            VerificationMailService verificationMailService) {
+            VerificationMailService verificationMailService,
+            EmailResendService emailResendService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.avatarValidator = avatarValidator;
         this.userAvatarRepository = userAvatarRepository;
         this.verificationTokenService = verificationTokenService;
         this.verificationMailService = verificationMailService;
+        this.emailResendService = emailResendService;
     }
 
     @Transactional
@@ -120,7 +124,17 @@ public class RegistrationService {
             throw new FieldValidationException(fieldErrors);
         }
 
-        User user = resolveAccount(email);
+        Optional<User> existingAccount = userRepository.findByEmail(email);
+        User user = existingAccount
+                .map(existing -> {
+                    if (existing.getEmailVerifiedAt() != null) {
+                        // FR-016: verified accounts keep 409 "ya se encuentra registrado".
+                        throw new EmailAlreadyRegisteredException();
+                    }
+                    // FR-015: same account, data and password replaced by the new form.
+                    return existing;
+                })
+                .orElseGet(User::new);
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setEmail(email);
@@ -134,33 +148,23 @@ public class RegistrationService {
 
         User saved = userRepository.save(user);
         persistAvatar(avatar, saved);
-        // FR-001/FR-003/D2: the account is created "no verificada" and gets a
-        // single-use token; only its SHA-256 hash is persisted (T018).
-        String clearToken = verificationTokenService.issueFor(saved);
-        // FR-003/D1: fired @Async so the request never waits on SMTP; FR-019: a
-        // send failure never fails the registration. FR-011/Q3: the first
-        // registration always sends immediately — the resend limit only applies
-        // to resend requests, added in US4.
-        verificationMailService.sendVerificationEmail(saved, clearToken);
+        if (existingAccount.isPresent()) {
+            // FR-015/Q2 (US4): re-registration over a PENDING account always
+            // re-issues the token (FR-009), but the mail respects any active
+            // resend term: with the term in force, the token is replaced and the
+            // mail waits (Q2).
+            emailResendService.reissueForPendingAccount(saved);
+        }
+        else {
+            // FR-001/FR-003/D2: the account is created "no verificada" and gets a
+            // single-use token; only its SHA-256 hash is persisted (T018).
+            String clearToken = verificationTokenService.issueFor(saved);
+            // FR-003/D1: fired @Async so the request never waits on SMTP; FR-019: a
+            // send failure never fails the registration. FR-011/Q3: the FIRST
+            // registration always sends immediately, untouched by any prior term.
+            verificationMailService.sendVerificationEmail(saved, clearToken);
+        }
         return saved;
-    }
-
-    /**
-     * Feature 003 (FR-015/FR-016): a VERIFIED duplicate keeps the 001 conflict;
-     * a PENDING duplicate is the same account to be replaced, and a new email
-     * starts a fresh unverified account.
-     */
-    private User resolveAccount(String email) {
-        return userRepository.findByEmail(email)
-                .map(existing -> {
-                    if (existing.getEmailVerifiedAt() != null) {
-                        // FR-016: verified accounts keep 409 "ya se encuentra registrado".
-                        throw new EmailAlreadyRegisteredException();
-                    }
-                    // FR-015: same account, data and password replaced by the new form.
-                    return existing;
-                })
-                .orElseGet(User::new);
     }
 
     /**

@@ -26,24 +26,36 @@ import jakarta.servlet.http.HttpServletRequest;
  * has the same shape as {@code GET /api/users/me}, so the SPA can drop it into
  * the shared session store. Errors are mapped centrally by
  * {@code ProblemDetailExceptionHandler}.
+ *
+ * <p>Also hosts {@code POST /api/auth/resend-verification} (task T049,
+ * FR-011..FR-013): a public, always-200 endpoint that never answers 400/404/429,
+ * so the response is identical whether the account exists, is verified, is
+ * pending or has an active term (SC-005). The neutral body and its internal
+ * effects live in {@link EmailResendService}.
  */
 @RestController
 @RequestMapping("/api/auth")
 public class EmailVerificationController {
 
     private final EmailVerificationService verificationService;
+    private final EmailResendService resendService;
     private final JwtService jwtService;
     private final UserMapper userMapper;
 
     public EmailVerificationController(EmailVerificationService verificationService,
-            JwtService jwtService, UserMapper userMapper) {
+            EmailResendService resendService, JwtService jwtService, UserMapper userMapper) {
         this.verificationService = verificationService;
+        this.resendService = resendService;
         this.jwtService = jwtService;
         this.userMapper = userMapper;
     }
 
     /** Body of the redemption: the clear token taken from the emailed link. */
     public record VerifyEmailRequest(String token) {
+    }
+
+    /** Body of the resend: the address the user typed (normalized server-side). */
+    public record ResendVerificationRequest(String email) {
     }
 
     @PostMapping("/verify-email")
@@ -60,5 +72,18 @@ public class EmailVerificationController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(profile);
+    }
+
+    /**
+     * Resends the verification link with the neutral, always-200 answer of
+     * FR-012/SC-005: the message never varies and {@code remainingSeconds} is the
+     * server's source of truth for the visible countdown (FR-010/FR-013).
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<EmailResendService.ResendResult> resendVerification(
+            @RequestBody(required = false) ResendVerificationRequest request) {
+        EmailResendService.ResendResult result =
+                resendService.resend(request == null ? null : request.email());
+        return ResponseEntity.ok(result);
     }
 }

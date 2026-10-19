@@ -1,19 +1,30 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ExpiredLinkPage from './ExpiredLinkPage'
+import { NEUTRAL_MESSAGE } from '../components/resendCountdown'
 
-// Expired-link screen (task T030, TDD: written BEFORE the implementation):
-// FR-006 — explains that the link expired and leads to the resend screen, where
-// the user types the address (the request itself is wired in US4, task T053).
-describe('ExpiredLinkPage (T030)', () => {
+// Expired-link screen (task T030 + T053, TDD: the wiring arrived in US4):
+// FR-006 — explains that the link expired and offers the resend flow, where the
+// user types the address and submitting it fires the resend and shows the
+// neutral message plus the countdown dictated by the server (FR-012/FR-013).
+afterEach(() => {
+  vi.unstubAllGlobals()
+  sessionStorage.clear()
+})
+
+function renderPage() {
+  render(
+    <MemoryRouter>
+      <ExpiredLinkPage />
+    </MemoryRouter>,
+  )
+}
+
+describe('ExpiredLinkPage (T030/T053)', () => {
   it('explica que el enlace expiró y ofrece el formulario de reenvío (FR-006)', () => {
-    render(
-      <MemoryRouter>
-        <ExpiredLinkPage />
-      </MemoryRouter>,
-    )
+    renderPage()
 
     expect(
       screen.getByRole('heading', { name: /el enlace expiró/i }),
@@ -25,19 +36,28 @@ describe('ExpiredLinkPage (T030)', () => {
     ).toBeEnabled()
   })
 
-  it('el envío sigue en la pantalla: el wiring del reenvío llega en US4', async () => {
-    const user = userEvent.setup()
-    render(
-      <MemoryRouter>
-        <ExpiredLinkPage />
-      </MemoryRouter>,
+  it('al enviar el correo dispara el reenvío neutro y muestra la cuenta regresiva (FR-012/T053)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ message: NEUTRAL_MESSAGE, remainingSeconds: 300 }),
+      }),
     )
+    const user = userEvent.setup()
+    renderPage()
 
     await user.type(screen.getByLabelText(/correo electrónico/i), 'ana.perez@example.com')
     await user.click(screen.getByRole('button', { name: /reenviar correo de verificación/i }))
 
-    expect(
-      screen.getByRole('heading', { name: /el enlace expiró/i }),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(NEUTRAL_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('timer')).toHaveTextContent('05:00')
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/auth/resend-verification',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ email: 'ana.perez@example.com' }),
+      }),
+    )
   })
 })

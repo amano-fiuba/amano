@@ -29,6 +29,9 @@ import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
+import com.amano.backend.verification.EmailResendLimit;
+import com.amano.backend.verification.EmailResendLimitRepository;
+import com.amano.backend.verification.EmailResendService;
 import com.amano.backend.verification.VerificationMailService;
 import com.amano.backend.verification.VerificationProperties;
 import com.amano.backend.verification.VerificationToken;
@@ -62,13 +65,21 @@ class RegistrationServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0, VerificationToken.class));
         mailService = Mockito.mock(VerificationMailService.class);
         // Real token lifecycle over the mocked repository (T018 is exercised through its collaborator).
-        VerificationTokenService tokenService = new VerificationTokenService(tokenRepository,
-                new VerificationProperties(Duration.ofHours(24), Duration.ofMinutes(5),
-                        Duration.ofDays(3), "0 0 * * * *"));
+        VerificationProperties properties = new VerificationProperties(Duration.ofHours(24),
+                Duration.ofMinutes(5), Duration.ofDays(3), "0 0 * * * *");
+        VerificationTokenService tokenService = new VerificationTokenService(tokenRepository, properties);
+        // Real resend service over a mocked limit repository (US4: the term logic is
+        // exercised through RegistrationService's collaborator, T054).
+        EmailResendLimitRepository limitRepository = Mockito.mock(EmailResendLimitRepository.class);
+        when(limitRepository.findById(anyString())).thenReturn(Optional.empty());
+        when(limitRepository.save(any(EmailResendLimit.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0, EmailResendLimit.class));
+        EmailResendService emailResendService = new EmailResendService(limitRepository, userRepository,
+                tokenService, mailService, properties);
         service = new RegistrationService(userRepository, new BCryptPasswordEncoder(),
                 new com.amano.backend.user.AvatarValidator(),
                 Mockito.mock(com.amano.backend.user.UserAvatarRepository.class),
-                tokenService, mailService);
+                tokenService, mailService, emailResendService);
     }
 
     /** Independent SHA-256 implementation (D2): the test never reuses production hashing. */

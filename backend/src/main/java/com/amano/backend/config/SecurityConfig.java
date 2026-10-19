@@ -37,6 +37,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * - {@code POST /api/auth/register} and {@code /api/health} are public;
  * - {@code POST /api/auth/verify-email} is public too: the emailed link is the
  *   credential and the request carries no session yet (feature 003, FR-005, D7);
+ * - {@code POST /api/auth/resend-verification} is public: it is the neutral,
+ *   always-200 resend endpoint of feature 003 (FR-011..FR-013);
  * - {@code POST /api/auth/login} is the public provisional stub of feature 003
  *   (FR-014, D7): it cannot require a session;
  * - {@code /api/users/**} requires a VERIFIED session (feature 003, FR-004,
@@ -57,7 +59,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/verify-email",
-                                "/api/auth/login").permitAll()
+                                "/api/auth/login", "/api/auth/resend-verification").permitAll()
                         .requestMatchers("/api/users/**").access(verifiedAccount(userRepository))
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
