@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 import { AuthProvider } from '../auth/AuthContext'
 import DashboardPage from './DashboardPage'
 
@@ -36,7 +37,9 @@ function renderDashboard(meProfile = PROFILE) {
   )
   return render(
     <AuthProvider>
-      <DashboardPage />
+      <MemoryRouter>
+        <DashboardPage />
+      </MemoryRouter>
     </AuthProvider>,
   )
 }
@@ -83,5 +86,12 @@ describe('DashboardPage (T024)', () => {
     expect(await screen.findByText(/bienvenida, anabel/i)).toBeInTheDocument()
     // Both the AuthContext bootstrapping and the refresh go through the same contract.
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/users/me', { credentials: 'include' })
+  })
+
+  it('expone acceso a su perfil en ≤2 interacciones (T007, SC-001)', async () => {
+    renderDashboard(PROFILE)
+
+    const link = await screen.findByRole('link', { name: /mi perfil/i })
+    expect(link).toHaveAttribute('href', '/profile')
   })
 })
