@@ -18,10 +18,10 @@
 
 **Purpose**: Dependencias y configuración de entorno del correo; nada de esto toca lógica de historias.
 
-- [ ] T001 Agregar `spring-boot-starter-mail` (scope compile) y, en scope test, `com.icegreen:greenmail` y `com.icegreen:greenmail-junit5` versión 2.1.14 a `backend/pom.xml` (research.md §1, D9)
-- [ ] T002 [P] Agregar placeholders de correo a `.env.example`: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (contraseña de aplicación de Gmail; nota de que nunca se usa Gmail real en tests) y `APP_BASE_URL` (base del enlace del correo, con ejemplos dev/prod) — D8
-- [ ] T003 [P] Propagar las 5 variables de correo al servicio `backend` en `compose.yaml` (dev) y `compose.prod.yaml` (prod), siguiendo el patrón existente de `JWT_SECRET`/`JWT_EXPIRATION` — D8
-- [ ] T004 [P] Agregar a `backend/src/main/resources/application.properties`: `spring.mail.host/port/username/password` desde las env vars, `app.base-url=${APP_BASE_URL}` y los plazos de `VerificationProperties` con defaults (token 24 h = 86400 s, límite de reenvío 300 s, caducidad de cuenta 3 días, cron horario de limpieza) — D1, D8, contracts §"Plazos"
+- [X] T001 Agregar `spring-boot-starter-mail` (scope compile) y, en scope test, `com.icegreen:greenmail` y `com.icegreen:greenmail-junit5` versión 2.1.14 a `backend/pom.xml` (research.md §1, D9)
+- [X] T002 [P] Agregar placeholders de correo a `.env.example`: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` (contraseña de aplicación de Gmail; nota de que nunca se usa Gmail real en tests) y `APP_BASE_URL` (base del enlace del correo, con ejemplos dev/prod) — D8
+- [X] T003 [P] Propagar las 5 variables de correo al servicio `backend` en `compose.yaml` (dev) y `compose.prod.yaml` (prod), siguiendo el patrón existente de `JWT_SECRET`/`JWT_EXPIRATION` — D8
+- [X] T004 [P] Agregar a `backend/src/main/resources/application.properties`: `spring.mail.host/port/username/password` desde las env vars, `app.base-url=${APP_BASE_URL}` y los plazos de `VerificationProperties` con defaults (token 24 h = 86400 s, límite de reenvío 300 s, caducidad de cuenta 3 días, cron horario de limpieza) — D1, D8, contracts §"Plazos"
 
 ---
 
@@ -31,11 +31,11 @@
 
 **⚠️ CRITICAL**: Ninguna historia puede empezar hasta completar esta fase.
 
-- [ ] T005 Crear `backend/src/main/resources/db/migration/V2__email_verification.sql` según data-model.md: `ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMPTZ NULL;`, tabla `email_verification_tokens` (`id` IDENTITY PK, `user_id BIGINT NOT NULL` FK→`users(id)` ON DELETE CASCADE, `token_hash VARCHAR(64) NOT NULL UNIQUE`, `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`, `expires_at TIMESTAMPTZ NOT NULL`, `used_at TIMESTAMPTZ NULL`, CHECK `expires_at > created_at`) y tabla `email_resend_limits` (`email_hash VARCHAR(64) NOT NULL` PK, `last_resend_at TIMESTAMPTZ NOT NULL`). **Sin DELETE** (regla del equipo) — data-model.md §Compatibilidad
-- [ ] T006 [P] Agregar campo `emailVerifiedAt` (`OffsetDateTime`, nullable, columna `email_verified_at`) a la entidad `backend/src/main/java/com/amano/backend/user/User.java` — FR-001, FR-004
-- [ ] T007 [P] Crear entidad `backend/src/main/java/com/amano/backend/verification/VerificationToken.java` (`user_id`, `token_hash`, `created_at`, `expires_at`, `used_at`; `@ManyToOne` LAZY hacia `User`) y repositorio `backend/src/main/java/com/amano/backend/verification/VerificationTokenRepository.java` (`JpaRepository` + `Optional<VerificationToken> findByTokenHash(String)` y `List<VerificationToken> findByUserIdAndUsedAtIsNull(Long userId)`) — data-model.md §email_verification_tokens
-- [ ] T008 [P] Crear `backend/src/main/java/com/amano/backend/verification/VerificationProperties.java` como `@ConfigurationProperties(prefix="verification")` record con `Duration tokenExpiration` (default 24 h), `Duration resendCooldown` (default 5 min), `Duration accountExpiration` (default 3 días), `String cronCleanup` y binding a las properties de T004 — D6, contracts §"Plazos"
-- [ ] T009 Agregar `@EnableAsync` y `@EnableScheduling` a `backend/src/main/java/com/amano/backend/BackendApplication.java` — D1, D6
+- [X] T005 Crear `backend/src/main/resources/db/migration/V2__email_verification.sql` según data-model.md: `ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMPTZ NULL;`, tabla `email_verification_tokens` (`id` IDENTITY PK, `user_id BIGINT NOT NULL` FK→`users(id)` ON DELETE CASCADE, `token_hash VARCHAR(64) NOT NULL UNIQUE`, `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`, `expires_at TIMESTAMPTZ NOT NULL`, `used_at TIMESTAMPTZ NULL`, CHECK `expires_at > created_at`) y tabla `email_resend_limits` (`email_hash VARCHAR(64) NOT NULL` PK, `last_resend_at TIMESTAMPTZ NOT NULL`). **Sin DELETE** (regla del equipo) — data-model.md §Compatibilidad
+- [X] T006 [P] Agregar campo `emailVerifiedAt` (`OffsetDateTime`, nullable, columna `email_verified_at`) a la entidad `backend/src/main/java/com/amano/backend/user/User.java` — FR-001, FR-004
+- [X] T007 [P] Crear entidad `backend/src/main/java/com/amano/backend/verification/VerificationToken.java` (`user_id`, `token_hash`, `created_at`, `expires_at`, `used_at`; `@ManyToOne` LAZY hacia `User`) y repositorio `backend/src/main/java/com/amano/backend/verification/VerificationTokenRepository.java` (`JpaRepository` + `Optional<VerificationToken> findByTokenHash(String)` y `List<VerificationToken> findByUserIdAndUsedAtIsNull(Long userId)`) — data-model.md §email_verification_tokens
+- [X] T008 [P] Crear `backend/src/main/java/com/amano/backend/verification/VerificationProperties.java` como `@ConfigurationProperties(prefix="verification")` record con `Duration tokenExpiration` (default 24 h), `Duration resendCooldown` (default 5 min), `Duration accountExpiration` (default 3 días), `String cronCleanup` y binding a las properties de T004 — D6, contracts §"Plazos"
+- [X] T009 Agregar `@EnableAsync` y `@EnableScheduling` a `backend/src/main/java/com/amano/backend/BackendApplication.java` — D1, D6
 
 **Checkpoint**: Esquema V2 aplicable, entidades validadas por Hibernate; las historias pueden comenzar.
 

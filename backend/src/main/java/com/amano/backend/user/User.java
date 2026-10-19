@@ -59,6 +59,14 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    /**
+     * Instant the verification token was redeemed; {@code null} means the account
+     * is not verified yet and is blocked from protected resources (feature 002,
+     * FR-001/FR-004, data-model.md). Written only by the token redemption.
+     */
+    @Column(name = "email_verified_at")
+    private OffsetDateTime emailVerifiedAt;
+
     /** 0..N subset of {@link Currency}; empty means ARS by default at read time (FR-011, Q1). */
     @jakarta.persistence.ElementCollection(fetch = FetchType.LAZY)
     @jakarta.persistence.CollectionTable(
@@ -137,6 +145,14 @@ public class User {
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public OffsetDateTime getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void setEmailVerifiedAt(OffsetDateTime emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
     }
 
     public Set<Currency> getCurrencies() {
