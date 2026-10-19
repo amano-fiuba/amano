@@ -51,6 +51,14 @@ class SecurityConfigTest {
     }
 
     @Test
+    void verifyEmailEndpointIsReachableWithoutSession() throws Exception {
+        // permitAll (feature 003, FR-005): the link is the credential, so no cookie
+        // is required. 404 = no EmailVerificationController in this slice.
+        mockMvc.perform(post("/api/auth/verify-email"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void usersEndpointsWithoutSessionReturn401ProblemDetail() throws Exception {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isUnauthorized())

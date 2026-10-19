@@ -79,6 +79,36 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /**
+     * Redemption of an unknown/tampered link (feature 003, FR-008): 400 with the
+     * neutral message that never reveals whether the account exists.
+     */
+    @ExceptionHandler(VerificationTokenInvalidException.class)
+    public ProblemDetail handleVerificationTokenInvalid(VerificationTokenInvalidException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Enlace no válido");
+        return problem;
+    }
+
+    /** Redemption of an already consumed link (feature 003, FR-007): 409, no session. */
+    @ExceptionHandler(VerificationTokenUsedException.class)
+    public ProblemDetail handleVerificationTokenUsed(VerificationTokenUsedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Enlace ya utilizado");
+        return problem;
+    }
+
+    /** Redemption past the 24 h window (feature 003, FR-006): 410, leads to resend. */
+    @ExceptionHandler(VerificationTokenExpiredException.class)
+    public ProblemDetail handleVerificationTokenExpired(VerificationTokenExpiredException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GONE, exception.getMessage());
+        problem.setTitle("Enlace expirado");
+        return problem;
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail handleMaxUploadSize(MaxUploadSizeExceededException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(

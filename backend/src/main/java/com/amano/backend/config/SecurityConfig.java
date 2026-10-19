@@ -28,6 +28,8 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * Authorization layout:
  * - {@code POST /api/auth/register} and {@code /api/health} are public;
+ * - {@code POST /api/auth/verify-email} is public too: the emailed link is the
+ *   credential and the request carries no session yet (feature 003, FR-005, D7);
  * - {@code /api/users/**} requires a valid {@code amano_auth} cookie (FR-016, SC-005).
  */
 @Configuration
@@ -44,7 +46,7 @@ public class SecurityConfig {
                         UsernamePasswordAuthenticationFilter.class)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/health", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/health", "/api/auth/register", "/api/auth/verify-email").permitAll()
                         .requestMatchers("/api/users/**").authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(new UnauthorizedEntryPoint(objectMapper)))

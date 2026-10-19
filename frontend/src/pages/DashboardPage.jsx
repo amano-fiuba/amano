@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
 
@@ -8,6 +8,12 @@ import { useAuth } from '../auth/AuthContext'
 // currencies empty → display default ["ARS"] (FR-011/Q1).
 export default function DashboardPage() {
   const { user, setUser } = useAuth()
+  const location = useLocation()
+
+  // FR-005 (main flow step 5): arriving right after redeeming the link shows the
+  // one-time welcome for the freshly verified account; the link from US2 sends
+  // state { verifiedWelcome: true } and a later manual visit shows nothing.
+  const verifiedWelcome = location.state?.verifiedWelcome === true
 
   useEffect(() => {
     let cancelled = false
@@ -37,6 +43,11 @@ export default function DashboardPage() {
     <main>
       <img src={avatarUrl} alt="@avatar" width={96} height={96} />
       <h1>Bienvenida, {fullName}</h1>
+      {verifiedWelcome && (
+        <p data-testid="dashboard-verified-welcome">
+          ¡Tu cuenta fue verificada correctamente!
+        </p>
+      )}
       <p data-testid="dashboard-email">{user.email}</p>
       {/* FR-009: the CBU/CVU is only shown to the session owner (FR-021), here. */}
       {user.cbuCvu && <p data-testid="dashboard-cbu">CBU/CVU: {user.cbuCvu}</p>}

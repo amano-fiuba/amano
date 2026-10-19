@@ -26,7 +26,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderDashboard(meProfile = PROFILE) {
+function renderDashboard(meProfile = PROFILE, initialEntries = ['/dashboard']) {
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
@@ -37,7 +37,7 @@ function renderDashboard(meProfile = PROFILE) {
   )
   return render(
     <AuthProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <DashboardPage />
       </MemoryRouter>
     </AuthProvider>,
@@ -93,5 +93,23 @@ describe('DashboardPage (T024)', () => {
 
     const link = await screen.findByRole('link', { name: /mi perfil/i })
     expect(link).toHaveAttribute('href', '/profile')
+  })
+
+  it('sin venir de la verificación mantiene el saludo y no muestra bienvenida (regresión T036)', async () => {
+    renderDashboard(PROFILE)
+
+    expect(await screen.findByText(/bienvenida, ana/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('dashboard-verified-welcome')).not.toBeInTheDocument()
+  })
+
+  it('al llegar desde el canje muestra la bienvenida de cuenta verificada (FR-005/T036)', async () => {
+    renderDashboard(PROFILE, [
+      { pathname: '/dashboard', state: { verifiedWelcome: true } },
+    ])
+
+    expect(
+      await screen.findByTestId('dashboard-verified-welcome'),
+    ).toHaveTextContent(/verificada correctamente/i)
+    expect(screen.getByText(/bienvenida, ana/i)).toBeInTheDocument()
   })
 })

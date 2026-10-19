@@ -45,6 +45,34 @@ export async function register(formData) {
   }
 }
 
+/**
+ * Redeems a verification token (feature 003, POST /api/auth/verify-email).
+ * Returns { ok: true, profile } on 200 — the backend also sets the session
+ * cookie, so the SPA only has to store the profile. 4xx come back as
+ * { ok: false, status, detail } (400 invalid, 409 already used, 410 expired);
+ * network failures and 5xx as { ok: false, network: true }.
+ */
+export async function verifyEmail(token) {
+  try {
+    const response = await fetch('/api/auth/verify-email', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    })
+    if (response.ok) {
+      return { ok: true, profile: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await parseProblem(response)
+    return { ok: false, status: response.status, ...problem }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 /** GET /api/users/me with the session cookie; { ok, profile } or { ok: false }. */
 export async function me() {
   try {

@@ -81,6 +81,10 @@ class RegistrationVerificationIT {
     static void mailProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.mail.host", () -> "localhost");
         registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
+        // GreenMail speaks plain SMTP: the STARTTLS/AUTH required by the real
+        // Gmail (application.properties) is turned off here (research.md D9).
+        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
+        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
         registry.add("app.base-url", () -> BASE_URL);
     }
 
