@@ -2,7 +2,7 @@
 
 **Branch**: `feat/email-verification` | **Date**: 2026-10-19 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/002-email-verification/spec.md`
+**Input**: Feature specification from `/specs/003-email-verification/spec.md`
 
 ## Summary
 
@@ -75,7 +75,7 @@ las pruebas usan GreenMail sin tocar umbrales (V).
 ### Documentation (this feature)
 
 ```text
-specs/002-email-verification/
+specs/003-email-verification/
 ├── plan.md              # Este archivo (/speckit.plan)
 ├── research.md          # Salida Phase 0: decisiones técnicas, versiones y tests de 001 afectados
 ├── data-model.md        # Salida Phase 1: entidades, tablas, transiciones de estado

@@ -61,7 +61,7 @@ public class User {
 
     /**
      * Instant the verification token was redeemed; {@code null} means the account
-     * is not verified yet and is blocked from protected resources (feature 002,
+     * is not verified yet and is blocked from protected resources (feature 003,
      * FR-001/FR-004, data-model.md). Written only by the token redemption.
      */
     @Column(name = "email_verified_at")

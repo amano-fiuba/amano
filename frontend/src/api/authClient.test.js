@@ -11,7 +11,7 @@ afterEach(() => {
 })
 
 describe('register(endpoint: POST /api/auth/register, contracts/email-verification-api.md)', () => {
-  // Feature 002 (task T013): the 201 body is {email} — no profile, no session cookie.
+  // Feature 003 (task T013): the 201 body is {email} — no profile, no session cookie.
   it('201 devuelve ok con el correo normalizado (sin perfil)', async () => {
     vi.stubGlobal(
       'fetch',

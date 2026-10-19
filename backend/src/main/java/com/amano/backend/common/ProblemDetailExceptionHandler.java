@@ -63,7 +63,7 @@ public class ProblemDetailExceptionHandler {
 
     /**
      * Service-level duplicate detection: a verified account already owns the email
-     * (feature 002, FR-016). Same 409 shape as the unique-index race above.
+     * (feature 003, FR-016). Same 409 shape as the unique-index race above.
      */
     @ExceptionHandler(EmailAlreadyRegisteredException.class)
     public ProblemDetail handleEmailAlreadyRegistered(EmailAlreadyRegisteredException exception) {

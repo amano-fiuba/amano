@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import CheckEmailPage, { CHECK_EMAIL_STORAGE_KEY } from './CheckEmailPage'
 
-// "Revisa tu correo" contract (task T023, feature 002): FR-002 (the address is
+// "Revisa tu correo" contract (task T023, feature 003): FR-002 (the address is
 // restored from sessionStorage, so a reload keeps showing it) and FR-010 (the
 // resend button is always available; its request lands in US4).
 afterEach(() => {

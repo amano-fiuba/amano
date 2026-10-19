@@ -14,7 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.amano.backend.user.User;
 
 /**
- * POST /api/auth/register (task T021, feature 002): single atomic multipart
+ * POST /api/auth/register (task T021, feature 003): single atomic multipart
  * submit. Since the registration no longer starts a session (FR-001, replaces
  * FR-016 of 001) the 201 response carries ONLY the normalized email and neither
  * {@code Set-Cookie} nor {@code Location} (contracts/email-verification-api.md

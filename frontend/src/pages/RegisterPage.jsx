@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router'
 import RegisterForm from '../components/RegisterForm'
 import { CHECK_EMAIL_STORAGE_KEY } from './CheckEmailPage'
 
-// Registration page (task T024, feature 002): a successful registration does NOT
+// Registration page (task T024, feature 003): a successful registration does NOT
 // start a session and does not reach the dashboard (FR-001, replaces FR-016 of
 // 001); the account stays "no verificada" until the email link is confirmed.
 // The normalized address is kept in sessionStorage so the "Revisa tu correo"

@@ -21,7 +21,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * Contract integration tests for POST /api/auth/register after feature 002
+ * Contract integration tests for POST /api/auth/register after feature 003
  * (task T010, TDD: written BEFORE the implementation). Replicates the "Cambio
  * sobre contrato de 001" of contracts/email-verification-api.md with a real
  * PostgreSQL (Testcontainers): FR-001 (account created unverified, no session,

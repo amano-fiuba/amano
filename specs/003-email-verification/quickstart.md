@@ -1,6 +1,6 @@
 # Quickstart: Verificación de correo electrónico
 
-**Feature**: `002-email-verification` | **Spec**: [spec.md](../spec.md)
+**Feature**: `003-email-verification` | **Spec**: [spec.md](../spec.md)
 
 Referencias: [contrato de API](./contracts/email-verification-api.md), [modelo de
 datos](./data-model.md), [decisiones](./research.md).

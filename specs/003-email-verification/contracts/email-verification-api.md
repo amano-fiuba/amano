@@ -1,6 +1,6 @@
 # Contrato API: Verificación de correo electrónico
 
-**Feature**: `002-email-verification` | **Spec**: [../spec.md](../spec.md)
+**Feature**: `003-email-verification` | **Spec**: [../spec.md](../spec.md)
 
 Contratos nuevos y cambios sobre los endpoints de 001 que produce esta feature. El formato
 de errores es el mismo de 001: RFC 7807 (`application/problem+json`) con la propiedad
@@ -19,7 +19,7 @@ Reemplaza el comportamiento de FR-016/SC-002 de 001 (sin sesión automática).
   - Efectos: cuenta creada/actualizada como "no verificada", token emitido (invalida el
     anterior si lo hubiera) y correo enviado `@Async` si corresponde por el límite de reenvío
     (FR-015, Q2: con límite vigente no se envía hasta que venza).
-- **409 Conflict**: el correo ya está registrado **y verificada** (FR-016 de 002) — mismo ProblemDetail
+- **409 Conflict**: el correo ya está registrado **y verificada** (FR-016 de 003) — mismo ProblemDetail
   de 001: `title: "Conflicto"`, `detail: "El correo electrónico ya se encuentra registrado"`.
 - **400 / 413 / 500**: idénticos a 001 (validación, avatar, error interno).
 

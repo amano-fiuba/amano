@@ -29,7 +29,7 @@ import com.amano.backend.config.JwtService;
 import jakarta.servlet.http.Cookie;
 
 /**
- * US3 contract integration tests (task T032, updated for feature 002 in task
+ * US3 contract integration tests (task T032, updated for feature 003 in task
  * T026): replicates contracts/auth-api.md + users-api.md with a real
  * PostgreSQL. Since the registration no longer starts a session (FR-001), every
  * test verifies the account first via {@link #verifiedSessionOf(String)} and
@@ -93,7 +93,7 @@ class RegistrationProfileIT {
     }
 
     /**
-     * Feature 002 (task T026): the account created by the registration is verified
+     * Feature 003 (task T026): the account created by the registration is verified
      * straight in the database (the token redemption lands in US2) and a session
      * cookie is issued for it, so the protected reads can be asserted as before.
      */

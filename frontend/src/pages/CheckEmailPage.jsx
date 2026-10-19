@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-// "Revisa tu correo" screen (task T023, feature 002: FR-002, FR-010, SC-002).
+// "Revisa tu correo" screen (task T023, feature 003: FR-002, FR-010, SC-002).
 // The registration no longer starts a session, so after signing up the user
 // lands here instead of the dashboard. The normalized address is restored from
 // sessionStorage, so reloading the page keeps showing where the link was sent

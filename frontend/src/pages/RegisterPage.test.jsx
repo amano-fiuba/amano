@@ -8,7 +8,7 @@ import DashboardPage from '../pages/DashboardPage'
 import ProtectedRoute from '../auth/ProtectedRoute'
 
 // The auth client is task T021: mocked here so the page contract is defined
-// first, with shapes styled by contracts/email-verification-api.md. Feature 002
+// first, with shapes styled by contracts/email-verification-api.md. Feature 003
 // (task T014): a successful registration navigates to /check-email WITHOUT
 // starting a session (FR-001); the screen itself is task T023.
 vi.mock('../api/authClient', () => ({
@@ -75,7 +75,7 @@ async function fillForm(user) {
   await user.click(screen.getByLabelText(/Términos y Condiciones/i))
 }
 
-describe('RegisterPage (US1/US2 behaviors after feature 002)', () => {
+describe('RegisterPage (US1/US2 behaviors after feature 003)', () => {
   it('envío válido → navega a /check-email sin iniciar sesión (FR-001, SC-002)', async () => {
     const user = userEvent.setup()
     authClient.register.mockResolvedValue({ ok: true, email: 'ana.perez@example.com' })

@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Atomic account creation (tasks T018 + T033, feature 002 in T020): nothing is
+ * Atomic account creation (tasks T018 + T033, feature 003 in T020): nothing is
  * persisted when anything fails (FR-014). Normalization before validation is
  * mandated by the clarifications: names trimmed (Q4), email trim+lowercase
  * (FR-004), password policy (FR-006 + Q2), CBU separators stripped before the
@@ -146,7 +146,7 @@ public class RegistrationService {
     }
 
     /**
-     * Feature 002 (FR-015/FR-016): a VERIFIED duplicate keeps the 001 conflict;
+     * Feature 003 (FR-015/FR-016): a VERIFIED duplicate keeps the 001 conflict;
      * a PENDING duplicate is the same account to be replaced, and a new email
      * starts a fresh unverified account.
      */

@@ -21,7 +21,7 @@ async function parseProblem(response) {
 
 /**
  * Single atomic multipart submit of the registration form.
- * Returns { ok: true, email } on 201 (feature 002: no profile, no session),
+ * Returns { ok: true, email } on 201 (feature 003: no profile, no session),
  * otherwise { ok: false, status, detail, fields } or { ok: false, network: true }.
  */
 export async function register(formData) {

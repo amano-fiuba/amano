@@ -38,7 +38,7 @@ import com.amano.backend.verification.VerificationTokenService;
 /**
  * Unit tests of the normalization/validation rules of RegistrationService
  * (FR-002..FR-006, FR-009, FR-012 and clarifications Q2/Q3/Q4) plus the
- * feature-002 behaviors (task T011, TDD: written BEFORE the implementation):
+ * feature-003 behaviors (task T011, TDD: written BEFORE the implementation):
  * FR-001 (account left unverified), FR-003/FR-009 (hashed token issued, mail
  * triggered, previous token invalidated), FR-015 (re-registration over a
  * pending account replaces the data), FR-016 (409 only for a verified

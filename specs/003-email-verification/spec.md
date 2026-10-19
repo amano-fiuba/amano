@@ -16,7 +16,7 @@ Esta especificación MODIFICA el comportamiento de la especificación 001 (Regis
 - **Reemplaza SC-002 de 001** (acceso inmediato al perfil tras registrarse): el acceso inmediato ahora ocurre únicamente tras confirmar el correo.
 - **Modifica el alcance de FR-005 de 001** ("correo ya registrado → error"): la regla de correo duplicado aplica solo a cuentas **verificadas**; para direcciones con cuenta **no verificada** rige el flujo de esta especificación (reemplazo de la cuenta pendiente, ver Casos borde).
 
-Los identificadores FR-### y SC-### de esta especificación son propios de 002 y no coinciden necesariamente en número con los de 001; toda referencia cruzada se cualifica con la especificación de origen (por ejemplo, "FR-016 de 001").
+Los identificadores FR-### y SC-### de esta especificación son propios de 003 y no coinciden necesariamente en número con los de 001; toda referencia cruzada se cualifica con la especificación de origen (por ejemplo, "FR-016 de 001").
 
 Todo lo demás de 001 (validaciones del formulario, campos, políticas de contraseña, avatares, CBU/CVU, monedas) se mantiene sin cambios.
 

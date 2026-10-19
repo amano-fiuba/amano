@@ -1,6 +1,6 @@
 # Data Model: Verificación de correo electrónico
 
-**Feature**: `002-email-verification` | **Fecha**: 2026-10-19 | **Spec**: [spec.md](../spec.md)
+**Feature**: `003-email-verification` | **Fecha**: 2026-10-19 | **Spec**: [spec.md](../spec.md)
 
 Este documento describe el modelo de datos nuevo o modificado por esta feature. La migración
 Flyway `V2__email_verification.sql` es el modelo físico definitivo (`ddl-auto=validate` exige

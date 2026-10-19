@@ -1,6 +1,6 @@
 # Research: Verificación de correo electrónico
 
-**Feature**: `002-email-verification` | **Fecha**: 2026-10-19 | **Spec**: [spec.md](../spec.md)
+**Feature**: `003-email-verification` | **Fecha**: 2026-10-19 | **Spec**: [spec.md](../spec.md)
 
 Este documento resuelve las decisiones técnicas de la fase de investigación para la
 verificación de correo, respetando el stack ya confirmado por la feature 001 (Java 25,

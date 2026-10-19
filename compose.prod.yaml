@@ -25,7 +25,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
-      # Correo de verificación (feature 002, D8). En prod son obligatorias
+      # Correo de verificación (feature 003, D8). En prod son obligatorias
       # (mismo patrón fail-fast que JWT_SECRET): sin SMTP real la feature no
       # funciona y el fallo sería silencioso.
       MAIL_HOST: ${MAIL_HOST:?Falta MAIL_HOST en .env}
