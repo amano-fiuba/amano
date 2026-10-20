@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { AppRoutes } from './App'
 import { AuthProvider } from './auth/AuthContext'
+import { INVALID_LINK_MESSAGE } from './pages/VerifyEmailPage'
 
 // AuthProvider consulta /api/users/me al montar; en pruebas offline devuelve 401.
 beforeEach(() => {
@@ -70,5 +71,33 @@ describe('App rutas (T005/T009, specs/002-user-profile)', () => {
     )
 
     expect(await screen.findByRole('heading', { name: /mi perfil/i })).toBeInTheDocument()
+  })
+})
+
+describe('App rutas de verificación (T035, specs/003-email-verification)', () => {
+  it('/verify-email sin token es una ruta pública que muestra el enlace inválido (FR-008)', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/verify-email']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByText(INVALID_LINK_MESSAGE)).toBeInTheDocument()
+  })
+
+  it('/verify-email/expired es una ruta pública con la pantalla de vencido (FR-006)', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/verify-email/expired']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: /el enlace expiró/i }),
+    ).toBeInTheDocument()
   })
 })

@@ -21,8 +21,8 @@ async function parseProblem(response) {
 
 /**
  * Single atomic multipart submit of the registration form.
- * Returns { ok: true, profile } on 201, otherwise
- * { ok: false, status, detail, fields } or { ok: false, network: true }.
+ * Returns { ok: true, email } on 201 (feature 003: no profile, no session),
+ * otherwise { ok: false, status, detail, fields } or { ok: false, network: true }.
  */
 export async function register(formData) {
   try {
@@ -30,6 +30,35 @@ export async function register(formData) {
       method: 'POST',
       credentials: 'include',
       body: formData,
+    })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, email: body.email }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await parseProblem(response)
+    return { ok: false, status: response.status, ...problem }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * Redeems a verification token (feature 003, POST /api/auth/verify-email).
+ * Returns { ok: true, profile } on 200 — the backend also sets the session
+ * cookie, so the SPA only has to store the profile. 4xx come back as
+ * { ok: false, status, detail } (400 invalid, 409 already used, 410 expired);
+ * network failures and 5xx as { ok: false, network: true }.
+ */
+export async function verifyEmail(token) {
+  try {
+    const response = await fetch('/api/auth/verify-email', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
     })
     if (response.ok) {
       return { ok: true, profile: await response.json() }
@@ -52,6 +81,30 @@ export async function me() {
       return { ok: false, status: response.status }
     }
     return { ok: true, profile: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * Requests a new verification email (feature 003, POST /api/auth/resend-verification).
+ * The endpoint is always 200 with the neutral message and the remaining seconds of
+ * the 5-minute limit (FR-012/SC-005), so a 4xx never carries domain meaning: only
+ * network failures and 5xx come back as { ok: false, network: true }.
+ */
+export async function resendVerification(email) {
+  try {
+    const response = await fetch('/api/auth/resend-verification', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, message: body.message, remainingSeconds: body.remainingSeconds }
+    }
+    return { ok: false, network: response.status >= 500 }
   } catch {
     return { ok: false, network: true }
   }

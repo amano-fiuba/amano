@@ -6,6 +6,9 @@ import viteLogo from './assets/vite.svg'
 import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
 import RegisterPage from './pages/RegisterPage'
+import CheckEmailPage from './pages/CheckEmailPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import ExpiredLinkPage from './pages/ExpiredLinkPage'
 import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import './App.css'
@@ -123,13 +126,18 @@ function Home() {
   )
 }
 
-// Rutas base del shell de la SPA (T015 + US1): '/', '/register' y '/dashboard'
-// (pantalla protegida). Home sigue siendo el landing provisorio del scaffold.
+// Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
+// '/check-email' (pantalla "Revisa tu correo"), '/verify-email' (canje del
+// enlace) y '/verify-email/expired' (enlace vencido), todas públicas por diseño;
+// '/dashboard' y '/profile' quedan protegidas.
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/check-email" element={<CheckEmailPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/verify-email/expired" element={<ExpiredLinkPage />} />
       <Route
         path="/dashboard"
         element={

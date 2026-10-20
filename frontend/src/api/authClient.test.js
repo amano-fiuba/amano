@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { NETWORK_ERROR_MESSAGE, me, register } from './authClient'
+import { NETWORK_ERROR_MESSAGE, me, register, resendVerification } from './authClient'
 
 beforeEach(() => {
   vi.unstubAllGlobals()
@@ -10,21 +10,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('register(endpoint: POST /api/auth/register, contracts/auth-api.md)', () => {
-  it('201 devuelve ok con el perfil creado', async () => {
-    const profile = { id: 1, firstName: 'Ana', email: 'ana.perez@example.com' }
+describe('register(endpoint: POST /api/auth/register, contracts/email-verification-api.md)', () => {
+  // Feature 003 (task T013): the 201 body is {email} — no profile, no session cookie.
+  it('201 devuelve ok con el correo normalizado (sin perfil)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(profile),
+        json: () => Promise.resolve({ email: 'ana.perez@example.com' }),
       }),
     )
 
     const formData = new FormData()
     const result = await register(formData)
 
-    expect(result).toEqual({ ok: true, profile })
+    expect(result).toEqual({ ok: true, email: 'ana.perez@example.com' })
     expect(fetch).toHaveBeenCalledWith('/api/auth/register', {
       method: 'POST',
       credentials: 'include',
@@ -133,5 +133,37 @@ describe('NETWORK_ERROR_MESSAGE (FR-019, contrato)', () => {
     expect(NETWORK_ERROR_MESSAGE).toBe(
       'No se pudo completar el registro. Intenta nuevamente',
     )
+  })
+})
+
+describe('resendVerification(endpoint: POST /api/auth/resend-verification, contracts)', () => {
+  const NEUTRAL_MESSAGE =
+    'Si el correo existe y no ha sido verificado, se enviará un nuevo enlace de confirmación'
+
+  // Feature 003 (task T050): the 200 body is {message, remainingSeconds}.
+  it('200 devuelve ok con el mensaje neutro y el tiempo restante', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ message: NEUTRAL_MESSAGE, remainingSeconds: 127 }),
+      }),
+    )
+
+    const result = await resendVerification('ana.perez@example.com')
+
+    expect(result).toEqual({ ok: true, message: NEUTRAL_MESSAGE, remainingSeconds: 127 })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/resend-verification', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ana.perez@example.com' }),
+    })
+  })
+
+  it('fallo de red devuelve ok:false + network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+
+    expect(await resendVerification('ana@example.com')).toEqual({ ok: false, network: true })
   })
 })

@@ -38,6 +38,12 @@ class UserEntitiesTest {
         assertThat(user.getAvatar()).isNull();        // resolved by the owner of user_avatars
         assertThat(user.getCurrencies()).isNotNull(); // allowed subset of ARS/USD/EUR
 
+        // Feature 003 (task T012): NULL means the account is not verified yet (FR-001).
+        assertThat(new User().getEmailVerifiedAt()).isNull();
+        OffsetDateTime verifiedAt = OffsetDateTime.now();
+        user.setEmailVerifiedAt(verifiedAt);
+        assertThat(user.getEmailVerifiedAt()).isEqualTo(verifiedAt);
+
         user.getCurrencies().add(Currency.EUR);
         assertThat(user.getCurrencies()).containsExactly(Currency.EUR);
     }

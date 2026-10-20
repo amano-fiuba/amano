@@ -2,14 +2,15 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { AuthProvider } from '../auth/AuthContext'
+import { AuthProvider, useAuth } from '../auth/AuthContext'
 import RegisterPage from './RegisterPage'
 import DashboardPage from '../pages/DashboardPage'
 import ProtectedRoute from '../auth/ProtectedRoute'
 
-// The auth client is task T021: mocked here so the page contract (T017) is
-// defined first, with shapes styled by contracts/auth-api.md. The Network
-// message constant must exist for the FR-019 branch of RegisterForm.
+// The auth client is task T021: mocked here so the page contract is defined
+// first, with shapes styled by contracts/email-verification-api.md. Feature 003
+// (task T014): a successful registration navigates to /check-email WITHOUT
+// starting a session (FR-001); the screen itself is task T023.
 vi.mock('../api/authClient', () => ({
   NETWORK_ERROR_MESSAGE: 'No se pudo completar el registro. Intenta nuevamente',
   register: vi.fn(),
@@ -22,12 +23,20 @@ beforeEach(() => {
   vi.unstubAllGlobals()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }))
   authClient.me.mockResolvedValue({ ok: false, status: 401 })
+  sessionStorage.clear()
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  sessionStorage.clear()
 })
+
+/** Reads the auth context to prove no session was populated (FR-001). */
+function SessionProbe() {
+  const { user } = useAuth()
+  return <span data-testid="session-probe">{user ? 'con-sesion' : 'sin-sesion'}</span>
+}
 
 function setupApp() {
   return render(
@@ -35,6 +44,15 @@ function setupApp() {
       <MemoryRouter initialEntries={['/register']}>
         <Routes>
           <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/check-email"
+            element={
+              <div data-testid="check-email">
+                Revisa tu correo
+                <SessionProbe />
+              </div>
+            }
+          />
           <Route
             path="/dashboard"
             element={
@@ -57,34 +75,21 @@ async function fillForm(user) {
   await user.click(screen.getByLabelText(/Términos y Condiciones/i))
 }
 
-describe('RegisterPage (US1/US2 behaviors required by T017)', () => {
-  it('envío válido → navegación al dashboard con la sesión poblada (FR-016)', async () => {
+describe('RegisterPage (US1/US2 behaviors after feature 003)', () => {
+  it('envío válido → navega a /check-email sin iniciar sesión (FR-001, SC-002)', async () => {
     const user = userEvent.setup()
-    authClient.me.mockResolvedValue({ ok: false, status: 401 })
-    authClient.register.mockResolvedValue({
-      ok: true,
-      profile: {
-        id: 1,
-        firstName: 'Ana',
-        lastName: null,
-        email: 'ana.perez@example.com',
-        currencies: [],
-        cbuCvu: null,
-        hasCustomAvatar: false,
-      },
-    })
+    authClient.register.mockResolvedValue({ ok: true, email: 'ana.perez@example.com' })
     setupApp()
 
     await fillForm(user)
     await user.click(screen.getByRole('button', { name: /crear cuenta/i }))
 
-    expect(await screen.findByText(/bienvenida/i)).toBeInTheDocument()
-    expect(screen.getByTestId('dashboard-email')).toHaveTextContent('ana.perez@example.com')
-    expect(screen.getByRole('img', { name: '@avatar' })).toHaveAttribute(
-      'src',
-      '/avatar-default.png',
-    )
-    expect(screen.getByTestId('dashboard-currencies')).toHaveTextContent('Monedas: ARS')
+    expect(await screen.findByTestId('check-email')).toHaveTextContent('Revisa tu correo')
+    // No session is started: the dashboard is never reached (FR-001/SC-002).
+    expect(screen.getByTestId('session-probe')).toHaveTextContent('sin-sesion')
+    expect(screen.queryByTestId('dashboard-email')).not.toBeInTheDocument()
+    // The address is kept for the "Revisa tu correo" screen across reloads (FR-002).
+    expect(sessionStorage.getItem('amano.check-email')).toBe('ana.perez@example.com')
   })
 
   it('409 → muestra el mensaje exacto y conserva lo completado (FR-018)', async () => {
