@@ -6,6 +6,7 @@ import viteLogo from './assets/vite.svg'
 import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
 import RegisterPage from './pages/RegisterPage'
+import LoginPage from './pages/LoginPage'
 import CheckEmailPage from './pages/CheckEmailPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ExpiredLinkPage from './pages/ExpiredLinkPage'
@@ -135,6 +136,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/check-email" element={<CheckEmailPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/verify-email/expired" element={<ExpiredLinkPage />} />

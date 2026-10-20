@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from '../auth/AuthContext'
 import DashboardPage from './DashboardPage'
 
@@ -111,5 +112,35 @@ describe('DashboardPage (T024)', () => {
       await screen.findByTestId('dashboard-verified-welcome'),
     ).toHaveTextContent(/verificada correctamente/i)
     expect(screen.getByText(/bienvenida, ana/i)).toBeInTheDocument()
+  })
+
+  it('cerrar sesión llama al backend y lleva al login (feature 004)', async () => {
+    const fetchMock = vi.fn((url) =>
+      Promise.resolve(
+        url === '/api/auth/logout'
+          ? { ok: true, status: 204 }
+          : { ok: true, status: 200, json: () => Promise.resolve(PROFILE) },
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/dashboard']}>
+          <Routes>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/login" element={<div>PANTALLA LOGIN</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /cerrar sesión/i }))
+
+    expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
   })
 })

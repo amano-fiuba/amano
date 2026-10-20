@@ -84,10 +84,18 @@ class SecurityConfigTest {
     }
 
     @Test
-    void loginStubEndpointIsReachableWithoutSession() throws Exception {
-        // permitAll (feature 003, FR-014): the login stub cannot require a session.
-        // 404 = no SimulatedLoginController in this slice.
+    void loginEndpointIsReachableWithoutSession() throws Exception {
+        // permitAll (feature 004): login cannot require a session.
+        // 404 = no AuthController in this slice.
         mockMvc.perform(post("/api/auth/login"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void logoutEndpointIsReachableWithoutSession() throws Exception {
+        // permitAll (feature 004): logout only expires the cookie, so it must work
+        // even when the session already expired. 404 = no AuthController in this slice.
+        mockMvc.perform(post("/api/auth/logout"))
                 .andExpect(status().isNotFound());
     }
 

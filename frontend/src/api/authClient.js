@@ -109,3 +109,63 @@ export async function resendVerification(email) {
     return { ok: false, network: true }
   }
 }
+
+// Feature 004 (login): fixed message for network failures or 5xx on login.
+export const LOGIN_NETWORK_ERROR_MESSAGE =
+  'No se pudo iniciar sesión. Intenta nuevamente'
+
+/**
+ * Logs in (POST /api/auth/login). Returns { ok: true, profile } on 200 — the
+ * backend also sets the HttpOnly session cookie, so the SPA only stores the
+ * profile. 4xx come back as { ok: false, status, detail, fields, action }
+ * (401 bad credentials, 403 unverified account with action
+ * 'RESEND_VERIFICATION'); network failures and 5xx as { ok: false, network: true }.
+ */
+export async function login(email, password) {
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    if (response.ok) {
+      return { ok: true, profile: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    let problem = {}
+    try {
+      problem = await response.json()
+    } catch {
+      problem = {}
+    }
+    return {
+      ok: false,
+      status: response.status,
+      detail: problem.detail ?? '',
+      fields: problem.properties?.fields ?? {},
+      action: problem.properties?.action ?? null,
+    }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * Logs out (POST /api/auth/logout): the backend expires the HttpOnly cookie,
+ * which the SPA cannot delete itself. Always resolves; the caller clears the
+ * session store whatever the outcome.
+ */
+export async function logout() {
+  try {
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    return { ok: response.ok }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
