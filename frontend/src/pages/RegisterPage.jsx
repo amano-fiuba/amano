@@ -14,7 +14,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main>
+    <main className="page">
       <h1>Crear tu cuenta</h1>
       <RegisterForm onRegistered={handleRegistered} />
     </main>

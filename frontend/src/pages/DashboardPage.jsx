@@ -34,8 +34,8 @@ export default function DashboardPage() {
   const fullName = user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName
 
   return (
-    <main>
-      <img src={avatarUrl} alt="@avatar" width={96} height={96} />
+    <main className="page">
+      <img src={avatarUrl} alt="@avatar" className="app-avatar" />
       <h1>Bienvenida, {fullName}</h1>
       <p data-testid="dashboard-email">{user.email}</p>
       {/* FR-009: the CBU/CVU is only shown to the session owner (FR-021), here. */}

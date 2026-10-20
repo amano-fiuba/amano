@@ -40,7 +40,7 @@ export default function ProfilePage() {
   if (!user || error) {
     if (error) {
       return (
-        <main>
+        <main className="page">
           <h1>Mi perfil</h1>
           <p role="alert">No se pudo cargar el perfil. Intenta nuevamente</p>
         </main>
@@ -57,8 +57,12 @@ export default function ProfilePage() {
       : ['ARS']
 
   return (
-    <main>
-      <img src={avatarUrl} alt={`Avatar de ${user.firstName}`} width={96} height={96} />
+    <main className="page">
+      <img
+        src={avatarUrl}
+        alt={`Avatar de ${user.firstName}`}
+        className="app-avatar"
+      />
       <h1>Mi perfil</h1>
       <p>
         Nombre: <span data-testid="profile-name">{user.firstName}</span>

@@ -8,7 +8,8 @@ import ProtectedRoute from './auth/ProtectedRoute'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
-import './App.css'
+import ThemeToggle from './components/ThemeToggle'
+import './App.scss'
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
 // conforme avance el feature de registro.
@@ -155,6 +156,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ThemeToggle />
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
