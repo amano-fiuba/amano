@@ -26,4 +26,12 @@ public final class AuthCookie {
                 .secure(secure)
                 .build();
     }
+
+    /**
+     * Logout (feature 004): same name, path and attributes as the session cookie
+     * but empty and with Max-Age=0, so the browser deletes it at once.
+     */
+    public static ResponseCookie expiredCookie(boolean secure) {
+        return sessionCookie("", Duration.ZERO, secure);
+    }
 }

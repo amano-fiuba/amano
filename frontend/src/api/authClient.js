@@ -152,3 +152,20 @@ export async function login(email, password) {
     return { ok: false, network: true }
   }
 }
+
+/**
+ * Logs out (POST /api/auth/logout): the backend expires the HttpOnly cookie,
+ * which the SPA cannot delete itself. Always resolves; the caller clears the
+ * session store whatever the outcome.
+ */
+export async function logout() {
+  try {
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
+    return { ok: response.ok }
+  } catch {
+    return { ok: false, network: true }
+  }
+}

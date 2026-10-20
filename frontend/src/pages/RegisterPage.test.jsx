@@ -15,8 +15,8 @@ vi.mock('../api/authClient', () => ({
   NETWORK_ERROR_MESSAGE: 'No se pudo completar el registro. Intenta nuevamente',
   register: vi.fn(),
   me: vi.fn(),
+  logout: vi.fn(),
 }))
-
 const authClient = await import('../api/authClient')
 
 beforeEach(() => {

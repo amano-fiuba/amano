@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { Link, useLocation } from 'react-router'
-import { me } from '../api/authClient'
+import { Link, useLocation, useNavigate } from 'react-router'
+import { logout, me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
 
 // Protected landing screen (task T024; FR-016, FR-021, SC-002): renders the
@@ -9,6 +9,16 @@ import { useAuth } from '../auth/AuthContext'
 export default function DashboardPage() {
   const { user, setUser } = useAuth()
   const location = useLocation()
+
+  const navigate = useNavigate()
+
+  // Feature 004: the backend expires the HttpOnly cookie; the local session is
+  // cleared whatever the outcome, so the user is never left half logged in.
+  const handleLogout = async () => {
+    await logout()
+    setUser(null)
+    navigate('/login', { replace: true })
+  }
 
   // FR-005 (main flow step 5): arriving right after redeeming the link shows the
   // one-time welcome for the freshly verified account; the link from US2 sends
@@ -55,6 +65,9 @@ export default function DashboardPage() {
       <nav>
         {/* T007 (specs/002-user-profile): acceso al perfil a 1 clic de distancia (SC-001). */}
         <Link to="/profile">Mi perfil</Link>
+        <button type="button" onClick={handleLogout}>
+          Cerrar sesión
+        </button>
       </nav>
     </main>
   )

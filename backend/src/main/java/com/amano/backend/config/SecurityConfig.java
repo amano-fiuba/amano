@@ -59,7 +59,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/verify-email",
-                                "/api/auth/login", "/api/auth/resend-verification").permitAll()
+                                "/api/auth/login", "/api/auth/logout", "/api/auth/resend-verification").permitAll()
                         .requestMatchers("/api/users/**").access(verifiedAccount(userRepository))
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

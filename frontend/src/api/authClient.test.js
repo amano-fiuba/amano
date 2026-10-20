@@ -4,6 +4,7 @@ import {
   LOGIN_NETWORK_ERROR_MESSAGE,
   NETWORK_ERROR_MESSAGE,
   login,
+  logout,
   me,
   register,
   resendVerification,
@@ -265,5 +266,23 @@ describe('login(endpoint: POST /api/auth/login)', () => {
 
   it('LOGIN_NETWORK_ERROR_MESSAGE es el mensaje fijo del login', () => {
     expect(LOGIN_NETWORK_ERROR_MESSAGE).toBe('No se pudo iniciar sesión. Intenta nuevamente')
+  })
+})
+
+describe('logout(endpoint: POST /api/auth/logout)', () => {
+  it('204 devuelve ok y envía la cookie', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+    expect(await logout()).toEqual({ ok: true })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    })
+  })
+
+  it('fallo de red no lanza', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+
+    expect(await logout()).toEqual({ ok: false, network: true })
   })
 })
