@@ -1,6 +1,8 @@
-package com.amano.backend.verification;
+package com.amano.backend.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -18,26 +20,25 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import jakarta.servlet.http.Cookie;
+
 /**
- * Contract tests of the PROVISIONAL login stub (task T038, TDD: written BEFORE
- * the implementation; contracts/email-verification-api.md, D7). It exists only
- * to prove FR-014 server-side: valid credentials on a VERIFIED account open the
- * session (001 cookie + profile), valid credentials on a PENDING account are a
- * 403 with the exact message and the machine-readable resend indicator, and bad
- * credentials (wrong password or unknown account) are the same 401 so the
- * existence of the account is never disclosed. The real login feature will
- * replace {@code SimulatedLoginController}; the UI of login is out of scope.
+ * Contract tests of the real login (feature 004), end to end against PostgreSQL.
+ * Replaces SimulatedLoginIT of feature 003 and keeps every rule it proved.
  */
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
 })
 @AutoConfigureMockMvc
 @Testcontainers
-class SimulatedLoginIT {
+class LoginIT {
+
+    private static final String BAD_CREDENTIALS = "El correo electrónico o la contraseña son incorrectos";
 
     @Container
     @ServiceConnection
@@ -53,19 +54,14 @@ class SimulatedLoginIT {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static MockPart[] mandatoryFields(String email) {
-        return new MockPart[] {
-                part("firstName", "Ana"),
-                part("email", email),
-                part("password", "Password123!"),
-                part("confirmPassword", "Password123!"),
-                part("acceptTerms", "true"),
-        };
-    }
-
     /** Creates the PENDING account through the real registration endpoint. */
     private void register(String email) throws Exception {
-        mockMvc.perform(multipart("/api/auth/register").part(mandatoryFields(email)))
+        mockMvc.perform(multipart("/api/auth/register").part(
+                        part("firstName", "Ana"),
+                        part("email", email),
+                        part("password", "Password123!"),
+                        part("confirmPassword", "Password123!"),
+                        part("acceptTerms", "true")))
                 .andExpect(status().isCreated());
     }
 
@@ -79,26 +75,32 @@ class SimulatedLoginIT {
         return "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
     }
 
-    /** FR-014: verified credentials start the session with the 001 cookie and the profile. */
     @Test
     void verifiedCredentialsOpenTheSessionWithCookieAndProfile() throws Exception {
         String email = "login.verificada@example.com";
         register(email);
         markVerified(email);
 
-        mockMvc.perform(post("/api/auth/login")
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody("  Login.Verificada@Example.COM ", "Password123!")))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Set-Cookie", containsString("amano_auth=")))
                 .andExpect(header().string("Set-Cookie", containsString("HttpOnly")))
                 .andExpect(header().string("Set-Cookie", containsString("SameSite=Strict")))
-                .andExpect(jsonPath("$.email").value(email)) // normalized email in the profile
+                .andExpect(jsonPath("$.email").value(email))
                 .andExpect(jsonPath("$.firstName").value("Ana"))
-                .andExpect(jsonPath("$.passwordHash").doesNotExist());
+                .andExpect(jsonPath("$.passwordHash").doesNotExist())
+                .andReturn();
+
+        // The issued cookie is a real session: it opens the protected scope.
+        Cookie session = result.getResponse().getCookie("amano_auth");
+        assertThat(session).isNotNull();
+        mockMvc.perform(get("/api/users/me").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value(email));
     }
 
-    /** FR-004/FR-014: valid credentials on a PENDING account never log in (403, no cookie). */
     @Test
     void unverifiedCredentialsAreForbiddenWithTheResendIndicator() throws Exception {
         String email = "login.pendiente@example.com";
@@ -115,7 +117,18 @@ class SimulatedLoginIT {
                 .andExpect(jsonPath("$.properties.action").value("RESEND_VERIFICATION"));
     }
 
-    /** FR-014: a wrong password is a 401 that does not disclose the account exists. */
+    @Test
+    void unverifiedAccountWithWrongPasswordDoesNotRevealItsState() throws Exception {
+        String email = "login.pendiente.mal@example.com";
+        register(email);
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody(email, "OtraClave123!")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value(BAD_CREDENTIALS));
+    }
+
     @Test
     void wrongPasswordIsUnauthorizedWithoutCookie() throws Exception {
         String email = "login.clave@example.com";
@@ -127,10 +140,10 @@ class SimulatedLoginIT {
                         .content(loginBody(email, "OtraClave123!")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("Set-Cookie"))
-                .andExpect(jsonPath("$.title").value("No autorizado"));
+                .andExpect(jsonPath("$.title").value("No autorizado"))
+                .andExpect(jsonPath("$.detail").value(BAD_CREDENTIALS));
     }
 
-    /** FR-014: an unknown account answers the very same 401 as a wrong password. */
     @Test
     void unknownAccountIsUnauthorizedWithTheSameShape() throws Exception {
         mockMvc.perform(post("/api/auth/login")
@@ -138,6 +151,18 @@ class SimulatedLoginIT {
                         .content(loginBody("no.existe@example.com", "Password123!")))
                 .andExpect(status().isUnauthorized())
                 .andExpect(header().doesNotExist("Set-Cookie"))
-                .andExpect(jsonPath("$.title").value("No autorizado"));
+                .andExpect(jsonPath("$.title").value("No autorizado"))
+                .andExpect(jsonPath("$.detail").value(BAD_CREDENTIALS));
+    }
+
+    @Test
+    void missingFieldsAreA400WithFieldMessages() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody("   ", "")))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().doesNotExist("Set-Cookie"))
+                .andExpect(jsonPath("$.properties.fields.email").value("El correo electrónico es obligatorio"))
+                .andExpect(jsonPath("$.properties.fields.password").value("La contraseña es obligatoria"));
     }
 }
