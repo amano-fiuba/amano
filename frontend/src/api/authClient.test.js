@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { NETWORK_ERROR_MESSAGE, me, register, resendVerification } from './authClient'
+import {
+  LOGIN_NETWORK_ERROR_MESSAGE,
+  NETWORK_ERROR_MESSAGE,
+  login,
+  me,
+  register,
+  resendVerification,
+} from './authClient'
 
 beforeEach(() => {
   vi.unstubAllGlobals()
@@ -165,5 +172,98 @@ describe('resendVerification(endpoint: POST /api/auth/resend-verification, contr
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
 
     expect(await resendVerification('ana@example.com')).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('login(endpoint: POST /api/auth/login)', () => {
+  it('200 devuelve ok con el perfil y envía las credenciales como JSON con cookie', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ id: 7, firstName: 'Ana' }),
+      }),
+    )
+
+    const result = await login('ana@example.com', 'Password123!')
+
+    expect(result).toEqual({ ok: true, profile: { id: 7, firstName: 'Ana' } })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ana@example.com', password: 'Password123!' }),
+    })
+  })
+
+  it('401 devuelve el detalle sin acción', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ title: 'No autorizado', detail: 'Credenciales inválidas' }),
+      }),
+    )
+
+    expect(await login('ana@example.com', 'mala')).toEqual({
+      ok: false,
+      status: 401,
+      detail: 'Credenciales inválidas',
+      fields: {},
+      action: null,
+    })
+  })
+
+  it('403 expone la acción RESEND_VERIFICATION', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () =>
+          Promise.resolve({
+            detail: 'Tu cuenta aún no ha sido verificada. Por favor, revisa tu correo electrónico',
+            properties: { action: 'RESEND_VERIFICATION' },
+          }),
+      }),
+    )
+
+    const result = await login('ana@example.com', 'Password123!')
+
+    expect(result.status).toBe(403)
+    expect(result.action).toBe('RESEND_VERIFICATION')
+  })
+
+  it('4xx con cuerpo no JSON no rompe', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.reject(new Error('no json')),
+      }),
+    )
+
+    expect(await login('a@b.co', 'x')).toEqual({
+      ok: false,
+      status: 401,
+      detail: '',
+      fields: {},
+      action: null,
+    })
+  })
+
+  it('5xx y fallo de red se tratan como network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+    expect(await login('a@b.co', 'x')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await login('a@b.co', 'x')).toEqual({ ok: false, network: true })
+  })
+
+  it('LOGIN_NETWORK_ERROR_MESSAGE es el mensaje fijo del login', () => {
+    expect(LOGIN_NETWORK_ERROR_MESSAGE).toBe('No se pudo iniciar sesión. Intenta nuevamente')
   })
 })
