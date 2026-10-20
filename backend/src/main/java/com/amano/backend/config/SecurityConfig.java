@@ -39,8 +39,9 @@ import jakarta.servlet.http.HttpServletResponse;
  *   credential and the request carries no session yet (feature 003, FR-005, D7);
  * - {@code POST /api/auth/resend-verification} is public: it is the neutral,
  *   always-200 resend endpoint of feature 003 (FR-011..FR-013);
- * - {@code POST /api/auth/login} is the public provisional stub of feature 003
- *   (FR-014, D7): it cannot require a session;
+ * - {@code POST /api/auth/login} and {@code POST /api/auth/logout} are public
+ *   (feature 004): login cannot require a session, and logout only expires the
+ *   cookie, so it is harmless (and idempotent) without one;
  * - {@code /api/users/**} requires a VERIFIED session (feature 003, FR-004,
  *   SC-002): a cookie issued before verifying is no session at all.
  */
