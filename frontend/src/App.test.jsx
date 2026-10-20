@@ -30,7 +30,7 @@ describe('App (T015)', () => {
 })
 
 describe('App rutas (T005/T009, specs/002-user-profile)', () => {
-  it('/profile sin sesión redirige al flujo de registro (FR-008)', async () => {
+    it('/profile sin sesión redirige al inicio de sesión (FR-008)', async () => {
     render(
       <AuthProvider>
         <MemoryRouter initialEntries={['/profile']}>
@@ -39,7 +39,9 @@ describe('App rutas (T005/T009, specs/002-user-profile)', () => {
       </AuthProvider>,
     )
 
-    expect(await screen.findByText(/crear\s+tu\s+cuenta/i)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
     // FR-008: no hay destello de datos del perfil.
     expect(screen.queryByTestId('profile-email')).not.toBeInTheDocument()
   })
