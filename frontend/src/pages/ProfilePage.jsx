@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
 
-// Pantalla "Mi perfil" de solo lectura (specs/002-user-profile): los datos
-// provienen únicamente del contrato de sesión GET /api/users/me vía me();
+// Pantalla "Mi perfil" (specs/002-user-profile): los datos provienen
+// únicamente del contrato de sesión GET /api/users/me vía me();
 // refresco explícito al montar (igual que el dashboard). La contraseña nunca
 // se muestra en claro (FR-007 de 001): presentación enmascarada (FR-002).
 // Opcionales ausentes → "No informado" (FR-004); monedas vacías → ARS (FR-006);
-// sin avatar propio (o imagen caída) → avatar por defecto (FR-005). Sin
-// controles de edición: la modificación queda diferida (FR-011).
+// sin avatar propio (o imagen caída) → avatar por defecto (FR-005). Desde 005
+// (FR-001) la edición vive en /profile/edit, accesible desde aquí.
 export default function ProfilePage() {
   const { user, setUser } = useAuth()
   const [error, setError] = useState(false)
@@ -89,6 +90,10 @@ export default function ProfilePage() {
       </p>
       <p>
         Monedas: <span data-testid="profile-currencies">{currencies.join(', ')}</span>
+      </p>
+      {/* FR-011 de 002 activado por 005: la edición vive en /profile/edit. */}
+      <p>
+        <Link to="/profile/edit">Modificar perfil</Link>
       </p>
     </main>
   )

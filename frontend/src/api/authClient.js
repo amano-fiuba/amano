@@ -169,3 +169,102 @@ export async function logout() {
     return { ok: false, network: true }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Edición del perfil (specs/005-edit-user-profile, contracts/users-api.md).
+// Conventions shared with the 001 client: { ok: true, profile } on success
+// (the server answers the FRESH public representation), { ok: false, status,
+// fields, detail } per contract failures and { ok: false, network: true } for
+// network failures / 5xx. A 401 never carries domain meaning: the caller lets
+// the ProtectedRoute gate of the route redirect.
+// FR-019: fixed message for network failures or 5xx on these mutations.
+// ---------------------------------------------------------------------------
+
+export const UPDATE_NETWORK_ERROR_MESSAGE =
+  'No se pudo completar la actualización. Intenta nuevamente'
+
+/** PUT /api/users/me (US1): names, lastName, cbuCvu, currencies. NEVER the email. */
+export async function updateProfile(payload) {
+  try {
+    const response = await fetch('/api/users/me', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (response.ok) {
+      return { ok: true, profile: await response.json() }
+    }
+    return await parseProblemOf(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/** PUT /api/users/me/password (US2): current credit + policy-compliant new one. */
+export async function updatePassword(payload) {
+  try {
+    const response = await fetch('/api/users/me/password', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (response.ok) {
+      return { ok: true, profile: await response.json() }
+    }
+    return await parseProblemOf(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * PUT /api/users/me/avatar (US3): replaces (or creates first) the own binary.
+ * The server validates the REAL content again (magic bytes + 2 MB, D6).
+ */
+export async function updateAvatar(file) {
+  try {
+    const body = new FormData()
+    body.append('avatar', file, file.name)
+    const response = await fetch('/api/users/me/avatar', {
+      method: 'PUT',
+      credentials: 'include',
+      body,
+    })
+    if (response.ok) {
+      return { ok: true, profile: await response.json() }
+    }
+    return await parseProblemOf(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/** DELETE /api/users/me/avatar (US3): back to the default representation; 204. */
+export async function deleteAvatar() {
+  try {
+    const response = await fetch('/api/users/me/avatar', {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (response.ok) {
+      return { ok: true } // 204 sin cuerpo
+    }
+    return await parseProblemOf(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/** Shared 4xx mapping for the mutation endpoints (parseProblem + status). */
+async function parseProblemOf(response) {
+  if (response.status === 401) {
+    return { ok: false, status: 401 }
+  }
+  if (response.status >= 500) {
+    return { ok: false, network: true }
+  }
+  const problem = await parseProblem(response)
+  return { ok: false, status: response.status, ...problem }
+}
