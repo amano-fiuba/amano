@@ -7,8 +7,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -16,6 +19,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.expense.IdempotencyConflictException;
 
 /**
  * Global REST error handling following RFC 7807 ProblemDetail, as defined in
@@ -32,6 +36,9 @@ public class ProblemDetailExceptionHandler {
 
     /** Properties key carrying the per-field validation messages map (contract "Errores"). */
     public static final String FIELDS_PROPERTY = "fields";
+
+    /** Header whose absence feature 007 turns into an actionable 400 (FR-027). */
+    public static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
     /**
      * Machine-readable indicator of the 403 raised when a pending account tries to
@@ -169,6 +176,16 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Reuse of an idempotency key with a different payload (FR-027): 422, no internals. */
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ProblemDetail handleIdempotencyConflict(IdempotencyConflictException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
+        problem.setTitle("Operación ya registrada");
+        problem.setProperty("properties", Map.of("code", "IDEMPOTENCY_KEY_REUSED"));
+        return problem;
+    }
+
     /** Service-level validations after normalization (Q3/Q4): same 400 shape (FR-018). */
     @ExceptionHandler(FieldValidationException.class)
     public ProblemDetail handleFieldValidation(FieldValidationException exception) {
@@ -200,6 +217,47 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "No existe el recurso solicitado");
         problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /**
+     * Malformed JSON body (feature 007, FR-026/SC-006): a predictable 400 instead
+     * of falling through to the generic 500. Generic Spanish message, no internals.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleMessageNotReadable(HttpMessageNotReadableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, "La solicitud no es válida");
+        problem.setTitle("Validación fallida");
+        return problem;
+    }
+
+    /**
+     * Unsupported request Content-Type: the contract expects Spring's standard 415,
+     * so it must not fall through to the generic 500 handler.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ProblemDetail handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "El tipo de contenido de la solicitud no es soportado");
+        problem.setTitle("Tipo de contenido no soportado");
+        return problem;
+    }
+
+    /**
+     * Missing required request header (FR-027). Only {@code Idempotency-Key} gets
+     * the actionable feature-007 message; any other required header keeps a generic
+     * 400 — the same status Spring would produce — instead of a 500. No internal
+     * detail is exposed.
+     */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ProblemDetail handleMissingRequestHeader(MissingRequestHeaderException exception) {
+        String detail = IDEMPOTENCY_KEY_HEADER.equals(exception.getHeaderName())
+                ? "Falta la cabecera Idempotency-Key en la solicitud"
+                : "Falta una cabecera obligatoria en la solicitud";
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
+        problem.setTitle("Validación fallida");
         return problem;
     }
 

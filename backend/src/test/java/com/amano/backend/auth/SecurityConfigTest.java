@@ -175,4 +175,37 @@ class SecurityConfigTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("No autorizado"));
     }
+
+    /** Feature 007 (T012): /api/expenses joins the verified scope. */
+    @Test
+    void expensesEndpointWithoutSessionReturns401ProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/expenses"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.title").value("No autorizado"));
+    }
+
+    /** Feature 007 (T012): a pending account cannot register expenses (FR-001/FR-002). */
+    @Test
+    void expensesEndpointWithUnverifiedCookieReturns401() throws Exception {
+        User pending = new User();
+        pending.setEmailVerifiedAt(null);
+        given(userRepository.findById(17L)).willReturn(Optional.of(pending));
+
+        mockMvc.perform(post("/api/expenses").cookie(userCookie(17L)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("No autorizado"));
+    }
+
+    /** Feature 007 (T012): a verified session passes the rule (no controller here ⇒ 404). */
+    @Test
+    void expensesEndpointWithVerifiedCookiePassesTheRule() throws Exception {
+        User verified = new User();
+        verified.setEmailVerifiedAt(OffsetDateTime.now());
+        given(userRepository.findById(18L)).willReturn(Optional.of(verified));
+
+        mockMvc.perform(post("/api/expenses").cookie(userCookie(18L)))
+                .andExpect(status().isNotFound());
+    }
 }

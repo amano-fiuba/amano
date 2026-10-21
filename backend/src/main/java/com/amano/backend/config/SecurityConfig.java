@@ -46,8 +46,9 @@ import jakarta.servlet.http.HttpServletResponse;
  *   are public (feature 006): whoever forgot the password has no session, the
  *   request always answers a neutral 200 and, on redemption, the emailed link is
  *   the credential;
- * - {@code /api/users/**} requires a VERIFIED session (feature 003, FR-004,
- *   SC-002): a cookie issued before verifying is no session at all.
+ * - {@code /api/users/**} and {@code /api/expenses/**} require a VERIFIED session
+ *   (feature 003, FR-004, SC-002; feature 007): a cookie issued before verifying
+ *   is no session at all.
  */
 @Configuration
 @EnableWebSecurity
@@ -66,7 +67,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/verify-email",
                                 "/api/auth/login", "/api/auth/logout", "/api/auth/resend-verification",
                                 "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
-                        .requestMatchers("/api/users/**").access(verifiedAccount(userRepository))
+                        .requestMatchers("/api/users/**", "/api/expenses/**")
+                                .access(verifiedAccount(userRepository))
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(new UnauthorizedEntryPoint(objectMapper))
@@ -82,7 +84,8 @@ public class SecurityConfig {
      * only passes when its account has {@code email_verified_at} set. The check runs
      * on the server, against the database — never trusting the client or the mere
      * possession of a cookie (constitution IX) — and covers every endpoint of the
-     * {@code /api/users/**} scope, present or future, without route enumeration.
+     * {@code /api/users/**} and {@code /api/expenses/**} scopes, present or future,
+     * without route enumeration.
      * A pending (or deleted) account is denied; the {@link UnauthorizedAccessDeniedHandler}
      * turns that into the 401 ProblemDetail of 001.
      */

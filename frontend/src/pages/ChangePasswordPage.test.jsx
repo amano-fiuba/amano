@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
 import ProtectedRoute from '../auth/ProtectedRoute'
 import { MemoryRouter, Route, Routes } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Cambio de contraseña (specs/005-edit-user-profile US2, T013): exige
 // acreditar la contraseña actual (FR-013/FR-014, clarificación 2026-10-20),
@@ -22,7 +22,7 @@ import ChangePasswordPage from './ChangePasswordPage'
 
 beforeEach(() => {
   vi.unstubAllGlobals()
-    updatePassword.mockReset()
+  updatePassword.mockReset()
   vi.stubGlobal(
     'fetch',
     vi.fn().mockResolvedValue({
@@ -118,8 +118,9 @@ describe('ChangePasswordPage (US2)', () => {
     await user.type(screen.getByLabelText('Nueva contraseña'), 'corta')
     await user.click(screen.getByLabelText('Confirmar nueva contraseña'))
 
-    expect(await screen.findByText(/la contraseña debe tener al menos 8 caracteres/i))
-      .toBeInTheDocument()
+    expect(
+      await screen.findByText(/la contraseña debe tener al menos 8 caracteres/i),
+    ).toBeInTheDocument()
     // La política fallida en el cliente nunca llama al servidor.
     expect(updatePassword).not.toHaveBeenCalled()
 

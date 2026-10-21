@@ -50,8 +50,8 @@ export default function DashboardPage() {
   const fullName = user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName
 
   return (
-    <main>
-      <img src={avatarUrl} alt="@avatar" width={96} height={96} />
+    <main className="page">
+      <img src={avatarUrl} alt="@avatar" className="app-avatar" />
       <h1>Bienvenida, {fullName}</h1>
       {verifiedWelcome && (
         <p data-testid="dashboard-verified-welcome">

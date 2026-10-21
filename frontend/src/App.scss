@@ -1,12 +1,45 @@
+// Landing provisoria del scaffold, adaptada a la paleta del tema global.
+// Variables locales mapeadas a los colores de inicial.scss
+:root {
+  --bg: var(--color-fondo);
+  --text: var(--color-texto-suave);
+  --text-h: var(--color-texto);
+  --border: var(--color-borde);
+  --code-bg: var(--color-superficie-fuerte);
+  --accent: var(--color-acento);
+  --accent-bg: color-mix(in srgb, var(--color-acento) 12%, transparent);
+  --accent-border: color-mix(in srgb, var(--color-acento) 50%, transparent);
+  --social-bg: color-mix(in srgb, var(--color-superficie) 60%, transparent);
+  --shadow:
+    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --mono: ui-monospace, Consolas, monospace;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
 .counter {
   font-size: 16px;
   padding: 5px 10px;
-  border-radius: 5px;
   color: var(--accent);
+  font-weight: 700;
   background: var(--accent-bg);
   border: 2px solid transparent;
   transition: border-color 0.3s;
   margin-bottom: 24px;
+  cursor: pointer;
 
   &:hover {
     border-color: var(--accent-border);
@@ -64,9 +97,8 @@
   place-items: center;
   flex-grow: 1;
 
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
+  p {
+    margin: 0;
   }
 }
 
@@ -78,9 +110,6 @@
   & > div {
     flex: 1 1 0;
     padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
   }
 
   .icon {
@@ -88,20 +117,10 @@
     width: 22px;
     height: 22px;
   }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
 }
 
 #docs {
   border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
 }
 
 #next-steps ul {
@@ -118,6 +137,7 @@
   a {
     color: var(--text-h);
     font-size: 16px;
+    border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--social-bg);
     display: flex;
@@ -135,30 +155,15 @@
       width: 18px;
     }
   }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
 }
 
 #spacer {
   height: 88px;
   border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
+}
+
+#social .button-icon {
+  fill: var(--text-h);
 }
 
 .ticks {

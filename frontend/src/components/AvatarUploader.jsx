@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import {
   FORMAT_MESSAGE,
-  SIZE_MESSAGE,
   realContentType,
+  SIZE_MESSAGE,
 } from '../validation/avatarValidation'
 import { AVATAR_MAX_BYTES } from '../validation/registerValidation'
 
