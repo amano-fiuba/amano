@@ -39,17 +39,29 @@ persiste en `expenses.idempotency_key UUID NOT NULL` con la restricción
   **después de un guardado exitoso** (junto con el reseteo de FR-032) y, por lo tanto, todo
   gasto iniciado luego de un reseteo es una operación distinta. Un rechazo de validación no
   persiste nada, así que reutilizar la clave en el siguiente intento es inocuo.
-- **Reintento (backend)**: si ya existe un gasto del mismo usuario con esa clave, el backend
-  **no valida ni inserta de nuevo**: devuelve la representación persistida con **200 OK**
-  (mismo recurso, sin segundo gasto). La primera creación responde **201 Created**.
+- **Reintento con el mismo payload (backend)**: si ya existe un gasto del mismo usuario con esa
+  clave **y el payload normalizado coincide**, el backend **no valida ni inserta de nuevo**:
+  devuelve la representación persistida con **200 OK** (mismo recurso, sin segundo gasto). La
+  primera creación responde **201 Created**.
+- **Misma clave con payload distinto** (decisión cerrada): el backend responde **422
+  Unprocessable Content** y **no persiste** nada, dejando intacto el gasto original. Es la
+  convención del borrador IETF de `Idempotency-Key` y cubre el caso típico de timeout con
+  persistencia seguido de una edición del monto. El frontend, ante `422`, renueva la clave e
+  informa al usuario para que vuelva a confirmar (evita que quede atascado).
+- **Cómo se decide "igual" vs. "distinto" sin columna extra**: se comparan los campos
+  normalizados que la fila ya conserva (`amount` con `compareTo`, `currency`, `expense_date`,
+  `category`, `expense_type`, `payment_method` y `description` con el `null` canónico) contra el
+  payload entrante ya normalizado. No se agrega hash ni columna de payload.
 - **Carrera entre dos solicitudes simultáneas con la misma clave**: ambas consultan por
   `(user_id, key)` y no encuentran nada; ambas intentan insertar. PostgreSQL serializa por el
-  índice único: la segunda inserción espera a que la primera termine y, si la primera
+  índice único: la segunda inserción **espera** a que la primera termine y, si la primera
   confirma, falla con violación de unicidad. El servicio `@Transactional` propaga
   `DataIntegrityViolationException`; el controlador la captura (la transacción ya quedó
-  revertida), relee el gasto ganador por `(user_id, key)` en una transacción nueva y responde
-  **200** con ese recurso. Si la relectura no encontrara nada (el ganador abortó y nuestra
-  inserción no se ejecutó por la excepción), se considera error inesperado (500).
+  revertida), relee el gasto ganador por `(user_id, key)` en una transacción nueva y aplica la
+  **misma comparación de payload**: `200` si coincide, `422` si difiere. Por eso **no se usa
+  `409`**: la espera en el índice único más la relectura resuelven la carrera de forma
+  determinista. Si la relectura no encontrara nada (el ganador abortó y nuestra inserción no se
+  ejecutó por la excepción), se considera error inesperado (500).
 - **Dos gastos idénticos deliberados**: al renovar la clave tras cada éxito, dos operaciones
   legítimamente separadas tienen claves distintas y producen dos filas, respetando el
   Assumption del spec (FR-027 solo bloquea el reenvío de *una misma* operación).
@@ -72,6 +84,14 @@ persiste en `expenses.idempotency_key UUID NOT NULL` con la restricción
    proxy `/api`).
 5. **Replay 200 vs. 201**: elegido **200**. Es explícito ("el recurso ya existía") y el cliente
    acepta ambos como éxito; devolver 201 sugeriría una creación nueva.
+6. **Misma clave con payload distinto: `422` vs. devolver el original**: elegido **422**. El
+   borrador IETF de `Idempotency-Key` recomienda `422`; devolver el original en silencio
+   ocultaría que el usuario editó el gasto tras un timeout y le haría creer que se guardó lo
+   nuevo. `409` se descarta: es para conflictos de estado del recurso, no para payload
+   inconsistente con una clave.
+7. **Carrera simultánea: `409` vs. esperar y resolver**: elegido **esperar y resolver** (200 si
+   el payload coincide, 422 si difiere). Es determinista, se apoya en el `UNIQUE` y evita un
+   código de estado nuevo que obligaría al cliente a reintentar sin necesidad.
 
 ---
 
@@ -354,8 +374,9 @@ testeada con listas vacías, desordenadas, con valores inválidos y con las tres
   no pueda registrar gastos. Cambio mínimo, sin tocar los matchers existentes.
 - **Cabecera**: `Idempotency-Key` obligatoria (UUID). Ausente o malformada ⇒ 400.
 - **Request/Response y códigos**: ver [contracts/expenses-api.md](./contracts/expenses-api.md).
-  Resumen: `201` creación, `200` replay idempotente, `400` validación/forma, `401` sin sesión,
-  `415` media type, `500` inesperado. **No** se usa `409`.
+  Resumen: `201` creación, `200` replay idempotente (mismo payload), `422` misma clave con
+  payload distinto, `400` validación/forma, `401` sin sesión, `415` media type, `500`
+  inesperado. **No** se usa `409` (ver D1).
 - **Errores por campo**: `ProblemDetail` con `properties.fields` (formato vigente), para que el
   frontend asocie el mensaje al campo.
 - **Cambios mínimos en el manejador global** (justificados, Constitución VIII):

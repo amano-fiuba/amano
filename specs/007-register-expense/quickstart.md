@@ -73,9 +73,14 @@ confirmar que se lee y muestra exactamente con la misma escala (`10,10` sigue si
 
 - **Doble clic**: confirmar dos veces rápido. Esperado: un solo gasto, botón "Guardando…"
   durante la operación.
-- **Reintento tras timeout**: forzar un timeout del cliente después de que el backend persistió
-  (p. ej. interrumpir la respuesta) y reintentar el mismo envío con la misma `Idempotency-Key`.
-  Esperado: `200`, un único gasto.
+- **Reintento tras timeout (mismo payload)**: forzar un timeout del cliente después de que el
+  backend persistió (p. ej. interrumpir la respuesta) y reintentar el mismo envío con la misma
+  `Idempotency-Key`. Esperado: `200`, un único gasto.
+- **Misma clave con payload distinto**: tras el timeout de arriba, editar el monto y reenviar
+  con la misma `Idempotency-Key`. Esperado: `422`, sin segundo gasto y con el original intacto;
+  el frontend renueva la clave e informa que se debe confirmar de nuevo.
+- **Concurrencia**: enviar dos solicitudes simultáneas con la misma clave. Esperado: una sola
+  fila; respuestas `201`/`200` si el payload coincide, `201`/`422` si difiere.
 - **Dos gastos idénticos deliberados**: registrar el mismo gasto dos veces (con reseteo entre
   medio). Esperado: dos filas, dos claves distintas.
 

@@ -113,7 +113,7 @@ Orden: normalizar → validar todo en un solo pase → persistir. Cualquier erro
 | `paymentMethod` | `valueOf` sobre `PaymentMethod` | ∈ catálogo | FR-011, FR-022 |
 | `description` | recorte Unicode + CRLF/CR→LF; vacío ⇒ `null` | code points ≤ 200 | FR-012, FR-017, FR-022 |
 | `deviceTimeZone` | — | `ZoneId.of` válido; si falta o es inválido ⇒ tolerancia (no error) | FR-022 |
-| propiedades reservadas | `@JsonAnySetter` | rechazo de `userId`/`creatorId`/`creator`/`user`/`participants`/`splits`/`divisions`/`shares`/`debts`/`friends`/`groups` | FR-005, FR-006 |
+| propiedades reservadas | `@JsonAnySetter` | rechazo de `userId`/`creatorId`/`creator`/`user`/`participants`/`participantIds`/`splits`/`divisions`/`shares`/`debts`/`friends`/`groups` | FR-005, FR-006 |
 | `Idempotency-Key` (cabecera) | — | presente y UUID válido (400 si no) | FR-027 |
 
 ## Reglas derivadas
@@ -121,7 +121,11 @@ Orden: normalizar → validar todo en un solo pase → persistir. Cualquier erro
 - **Creador**: siempre `user_id` = principal de la sesión; nunca provisto por el cliente
   (FR-003/FR-004/FR-005).
 - **Idempotencia**: existe a lo sumo un gasto por `(user_id, idempotency_key)`. Si la clave ya
-  existe, se devuelve ese gasto (replay) sin insertar (FR-027/SC-003).
+  existe **y el payload normalizado coincide**, se devuelve ese gasto (replay `200`) sin
+  insertar (FR-027/SC-003). Si la clave existe pero el payload **difiere** (comparando
+  `amount`, `currency`, `expense_date`, `category`, `expense_type`, `payment_method` y
+  `description` de la fila persistida contra el payload entrante normalizado), se responde
+  `422` y no se inserta (FR-027, ver research.md §D1). No se agrega columna de hash.
 - **Dos gastos idénticos deliberados**: al renovarse la clave tras cada éxito, producen dos
   filas válidas (Assumption del spec).
 - **Precisión**: `amount` se almacena y se lee como `NUMERIC(11,2)`; la representación de API

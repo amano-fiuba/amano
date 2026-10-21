@@ -20,7 +20,7 @@ Registra un gasto personal (US1). Requiere sesión **verificada**, como `/api/us
 | Cabecera | Obligatoria | Reglas |
 |---|---|---|
 | `Content-Type` | Sí | `application/json` |
-| `Idempotency-Key` | Sí | UUID. Identifica **la operación de guardado** (FR-027): un reintento de la misma operación reutiliza el mismo valor; un gasto nuevo deliberado usa uno nuevo. Ausente o inválido ⇒ `400` |
+| `Idempotency-Key` | Sí | UUID. Identifica **la operación de guardado** (FR-027): un reintento de la misma operación reutiliza el mismo valor; un gasto nuevo deliberado usa uno nuevo. Ausente o inválido ⇒ `400`. Reutilizarla con un **payload distinto** ⇒ `422` (ver Semántica de idempotencia) |
 
 ### Petición (application/json)
 
@@ -74,9 +74,30 @@ usada en `UserAccountResponse`).
 
 ### Respuesta 200 (replay idempotente)
 
-Si ya existe un gasto del mismo usuario con la misma `Idempotency-Key`, el backend **no valida
-ni inserta de nuevo** y responde `200` con la **misma representación** del gasto ya persistido
-(FR-027/SC-003). El cliente trata `200` y `201` como éxito.
+Si ya existe un gasto del mismo usuario con la misma `Idempotency-Key` **y el payload
+normalizado coincide**, el backend **no valida ni inserta de nuevo** y responde `200` con la
+**misma representación** del gasto ya persistido (FR-027/SC-003). El cliente trata `200` y
+`201` como éxito.
+
+Se comparan los campos normalizados que el gasto persistido ya conserva
+(`amount`, `currency`, `expense_date`, `category`, `expense_type`, `payment_method`,
+`description`); no se requiere una columna extra. La comparación de `amount` usa `compareTo` y
+la de `description` usa el `null` canónico.
+
+### Respuesta 422 (clave reutilizada con payload distinto)
+
+Si existe un gasto con la misma `Idempotency-Key` pero el payload normalizado **difiere**, la
+solicitud se rechaza con `422 Unprocessable Content` (convención del borrador IETF de
+`Idempotency-Key`); **no se persiste** un segundo gasto ni se aplica el nuevo payload, y el
+gasto original queda intacto. Caso típico: un timeout con persistencia seguido de una edición
+del monto.
+
+El mensaje es claro y accionable (p. ej. `detail`: "La operación ya fue registrada con datos
+distintos. Reintentá el guardado."), sin exponer internos (SC-006). El frontend, ante `422`,
+**renueva la clave** e informa al usuario para que confirme de nuevo (ver contrato del
+frontend), de modo que el usuario nunca quede atascado.
+
+Formato: `application/problem+json`; puede incluir `properties.code = "IDEMPOTENCY_KEY_REUSED"`.
 
 ### Respuestas de fallo
 
@@ -86,6 +107,7 @@ ni inserta de nuevo** y responde `200` con la **misma representación** del gast
 | `Idempotency-Key` ausente o inválida | `400` | Validación fallida | mensaje claro; sin detalle interno |
 | Propiedad reservada (creador/participantes/divisiones/…) | `400` | Validación fallida | campo ofensor en `properties.fields` (FR-005/FR-006) |
 | JSON malformado | `400` | Validación fallida | mensaje genérico (nuevo handler; FR-026) |
+| Misma `Idempotency-Key` con payload distinto | `422` | Operación ya registrada | mensaje accionable; `properties.code` si aplica; sin datos sensibles |
 | Sin cookie / cookie inválida o expirada | `401` | No autorizado | "Necesitas iniciar sesión para continuar"; el gate redirige al login de 004 |
 | Cuenta no verificada | `401` | No autorizado | bloqueo del ámbito `verifiedAccount` (coherente con `/api/users/**`) |
 | `Content-Type` no soportado | `415` | — | respuesta estándar de Spring |
@@ -94,14 +116,26 @@ ni inserta de nuevo** y responde `200` con la **misma representación** del gast
 Ningún error expone trazas, nombres de clases/paquetes, SQL, identificadores internos, tokens,
 cookies ni datos de otros usuarios (FR-026/SC-006).
 
-### Reglas de idempotencia (resumen operativo)
+### Semántica de idempotencia (resumen operativo)
+
+| Estado de `(user_id, Idempotency-Key)` | Payload entrante | Resultado |
+|---|---|---|
+| No existe | cualquiera válido | `201`, se persiste |
+| Existe | igual al persistido (normalizado) | `200` con el gasto original |
+| Existe | distinto del persistido | `422`, no se persiste |
+| En curso (otra solicitud sin confirmar) | igual | espera a que termine el ganador y responde `200` |
+| En curso (otra solicitud sin confirmar) | distinto | espera al ganador y responde `422` |
+
+Reglas:
 
 1. El frontend genera la clave con `crypto.randomUUID()` al primer confirmar.
 2. Un reintento por timeout o fallo de red reutiliza la misma clave.
 3. Tras un guardado exitoso (y el reseteo de FR-032), la clave se renueva.
 4. Dos gastos idénticos en operaciones distintas usan claves distintas ⇒ dos gastos.
-5. Carrera de dos solicitudes simultáneas con la misma clave: el índice único resuelve; la
-   perdedora responde `200` con el gasto ganador (ver research.md §D1).
+5. Carrera de dos solicitudes simultáneas con la misma clave: PostgreSQL serializa por el
+   índice único; la perdedora espera al ganador, relee y resuelve por payload (`200` si
+   coincide, `422` si difiere). El índice único es el punto de serialización, por lo que **no
+   se usa `409`** (ver research.md §D1).
 
 ## Contrato del frontend con este endpoint
 
@@ -116,7 +150,9 @@ cookies ni datos de otros usuarios (FR-026/SC-006).
 - **Guardar** (US1): `POST /api/expenses` con la clave del intento. Éxito (`201`/`200`) ⇒
   notificación de éxito que se cierra a los 5 s o antes si el usuario la cierra, reseteo exacto
   de FR-032 y permanencia en la pantalla (sin redirección ni listado). `400` ⇒ mensajes por
-  campo en `properties.fields` sin limpiar el formulario. `401` ⇒ `ProtectedRoute`.
+  campo en `properties.fields` sin limpiar el formulario. `422` ⇒ la clave se **renueva** y se
+  informa que la operación anterior ya quedó registrada con datos distintos; el usuario vuelve
+  a confirmar (sin quedar atascado) y sus datos se conservan. `401` ⇒ `ProtectedRoute`.
   Red/`5xx` ⇒ mensaje fijo, sin notificación de éxito, datos conservados (FR-029/FR-030).
 - **Estado de envío** (FR-027): botón deshabilitado con texto "Guardando…" o indicador
   equivalente; el formulario permanece visible; los controles no permiten un segundo envío.

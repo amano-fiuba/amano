@@ -67,7 +67,7 @@ reintentos concurrentes a esa escala.
 | I | Arquitectura y separación de responsabilidades | PASS | Paquete nuevo `com.amano.backend.expense/` con la misma forma que `user/` (entidad, repositorio, DTOs, servicio, controlador); la validación/normalización vive en el servicio y en utilidades puras, no en el controlador (research.md §D9). Se reutilizan seguridad, `ProblemDetailExceptionHandler`, `FieldValidationException`, `Currency`, `TextField`, `react-hook-form` y el cliente `authClient.me()`. No se refactoriza código ajeno |
 | II | Desarrollo guiado por especificaciones y trazabilidad | PASS | `spec.md` aprobado; este plan cita FR/SC por decisión y la tabla de trazabilidad de pruebas asocia cada FR/SC con su verificación; `data-model.md` y `contracts/` son la fuente técnica |
 | III | Entrega incremental por historia | PASS | US1 (registro válido) es independiente y entregable; US2 (validación cliente) y US3 (identidad/sesión/duplicados) se apoyan sobre US1. Orden sugerido de implementación y dependencias en "Fases de implementación" |
-| IV | Alcance controlado y fidelidad al backlog | PASS | Se respeta Out of Scope; las decisiones que la spec delegó al plan quedan en research.md con alternativas; las ambigüedades detectadas (redundancia de FR-012, interpretación estricta del formato de miles, código de replay idempotente) se documentan como supuestos explícitos, no se resuelven por inferencia silenciosa |
+| IV | Alcance controlado y fidelidad al backlog | PASS | Se respeta Out of Scope; las decisiones que la spec delegó al plan quedan en research.md con alternativas; las ambigüedades detectadas (redundancia de FR-012, interpretación estricta del formato de miles, códigos de idempotencia (replay 200 / payload distinto 422)) se documentan como supuestos explícitos, no se resuelven por inferencia silenciosa |
 | V | Calidad, pruebas y cobertura | PASS | Estrategia por capas abajo; umbral 85 % verificado en `pom.xml` (JaCoCo LINE 0.85) y `vite.config.js` (lines/statements 85). Se incluyen regresiones de 001/004 por el cambio en `SecurityConfig` y en el manejador de errores |
 | VI | Integridad de las reglas de negocio | PASS | Propiedad por sesión (FR-003/FR-005), gasto estrictamente personal (FR-006), catálogos cerrados validados en backend (FR-022); no se inventan invariantes financieras |
 | VII | Contratos REST y compatibilidad | PASS | `contracts/expenses-api.md`; formato ProblemDetail RFC 7807 idéntico al vigente; el único cambio de contrato existente son matchers de seguridad (se amplía el ámbito verificado) y un handler nuevo, sin romper contratos de 001–006 |
@@ -114,6 +114,7 @@ backend/src/main/java/com/amano/backend/expense/
 ├── PaymentMethod.java               # CASH | DEBIT_CARD | ...
 ├── RegisterExpenseRequest.java      # DTO de entrada + @JsonAnySetter de reservados
 ├── ExpenseResponse.java             # DTO de salida (amount como String)
+├── IdempotencyConflictException.java # clave reutilizada con payload distinto ⇒ 422
 └── ExpenseService.java              # Validación/normalización + persistencia atómica
 backend/src/main/java/com/amano/backend/expense/ExpenseController.java  # POST /api/expenses
 backend/src/main/java/com/amano/backend/expense/ExpenseAmountNormalizer.java  # monto canónico
@@ -126,14 +127,17 @@ backend/src/test/java/com/amano/backend/expense/
 ├── ExpenseAmountNormalizerTest.java
 ├── ExpenseDescriptionNormalizerTest.java
 ├── ExpenseDateValidatorTest.java
+├── ExpenseSchemaIT.java
 ├── ExpenseServiceTest.java
 └── RegisterExpenseIT.java
 
 # Modificados (cambios mínimos):
 backend/src/main/java/com/amano/backend/config/SecurityConfig.java          # ámbito verificado
-backend/src/main/java/com/amano/backend/common/ProblemDetailExceptionHandler.java # 400 de forma/cabecera
+backend/src/main/java/com/amano/backend/common/ProblemDetailExceptionHandler.java # 400 de forma/cabecera + 422 de idempotencia
+backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java        # regresión + /api/expenses
+backend/src/test/java/com/amano/backend/common/ProblemDetailExceptionHandlerTest.java # 400/422 + regresión
 
-frontend/src/api/expenseClient.js               # createExpense(payload, idempotencyKey, tz)
+frontend/src/api/expenseClient.js               # createExpense(payload, idempotencyKey); deviceTimeZone dentro de payload
 frontend/src/validation/expenseValidation.js    # parseo puro de monto, fecha, descripción
 frontend/src/validation/expenseCatalog.js        # catálogos code → etiqueta (es)
 frontend/src/pages/NewExpensePage.jsx            # ruta protegida /expenses/new
@@ -171,7 +175,7 @@ repositorio: `*Test` (unitarias con Mockito), `*IT` (Testcontainers + MockMvc),
 | `ExpenseDescriptionNormalizerTest` | Recorte Unicode (incluye NBSP), CRLF/CR→LF, tabs/saltos internos conservados, 200/201, solo espacios/tabs/saltos ⇒ ausente, conteo por code points | FR-012, FR-017, FR-022 |
 | `ExpenseDateValidatorTest` | Hoy, pasada, futura, zona adelantada, zona ausente, zona inválida, tolerancia de un día acotada | FR-009, FR-016, FR-022, SC-011 |
 | `ExpenseServiceTest` | Catálogos manipulados, creador/participantes/divisiones prohibidos, normalización + un solo pase de validación, sin persistir ante error, idempotencia lógica (replay por clave) | FR-005, FR-006, FR-021, FR-024, FR-025, SC-001, SC-002, SC-008 |
-| `RegisterExpenseIT` | Creación válida vinculada al usuario autenticado; rechazos sin persistir; lectura exacta de montos (SC-004) desde PostgreSQL; 401 sin sesión; idempotencia (replay tras persistencia, doble envío concurrente con la misma clave, dos gastos idénticos en operaciones distintas con claves distintas); atomicidad; mensajes sin internos (SC-006); la migración V4 aplica limpia; la ruta exige cuenta verificada | FR-001–FR-006, FR-021–FR-032, SC-001, SC-002, SC-003, SC-004, SC-006, SC-007, SC-008 |
+| `RegisterExpenseIT` | Creación válida vinculada al usuario autenticado; rechazos sin persistir; lectura exacta de montos (SC-004) desde PostgreSQL; 401 sin sesión; idempotencia (replay con mismo payload tras persistencia, misma clave con payload distinto ⇒ 422 sin segundo gasto, doble envío concurrente con la misma clave, dos gastos idénticos en operaciones distintas con claves distintas); atomicidad; mensajes sin internos (SC-006); la migración V4 aplica limpia; la ruta exige cuenta verificada | FR-001–FR-006, FR-021–FR-032, SC-001, SC-002, SC-003, SC-004, SC-006, SC-007, SC-008 |
 | `SecurityConfigTest` (regresión) | `/api/expenses` exige sesión verificada; ningún matcher previo cambia | FR-001, FR-002 |
 
 ### Frontend
@@ -206,8 +210,9 @@ repositorio: `*Test` (unitarias con Mockito), `*IT` (Testcontainers + MockMvc),
 
 | Desviación | Por qué es necesaria | Alternativa más simple rechazada |
 |---|---|---|
-| Dos cambios mínimos en código compartido (`SecurityConfig`, `ProblemDetailExceptionHandler`) | La ruta nueva debe quedar en el ámbito verificado y los errores de forma/cabecera deben ser 400 sin filtrar internos | Duplicar una cadena de seguridad solo para gastos (fragmentaria la seguridad) o dejar 500 en JSON malformado (contradice VIII/SC-006) |
-| Cabecera `Idempotency-Key` + columna/índice único | FR-027/SC-003 exigen evitar duplicados ante timeout con persistencia previa; el bloqueo de UI no cubre el reintento del cliente | Solo deshabilitar el botón (no cubre timeout), o deduplicar por campos (impedirla registrar dos gastos idénticos deliberados, contra el Assumption del spec) |
+| Tres cambios mínimos en código compartido (`SecurityConfig`, `ProblemDetailExceptionHandler`, handler de `422` de idempotencia) | La ruta nueva debe quedar en el ámbito verificado; los errores de forma/cabecera deben ser 400 sin filtrar internos; la decisión "misma clave con payload distinto ⇒ 422" necesita una excepción propia y su handler | Duplicar una cadena de seguridad solo para gastos (fragmentaría la seguridad); dejar 500 en JSON malformado (contradice VIII/SC-006); o devolver el gasto original ante payload distinto (ocultaría la edición del usuario) |
+| Cabecera `Idempotency-Key` + columna/índice único | FR-027/SC-003 exigen evitar duplicados ante timeout con persistencia previa; el bloqueo de UI no cubre el reintento del cliente | Solo deshabilitar el botón (no cubre timeout), o deduplicar por campos (impediría registrar dos gastos idénticos deliberados, contra el Assumption del spec) |
+| Comparación de payload sin columna extra | Distinguir "mismo payload" (200) de "payload distinto" (422) sin agregar hash/columna, usando los campos ya persistidos | Agregar una columna `payload_hash`: más esquema y migración sin mejorar la semántica a esta escala |
 | DTO de monto como `String` canónico | Evita que Jackson o `Number`/`parseFloat` introduzcan error de punto flotante (FR-023/SC-004) | `BigDecimal` serializado como número JSON: `10,10` se convierte en `10.1` en JS y pierde la escala exigida |
 
 Sin violaciones a principios. Las XIII y XII se cumplen al commitear/abrir el PR, fuera del
@@ -231,13 +236,27 @@ confirmarse en revisión (Constitución IV). Detalle en [research.md](./research
    operación responde 200 con la misma representación, sin crear un segundo gasto.
 4. **`Idempotency-Key` obligatoria**: ausente o inválida ⇒ 400. La spec exige la protección;
    hacerla opcional la desactivaría silenciosamente.
-5. **`/api/expenses` exige cuenta verificada**: la spec dice "autenticado"; se homologa a
-   `/api/users/**` (una cuenta pendiente no registra gastos).
+5. **`/api/expenses` exige cuenta verificada (decisión confirmada por el equipo)**: se homologa
+   a `/api/users/**`. Evidencia del repo: `SecurityConfig.verifiedAccount(...)`
+   ([SecurityConfig.java:89-102](backend/src/main/java/com/amano/backend/config/SecurityConfig.java))
+   resuelve el ámbito a nivel servidor contra la base —exige `email_verified_at`, sin confiar en
+   la cookie (Constitución IX)— y hoy cubre `/api/users/**`
+   ([SecurityConfig.java:69](backend/src/main/java/com/amano/backend/config/SecurityConfig.java)),
+   dejando el resto en `authenticated()`
+   ([SecurityConfig.java:70](backend/src/main/java/com/amano/backend/config/SecurityConfig.java));
+   T011 extiende el matcher a `"/api/expenses/**"`. El login ya rechaza cuentas no verificadas,
+   por lo que es defensa en profundidad y no restringe a ningún usuario con sesión válida.
 6. **`deviceTimeZone` viaja en el cuerpo** (dato de validación no persistido), no como cabecera.
 7. **Conteo de la descripción por code points** (no unidades UTF-16 ni *chars* UTF-8), igual en
    frontend y backend.
 8. **Sin endpoint de lectura**: el listado está fuera de alcance; las IT verifican la
    persistencia con SQL directo (patrón de `ProfileEditIT`).
+9. **Misma `Idempotency-Key` con payload distinto ⇒ `422`** (decisión cerrada, ver
+   [research.md](./research.md) §D1 y [contracts/expenses-api.md](./contracts/expenses-api.md)):
+   la spec exige evitar duplicados pero no define este caso; se adopta la convención del
+   borrador IETF (`422`, sin persistir). El frontend renueva la clave ante ese código. La
+   carrera simultánea se resuelve esperando al ganador por el `UNIQUE` y comparando el payload
+   (`200`/`422`), sin usar `409`.
 
 ## Verification (quickstart)
 
