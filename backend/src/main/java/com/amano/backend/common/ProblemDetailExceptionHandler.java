@@ -161,6 +161,21 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /**
+     * Password change without the right accreditation (feature 005, FR-014): 400
+     * with the exact message as detail AND as the currentPassword field message,
+     * so the UI highlights the offending input; the stored hash was not touched.
+     */
+    @ExceptionHandler(WrongCurrentPasswordException.class)
+    public ProblemDetail handleWrongCurrentPassword(WrongCurrentPasswordException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Validación fallida");
+        problem.setProperty("properties",
+                Map.of(FIELDS_PROPERTY, Map.of("currentPassword", exception.getMessage())));
+        return problem;
+    }
+
     /** Framework 404s must not be swallowed by the generic 500 handler (contract "Errores"). */
     @ExceptionHandler({ NoHandlerFoundException.class, NoResourceFoundException.class })
     public ProblemDetail handleNoHandlerFound(Exception exception) {

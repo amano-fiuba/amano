@@ -12,6 +12,8 @@ import VerifyEmailPage from './pages/VerifyEmailPage'
 import ExpiredLinkPage from './pages/ExpiredLinkPage'
 import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
+import ProfileEditPage from './pages/ProfileEditPage'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 import './App.css'
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
@@ -128,9 +130,10 @@ function Home() {
 }
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
-// '/check-email' (pantalla "Revisa tu correo"), '/verify-email' (canje del
-// enlace) y '/verify-email/expired' (enlace vencido), todas públicas por diseño;
-// '/dashboard' y '/profile' quedan protegidas.
+// '/login' (specs/004-user-login), '/check-email' (pantalla "Revisa tu correo"),
+// '/verify-email' (canje del enlace) y '/verify-email/expired' (enlace vencido),
+// todas públicas por diseño; '/dashboard', '/profile' y sus rutas de edición
+// (005) quedan protegidas.
 export function AppRoutes() {
   return (
     <Routes>
@@ -154,6 +157,24 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Edición del perfil (specs/005-edit-user-profile, FR-001/FR-018). */}
+      <Route
+        path="/profile/edit"
+        element={
+          <ProtectedRoute>
+            <ProfileEditPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Cambio de contraseña (US2 de 005). */}
+      <Route
+        path="/profile/password"
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
           </ProtectedRoute>
         }
       />

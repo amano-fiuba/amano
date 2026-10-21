@@ -12,6 +12,7 @@ import com.amano.backend.common.EmailAlreadyRegisteredException;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.user.AvatarValidator;
 import com.amano.backend.user.Currency;
+import com.amano.backend.user.PasswordPolicy;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserAvatar;
 import com.amano.backend.user.UserAvatarRepository;
@@ -96,7 +97,7 @@ public class RegistrationService {
             fieldErrors.put("password", "La contraseña es obligatoria");
         }
         else {
-            String passwordMessage = validatePassword(password);
+            String passwordMessage = PasswordPolicy.validationError(password);
             if (passwordMessage != null) {
                 fieldErrors.put("password", passwordMessage);
             }
@@ -194,24 +195,7 @@ public class RegistrationService {
         userAvatarRepository.save(stored);
     }
 
-    /** FR-006 + Q2: 8-64 chars, at least one uppercase/lowercase/digit/special. */
-    private static String validatePassword(String password) {
-        if (password.length() < 8) {
-            return "La contraseña debe tener al menos 8 caracteres";
-        }
-        if (password.length() > 64) {
-            return "La contraseña no puede superar los 64 caracteres";
-        }
-        boolean missingRequirements =
-                !password.matches(".*[A-Z].*")
-                        || !password.matches(".*[a-z].*")
-                        || !password.matches(".*[0-9].*")
-                        || !password.matches(".*[^A-Za-z0-9].*");
-        if (missingRequirements) {
-            return "La contraseña debe incluir una mayúscula, una minúscula, un número y un símbolo";
-        }
-        return null;
-    }
+    /** FR-006 + Q2: policy lives in PasswordPolicy (shared with the 005 edit). */
 
     private static Set<Currency> parseCurrencies(java.util.List<String> requested,
             Map<String, String> fieldErrors) {

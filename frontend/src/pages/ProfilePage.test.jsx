@@ -1,4 +1,6 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../auth/AuthContext'
 
@@ -53,7 +55,12 @@ afterEach(() => {
 function renderProfile() {
   return render(
     <AuthProvider>
-      <ProfilePage />
+      <MemoryRouter initialEntries={['/profile']}>
+        <Routes>
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/edit" element={<div>Pantalla de edición</div>} />
+        </Routes>
+      </MemoryRouter>
     </AuthProvider>,
   )
 }
@@ -168,5 +175,19 @@ describe('ProfilePage (US3: estados de fallo)', () => {
     resolveMe({ ok: true, profile: PERFIL_COMPLETO })
     // Flush de microtareas: la respuesta tardía debe ignorarse sin actualizar estado.
     await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+})
+
+describe('ProfilePage (005: entrada a la edición)', () => {
+  it('"Modificar perfil" es alcanzable desde la visualización en ≤1 interacción (FR-001 de 005)', async () => {
+    const user = userEvent.setup()
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderProfile()
+
+    expect(await screen.findByRole('heading', { name: /mi perfil/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('link', { name: /modificar perfil/i }))
+
+    expect(await screen.findByText('Pantalla de edición')).toBeInTheDocument()
   })
 })
