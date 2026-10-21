@@ -32,13 +32,17 @@ public final class ExpenseAmountNormalizer {
     private ExpenseAmountNormalizer() {
     }
 
-    /** Parses and validates the canonical amount, throwing the field error when invalid. */
+    /**
+     * Parses and validates the canonical amount, throwing the field error when invalid.
+     * The result always uses scale 2 ({@code "10.1"} becomes {@code 10.10}), matching
+     * the {@code NUMERIC(11,2)} column and the response contract.
+     */
     public static BigDecimal normalize(String raw) {
         String error = validationError(raw);
         if (error != null) {
             throw new FieldValidationException(Map.of("amount", error));
         }
-        return new BigDecimal(raw.trim());
+        return new BigDecimal(raw.trim()).setScale(2);
     }
 
     /** Null when the canonical amount is valid, the Spanish message otherwise (FR-022). */
