@@ -1,25 +1,27 @@
-import { BrowserRouter, Route, Routes } from 'react-router'
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import { AuthProvider } from './auth/AuthContext'
-import ProtectedRoute from './auth/ProtectedRoute'
-import RegisterPage from './pages/RegisterPage'
-import LoginPage from './pages/LoginPage'
-import CheckEmailPage from './pages/CheckEmailPage'
-import VerifyEmailPage from './pages/VerifyEmailPage'
-import ExpiredLinkPage from './pages/ExpiredLinkPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import DashboardPage from './pages/DashboardPage'
-import ProfilePage from './pages/ProfilePage'
-import './App.css'
+import { BrowserRouter, Route, Routes } from "react-router";
+import { useState } from "react";
+import heroImg from "./assets/hero.png";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "./assets/vite.svg";
+import { AuthProvider } from "./auth/AuthContext";
+import ProtectedRoute from "./auth/ProtectedRoute";
+import RegisterPage from "./pages/RegisterPage";
+import LoginPage from "./pages/LoginPage";
+import CheckEmailPage from "./pages/CheckEmailPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import ExpiredLinkPage from "./pages/ExpiredLinkPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import DashboardPage from "./pages/DashboardPage";
+import ProfilePage from "./pages/ProfilePage";
+import ProfileEditPage from "./pages/ProfileEditPage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
+import "./App.css";
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
 // conforme avance el feature de registro.
 function Home() {
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(0);
 
   return (
     <>
@@ -62,11 +64,7 @@ function Home() {
             </li>
             <li>
               <a href="https://react.dev" target="_blank" rel="noreferrer">
-                <img
-                  className="button-icon"
-                  src={reactLogo}
-                  alt="React"
-                />
+                <img className="button-icon" src={reactLogo} alt="React" />
               </a>
             </li>
             <li>
@@ -91,7 +89,11 @@ function Home() {
           <p>Stay in touch</p>
           <ul>
             <li>
-              <a href="https://github.com/vitejs/vite" target="_blank" rel="noreferrer">
+              <a
+                href="https://github.com/vitejs/vite"
+                target="_blank"
+                rel="noreferrer"
+              >
                 <img
                   className="button-icon"
                   src="/icons.svg#github-icon"
@@ -100,7 +102,11 @@ function Home() {
               </a>
             </li>
             <li>
-              <a href="https://discord.gg/vite" target="_blank" rel="noreferrer">
+              <a
+                href="https://discord.gg/vite"
+                target="_blank"
+                rel="noreferrer"
+              >
                 <img
                   className="button-icon"
                   src="/icons.svg#discord-icon"
@@ -126,14 +132,16 @@ function Home() {
       <div className="ticks"></div>
       <section id="spacer"></section>
     </>
-  )
+  );
 }
 
-// Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
-// '/check-email' (pantalla "Revisa tu correo"), '/verify-email' (canje del
-// enlace), '/verify-email/expired' (enlace vencido), '/forgot-password' y
-// '/reset-password' (feature 006), todas públicas por diseño; '/dashboard' y '/profile' quedan
-// protegidas.
+// Rutas base del shell de la SPA (T015 + US1 + US2):
+// '/', '/register', '/login', '/check-email', '/verify-email',
+// '/verify-email/expired', '/forgot-password' y '/reset-password'
+// (feature 006 y specs/004-user-login) son rutas públicas por diseño;
+// '/dashboard', '/profile' y sus rutas de edición y cambio de contraseña
+// (005) quedan protegidas.
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -162,8 +170,26 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      {/* Edición del perfil (specs/005-edit-user-profile, FR-001/FR-018). */}
+      <Route
+        path="/profile/edit"
+        element={
+          <ProtectedRoute>
+            <ProfileEditPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Cambio de contraseña (US2 de 005). */}
+      <Route
+        path="/profile/password"
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
     </Routes>
-  )
+  );
 }
 
 export default function App() {
@@ -173,5 +199,5 @@ export default function App() {
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
-  )
+  );
 }

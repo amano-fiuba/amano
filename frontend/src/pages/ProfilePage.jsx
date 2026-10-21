@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
 
@@ -85,6 +86,10 @@ export default function ProfilePage() {
       </p>
       <p>
         Monedas: <span data-testid="profile-currencies">{currencies.join(', ')}</span>
+      </p>
+      {/* FR-011 de 002 activado por 005: la edición vive en /profile/edit. */}
+      <p>
+        <Link to="/profile/edit">Modificar perfil</Link>
       </p>
     </main>
   )

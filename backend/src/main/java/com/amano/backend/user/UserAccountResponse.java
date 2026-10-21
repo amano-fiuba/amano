@@ -22,12 +22,19 @@ public record UserAccountResponse(
         String avatarUrl) {
 
     /** currencies empty → empty list (the client applies the ARS default, FR-011/Q1). */
-    public static UserAccountResponse from(User user, boolean hasCustomAvatar) {
+    public static UserAccountResponse from(User user, boolean hasCustomAvatar, Long avatarVersion) {
         List<String> currencyCodes = new ArrayList<>();
         for (Currency currency : user.getCurrencies()) {
             currencyCodes.add(currency.name());
         }
-        String avatarUrl = hasCustomAvatar ? "/api/users/" + user.getId() + "/avatar" : null;
+        // The avatar content is MUTABLE under a fixed path (feature 005
+        // replaces/deletes the binary), so the URL carries a content-derived
+        // version (?v=fingerprint): any cached representation of a previous
+        // binary never shares the URL of the current one — replacing the
+        // image is always reflected on every consumer, with no stalecache.
+        String avatarUrl = hasCustomAvatar && avatarVersion != null
+                ? "/api/users/" + user.getId() + "/avatar?v=" + avatarVersion
+                : null;
         return new UserAccountResponse(
                 user.getId(),
                 user.getFirstName(),
@@ -37,5 +44,12 @@ public record UserAccountResponse(
                 user.getCbu(),
                 hasCustomAvatar,
                 avatarUrl);
+    }
+
+    /** Deterministic per-byte fingerprint (CRC32), shared by ?v= and the ETag. */
+    public static Long versionOf(byte[] data) {
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(data);
+        return crc.getValue();
     }
 }
