@@ -40,9 +40,10 @@ persiste en `expenses.idempotency_key UUID NOT NULL` con la restricción
   gasto iniciado luego de un reseteo es una operación distinta. Un rechazo de validación no
   persiste nada, así que reutilizar la clave en el siguiente intento es inocuo.
 - **Reintento con el mismo payload (backend)**: si ya existe un gasto del mismo usuario con esa
-  clave **y el payload normalizado coincide**, el backend **no valida ni inserta de nuevo**:
-  devuelve la representación persistida con **200 OK** (mismo recurso, sin segundo gasto). La
-  primera creación responde **201 Created**.
+  clave **y el payload normalizado coincide**, el backend **no inserta de nuevo**: devuelve la
+  representación persistida con **200 OK** (mismo recurso, sin segundo gasto). La primera
+  creación responde **201 Created**. Para poder comparar, el payload entrante se valida y
+  normaliza igual que en la creación; un payload inválido sigue respondiendo **400**.
 - **Misma clave con payload distinto** (decisión cerrada): el backend responde **422
   Unprocessable Content** y **no persiste** nada, dejando intacto el gasto original. Es la
   convención del borrador IETF de `Idempotency-Key` y cubre el caso típico de timeout con
@@ -104,11 +105,13 @@ persiste en `expenses.idempotency_key UUID NOT NULL` con la restricción
   queda garantizado por la precisión; se documenta y se prueba.
 - **Java**: `BigDecimal` (`precision = 11, scale = 2`) en la entidad, nunca `double`/`float`.
   Comparaciones con `compareTo` (no `equals`, que incluye escala).
-- **Validación de escala**: se rechaza `scale() > 2` **sin redondear** (no se usa
-  `setScale` ni `RoundingMode`); el valor canónico recibido siempre tiene hasta 2 decimales.
+- **Validación de escala**: se rechaza `scale() > 2` **sin redondear**. Al normalizar se usa
+  `setScale(2)` sin `RoundingMode`: solo completa los centavos que falten (`10.1` → `10.10`);
+  un tercer decimal ya fue rechazado, así que nunca se ajusta el valor.
 - **Wire format**: el monto se transporta como **string decimal canónico** en JSON, con punto
-  como separador decimal y exactamente dos decimales (p. ej. `"10.10"`, `"0.01"`,
-  `"999999999.99"`). El DTO de entrada y el de salida exponen `String amount`; el servicio
+  como separador decimal y hasta dos decimales (p. ej. `"10.10"`, `"0.01"`,
+  `"999999999.99"`); el servicio completa a dos antes de persistir y la respuesta siempre usa
+  dos. El DTO de entrada y el de salida exponen `String amount`; el servicio
   convierte a/desde `BigDecimal` con `new BigDecimal(canonical)` (nunca `double`).
 - **Por qué string**: evita que Jackson serialice `BigDecimal` como número JSON y que
   `JSON.parse`/`Number` en el navegador colapse `10.10` a `10.1`, perdiendo la escala exigida

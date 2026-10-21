@@ -100,12 +100,12 @@ frontend (`expenseCatalog.js`).
 
 ## Reglas de validación y normalización (backend)
 
-Orden: normalizar → validar todo en un solo pase → persistir. Cualquier error ⇒
+Orden: validar todo en un solo pase → normalizar → persistir. Cualquier error ⇒
 `FieldValidationException` (400, `properties.fields`) y **nada persistido** (FR-024).
 
 | Campo | Normalización | Validación | FR |
 |---|---|---|---|
-| `amount` (string canónico) | `new BigDecimal(texto)`; sin `setScale`/redondeo | numérico; `scale() <= 2`; `0.01 <= x <= 999999999.99`; estrictamente > 0 | FR-013, FR-014, FR-022, FR-023 |
+| `amount` (string canónico) | `new BigDecimal(texto).setScale(2)`: completa centavos (`10.1` → `10.10`), nunca redondea | numérico; `scale() <= 2`; `0.01 <= x <= 999999999.99`; estrictamente > 0 | FR-013, FR-014, FR-022, FR-023 |
 | `currency` | `valueOf` sobre `Currency` | ∈ {ARS, USD, EUR} | FR-011 |
 | `date` (ISO `yyyy-MM-dd`) | `LocalDate.parse` | formato válido; existe; no futura según `deviceTimeZone`; tolerancia de un día si falta/es inválida | FR-009, FR-016, FR-022 |
 | `category` | `valueOf` sobre `ExpenseCategory` | ∈ catálogo | FR-011, FR-022 |

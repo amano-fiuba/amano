@@ -39,7 +39,7 @@ Registra un gasto personal (US1). Requiere sesión **verificada**, como `/api/us
 
 | Campo | Tipo | Obligatorio | Reglas / Normalización |
 |---|---|---|---|
-| `amount` | string | Sí | Decimal **canónico** con punto y exactamente 2 decimales (`"10.10"`), entre `"0.01"` y `"999999999.99"`. El cliente envía el valor ya parseado del formato argentino; el backend **no** acepta `,`, separadores de miles ni punto decimal como entrada del usuario (FR-013/FR-014/FR-022/FR-023) |
+| `amount` | string | Sí | Decimal **canónico** con punto y hasta 2 decimales (`"10.10"`), entre `"0.01"` y `"999999999.99"`; el backend completa a 2 sin redondear. El cliente envía el valor ya parseado del formato argentino; el backend **no** acepta `,`, separadores de miles ni punto decimal como entrada del usuario (FR-013/FR-014/FR-022/FR-023) |
 | `currency` | string | Sí | Uno de `ARS`, `USD`, `EUR` (FR-011) |
 | `date` | string | Sí | ISO `yyyy-MM-dd`; no posterior al día actual según `deviceTimeZone` (FR-009/FR-016) |
 | `category` | string | Sí | Uno de `FOOD`, `TRANSPORT`, `HOUSING`, `SERVICES`, `HEALTH`, `EDUCATION`, `LEISURE`, `SHOPPING`, `PETS`, `OTHER` (FR-011) |
@@ -75,8 +75,9 @@ usada en `UserAccountResponse`).
 ### Respuesta 200 (replay idempotente)
 
 Si ya existe un gasto del mismo usuario con la misma `Idempotency-Key` **y el payload
-normalizado coincide**, el backend **no valida ni inserta de nuevo** y responde `200` con la
-**misma representación** del gasto ya persistido (FR-027/SC-003). El cliente trata `200` y
+normalizado coincide**, el backend **no inserta de nuevo** y responde `200` con la **misma
+representación** del gasto ya persistido (FR-027/SC-003). Para comparar, el payload entrante se
+valida y normaliza igual que en la creación; un payload inválido sigue respondiendo `400`. El cliente trata `200` y
 `201` como éxito.
 
 Se comparan los campos normalizados que el gasto persistido ya conserva

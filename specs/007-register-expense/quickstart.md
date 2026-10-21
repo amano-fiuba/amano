@@ -122,3 +122,24 @@ cd frontend && npx vitest run src/validation/expenseValidation.test.js
 Herramientas ya configuradas: JUnit 5 + Mockito, Spring Boot Test + MockMvc + Testcontainers,
 JaCoCo (en `mvn verify`), Vitest + React Testing Library y cobertura v8 (`npm run test:coverage`).
 No se reducen umbrales ni se excluye código arbitrariamente (Constitución V).
+
+
+## Resultado de la verificación (2026-10-21)
+
+- **Backend**: `mvn -B verify` en verde; **151 unitarias + 82 ITs**, 0 fallos/errores;
+  JaCoCo **96,19 %** de líneas (1111/1155) y **80,73 %** de ramas (352/436), umbral 85 % de
+  líneas cumplido. `RegisterExpenseIT` cubre alta, precisión SC-004, replay `200`, `422` con
+  payload distinto y fila original intacta, concurrencia (`201`/`200` y `201`/`422`), claves
+  distintas, propiedades reservadas, `401` y ausencia de filas parciales.
+- **Frontend**: `npm run lint` con 0 errores (2 warnings preexistentes de `RegisterForm.jsx` y
+  `ChangePasswordPage.jsx`), `npm run test:coverage` con **310 tests** en verde y
+  **91,61 %** de líneas / **91,51 %** de sentencias (umbral 85 %), y `npm run build` correcto.
+  `ExpenseForm.test.jsx` cubre validación cliente, mapeo `400`, `422` con renovación de clave,
+  doble clic, `401`, red/5xx, teclado, `aria-invalid`/`aria-describedby` y viewport de 375 px.
+- **Escenarios 1–6**: verificados mediante las suites automatizadas (API real con Testcontainers
+  y formulario con RTL/jsdom), incluidos montos SC-004 en ARS/USD/EUR y ausencia de detalles
+  internos en los errores.
+- **Escenario 7 (móvil real)**: el recorrido por teclado y las asociaciones ARIA están
+  automatizados; el layout se revisó en CSS (ancho fluido, `min-width: 0` y media query a
+  420 px), pero **no se ejecutó una prueba manual en un navegador móvil real**. No se detectaron
+  anchos fijos que puedan provocar desplazamiento horizontal.
