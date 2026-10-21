@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  FORGOT_PASSWORD_NETWORK_ERROR_MESSAGE,
   LOGIN_NETWORK_ERROR_MESSAGE,
   NETWORK_ERROR_MESSAGE,
+  RESET_PASSWORD_NETWORK_ERROR_MESSAGE,
+  forgotPassword,
   login,
   logout,
   me,
   register,
   resendVerification,
+  resetPassword,
 } from './authClient'
 
 beforeEach(() => {
@@ -284,5 +288,100 @@ describe('logout(endpoint: POST /api/auth/logout)', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
 
     expect(await logout()).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('forgotPassword(endpoint: POST /api/auth/forgot-password, feature 006)', () => {
+  const NEUTRAL_MESSAGE =
+    'Si el correo existe, recibirás un enlace para restablecer tu contraseña'
+
+  it('200 devuelve ok con el mensaje neutro y envía el correo como JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ message: NEUTRAL_MESSAGE }),
+      }),
+    )
+
+    expect(await forgotPassword('ana@example.com')).toEqual({ ok: true, message: NEUTRAL_MESSAGE })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/forgot-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'ana@example.com' }),
+    })
+  })
+
+  it('5xx y fallo de red se tratan como network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+    expect(await forgotPassword('a@b.co')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await forgotPassword('a@b.co')).toEqual({ ok: false, network: true })
+  })
+
+  it('FORGOT_PASSWORD_NETWORK_ERROR_MESSAGE es el mensaje fijo', () => {
+    expect(FORGOT_PASSWORD_NETWORK_ERROR_MESSAGE).toBe(
+      'No se pudo enviar la solicitud. Intenta nuevamente',
+    )
+  })
+})
+
+describe('resetPassword(endpoint: POST /api/auth/reset-password, feature 006)', () => {
+  const SUCCESS = 'Tu contraseña fue actualizada. Ya puedes iniciar sesión'
+
+  it('200 devuelve ok con el mensaje y envía token y contraseñas como JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ message: SUCCESS }) }),
+    )
+
+    expect(await resetPassword('tok', 'Clave123!', 'Clave123!')).toEqual({
+      ok: true,
+      message: SUCCESS,
+    })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/reset-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: 'tok', password: 'Clave123!', confirmPassword: 'Clave123!' }),
+    })
+  })
+
+  it('4xx devuelve status, detail y campos del ProblemDetail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve({
+            detail: 'La solicitud contiene campos inválidos',
+            properties: { fields: { password: 'Muy corta' } },
+          }),
+      }),
+    )
+
+    expect(await resetPassword('tok', 'x', 'x')).toEqual({
+      ok: false,
+      status: 400,
+      detail: 'La solicitud contiene campos inválidos',
+      fields: { password: 'Muy corta' },
+    })
+  })
+
+  it('5xx y fallo de red se tratan como network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    expect(await resetPassword('tok', 'x', 'x')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await resetPassword('tok', 'x', 'x')).toEqual({ ok: false, network: true })
+  })
+
+  it('RESET_PASSWORD_NETWORK_ERROR_MESSAGE es el mensaje fijo', () => {
+    expect(RESET_PASSWORD_NETWORK_ERROR_MESSAGE).toBe(
+      'No se pudo actualizar la contraseña. Intenta nuevamente',
+    )
   })
 })

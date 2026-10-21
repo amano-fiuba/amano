@@ -116,6 +116,24 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Unknown, redeemed or superseded password reset link (feature 006, FR-012): 400. */
+    @ExceptionHandler(PasswordResetTokenInvalidException.class)
+    public ProblemDetail handlePasswordResetTokenInvalid(PasswordResetTokenInvalidException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Enlace no válido");
+        return problem;
+    }
+
+    /** Password reset link past its 1-hour window (feature 006, FR-013): 410. */
+    @ExceptionHandler(PasswordResetTokenExpiredException.class)
+    public ProblemDetail handlePasswordResetTokenExpired(PasswordResetTokenExpiredException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GONE, exception.getMessage());
+        problem.setTitle("Enlace expirado");
+        return problem;
+    }
+
     /**
      * Provisional login stub with bad credentials (feature 003, FR-014): wrong
      * password or unknown account share the 401 of the session filter of 001, so
@@ -158,6 +176,21 @@ public class ProblemDetailExceptionHandler {
                 HttpStatus.BAD_REQUEST, exception.getMessage());
         problem.setTitle("Validación fallida");
         problem.setProperty("properties", Map.of(FIELDS_PROPERTY, exception.getFields()));
+        return problem;
+    }
+
+    /**
+     * Password change without the right accreditation (feature 005, FR-014): 400
+     * with the exact message as detail AND as the currentPassword field message,
+     * so the UI highlights the offending input; the stored hash was not touched.
+     */
+    @ExceptionHandler(WrongCurrentPasswordException.class)
+    public ProblemDetail handleWrongCurrentPassword(WrongCurrentPasswordException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Validación fallida");
+        problem.setProperty("properties",
+                Map.of(FIELDS_PROPERTY, Map.of("currentPassword", exception.getMessage())));
         return problem;
     }
 

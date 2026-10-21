@@ -29,11 +29,17 @@ public class UserMapper {
             return null;
         }
         return userRepository.findById(userId)
-                .map(user -> UserAccountResponse.from(user, hasCustomAvatar(user.getId())))
+                .map(user -> {
+                    byte[] avatarData = avatarDataOf(user.getId());
+                    return UserAccountResponse.from(user, avatarData != null,
+                            avatarData == null ? null : UserAccountResponse.versionOf(avatarData));
+                })
                 .orElse(null);
     }
 
-    private boolean hasCustomAvatar(Long userId) {
-        return userAvatarRepository.existsById(userId);
+    private byte[] avatarDataOf(Long userId) {
+        return userAvatarRepository.findById(userId)
+                .map(UserAvatar::getData)
+                .orElse(null);
     }
 }

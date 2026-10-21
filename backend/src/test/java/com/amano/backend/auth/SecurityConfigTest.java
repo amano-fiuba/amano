@@ -108,6 +108,22 @@ class SecurityConfigTest {
     }
 
     @Test
+    void forgotPasswordEndpointIsReachableWithoutSession() throws Exception {
+        // permitAll (feature 006, FR-001): whoever forgot the password has no session.
+        // 404 = no PasswordResetController in this slice.
+        mockMvc.perform(post("/api/auth/forgot-password"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void resetPasswordEndpointIsReachableWithoutSession() throws Exception {
+        // permitAll (feature 006, FR-010): the emailed link is the credential.
+        // 404 = no PasswordResetController in this slice.
+        mockMvc.perform(post("/api/auth/reset-password"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void usersEndpointsWithoutSessionReturn401ProblemDetail() throws Exception {
         mockMvc.perform(get("/api/users/me"))
                 .andExpect(status().isUnauthorized())

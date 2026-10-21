@@ -21,7 +21,7 @@ const PERFIL_COMPLETO = {
   currencies: ['ARS', 'USD'],
   cbuCvu: '0000003100010000000001',
   hasCustomAvatar: true,
-  avatarUrl: '/api/users/7/avatar',
+  avatarUrl: '/api/users/7/avatar?v=3',
 }
 
 const PERFIL_EDICION_ACTUALIZADO = {
@@ -197,9 +197,8 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     await editarCompletamente(user)
     await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
 
-    expect(
-      await screen.findByText(/el nombre debe tener entre 2 y 50 caracteres/i),
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/el nombre debe tener entre 2 y 50 caracteres/i))
+      .toBeInTheDocument()
     // Los datos escritos se conservan para corregir sin repetir nada (crudos,
     // sin normalización: el trim y los 22 dígitos son del payload al enviar).
     expect(screen.getByLabelText('Apellido')).toHaveValue('Gómez')
@@ -262,7 +261,9 @@ describe('ProfileEditPage (US3: avatar)', () => {
     const avatarActualizado = {
       ...PERFIL_COMPLETO,
       hasCustomAvatar: true,
-      avatarUrl: '/api/users/7/avatar',
+      // La respuesta del servidor lleva su propia versión de contenido (?v=):
+      // distinta de la precargada, el preview refetchea siempre.
+      avatarUrl: '/api/users/7/avatar?v=7',
     }
     updateAvatar.mockResolvedValue({ ok: true, profile: avatarActualizado })
     renderEdit()
@@ -280,7 +281,9 @@ describe('ProfileEditPage (US3: avatar)', () => {
 
     const preview = await screen.findByRole('img', { name: /avatar de ana/i })
     await waitFor(() => {
-      expect(preview.getAttribute('src')).toBe('/api/users/7/avatar')
+      // Tras el reemplazo la versión sube: ?v=1 invalida cualquier imagen
+      // cacheada bajo la misma URL (specs/005, contenido mutable).
+      expect(preview.getAttribute('src')).toBe('/api/users/7/avatar?v=7')
     })
   })
 
@@ -300,9 +303,10 @@ describe('ProfileEditPage (US3: avatar)', () => {
       /el archivo debe ser una imagen jpg o png válida/i,
     )
     expect(updateAvatar).not.toHaveBeenCalled()
-    // El avatar vigente sigue servido (FR-010 de 001 aplicada a la edición).
+    // El avatar vigente sigue servido, con su versión de precarga intacta
+    // (FR-010 de 001 aplicada a la edición).
     expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src')).toBe(
-      '/api/users/7/avatar',
+      '/api/users/7/avatar?v=3',
     )
   })
 
@@ -336,7 +340,7 @@ describe('ProfileEditPage (US3: avatar)', () => {
 
     expect(await screen.findByRole('img', { name: /avatar de ana/i })).toHaveAttribute(
       'src',
-      '/api/users/7/avatar',
+      '/api/users/7/avatar?v=3',
     )
     await user.click(screen.getByRole('button', { name: /eliminar avatar/i }))
 
