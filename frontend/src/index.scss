@@ -158,6 +158,55 @@ ul {
   margin: 0;
 }
 
+// Barra global de navegación (visible en todas las páginas)
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1rem;
+  background: color-mix(in srgb, var(--color-superficie) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-borde);
+
+  // El toggle de tema deja de flotar: vive dentro de la barra.
+  .theme-toggle {
+    position: static;
+    top: auto;
+    right: auto;
+    z-index: auto;
+  }
+}
+
+.site-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.site-nav__link {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: var(--color-texto);
+
+  &:hover {
+    background: var(--color-superficie-fuerte);
+    color: var(--color-texto);
+  }
+
+  &.is-active {
+    background: var(--color-acento);
+    color: #fff;
+  }
+}
+
 // ---- Páginas de la app (prueba visual del tema) ----
 
 .page {

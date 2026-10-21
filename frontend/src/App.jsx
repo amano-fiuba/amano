@@ -16,7 +16,8 @@ import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import ProfileEditPage from './pages/ProfileEditPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
-import ThemeToggle from './components/ThemeToggle'
+import NewExpensePage from './pages/NewExpensePage'
+import SiteNav from './components/SiteNav'
 import './App.scss'
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
@@ -158,6 +159,15 @@ export function AppRoutes() {
         }
       />
       {/* Ruta protegida del perfil (T005; FR-001, FR-008): sin sesión redirige. */}
+      {/* Registro de gasto (specs/007-register-expense, FR-001/FR-002). */}
+      <Route
+        path="/expenses/new"
+        element={
+          <ProtectedRoute>
+            <NewExpensePage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/profile"
         element={
@@ -192,7 +202,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <ThemeToggle />
+        <SiteNav />
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>

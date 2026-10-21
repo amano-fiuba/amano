@@ -76,6 +76,22 @@ describe('App rutas (T005/T009, specs/002-user-profile)', () => {
   })
 })
 
+describe('App ruta de nuevo gasto (specs/007-register-expense, T028)', () => {
+  it('/expenses/new sin sesión redirige al login (FR-001/FR-002)', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/expenses/new']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
+  })
+})
+
 describe('App rutas de verificación (T035, specs/003-email-verification)', () => {
   it('/verify-email sin token es una ruta pública que muestra el enlace inválido (FR-008)', async () => {
     render(
