@@ -42,6 +42,10 @@ import jakarta.servlet.http.HttpServletResponse;
  * - {@code POST /api/auth/login} and {@code POST /api/auth/logout} are public
  *   (feature 004): login cannot require a session, and logout only expires the
  *   cookie, so it is harmless (and idempotent) without one;
+ * - {@code POST /api/auth/forgot-password} and {@code POST /api/auth/reset-password}
+ *   are public (feature 006): whoever forgot the password has no session, the
+ *   request always answers a neutral 200 and, on redemption, the emailed link is
+ *   the credential;
  * - {@code /api/users/**} requires a VERIFIED session (feature 003, FR-004,
  *   SC-002): a cookie issued before verifying is no session at all.
  */
@@ -60,7 +64,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/verify-email",
-                                "/api/auth/login", "/api/auth/logout", "/api/auth/resend-verification").permitAll()
+                                "/api/auth/login", "/api/auth/logout", "/api/auth/resend-verification",
+                                "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                         .requestMatchers("/api/users/**").access(verifiedAccount(userRepository))
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

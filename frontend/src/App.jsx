@@ -1,25 +1,27 @@
-import { BrowserRouter, Route, Routes } from 'react-router'
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import { AuthProvider } from './auth/AuthContext'
-import ProtectedRoute from './auth/ProtectedRoute'
-import RegisterPage from './pages/RegisterPage'
-import LoginPage from './pages/LoginPage'
-import CheckEmailPage from './pages/CheckEmailPage'
-import VerifyEmailPage from './pages/VerifyEmailPage'
-import ExpiredLinkPage from './pages/ExpiredLinkPage'
-import DashboardPage from './pages/DashboardPage'
-import ProfilePage from './pages/ProfilePage'
-import ProfileEditPage from './pages/ProfileEditPage'
-import ChangePasswordPage from './pages/ChangePasswordPage'
-import './App.css'
+import { BrowserRouter, Route, Routes } from "react-router";
+import { useState } from "react";
+import heroImg from "./assets/hero.png";
+import reactLogo from "./assets/react.svg";
+import viteLogo from "./assets/vite.svg";
+import { AuthProvider } from "./auth/AuthContext";
+import ProtectedRoute from "./auth/ProtectedRoute";
+import RegisterPage from "./pages/RegisterPage";
+import LoginPage from "./pages/LoginPage";
+import CheckEmailPage from "./pages/CheckEmailPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
+import ExpiredLinkPage from "./pages/ExpiredLinkPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import DashboardPage from "./pages/DashboardPage";
+import ProfilePage from "./pages/ProfilePage";
+import ProfileEditPage from "./pages/ProfileEditPage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
+import "./App.css";
 
 // Landing provisoria (equipo base); remplazada por las pantallas definitivas
 // conforme avance el feature de registro.
 function Home() {
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(0);
 
   return (
     <>
@@ -62,11 +64,7 @@ function Home() {
             </li>
             <li>
               <a href="https://react.dev" target="_blank" rel="noreferrer">
-                <img
-                  className="button-icon"
-                  src={reactLogo}
-                  alt="React"
-                />
+                <img className="button-icon" src={reactLogo} alt="React" />
               </a>
             </li>
             <li>
@@ -91,7 +89,11 @@ function Home() {
           <p>Stay in touch</p>
           <ul>
             <li>
-              <a href="https://github.com/vitejs/vite" target="_blank" rel="noreferrer">
+              <a
+                href="https://github.com/vitejs/vite"
+                target="_blank"
+                rel="noreferrer"
+              >
                 <img
                   className="button-icon"
                   src="/icons.svg#github-icon"
@@ -100,7 +102,11 @@ function Home() {
               </a>
             </li>
             <li>
-              <a href="https://discord.gg/vite" target="_blank" rel="noreferrer">
+              <a
+                href="https://discord.gg/vite"
+                target="_blank"
+                rel="noreferrer"
+              >
                 <img
                   className="button-icon"
                   src="/icons.svg#discord-icon"
@@ -126,14 +132,16 @@ function Home() {
       <div className="ticks"></div>
       <section id="spacer"></section>
     </>
-  )
+  );
 }
 
-// Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
-// '/login' (specs/004-user-login), '/check-email' (pantalla "Revisa tu correo"),
-// '/verify-email' (canje del enlace) y '/verify-email/expired' (enlace vencido),
-// todas públicas por diseño; '/dashboard', '/profile' y sus rutas de edición
+// Rutas base del shell de la SPA (T015 + US1 + US2):
+// '/', '/register', '/login', '/check-email', '/verify-email',
+// '/verify-email/expired', '/forgot-password' y '/reset-password'
+// (feature 006 y specs/004-user-login) son rutas públicas por diseño;
+// '/dashboard', '/profile' y sus rutas de edición y cambio de contraseña
 // (005) quedan protegidas.
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -143,6 +151,8 @@ export function AppRoutes() {
       <Route path="/check-email" element={<CheckEmailPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/verify-email/expired" element={<ExpiredLinkPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/dashboard"
         element={
@@ -179,7 +189,7 @@ export function AppRoutes() {
         }
       />
     </Routes>
-  )
+  );
 }
 
 export default function App() {
@@ -189,5 +199,5 @@ export default function App() {
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
-  )
+  );
 }

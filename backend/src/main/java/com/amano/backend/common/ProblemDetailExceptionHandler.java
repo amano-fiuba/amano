@@ -116,6 +116,24 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Unknown, redeemed or superseded password reset link (feature 006, FR-012): 400. */
+    @ExceptionHandler(PasswordResetTokenInvalidException.class)
+    public ProblemDetail handlePasswordResetTokenInvalid(PasswordResetTokenInvalidException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Enlace no válido");
+        return problem;
+    }
+
+    /** Password reset link past its 1-hour window (feature 006, FR-013): 410. */
+    @ExceptionHandler(PasswordResetTokenExpiredException.class)
+    public ProblemDetail handlePasswordResetTokenExpired(PasswordResetTokenExpiredException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GONE, exception.getMessage());
+        problem.setTitle("Enlace expirado");
+        return problem;
+    }
+
     /**
      * Provisional login stub with bad credentials (feature 003, FR-014): wrong
      * password or unknown account share the 401 of the session filter of 001, so

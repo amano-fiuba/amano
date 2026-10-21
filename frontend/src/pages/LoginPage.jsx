@@ -4,13 +4,15 @@ import { useAuth } from '../auth/AuthContext'
 
 // Login page (feature 004). On success the profile goes into the shared
 // session store and the user returns to where ProtectedRoute stopped them
-// (state.from), or to the dashboard. Logged-in users skip the form.
+// (state.from), or to the dashboard. Logged-in users skip the form. A notice
+// passed in state.notice (feature 006: password updated) is shown above the form.
 export default function LoginPage() {
   const { user, loading, setUser } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
   const destination = location.state?.from?.pathname ?? '/dashboard'
+  const notice = location.state?.notice
 
   if (loading) {
     return null
@@ -27,7 +29,15 @@ export default function LoginPage() {
   return (
     <main>
       <h1>Iniciar sesión</h1>
+      {notice && (
+        <p role="status" data-testid="login-notice">
+          {notice}
+        </p>
+      )}
       <LoginForm onLoggedIn={handleLoggedIn} />
+      <p>
+        <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
+      </p>
       <p>
         ¿No tienes cuenta? <Link to="/register">Regístrate</Link>
       </p>
