@@ -12,6 +12,7 @@ export const AMOUNT_RANGE = 'El monto debe estar entre 0,01 y 999.999.999,99'
 export const DATE_REQUIRED = 'La fecha es obligatoria'
 export const DATE_FORMAT = 'Ingresá la fecha como dd/mm/aaaa'
 export const DATE_INVALID = 'La fecha no existe'
+export const DATE_FUTURE = 'La fecha no puede ser posterior a hoy'
 
 export const DESCRIPTION_MAX_CODE_POINTS = 200
 export const DESCRIPTION_LENGTH =

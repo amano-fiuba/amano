@@ -125,6 +125,19 @@ describe('createExpense (T024)', () => {
     )
   })
 
+  it('ignora fields que no sean un objeto de mensajes (SC-006)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({
+      status: 400,
+      body: { properties: { fields: 'detalle interno' } },
+    })))
+
+    await expect(createExpense(PAYLOAD, KEY)).resolves.toMatchObject({
+      ok: false,
+      status: 400,
+      fields: {},
+    })
+  })
+
   it('un cuerpo de error no JSON no rompe el cliente', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,

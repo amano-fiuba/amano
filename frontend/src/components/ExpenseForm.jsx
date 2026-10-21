@@ -13,16 +13,27 @@ import {
   TYPE_OPTIONS,
 } from '../validation/expenseCatalog'
 import {
+  DATE_FUTURE,
   normalizeDescription,
   parseArgentineAmount,
   parseArgentineDate,
+  validateDescription,
 } from '../validation/expenseValidation'
 import { deviceTimeZone } from '../hooks/useCurrentDate'
 
 export const EXPENSE_SUCCESS_MESSAGE = 'El gasto se guardó correctamente'
 export const EXPENSE_REUSED_KEY_MESSAGE =
   'La operación ya fue registrada con datos distintos. Reintentá el guardado.'
+export const EXPENSE_SESSION_EXPIRED_MESSAGE =
+  'Tu sesión expiró. Iniciá sesión nuevamente.'
 export const SUCCESS_VISIBLE_MS = 5000
+
+const REQUIRED_SELECT_MESSAGES = {
+  currency: 'La moneda es obligatoria',
+  category: 'La categoría es obligatoria',
+  type: 'El tipo de gasto es obligatorio',
+  paymentMethod: 'El medio de pago es obligatorio',
+}
 
 const FIELD_NAMES = [
   'amount',
@@ -47,8 +58,10 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     reset,
     setValue,
     setError,
+    clearErrors,
     formState: { errors, isSubmitting, dirtyFields },
   } = useForm({
+    mode: 'onBlur',
     defaultValues: {
       amount: '',
       currency: initialCurrency,
@@ -63,6 +76,7 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
   const [idempotencyKey, setIdempotencyKey] = useState(null)
   const [success, setSuccess] = useState('')
   const [formError, setFormError] = useState('')
+  const [sessionExpired, setSessionExpired] = useState(false)
 
   // The preloaded date follows midnight only while the user has not edited it.
   useEffect(() => {
@@ -99,8 +113,24 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     })
   }
 
+  const todayIso = parseArgentineDate(today).iso
+  const validateDate = (value) => {
+    const date = parseArgentineDate(value)
+    if (!date.ok) {
+      return date.error
+    }
+    if (todayIso != null && date.iso > todayIso) {
+      return DATE_FUTURE
+    }
+    return true
+  }
+  const validateRequiredSelect = (field) => (value) =>
+    value ? true : REQUIRED_SELECT_MESSAGES[field]
+
   const onSubmit = async (values) => {
+    clearErrors()
     setFormError('')
+    setSessionExpired(false)
     setSuccess('')
 
     const amount = parseArgentineAmount(values.amount)
@@ -136,7 +166,15 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
       setFormError(EXPENSE_NETWORK_ERROR_MESSAGE)
       return
     }
+    if (result.status === 401) {
+      setSessionExpired(true)
+      setFormError(EXPENSE_SESSION_EXPIRED_MESSAGE)
+      return
+    }
     if (result.reusedKey) {
+      // The previous operation is already persisted: a new confirm must use a
+      // fresh key so the user can intentionally register the edited payload.
+      setIdempotencyKey(null)
       setFormError(result.detail || EXPENSE_REUSED_KEY_MESSAGE)
       return
     }
@@ -169,6 +207,12 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
       {formError && (
         <p role="alert" data-testid="expense-error">
           {formError}
+          {sessionExpired && (
+            <>
+              {' '}
+              <a href="/login">Iniciar sesión</a>
+            </>
+          )}
         </p>
       )}
 
@@ -177,14 +221,21 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
         inputMode="decimal"
         autoComplete="off"
         error={errors.amount?.message}
-        {...register('amount')}
+        {...register('amount', {
+          validate: (value) => {
+            const amount = parseArgentineAmount(value)
+            return amount.ok ? true : amount.error
+          },
+        })}
       />
 
       <SelectField
         label="Moneda"
         options={CURRENCY_OPTIONS}
         error={errors.currency?.message}
-        {...register('currency')}
+        {...register('currency', {
+          validate: validateRequiredSelect('currency'),
+        })}
       />
 
       <TextField
@@ -192,35 +243,43 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
         placeholder="dd/mm/aaaa"
         autoComplete="off"
         error={errors.date?.message}
-        {...register('date')}
+        {...register('date', { validate: validateDate })}
       />
 
       <SelectField
         label="Categoría"
         options={CATEGORY_OPTIONS}
         error={errors.category?.message}
-        {...register('category')}
+        {...register('category', {
+          validate: validateRequiredSelect('category'),
+        })}
       />
 
       <SelectField
         label="Tipo de gasto"
         options={TYPE_OPTIONS}
         error={errors.type?.message}
-        {...register('type')}
+        {...register('type', {
+          validate: validateRequiredSelect('type'),
+        })}
       />
 
       <SelectField
         label="Medio de pago"
         options={PAYMENT_METHOD_OPTIONS}
         error={errors.paymentMethod?.message}
-        {...register('paymentMethod')}
+        {...register('paymentMethod', {
+          validate: validateRequiredSelect('paymentMethod'),
+        })}
       />
 
       <TextField
         label="Descripción"
         autoComplete="off"
         error={errors.description?.message}
-        {...register('description')}
+        {...register('description', {
+          validate: (value) => validateDescription(value) || true,
+        })}
       />
 
       <button type="submit" disabled={isSubmitting}>

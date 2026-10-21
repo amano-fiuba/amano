@@ -246,7 +246,10 @@ ul {
   gap: 0.35rem;
   margin-bottom: 1rem;
 
-  input:not([type="checkbox"]) {
+  input:not([type="checkbox"]),
+  select {
+    width: 100%;
+    min-width: 0;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--color-borde);
     border-radius: 0.5rem;
@@ -260,8 +263,17 @@ ul {
     }
   }
 
-  &.field--invalid input:not([type="checkbox"]) {
+  &.field--invalid input:not([type="checkbox"]),
+  &.field--invalid select {
     border-color: var(--color-error);
+  }
+}
+
+@media (max-width: 420px) {
+  .page {
+    width: calc(100% - 1rem);
+    margin: 1rem auto;
+    padding: 1.25rem;
   }
 }
 

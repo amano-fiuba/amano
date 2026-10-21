@@ -5,6 +5,15 @@
 export const EXPENSE_NETWORK_ERROR_MESSAGE =
   'No se pudo guardar el gasto. Intenta nuevamente'
 
+function safeFields(fields) {
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(fields).filter(([, message]) => typeof message === 'string'),
+  )
+}
+
 /**
  * Returns { ok: true, expense } on 201/200, { ok: false, status, fields, detail }
  * on other 4xx, { ok: false, status: 422, reusedKey: true, detail } when the key
@@ -47,7 +56,7 @@ export async function createExpense(payload, idempotencyKey) {
       ok: false,
       status: response.status,
       detail: problem.detail ?? '',
-      fields: problem.properties?.fields ?? {},
+      fields: safeFields(problem.properties?.fields),
     }
   } catch {
     return { ok: false, network: true }
