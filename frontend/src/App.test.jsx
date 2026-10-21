@@ -116,7 +116,9 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
     hasCustomAvatar: false,
   }
 
-  it('/profile/edit sin sesión redirige al flujo de registro (FR-018 de 005)', async () => {
+  // Sin sesión, el gate de 005 FR-018 reutiliza la redirección de 004 (FR-011):
+  // a /login, no a /register como en las features de registro.
+  it('/profile/edit sin sesión redirige al login (FR-018 de 005)', async () => {
     render(
       <AuthProvider>
         <MemoryRouter initialEntries={['/profile/edit']}>
@@ -125,7 +127,9 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
       </AuthProvider>,
     )
 
-    expect(await screen.findByText(/crear\s+tu\s+cuenta/i)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
   })
 
   it('/profile/edit con sesión renderiza la pantalla de edición con el correo deshabilitado (FR-001, FR-007 de 005)', async () => {
@@ -153,7 +157,7 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
     expect(screen.getByLabelText('Correo electrónico')).toBeDisabled()
   })
 
-  it('/profile/password sin sesión redirige al flujo de registro (FR-018 de 005)', async () => {
+  it('/profile/password sin sesión redirige al login (FR-018 de 005)', async () => {
     render(
       <AuthProvider>
         <MemoryRouter initialEntries={['/profile/password']}>
@@ -162,6 +166,8 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
       </AuthProvider>,
     )
 
-    expect(await screen.findByText(/crear\s+tu\s+cuenta/i)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
   })
 })

@@ -148,12 +148,14 @@ describe('ChangePasswordPage (US2)', () => {
     expect(screen.getByLabelText('Nueva contraseña')).toHaveValue('N3uva#Clave')
   })
 
-  it('sin sesión, ProtectedRoute redirige al flujo de registro (FR-018)', async () => {
+  // El gate redirige a /login desde 004 (FR-011): era /register antes de que
+  // existiera el login; 005 FR-018 hereda esa redirección al flujo de acceso.
+  it('sin sesión, ProtectedRoute redirige al login (FR-018)', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: false, status: 401, json: () => Promise.resolve({}) }),
     )
-    const RegisterPage = (await import('./RegisterPage')).default
+    const LoginPage = (await import('./LoginPage')).default
     render(
       <AuthProvider>
         <MemoryRouter initialEntries={['/profile/password']}>
@@ -167,12 +169,14 @@ describe('ChangePasswordPage (US2)', () => {
                 </ProtectedRoute>
               }
             />
-            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/login" element={<LoginPage />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>,
     )
 
-    expect(await screen.findByText(/crear\s+tu\s+cuenta/i)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
   })
 })

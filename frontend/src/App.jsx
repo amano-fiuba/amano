@@ -130,14 +130,16 @@ function Home() {
 }
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
-// '/check-email' (pantalla "Revisa tu correo"), '/verify-email' (canje del
-// enlace) y '/verify-email/expired' (enlace vencido), todas públicas por diseño;
-// '/dashboard' y '/profile' quedan protegidas.
+// '/login' (specs/004-user-login), '/check-email' (pantalla "Revisa tu correo"),
+// '/verify-email' (canje del enlace) y '/verify-email/expired' (enlace vencido),
+// todas públicas por diseño; '/dashboard', '/profile' y sus rutas de edición
+// (005) quedan protegidas.
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/check-email" element={<CheckEmailPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/verify-email/expired" element={<ExpiredLinkPage />} />
