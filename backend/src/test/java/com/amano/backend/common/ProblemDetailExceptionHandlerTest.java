@@ -9,11 +9,15 @@ import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -180,5 +184,58 @@ class ProblemDetailExceptionHandlerTest {
         assertThat(problem.getProperties().get("properties")).isEqualTo(
                 java.util.Map.of("fields",
                         java.util.Map.of("email", "Ingresa un correo electrónico válido")));
+    }
+
+    /** Feature 007 (T014): malformed JSON is a predictable 400, never a leaking 500. */
+    @Test
+    void malformedJsonMapsTo400WithoutInternals() {
+        ProblemDetail problem = handler.handleMessageNotReadable(
+                new HttpMessageNotReadableException(
+                        "Cannot deserialize org.postgresql: SQL leak", null));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getTitle()).isEqualTo("Validación fallida");
+        assertThat(problem.getDetail()).isEqualTo("La solicitud no es válida");
+        assertThat(String.valueOf(problem))
+                .doesNotContain("postgresql")
+                .doesNotContain("SQL")
+                .doesNotContain("deserialize");
+    }
+
+    /** Feature 007 (T014): a missing Idempotency-Key is a controlled, actionable 400. */
+    @Test
+    void missingIdempotencyKeyMapsTo400WithoutInternals() throws Exception {
+        ProblemDetail problem = handler.handleMissingRequestHeader(
+                new MissingRequestHeaderException("Idempotency-Key", dummyParameter()));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getTitle()).isEqualTo("Validación fallida");
+        assertThat(problem.getDetail()).isEqualTo("Falta la cabecera Idempotency-Key en la solicitud");
+        assertThat(String.valueOf(problem)).doesNotContain("MethodParameter");
+    }
+
+    /** Any other required header keeps a generic 400 instead of the generic 500. */
+    @Test
+    void otherMissingHeaderKeepsGeneric400() throws Exception {
+        ProblemDetail problem = handler.handleMissingRequestHeader(
+                new MissingRequestHeaderException("Authorization", dummyParameter()));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problem.getTitle()).isEqualTo("Validación fallida");
+        assertThat(problem.getDetail()).isEqualTo("Falta una cabecera obligatoria en la solicitud");
+        assertThat(problem.getDetail()).doesNotContain("Authorization");
+    }
+
+    /** Contract 007: an unsupported Content-Type is Spring's 415, never a 500. */
+    @Test
+    void unsupportedContentTypeMapsTo415() {
+        ProblemDetail problem = handler.handleMediaTypeNotSupported(
+                new HttpMediaTypeNotSupportedException(
+                        MediaType.TEXT_PLAIN, java.util.List.of(MediaType.APPLICATION_JSON)));
+
+        assertThat(problem.getStatus()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value());
+        assertThat(problem.getTitle()).isEqualTo("Tipo de contenido no soportado");
+        assertThat(problem.getDetail()).isEqualTo("El tipo de contenido de la solicitud no es soportado");
+        assertThat(String.valueOf(problem)).doesNotContain("text/plain");
     }
 }
