@@ -153,6 +153,67 @@ export async function login(email, password) {
   }
 }
 
+// Feature 006 (password recovery): fixed message for network failures or 5xx.
+export const FORGOT_PASSWORD_NETWORK_ERROR_MESSAGE =
+  'No se pudo enviar la solicitud. Intenta nuevamente'
+
+/**
+ * Requests a password reset link (feature 006, POST /api/auth/forgot-password).
+ * The endpoint is always 200 with the same neutral message whether the account
+ * exists or not (FR-002), so a 4xx never carries domain meaning: anything other
+ * than 200 comes back as { ok: false, network: true }.
+ */
+export async function forgotPassword(email) {
+  try {
+    const response = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, message: body.message }
+    }
+    return { ok: false, network: true }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+// Feature 006 (US2): fixed message for network failures or 5xx on the reset.
+export const RESET_PASSWORD_NETWORK_ERROR_MESSAGE =
+  'No se pudo actualizar la contraseña. Intenta nuevamente'
+
+/**
+ * Redeems a reset link with the new password (feature 006, POST
+ * /api/auth/reset-password). Returns { ok: true, message } on 200 — no session is
+ * opened, the user logs in afterwards. 4xx come back as
+ * { ok: false, status, detail, fields } (400 invalid link or per-field errors,
+ * 410 expired link); network failures and 5xx as { ok: false, network: true }.
+ */
+export async function resetPassword(token, password, confirmPassword) {
+  try {
+    const response = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password, confirmPassword }),
+    })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, message: body.message }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await parseProblem(response)
+    return { ok: false, status: response.status, ...problem }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 /**
  * Logs out (POST /api/auth/logout): the backend expires the HttpOnly cookie,
  * which the SPA cannot delete itself. Always resolves; the caller clears the

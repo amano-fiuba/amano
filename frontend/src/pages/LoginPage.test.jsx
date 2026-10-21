@@ -70,6 +70,24 @@ describe('LoginPage (feature 004)', () => {
     expect(await screen.findByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument()
     expect(screen.getByLabelText('Contraseña')).toHaveAttribute('type', 'password')
     expect(screen.getByRole('link', { name: /regístrate/i })).toHaveAttribute('href', '/register')
+    // Feature 006: entry point to the password recovery request.
+    expect(screen.getByRole('link', { name: /olvidaste tu contraseña/i })).toHaveAttribute(
+      'href',
+      '/forgot-password',
+    )
+  })
+
+  it('muestra el aviso recibido en state.notice (feature 006: contraseña actualizada)', async () => {
+    renderLogin([
+      {
+        pathname: '/login',
+        state: { notice: 'Tu contraseña fue actualizada. Ya puedes iniciar sesión' },
+      },
+    ])
+
+    expect(await screen.findByTestId('login-notice')).toHaveTextContent(
+      'Tu contraseña fue actualizada. Ya puedes iniciar sesión',
+    )
   })
 
   it('campos vacíos: muestra los obligatorios y no llama al backend', async () => {

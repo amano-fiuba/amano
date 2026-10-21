@@ -10,6 +10,8 @@ import LoginPage from './pages/LoginPage'
 import CheckEmailPage from './pages/CheckEmailPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import ExpiredLinkPage from './pages/ExpiredLinkPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import './App.css'
@@ -129,8 +131,9 @@ function Home() {
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
 // '/check-email' (pantalla "Revisa tu correo"), '/verify-email' (canje del
-// enlace) y '/verify-email/expired' (enlace vencido), todas públicas por diseño;
-// '/dashboard' y '/profile' quedan protegidas.
+// enlace), '/verify-email/expired' (enlace vencido), '/forgot-password' y
+// '/reset-password' (feature 006), todas públicas por diseño; '/dashboard' y '/profile' quedan
+// protegidas.
 export function AppRoutes() {
   return (
     <Routes>
@@ -140,6 +143,8 @@ export function AppRoutes() {
       <Route path="/check-email" element={<CheckEmailPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/verify-email/expired" element={<ExpiredLinkPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/dashboard"
         element={
