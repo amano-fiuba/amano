@@ -75,7 +75,7 @@ export default function ChangePasswordPage() {
   }
 
   return (
-    <main>
+    <main className="page">
       <h1>Cambiar contraseña</h1>
       {success && (
         <p role="status" data-testid="form-success">

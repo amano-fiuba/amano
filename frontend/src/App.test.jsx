@@ -104,9 +104,8 @@ describe('App rutas de verificación (T035, specs/003-email-verification)', () =
   })
 })
 
-
 describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => {
-  const PERFILE_FIJO = {
+  const PERFIL_FIJO = {
     id: 7,
     firstName: 'Ana',
     lastName: 'Pérez',
@@ -140,7 +139,7 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(PERFILE_FIJO),
+        json: () => Promise.resolve(PERFIL_FIJO),
       }),
     )
     render(
@@ -168,6 +167,28 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
 
     expect(
       await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('/profile/password con sesión renderiza la pantalla de cambio de contraseña (US2 de 005)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(PERFIL_FIJO),
+      }),
+    )
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/profile/password']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: /cambiar contraseña/i }),
     ).toBeInTheDocument()
   })
 })

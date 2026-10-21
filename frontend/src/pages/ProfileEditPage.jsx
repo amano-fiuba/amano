@@ -144,8 +144,7 @@ export default function ProfileEditPage() {
     }
     if (detail) {
       setFormError(detail)
-    }
-    else {
+    } else {
       setFormError(UPDATE_NETWORK_ERROR_MESSAGE)
     }
   }
@@ -205,17 +204,13 @@ export default function ProfileEditPage() {
 
   if (loadError) {
     return (
-      <main>
+      <main className="page">
         <h1>Modificar perfil</h1>
         <p role="alert">No se pudo cargar el perfil. Intenta nuevamente</p>
       </main>
     )
   }
 
-  // El avatar vive en una ruta fija con contenido mutable (specs/005): la URL
-  // que entrega el servidor ya lleva su versión de contenido (?v=huella), así
-  // que cualquier reemplazo/eliminación produce una URL distinta y ningún
-  // caché viejo del navegador puede ser servido como preview.
   const previewUrl = avatarUrl || '/avatar-default.png'
   const rules = (validate) => ({
     validate: (value) => {
@@ -225,7 +220,7 @@ export default function ProfileEditPage() {
   })
 
   return (
-    <main>
+    <main className="page">
       <h1>Modificar perfil</h1>
       {success && (
         <p role="status" data-testid="form-success">
@@ -238,9 +233,11 @@ export default function ProfileEditPage() {
         </p>
       )}
 
+      {/* US3: avatar procesado independiente de los datos del formulario. */}
       <img
         src={previewUrl}
         alt={`Avatar de ${user?.firstName ?? 'usuario'}`}
+        className="app-avatar"
         width={96}
         height={96}
       />
