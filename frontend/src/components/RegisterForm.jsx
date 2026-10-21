@@ -87,7 +87,7 @@ export default function RegisterForm({ onRegistered }) {
     const result = await register(formData)
 
     if (result.ok) {
-      onRegistered(result.profile)
+      onRegistered(result.email)
       return
     }
     if (result.network) {

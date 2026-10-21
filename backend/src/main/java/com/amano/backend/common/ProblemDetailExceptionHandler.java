@@ -33,6 +33,13 @@ public class ProblemDetailExceptionHandler {
     /** Properties key carrying the per-field validation messages map (contract "Errores"). */
     public static final String FIELDS_PROPERTY = "fields";
 
+    /**
+     * Machine-readable indicator of the 403 raised when a pending account tries to
+     * log in (feature 003, FR-014): the real login feature uses it to offer the
+     * resend link (contracts/email-verification-api.md).
+     */
+    public static final String RESEND_VERIFICATION_ACTION = "RESEND_VERIFICATION";
+
     @ExceptionHandler({ MethodArgumentNotValidException.class, HandlerMethodValidationException.class })
     public ProblemDetail handleValidation(Exception exception) {
         Map<String, String> fields = new LinkedHashMap<>();
@@ -58,10 +65,81 @@ public class ProblemDetailExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ProblemDetail handleDataIntegrity(DataIntegrityViolationException exception) {
         log.warn("Data integrity violation: {}", exception.getMostSpecificCause().getMessage());
+        return emailConflict();
+    }
+
+    /**
+     * Service-level duplicate detection: a verified account already owns the email
+     * (feature 003, FR-016). Same 409 shape as the unique-index race above.
+     */
+    @ExceptionHandler(EmailAlreadyRegisteredException.class)
+    public ProblemDetail handleEmailAlreadyRegistered(EmailAlreadyRegisteredException exception) {
+        log.info("Registration attempt for an already verified email (FR-016)");
+        return emailConflict();
+    }
+
+    private static ProblemDetail emailConflict() {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT, EMAIL_ALREADY_REGISTERED);
         problem.setTitle("Conflicto");
         problem.setProperty("properties", Map.of(FIELDS_PROPERTY, Map.of("email", EMAIL_ALREADY_REGISTERED)));
+        return problem;
+    }
+
+    /**
+     * Redemption of an unknown/tampered link (feature 003, FR-008): 400 with the
+     * neutral message that never reveals whether the account exists.
+     */
+    @ExceptionHandler(VerificationTokenInvalidException.class)
+    public ProblemDetail handleVerificationTokenInvalid(VerificationTokenInvalidException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Enlace no válido");
+        return problem;
+    }
+
+    /** Redemption of an already consumed link (feature 003, FR-007): 409, no session. */
+    @ExceptionHandler(VerificationTokenUsedException.class)
+    public ProblemDetail handleVerificationTokenUsed(VerificationTokenUsedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Enlace ya utilizado");
+        return problem;
+    }
+
+    /** Redemption past the 24 h window (feature 003, FR-006): 410, leads to resend. */
+    @ExceptionHandler(VerificationTokenExpiredException.class)
+    public ProblemDetail handleVerificationTokenExpired(VerificationTokenExpiredException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.GONE, exception.getMessage());
+        problem.setTitle("Enlace expirado");
+        return problem;
+    }
+
+    /**
+     * Provisional login stub with bad credentials (feature 003, FR-014): wrong
+     * password or unknown account share the 401 of the session filter of 001, so
+     * the existence of the account is never disclosed.
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNAUTHORIZED, exception.getMessage());
+        problem.setTitle("No autorizado");
+        return problem;
+    }
+
+    /**
+     * Provisional login stub with valid credentials on a PENDING account (feature
+     * 003, FR-004/FR-014): 403 with the exact message plus the machine-readable
+     * resend indicator the real login feature will consume. No session is issued.
+     */
+    @ExceptionHandler(UnverifiedAccountException.class)
+    public ProblemDetail handleUnverifiedAccount(UnverifiedAccountException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Cuenta no verificada");
+        problem.setProperty("properties", Map.of("action", RESEND_VERIFICATION_ACTION));
         return problem;
     }
 

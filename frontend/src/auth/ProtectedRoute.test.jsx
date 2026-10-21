@@ -18,7 +18,7 @@ function setupRouting(fetchMock) {
     <AuthProvider>
       <MemoryRouter initialEntries={['/dashboard']}>
         <Routes>
-          <Route path="/register" element={<div>ir al registro</div>} />
+          <Route path="/login" element={<div>ir al login</div>} />
           <Route
             path="/dashboard"
             element={
@@ -34,10 +34,10 @@ function setupRouting(fetchMock) {
 }
 
 describe('ProtectedRoute (T015, SC-002)', () => {
-  it('sin sesión redirige a /register', async () => {
+    it('sin sesión redirige a /login', async () => {
     setupRouting(vi.fn().mockResolvedValue({ ok: false, status: 401 }))
 
-    expect(await screen.findByText('ir al registro')).toBeInTheDocument()
+    expect(await screen.findByText('ir al login')).toBeInTheDocument()
   })
 
   it('con sesión activa renderiza el contenido protegido', async () => {

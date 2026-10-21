@@ -85,6 +85,10 @@
     <artifactId>spring-boot-starter-validation</artifactId>
 </dependency>
 <dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
+<dependency>
     <groupId>io.jsonwebtoken</groupId>
     <artifactId>jjwt-api</artifactId>
 </dependency>
@@ -111,6 +115,24 @@
 <dependency>
     <groupId>org.testcontainers</groupId>
     <artifactId>testcontainers-postgresql</artifactId>
+    <scope>test</scope>
+</dependency>
+<!--
+  GreenMail: SMTP en proceso para las IT de verificación de correo.
+  Versión fijada en research.md §1 (2.1.14, única versión explícita porque no
+  está gestionada por el BOM de Spring Boot). Solo scope test: los tests NUNCA
+  envían a Gmail real (research.md D9, regla del equipo).
+-->
+<dependency>
+    <groupId>com.icegreen</groupId>
+    <artifactId>greenmail</artifactId>
+    <version>2.1.14</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>com.icegreen</groupId>
+    <artifactId>greenmail-junit5</artifactId>
+    <version>2.1.14</version>
     <scope>test</scope>
 </dependency>
 	</dependencies>

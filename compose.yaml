@@ -27,6 +27,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?Falta JWT_SECRET en .env}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-86400}
+      # Correo de verificación (feature 003, D8). Con defaults de desarrollo:
+      # sin SMTP configurado el backend arranca igual y el fallo de envío queda
+      # registrado sin bloquear el registro (FR-019). Nunca se envía a Gmail real
+      # desde los tests (research.md D9).
+      MAIL_HOST: ${MAIL_HOST:-localhost}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8081}
     depends_on:
       db:
         condition: service_healthy

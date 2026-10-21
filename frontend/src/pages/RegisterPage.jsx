@@ -1,16 +1,18 @@
 import { useNavigate } from 'react-router'
-import { useAuth } from '../auth/AuthContext'
 import RegisterForm from '../components/RegisterForm'
+import { CHECK_EMAIL_STORAGE_KEY } from './CheckEmailPage'
 
-// Registration page (task T023): on a successful registration it populates the
-// session (automatic login, FR-016) and navigates to the dashboard (SC-001).
+// Registration page (task T024, feature 003): a successful registration does NOT
+// start a session and does not reach the dashboard (FR-001, replaces FR-016 of
+// 001); the account stays "no verificada" until the email link is confirmed.
+// The normalized address is kept in sessionStorage so the "Revisa tu correo"
+// screen can show it again after a reload (FR-002).
 export default function RegisterPage() {
-  const { setUser } = useAuth()
   const navigate = useNavigate()
 
-  const handleRegistered = (profile) => {
-    setUser(profile)
-    navigate('/dashboard')
+  const handleRegistered = (email) => {
+    sessionStorage.setItem(CHECK_EMAIL_STORAGE_KEY, email)
+    navigate('/check-email', { replace: true })
   }
 
   return (
