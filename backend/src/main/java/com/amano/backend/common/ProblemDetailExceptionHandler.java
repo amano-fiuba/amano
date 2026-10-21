@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.expense.IdempotencyConflictException;
 
 /**
  * Global REST error handling following RFC 7807 ProblemDetail, as defined in
@@ -172,6 +173,16 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.PAYLOAD_TOO_LARGE, "El archivo es demasiado grande (máximo 2 MB)");
         problem.setTitle("Payload demasiado grande");
+        return problem;
+    }
+
+    /** Reuse of an idempotency key with a different payload (FR-027): 422, no internals. */
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ProblemDetail handleIdempotencyConflict(IdempotencyConflictException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
+        problem.setTitle("Operación ya registrada");
+        problem.setProperty("properties", Map.of("code", "IDEMPOTENCY_KEY_REUSED"));
         return problem;
     }
 

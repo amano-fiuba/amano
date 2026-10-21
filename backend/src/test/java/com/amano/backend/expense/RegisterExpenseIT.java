@@ -11,9 +11,16 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,9 +40,10 @@ import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Feature 007 US1 contract tests (T023): POST /api/expenses over a real
+ * Feature 007 contract tests (US1/US3): POST /api/expenses over a real
  * PostgreSQL. The owner always comes from the session cookie, amounts are read
- * back exactly from NUMERIC(11,2), and invalid catalogs never persist a row.
+ * back exactly from NUMERIC(11,2), invalid catalogs never persist a row and the
+ * idempotency key is resolved both sequentially and under real concurrency.
  */
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
@@ -120,6 +128,36 @@ class RegisterExpenseIT {
                 .header("Idempotency-Key", key.toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)));
+    }
+
+    private List<Integer> concurrentCreates(Cookie session, UUID key,
+            List<Map<String, String>> payloads) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(payloads.size());
+        CountDownLatch ready = new CountDownLatch(payloads.size());
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (Map<String, String> payload : payloads) {
+                futures.add(pool.submit(() -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Concurrent start timed out");
+                    }
+                    return createExpense(session, key, payload)
+                            .andReturn().getResponse().getStatus();
+                }));
+            }
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            List<Integer> statuses = new ArrayList<>();
+            for (Future<Integer> future : futures) {
+                statuses.add(future.get(30, TimeUnit.SECONDS));
+            }
+            return statuses;
+        }
+        finally {
+            pool.shutdownNow();
+        }
     }
 
     private int rowsWithKey(String email, UUID key) {
@@ -341,6 +379,130 @@ class RegisterExpenseIT {
                 .andExpect(jsonPath("$.properties." + FIELDS + ".category").exists())
                 .andExpect(jsonPath("$.properties." + FIELDS + ".type").exists())
                 .andExpect(jsonPath("$.properties." + FIELDS + ".paymentMethod").exists());
+
+        assertThat(rowsWithKey(email, key)).isZero();
+    }
+
+    @Test
+    void sameKeyWithADifferentPayloadIs422AndKeepsTheOriginalRow() throws Exception {
+        String email = "gasto.conflicto@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        UUID key = UUID.randomUUID();
+        Map<String, String> original = validPayload(LocalDate.now(ZoneOffset.UTC).toString());
+
+        createExpense(session, key, original).andExpect(status().isCreated());
+
+        Map<String, String> edited = new HashMap<>(original);
+        edited.put("amount", "20.20");
+        edited.put("description", "Cena");
+
+        createExpense(session, key, edited)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.title").value("Operación ya registrada"))
+                .andExpect(jsonPath("$.detail").value(
+                        IdempotencyConflictException.MESSAGE))
+                .andExpect(jsonPath("$.properties.code").value("IDEMPOTENCY_KEY_REUSED"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Exception"))));
+
+        assertThat(rowsWithKey(email, key)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT amount::text FROM expenses WHERE idempotency_key = ?",
+                String.class, key)).isEqualTo("10.10");
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT description FROM expenses WHERE idempotency_key = ?",
+                String.class, key)).isEqualTo("Almuerzo");
+    }
+
+    @Test
+    void concurrentSameKeyAndSamePayloadPersistsOneRowAndAnswers201And200()
+            throws Exception {
+        String email = "gasto.carrera.igual@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        UUID key = UUID.randomUUID();
+        Map<String, String> payload = validPayload(LocalDate.now(ZoneOffset.UTC).toString());
+
+        List<Integer> statuses = concurrentCreates(session, key, List.of(payload, payload));
+
+        assertThat(statuses).containsExactlyInAnyOrder(201, 200);
+        assertThat(rowsWithKey(email, key)).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentSameKeyAndDifferentPayloadPersistsOneRowAndAnswers201And422()
+            throws Exception {
+        String email = "gasto.carrera.distinta@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        UUID key = UUID.randomUUID();
+        Map<String, String> first = validPayload(LocalDate.now(ZoneOffset.UTC).toString());
+        Map<String, String> second = new HashMap<>(first);
+        second.put("amount", "20.20");
+
+        List<Integer> statuses = concurrentCreates(session, key, List.of(first, second));
+
+        assertThat(statuses).containsExactlyInAnyOrder(201, 422);
+        assertThat(rowsWithKey(email, key)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT amount::text FROM expenses WHERE idempotency_key = ?",
+                String.class, key)).isIn("10.10", "20.20");
+    }
+
+    @Test
+    void identicalPayloadsWithDifferentKeysPersistTwoRows() throws Exception {
+        String email = "gasto.claves.distintas@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        Map<String, String> payload = validPayload(LocalDate.now(ZoneOffset.UTC).toString());
+        UUID firstKey = UUID.randomUUID();
+        UUID secondKey = UUID.randomUUID();
+
+        createExpense(session, firstKey, payload).andExpect(status().isCreated());
+        createExpense(session, secondKey, payload).andExpect(status().isCreated());
+
+        assertThat(rowsWithKey(email, firstKey)).isEqualTo(1);
+        assertThat(rowsWithKey(email, secondKey)).isEqualTo(1);
+    }
+
+    @Test
+    void reservedPropertiesAreRejectedWithoutPersistingAnything() throws Exception {
+        String email = "gasto.reservados@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        UUID key = UUID.randomUUID();
+        Map<String, Object> payload = new HashMap<>(validPayload(
+                LocalDate.now(ZoneOffset.UTC).toString()));
+        payload.put("userId", 999);
+        payload.put("participants", List.of(999));
+        payload.put("splits", List.of(Map.of("userId", 999)));
+
+        mockMvc.perform(post("/api/expenses")
+                        .cookie(session)
+                        .header("Idempotency-Key", key.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties." + FIELDS + ".userId").exists())
+                .andExpect(jsonPath("$.properties." + FIELDS + ".participants").exists())
+                .andExpect(jsonPath("$.properties." + FIELDS + ".splits").exists());
+
+        assertThat(rowsWithKey(email, key)).isZero();
+    }
+
+    @Test
+    void failedValidationLeavesNoPartialRow() throws Exception {
+        String email = "gasto.sin.parciales@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        UUID key = UUID.randomUUID();
+        Map<String, String> payload = new HashMap<>(
+                validPayload(LocalDate.now(ZoneOffset.UTC).toString()));
+        payload.put("amount", "0");
+        payload.put("description", "a".repeat(201));
+
+        createExpense(session, key, payload).andExpect(status().isBadRequest());
 
         assertThat(rowsWithKey(email, key)).isZero();
     }

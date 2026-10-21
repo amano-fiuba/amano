@@ -10,8 +10,11 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -244,6 +247,7 @@ class ExpenseServiceTest {
         existing.setCategory(ExpenseCategory.FOOD);
         existing.setType(ExpenseType.ONE_TIME);
         existing.setPaymentMethod(PaymentMethod.CASH);
+        existing.setDescription("Almuerzo");
         existing.setIdempotencyKey(KEY);
         when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
                 .thenReturn(Optional.of(existing));
@@ -255,6 +259,252 @@ class ExpenseServiceTest {
         assertThat(registration.created()).isFalse();
         assertThat(registration.expense().id()).isEqualTo(99L);
         assertThat(registration.expense().amount()).isEqualTo("10.10");
+    }
+
+    @Test
+    void boundaryAmountsAreAcceptedWithoutRounding() {
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty());
+
+        for (String amount : new String[] { "0.01", "999999999.99", "1.10" }) {
+            RegisterExpenseRequest request = validRequest();
+            request.setAmount(amount);
+
+            service.registerExpense(USER_ID, KEY, request);
+        }
+
+        ArgumentCaptor<Expense> captor = ArgumentCaptor.forClass(Expense.class);
+        verify(expenseRepository, Mockito.times(3)).save(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(expense -> expense.getAmount().toPlainString())
+                .containsExactly("0.01", "999999999.99", "1.10");
+    }
+
+    @Test
+    void descriptionAtTheLimitIsAccepted() {
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty());
+        RegisterExpenseRequest request = validRequest();
+        request.setDescription("a".repeat(ExpenseDescriptionNormalizer.MAX_CODE_POINTS));
+
+        service.registerExpense(USER_ID, KEY, request);
+
+        ArgumentCaptor<Expense> captor = ArgumentCaptor.forClass(Expense.class);
+        verify(expenseRepository).save(captor.capture());
+        assertThat(captor.getValue().getDescription()).hasSize(200);
+    }
+
+    @Test
+    void everyInvalidFieldIsAccumulatedInOnePassAndNothingIsSaved() {
+        RegisterExpenseRequest request = validRequest();
+        request.setAmount("1E+2");
+        request.setCurrency("GBP");
+        request.setDate(LocalDate.now(ZoneOffset.UTC).plusDays(2).toString());
+        request.setCategory("PARTY");
+        request.setType("WEEKLY");
+        request.setPaymentMethod("BITCOIN");
+        request.setDescription("a".repeat(ExpenseDescriptionNormalizer.MAX_CODE_POINTS + 1));
+
+        FieldValidationException failure = failureOf(request);
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.getFields()).containsOnlyKeys(
+                "amount", "currency", "date", "category", "type", "paymentMethod",
+                "description");
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void blankRequiredFieldsAreErrorsInsteadOfACrash() {
+        RegisterExpenseRequest request = validRequest();
+        request.setAmount("   ");
+        request.setCurrency("");
+        request.setDate(" ");
+        request.setCategory("");
+        request.setType("	");
+        request.setPaymentMethod("  ");
+
+        FieldValidationException failure = failureOf(request);
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.getFields()).containsOnlyKeys(
+                "amount", "currency", "date", "category", "type", "paymentMethod");
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void missingDeviceTimeZoneAppliesTheTolerance() {
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty());
+        RegisterExpenseRequest request = validRequest();
+        request.setDeviceTimeZone(null);
+        request.setDate(LocalDate.now(ZoneOffset.UTC).plusDays(1).toString());
+
+        service.registerExpense(USER_ID, KEY, request);
+
+        verify(expenseRepository).save(any(Expense.class));
+    }
+
+    private static Expense storedExpense(RegisterExpenseRequest request) {
+        Expense expense = new Expense();
+        expense.setId(99L);
+        expense.setUserId(USER_ID);
+        expense.setAmount(ExpenseAmountNormalizer.normalize(request.getAmount()));
+        expense.setCurrency(Currency.valueOf(request.getCurrency()));
+        expense.setExpenseDate(LocalDate.parse(request.getDate()));
+        expense.setCategory(ExpenseCategory.valueOf(request.getCategory()));
+        expense.setType(ExpenseType.valueOf(request.getType()));
+        expense.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod()));
+        expense.setDescription(ExpenseDescriptionNormalizer.normalize(request.getDescription()));
+        expense.setIdempotencyKey(KEY);
+        return expense;
+    }
+
+    @Test
+    void matchingPayloadReplaysTheOriginalWithoutInserting() {
+        RegisterExpenseRequest request = validRequest();
+        Expense existing = storedExpense(request);
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.of(existing));
+
+        ExpenseService.Registration registration = service.registerExpense(USER_ID, KEY, request);
+
+        assertThat(registration.created()).isFalse();
+        assertThat(registration.expense().id()).isEqualTo(99L);
+        assertThat(registration.expense().description()).isEqualTo("Almuerzo");
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void replayComparesAmountsByValueNotByScale() {
+        RegisterExpenseRequest request = validRequest();
+        Expense existing = storedExpense(request);
+        existing.setAmount(new BigDecimal("10.1"));
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.of(existing));
+
+        ExpenseService.Registration registration = service.registerExpense(USER_ID, KEY, request);
+
+        assertThat(registration.created()).isFalse();
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void anyDifferentNormalizedFieldIsAnIdempotencyConflictWithoutInserting() {
+        List<Consumer<RegisterExpenseRequest>> mutations = List.of(
+                request -> request.setAmount("10.11"),
+                request -> request.setCurrency("USD"),
+                request -> request.setDate(LocalDate.now(ZoneOffset.UTC).minusDays(1).toString()),
+                request -> request.setCategory("OTHER"),
+                request -> request.setType("RECURRING"),
+                request -> request.setPaymentMethod("TRANSFER"),
+                request -> request.setDescription("Cena"),
+                request -> request.setDescription(" "));
+
+        for (Consumer<RegisterExpenseRequest> mutation : mutations) {
+            RegisterExpenseRequest original = validRequest();
+            Expense existing = storedExpense(original);
+            RegisterExpenseRequest changed = validRequest();
+            mutation.accept(changed);
+            when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                    .thenReturn(Optional.of(existing));
+
+            IdempotencyConflictException conflict = catchThrowableOfType(
+                    () -> service.registerExpense(USER_ID, KEY, changed),
+                    IdempotencyConflictException.class);
+
+            assertThat(conflict).isNotNull();
+            assertThat(conflict).hasMessage(IdempotencyConflictException.MESSAGE);
+        }
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void reservedPropertiesAreRejectedOneByOneWithoutInserting() {
+        List<String> reserved = List.of(
+                "userId", "creatorId", "creator", "user", "participants", "participantIds",
+                "splits", "divisions", "shares", "debts", "friends", "groups");
+
+        for (String property : reserved) {
+            RegisterExpenseRequest request = validRequest();
+            request.putUnknownProperty(property, "otro-usuario");
+
+            FieldValidationException failure = failureOf(request);
+
+            assertThat(failure).isNotNull();
+            assertThat(failure.getFields()).containsOnlyKeys(property);
+            assertThat(failure.getFields().get(property)).isEqualTo(
+                    "No se permite informar este campo");
+        }
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void allReservedPropertiesAreAccumulatedInOnePass() {
+        RegisterExpenseRequest request = validRequest();
+        request.putUnknownProperty("userId", 1);
+        request.putUnknownProperty("participants", List.of(2));
+        request.putUnknownProperty("splits", List.of(Map.of("userId", 2)));
+
+        FieldValidationException failure = failureOf(request);
+
+        assertThat(failure).isNotNull();
+        assertThat(failure.getFields()).containsOnlyKeys("userId", "participants", "splits");
+        verify(expenseRepository, never()).save(any(Expense.class));
+    }
+
+    @Test
+    void nonReservedUnknownPropertiesAreIgnored() {
+        RegisterExpenseRequest request = validRequest();
+        request.putUnknownProperty("theme", "dark");
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty());
+
+        service.registerExpense(USER_ID, KEY, request);
+
+        verify(expenseRepository).save(any(Expense.class));
+    }
+
+    @Test
+    void concurrentWinnerWithSamePayloadIsReplayed() {
+        RegisterExpenseRequest request = validRequest();
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.of(storedExpense(request)));
+
+        ExpenseService.Registration registration = service.resolveConcurrentRegistration(
+                USER_ID, KEY, request);
+
+        assertThat(registration.created()).isFalse();
+        assertThat(registration.expense().id()).isEqualTo(99L);
+    }
+
+    @Test
+    void concurrentWinnerWithDifferentPayloadIsAConflict() {
+        RegisterExpenseRequest request = validRequest();
+        RegisterExpenseRequest changed = validRequest();
+        changed.setAmount("99.99");
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.of(storedExpense(request)));
+
+        IdempotencyConflictException conflict = catchThrowableOfType(
+                () -> service.resolveConcurrentRegistration(USER_ID, KEY, changed),
+                IdempotencyConflictException.class);
+
+        assertThat(conflict).isNotNull();
+    }
+
+    @Test
+    void concurrentRaceWithoutAWinnerIsAnUnexpectedError() {
+        RegisterExpenseRequest request = validRequest();
+        when(expenseRepository.findByUserIdAndIdempotencyKey(USER_ID, KEY))
+                .thenReturn(Optional.empty());
+
+        IllegalStateException failure = catchThrowableOfType(
+                () -> service.resolveConcurrentRegistration(USER_ID, KEY, request),
+                IllegalStateException.class);
+
+        assertThat(failure).isNotNull();
+        verify(expenseRepository, never()).save(any(Expense.class));
     }
 
     private void assertOnlyField(String field, RegisterExpenseRequest request) {

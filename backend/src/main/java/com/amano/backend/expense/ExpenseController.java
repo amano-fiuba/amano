@@ -3,6 +3,7 @@ package com.amano.backend.expense;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -46,8 +47,13 @@ public class ExpenseController {
             return unauthorized();
         }
         UUID key = parseIdempotencyKey(idempotencyKey);
-        ExpenseService.Registration registration = expenseService.registerExpense(
-                userId, key, request);
+        ExpenseService.Registration registration;
+        try {
+            registration = expenseService.registerExpense(userId, key, request);
+        }
+        catch (DataIntegrityViolationException race) {
+            registration = expenseService.resolveConcurrentRegistration(userId, key, request);
+        }
         return registration.created()
                 ? ResponseEntity.status(HttpStatus.CREATED).body(registration.expense())
                 : ResponseEntity.ok(registration.expense());

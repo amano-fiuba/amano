@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+
+import com.amano.backend.expense.IdempotencyConflictException;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -53,6 +55,20 @@ class ProblemDetailExceptionHandlerTest {
         assertThat(problem.getProperties()).containsKey("properties");
         assertThat(problem.getProperties().get("properties")).isEqualTo(
                 java.util.Map.of("fields", java.util.Map.of("email", "Ingresa un correo electrónico válido")));
+    }
+
+    @Test
+    void idempotencyConflictMapsTo422WithoutInternalDetails() {
+        ProblemDetail problem = handler.handleIdempotencyConflict(
+                new IdempotencyConflictException());
+
+        assertThat(problem.getStatus()).isEqualTo(422);
+        assertThat(problem.getTitle()).isEqualTo("Operación ya registrada");
+        assertThat(problem.getDetail()).isEqualTo(IdempotencyConflictException.MESSAGE);
+        assertThat(problem.getProperties()).isEqualTo(
+                java.util.Map.of("properties", java.util.Map.of(
+                        "code", "IDEMPOTENCY_KEY_REUSED")));
+        assertThat(String.valueOf(problem)).doesNotContain("Exception").doesNotContain("SQL");
     }
 
     @Test
