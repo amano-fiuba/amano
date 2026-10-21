@@ -123,13 +123,24 @@ class RegistrationProfileIT {
                 .andExpect(content().bytes(JPEG_BYTES))
                 .andExpect(content().contentType("image/jpeg"))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
-                .andExpect(header().string("Cache-Control", "private, max-age=3600"));
+                // The URL is fixed and 005 makes the content mutable: the cache
+                // must revalidate (no-cache + ETag), never serve long max-age
+                // snapshots of an overwritten binary.
+                .andExpect(header().string("Cache-Control",
+                        org.hamcrest.Matchers.containsString("no-cache")))
+                .andExpect(header().string("Cache-Control",
+                        org.hamcrest.Matchers.containsString("private")))
+                .andExpect(header().string("Cache-Control",
+                        org.hamcrest.Matchers.containsString("must-revalidate")))
+                .andExpect(header().string("ETag", org.hamcrest.Matchers.not("")));
 
         // Owner sees the profile with avatar metadata (FR-021, after verifying).
         mockMvc.perform(get("/api/users/me").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasCustomAvatar").value(true))
-                .andExpect(jsonPath("$.avatarUrl").value("/api/users/" + userId + "/avatar"));
+                .andExpect(jsonPath("$.avatarUrl").value(
+                        org.hamcrest.Matchers.matchesPattern(
+                                "/api/users/" + userId + "/avatar\\?v=\\d+")));
     }
 
     @Test

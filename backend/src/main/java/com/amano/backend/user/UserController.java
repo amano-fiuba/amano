@@ -1,5 +1,6 @@
 package com.amano.backend.user;
 
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -66,10 +67,19 @@ public class UserController {
                 .<ResponseEntity<?>>map(stored -> {
                     // D6: the stored content type matches the validated magic bytes.
                     MediaType mediaType = MediaType.valueOf(stored.getContentType());
+                    // The URL is fixed but the content is mutable (005 replaces/
+                    // deletes the binary), so long max-age would serve STALE
+                    // images for up to an hour. no-cache + ETag instead: the
+                    // browser must revalidate every time, and the ETag (content
+                    // fingerprint) keeps unchanged avatars cheap (304, no byte
+                    // re-download — the intent of the old max-age=3600 header).
                     return ResponseEntity.ok()
-                            .contentType(mediaType)                                   // exact MIME (FR-010)
-                            .header("X-Content-Type-Options", "nosniff")              // mandated (FR-010/D5)
-                            .header("Cache-Control", "private, max-age=3600")         // avoid repeated downloads
+                            .contentType(mediaType)                                // exact MIME (FR-010)
+                            .header("X-Content-Type-Options", "nosniff")           // mandated (FR-010/D5)
+                            .cacheControl(CacheControl.noCache()
+                                    .cachePrivate()
+                                    .mustRevalidate())
+                            .eTag(Long.toHexString(UserAccountResponse.versionOf(stored.getData())))
                             .body(stored.getData());
                 })
                 .orElseGet(this::notFoundProblem); // 0 rows → client uses /avatar-default.png (D5)

@@ -354,7 +354,9 @@ class ProfileEditIT {
                         .file(new MockMultipartFile("avatar", "ana.png", "image/png", PNG_BYTES)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasCustomAvatar").value(true))
-                .andExpect(jsonPath("$.avatarUrl").value("/api/users/" + userId + "/avatar"));
+                .andExpect(jsonPath("$.avatarUrl").value(
+                        org.hamcrest.Matchers.matchesPattern(
+                                "/api/users/" + userId + "/avatar\\?v=\\d+")));
 
         mockMvc.perform(get("/api/users/" + userId + "/avatar").cookie(session))
                 .andExpect(status().isOk())

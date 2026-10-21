@@ -73,8 +73,7 @@ public class UserAccountService {
         user.getCurrencies().clear();
         user.getCurrencies().addAll(currencies);
 
-        boolean hasCustomAvatar = userAvatarRepository.existsById(userId);
-        return UserAccountResponse.from(user, hasCustomAvatar);
+        return avatarResponse(user);
     }
 
     /** PUT /api/users/me/password (US2): the current hash authorizes the credit change. */
@@ -105,8 +104,7 @@ public class UserAccountService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-        boolean hasCustomAvatar = userAvatarRepository.existsById(userId);
-        return UserAccountResponse.from(user, hasCustomAvatar);
+        return avatarResponse(user);
     }
 
     /** PUT /api/users/me/avatar (US3): the new binary replaces (or creates) the row. */
@@ -132,7 +130,7 @@ public class UserAccountService {
             throw new java.io.UncheckedIOException(exception);
         }
         userAvatarRepository.save(stored);
-        return UserAccountResponse.from(user, true);
+        return UserAccountResponse.from(user, true, UserAccountResponse.versionOf(stored.getData()));
     }
 
     /** DELETE /api/users/me/avatar (US3): back to the default representation. */
@@ -144,9 +142,19 @@ public class UserAccountService {
         }
         // Map BEFORE the bulk delete: with clearAutomatically the context is
         // cleared and the lazy currencies of the detached user cannot load.
-        UserAccountResponse response = UserAccountResponse.from(user, false);
+        UserAccountResponse response = UserAccountResponse.from(user, false, null);
         userAvatarRepository.deleteRowForUser(userId); // bulk delete: idempotent
         return response;
+    }
+
+    /**
+     * Own-avatar metadata of a response (hasCustomAvatar + content-derived
+     * ?v= so consumers never share a URL across different binaries).
+     */
+    private UserAccountResponse avatarResponse(User user) {
+        UserAvatar avatar = userAvatarRepository.findById(user.getId()).orElse(null);
+        return UserAccountResponse.from(user, avatar != null,
+                avatar == null ? null : UserAccountResponse.versionOf(avatar.getData()));
     }
 
     private static String nullableTrim(String value) {

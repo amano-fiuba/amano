@@ -212,6 +212,10 @@ export default function ProfileEditPage() {
     )
   }
 
+  // El avatar vive en una ruta fija con contenido mutable (specs/005): la URL
+  // que entrega el servidor ya lleva su versión de contenido (?v=huella), así
+  // que cualquier reemplazo/eliminación produce una URL distinta y ningún
+  // caché viejo del navegador puede ser servido como preview.
   const previewUrl = avatarUrl || '/avatar-default.png'
   const rules = (validate) => ({
     validate: (value) => {
@@ -234,7 +238,6 @@ export default function ProfileEditPage() {
         </p>
       )}
 
-      {/* US3: avatar procesado independiente de los datos del formulario. */}
       <img
         src={previewUrl}
         alt={`Avatar de ${user?.firstName ?? 'usuario'}`}
