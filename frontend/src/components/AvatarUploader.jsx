@@ -1,24 +1,16 @@
 import { useState } from 'react'
+import {
+  FORMAT_MESSAGE,
+  SIZE_MESSAGE,
+  realContentType,
+} from '../validation/avatarValidation'
 import { AVATAR_MAX_BYTES } from '../validation/registerValidation'
 
 // US3 optional avatar uploader (task T036; FR-003, FR-010, FR-013, FR-022, D6):
 // live validation with Spanish messages — size first, then the REAL content is
 // inspected via magic bytes (the declared MIME is a hint, never the truth).
 // Without a file the field stays clean and never blocks the rest of the form.
-const FORMAT_MESSAGE = 'El archivo debe ser una imagen JPG o PNG válida'
-const SIZE_MESSAGE = 'El archivo es demasiado grande (máximo 2 MB)'
-
-async function realContentType(file) {
-  // reads only the leading bytes: JPEG FF D8 FF / PNG 89 50 4E 47 (same as backend)
-  const head = new Uint8Array(await file.slice(0, 4).arrayBuffer())
-  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) {
-    return 'jpeg'
-  }
-  if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) {
-    return 'png'
-  }
-  return null
-}
+// The shared rules (messages + realContentType) live in avatarValidation.js.
 
 export default function AvatarUploader({ onFileSelected }) {
   const [error, setError] = useState('')

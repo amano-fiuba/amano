@@ -103,3 +103,65 @@ describe('App rutas de verificación (T035, specs/003-email-verification)', () =
     ).toBeInTheDocument()
   })
 })
+
+
+describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => {
+  const PERFILE_FIJO = {
+    id: 7,
+    firstName: 'Ana',
+    lastName: 'Pérez',
+    email: 'ana.perez@example.com',
+    currencies: [],
+    cbuCvu: null,
+    hasCustomAvatar: false,
+  }
+
+  it('/profile/edit sin sesión redirige al flujo de registro (FR-018 de 005)', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/profile/edit']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByText(/crear\s+tu\s+cuenta/i)).toBeInTheDocument()
+  })
+
+  it('/profile/edit con sesión renderiza la pantalla de edición con el correo deshabilitado (FR-001, FR-007 de 005)', async () => {
+    // El gate y la pantalla consultan /api/users/me: la misma respuesta sirve
+    // para ambos fetch (AuthProvider y me()).
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(PERFILE_FIJO),
+      }),
+    )
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/profile/edit']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: /modificar perfil/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Correo electrónico')).toBeDisabled()
+  })
+
+  it('/profile/password sin sesión redirige al flujo de registro (FR-018 de 005)', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/profile/password']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByText(/crear\s+tu\s+cuenta/i)).toBeInTheDocument()
+  })
+})
