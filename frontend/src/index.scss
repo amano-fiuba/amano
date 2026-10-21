@@ -1,0 +1,356 @@
+// Tema global (derivado de inicial.scss): paleta cálida beige/verde, Montserrat.
+:root {
+  font-family: "Montserrat", "Segoe UI", Arial, sans-serif;
+  color: var(--color-texto);
+  background: var(--color-fondo);
+  font-synthesis: none;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: light;
+}
+
+/* Azul cielo — variables base */
+:root {
+  color-scheme: light;
+  --color-fondo: #edf4fc;
+  --color-superficie: #ffffff;
+  --color-superficie-fuerte: #dce8f7;
+  --color-texto: #1c2e45;
+  --color-texto-suave: #5c6f87;
+  --color-borde: #c5d5e9;
+  --color-acento: #4b80c5;
+  --color-acento-oscuro: #28548c;
+  --color-oliva: #668b83;
+  --color-error: #b42336;
+  --color-acento-tono: var(--color-acento);
+  --color-error-tono: var(--color-error);
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-fondo: #161e2a;
+  --color-superficie: #202c3b;
+  --color-superficie-fuerte: #2b3a4d;
+  --color-texto: #edf4ff;
+  --color-texto-suave: #a8b8ce;
+  --color-borde: #3b4d64;
+  --color-acento: color-mix(in srgb, var(--color-acento-tono) 78%, white);
+  --color-acento-oscuro: var(--color-acento);
+  --color-error: color-mix(in srgb, var(--color-error-tono) 72%, white);
+}
+* {
+  box-sizing: border-box;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+body {
+  min-height: 100vh;
+  min-width: 320px;
+  margin: 0;
+}
+
+a {
+  color: var(--color-acento-oscuro);
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    color: var(--color-acento);
+  }
+}
+
+h1,
+h2 {
+  margin: 0 0 1rem;
+  color: var(--color-texto);
+  line-height: 1.05;
+}
+
+h1 {
+  font-size: clamp(2.2rem, 5vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+p {
+  color: var(--color-texto-suave);
+  font-size: 1rem;
+}
+
+button,
+.buttonLink {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-texto);
+  border-radius: 0.5rem;
+  padding: 0.7rem 1rem;
+  color: var(--color-superficie);
+  background: var(--color-texto);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+
+  &:hover {
+    background: var(--color-acento-oscuro);
+    color: var(--color-superficie);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+  background: var(--color-superficie);
+}
+
+th,
+td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-borde);
+  text-align: left;
+}
+
+th {
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+tr:last-child td {
+  border-bottom: 0;
+}
+
+input {
+  accent-color: var(--color-acento);
+}
+
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.45rem;
+}
+
+label {
+  color: var(--color-texto);
+  font-weight: 600;
+}
+
+ul {
+  margin: 0;
+}
+
+// Barra global de navegación (visible en todas las páginas)
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1rem;
+  background: color-mix(in srgb, var(--color-superficie) 94%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-borde);
+
+  // El toggle de tema deja de flotar: vive dentro de la barra.
+  .theme-toggle {
+    position: static;
+    top: auto;
+    right: auto;
+    z-index: auto;
+  }
+}
+
+.site-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.site-nav__link {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: var(--color-texto);
+
+  &:hover {
+    background: var(--color-superficie-fuerte);
+    color: var(--color-texto);
+  }
+
+  &.is-active {
+    background: var(--color-acento);
+    color: #fff;
+  }
+}
+
+// ---- Páginas de la app (prueba visual del tema) ----
+
+.page {
+  width: calc(100% - 2rem);
+  max-width: 560px;
+  margin: 2.5rem auto;
+  padding: 2rem;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: 1rem;
+
+  h1 {
+    font-size: clamp(1.7rem, 3.5vw, 2.3rem);
+    margin-bottom: 1.5rem;
+  }
+
+  nav {
+    margin-top: 1.5rem;
+  }
+}
+
+.app-avatar {
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-borde);
+  background: var(--color-superficie-fuerte);
+}
+
+// Formulario (TextField + RegisterForm)
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+
+  input:not([type="checkbox"]),
+  select {
+    width: 100%;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.5rem;
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    font: inherit;
+
+    &:focus-visible {
+      outline: 2px solid var(--color-acento);
+      outline-offset: 2px;
+    }
+  }
+
+  &.field--invalid input:not([type="checkbox"]),
+  &.field--invalid select {
+    border-color: var(--color-error);
+  }
+}
+
+@media (max-width: 420px) {
+  .page {
+    width: calc(100% - 1rem);
+    margin: 1rem auto;
+    padding: 1.25rem;
+  }
+}
+
+.text-button {
+  align-self: flex-start;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-acento-oscuro);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+
+  &:hover {
+    background: none;
+    color: var(--color-acento);
+  }
+
+  &:active {
+    transform: none;
+  }
+}
+
+p[role="alert"] {
+  color: var(--color-error);
+  font-size: 0.9rem;
+  margin: 0.1rem 0 0;
+}
+
+fieldset {
+  border: 1px solid var(--color-borde);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+
+  legend {
+    color: var(--color-texto-suave);
+    font-size: 0.85rem;
+    padding: 0 0.25rem;
+  }
+
+  label {
+    margin-right: 1.25rem;
+    font-weight: 400;
+  }
+}
+
+.profile-password-caption {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+// Toggle de modo claro/oscuro (fijo, visible en todas las rutas)
+
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  border: 1px solid var(--color-borde);
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  gap: 0.5rem;
+
+  &:hover {
+    background: var(--color-superficie-fuerte);
+    color: var(--color-texto);
+  }
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+    fill: currentColor;
+  }
+}

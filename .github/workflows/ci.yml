@@ -50,8 +50,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Pruebas
-        run: npm test
+      - name: Pruebas con cobertura
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build

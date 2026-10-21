@@ -257,7 +257,7 @@ Desde `backend/`, **sin cargar el `.env` y sin base levantada**:
 
 ```
 mvn test       # solo las rápidas (*Test), sin Docker
-mvn verify     # rápidas + integración (*IT); necesita Docker en ejecución
+mvn verify     # rápidas + integración (*IT) + cobertura; necesita Docker en ejecución
 ```
 
 Las pruebas de integración usan Testcontainers: crean su propio contenedor de PostgreSQL (`postgres:18-alpine`), lo usan y lo borran. No tocan tu base de desarrollo. Lo único que piden es que Docker esté funcionando.
@@ -270,10 +270,17 @@ Desde `frontend/`:
 
 ```
 npm test               # ejecuta las pruebas una vez
+npm run test:coverage  # pruebas + verificación de cobertura (mínimo 85 % de líneas)
 npm run test:watch     # queda escuchando y re-ejecuta al guardar
 npm run lint           # revisa el estilo y errores comunes con ESLint
 npm run build          # compila para producción (comprueba que todo arma)
 ```
+
+La cobertura se verifica automáticamente: en el backend, JaCoCo exige un mínimo
+del 85 % de líneas durante `mvn verify`; en el frontend, `npm run test:coverage`
+aplica el mismo umbral con Vitest. Los puntos de entrada (`BackendApplication` y
+`src/main.jsx`) quedan excluidos de la medición porque son código de arranque del
+framework, no lógica de negocio.
 
 ### Antes de abrir un Pull Request
 
@@ -281,7 +288,7 @@ Corré en tu máquina lo mismo que va a correr GitHub, así evitás ver el check
 
 ```
 cd backend && mvn -B verify
-cd ../frontend && npm ci && npm run lint && npm test && npm run build
+cd ../frontend && npm ci && npm run lint && npm run test:coverage && npm run build
 ```
 
 ## 11. Integración continua (GitHub Actions)
@@ -290,8 +297,8 @@ El archivo `.github/workflows/ci.yml` hace que GitHub verifique el código en un
 
 | Job        | Qué ejecuta                                                               |
 | ---------- | ------------------------------------------------------------------------- |
-| `backend`  | Java 25 y `mvn -B verify` (pruebas rápidas, de integración y empaquetado) |
-| `frontend` | Node 24, `npm ci`, `npm run lint`, `npm test` y `npm run build`           |
+| `backend`  | Java 25 y `mvn -B verify` (pruebas rápidas, de integración, cobertura y empaquetado) |
+| `frontend` | Node 24, `npm ci`, `npm run lint`, `npm run test:coverage` y `npm run build`          |
 
 Los dos corren en paralelo. En el Pull Request aparecen como **backend** y **frontend**. Si alguno queda en rojo:
 

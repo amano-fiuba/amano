@@ -1,0 +1,74 @@
+import { useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router'
+import { logout, me } from '../api/authClient'
+import { useAuth } from '../auth/AuthContext'
+
+// Protected landing screen (task T024; FR-016, FR-021, SC-002): renders the
+// session profile and refreshes it via the users contract (GET /api/users/me).
+// currencies empty → display default ["ARS"] (FR-011/Q1).
+export default function DashboardPage() {
+  const { user, setUser } = useAuth()
+  const location = useLocation()
+
+  const navigate = useNavigate()
+
+  // Feature 004: the backend expires the HttpOnly cookie; the local session is
+  // cleared whatever the outcome, so the user is never left half logged in.
+  const handleLogout = async () => {
+    await logout()
+    setUser(null)
+    navigate('/login', { replace: true })
+  }
+
+  // FR-005 (main flow step 5): arriving right after redeeming the link shows the
+  // one-time welcome for the freshly verified account; the link from US2 sends
+  // state { verifiedWelcome: true } and a later manual visit shows nothing.
+  const verifiedWelcome = location.state?.verifiedWelcome === true
+
+  useEffect(() => {
+    let cancelled = false
+    me().then((result) => {
+      if (!cancelled && result.ok) {
+        setUser(result.profile)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [setUser])
+
+  if (!user) {
+    return null
+  }
+
+  const avatarUrl =
+    user.hasCustomAvatar && user.avatarUrl ? user.avatarUrl : '/avatar-default.png'
+  const currencies =
+    Array.isArray(user.currencies) && user.currencies.length > 0
+      ? user.currencies
+      : ['ARS']
+  const fullName = user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName
+
+  return (
+    <main className="page">
+      <img src={avatarUrl} alt="@avatar" className="app-avatar" />
+      <h1>Bienvenida, {fullName}</h1>
+      {verifiedWelcome && (
+        <p data-testid="dashboard-verified-welcome">
+          ¡Tu cuenta fue verificada correctamente!
+        </p>
+      )}
+      <p data-testid="dashboard-email">{user.email}</p>
+      {/* FR-009: the CBU/CVU is only shown to the session owner (FR-021), here. */}
+      {user.cbuCvu && <p data-testid="dashboard-cbu">CBU/CVU: {user.cbuCvu}</p>}
+      <p data-testid="dashboard-currencies">Monedas: {currencies.join(', ')}</p>
+      <nav>
+        {/* T007 (specs/002-user-profile): acceso al perfil a 1 clic de distancia (SC-001). */}
+        <Link to="/profile">Mi perfil</Link>
+        <button type="button" onClick={handleLogout}>
+          Cerrar sesión
+        </button>
+      </nav>
+    </main>
+  )
+}
