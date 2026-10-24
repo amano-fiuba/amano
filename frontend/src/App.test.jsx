@@ -208,3 +208,44 @@ describe('App rutas de edición de perfil (specs/005-edit-user-profile)', () => 
     ).toBeInTheDocument()
   })
 })
+
+
+describe('App ruta del buscador (specs/008-user-search)', () => {
+  it('/users/search sin sesión redirige al login y no muestra el buscador (FR-011)', async () => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/users/search']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: /iniciar sesión/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Buscar usuarios' })).not.toBeInTheDocument()
+  })
+
+  it('/users/search con sesión muestra la pantalla de búsqueda (FR-001)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve({ id: 7, firstName: 'Ana', email: 'ana@example.com', currencies: [] }),
+      }),
+    )
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/users/search']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(
+      await screen.findByRole('heading', { name: 'Buscar usuarios' }),
+    ).toBeInTheDocument()
+  })
+})
