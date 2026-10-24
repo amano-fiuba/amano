@@ -20,7 +20,7 @@ Los identificadores FR-### y SC-### de esta especificación son propios de 008 y
 
 ### User Story 1 - Buscar usuarios registrados y ver resultados (Priority: P1)
 
-Una persona autenticada y con cuenta verificada entra a la pantalla "Buscar usuarios" desde la barra de navegación, escribe al menos 2 caracteres de un nombre, apellido o correo electrónico y obtiene una lista de coincidencias. La búsqueda es parcial y no distingue mayúsculas de minúsculas ni espacios al inicio o al final. La lista muestra como máximo 20 resultados ordenados por nombre y, a igual nombre, por apellido. Cada resultado expone únicamente nombre, apellido, correo electrónico y el avatar por defecto.
+Una persona autenticada y con cuenta verificada entra a la pantalla "Buscar usuarios" desde la barra de navegación, escribe al menos 2 caracteres de un nombre, apellido o correo electrónico, presiona "Buscar" (o Enter) y obtiene una lista de coincidencias. La búsqueda es parcial y no distingue mayúsculas de minúsculas ni espacios al inicio o al final. La lista muestra como máximo 20 resultados ordenados por nombre y, a igual nombre, por apellido. Cada resultado expone únicamente nombre, apellido, correo electrónico y el avatar por defecto.
 
 **Why this priority**: Es el valor central de la funcionalidad: permitir que una persona encuentre a otras cuentas registradas. Sin esta búsqueda no existe ninguna de las demás historias.
 
@@ -39,7 +39,7 @@ Una persona autenticada y con cuenta verificada entra a la pantalla "Buscar usua
 
 ### User Story 2 - Aviso cuando el término es demasiado corto (Priority: P2)
 
-Si la persona escribe menos de 2 caracteres (después de recortar espacios), el sistema no ejecuta ninguna búsqueda y muestra un aviso que explica que debe ingresar al menos 2 caracteres. Al llegar a 2 caracteres la búsqueda se habilita.
+Si la persona escribe menos de 2 caracteres (después de recortar espacios), el sistema no ejecuta ninguna búsqueda y muestra un aviso que explica que debe ingresar al menos 2 caracteres. El botón "Buscar" permanece habilitado; la validación ocurre al enviar.
 
 **Why this priority**: Evita búsquedas demasiado amplias y da una guía clara sobre el mínimo requerido; sin esta validación la búsqueda seguiría siendo útil, por lo que es secundaria.
 
@@ -100,18 +100,21 @@ Cuando la búsqueda no encuentra coincidencias, la pantalla muestra "No se encon
 - **Error de red durante una búsqueda con resultados previos**: no se muestran resultados obsoletos; se muestra el mensaje fijo de reintento.
 - **Cambio del término mientras una consulta está en curso**: la pantalla refleja el resultado correspondiente a la última búsqueda solicitada, sin mezclar resultados de términos distintos.
 - **Sesión expirada durante el uso del buscador**: la siguiente consulta es rechazada y la persona es redirigida al flujo de acceso; no quedan datos visibles.
+- **Cuenta sin apellido** (el apellido es opcional en 001): se muestra solo el nombre, sin texto vacío ni "null"; en el orden, a igual nombre, las cuentas sin apellido van después de las que tienen.
+- **Caracteres especiales** (`%`, `_`, `\`): se buscan como texto literal, no como comodines; por ejemplo, buscar "%%" no devuelve todas las cuentas.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: El sistema MUST ofrecer una pantalla protegida de búsqueda de usuarios, accesible desde la barra de navegación (`SiteNav`), con un campo de búsqueda y una lista de resultados.
+- **FR-001b**: La búsqueda MUST ejecutarse al presionar el botón "Buscar" o la tecla Enter; NO se busca automáticamente mientras se escribe.
 - **FR-002**: La búsqueda MUST considerar coincidencias parciales en nombre, apellido o correo electrónico.
 - **FR-003**: La búsqueda MUST ignorar mayúsculas y minúsculas y MUST recortar los espacios al inicio y al final del término antes de buscar.
-- **FR-004**: La búsqueda MUST requerir al menos 2 caracteres después del recorte de espacios; con menos de 2 caracteres el sistema NO MUST ejecutar la consulta y MUST mostrar un aviso que indique el mínimo requerido.
+- **FR-004**: La búsqueda MUST requerir al menos 2 caracteres después del recorte de espacios; con menos de 2 caracteres el sistema MUST NOT ejecutar la consulta y MUST mostrar un aviso que indique el mínimo requerido.
 - **FR-005**: Los resultados MUST incluir únicamente cuentas verificadas y MUST excluir siempre la cuenta de la persona que realiza la búsqueda.
 - **FR-006**: El sistema MUST devolver como máximo 20 resultados, ordenados por nombre y, a igual nombre, por apellido.
-- **FR-007**: Cada resultado MUST mostrar únicamente nombre, apellido, correo electrónico y el avatar por defecto; NO MUST mostrar CBU/CVU, monedas, contraseña ni ningún otro dato privado.
+- **FR-007**: Cada resultado MUST mostrar únicamente nombre, apellido, correo electrónico y el avatar por defecto; MUST NOT mostrar CBU/CVU, monedas, contraseña ni ningún otro dato privado.
 - **FR-008**: Todos los resultados MUST usar el avatar por defecto; mostrar avatares de otras cuentas queda fuera de alcance.
 - **FR-009**: Cuando una búsqueda válida no tenga coincidencias, la pantalla MUST mostrar exactamente "No se encontraron usuarios".
 - **FR-010**: Ante un error de red o de disponibilidad del servidor, la pantalla MUST mostrar un mensaje fijo de reintento y MUST NOT mostrar resultados incompletos, obsoletos o ficticios.
@@ -121,6 +124,9 @@ Cuando la búsqueda no encuentra coincidencias, la pantalla muestra "No se encon
 - **FR-014**: Los datos personales expuestos por la búsqueda MUST limitarse a los campos indicados en FR-007; el correo electrónico es el único dato de contacto visible.
 - **FR-015**: La pantalla de búsqueda MUST ser de solo lectura: ninguna acción de la pantalla modifica datos de otras cuentas.
 - **FR-016**: La feature MUST NOT ofrecer paginación; los resultados se limitan al máximo definido en FR-006.
+- **FR-017**: El aviso de término corto MUST ser exactamente "Ingresá al menos 2 caracteres para buscar".
+- **FR-018**: El mensaje de error de red o servidor MUST ser exactamente "No se pudo completar la búsqueda. Intenta nuevamente".
+- **FR-019**: El backend MUST validar el término de forma independiente: si falta o tiene menos de 2 caracteres tras recortar espacios, MUST responder 400 con el formato de error del proyecto y MUST NOT consultar la base. Si supera 100 caracteres, MUST responder 400.
 
 ### Key Entities *(include if feature involves data)*
 
