@@ -37,8 +37,8 @@ prueba y revisión independientes.
 
 **Purpose**: confirmar la rama, la línea base y que no hay cambios de esquema ni dependencias.
 
-- [ ] T001 Confirmar que la rama activa es `feat/user-search` y que no se requieren dependencias ni migraciones nuevas: `backend/pom.xml` y `frontend/package.json` sin cambios, y `backend/src/main/resources/db/migration/` sin un V5 — solo se lee la tabla `users` (plan.md §Technical Context, research.md §D8)
-- [ ] T002 Ejecutar la línea base en verde antes de tocar código: `cd backend && ./mvnw -B verify` y `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build`, siguiendo [quickstart.md](./quickstart.md) §Verificación automatizada
+- [X] T001 Confirmar que la rama activa es `feat/user-search` y que no se requieren dependencias ni migraciones nuevas: `backend/pom.xml` y `frontend/package.json` sin cambios, y `backend/src/main/resources/db/migration/` sin un V5 — solo se lee la tabla `users` (plan.md §Technical Context, research.md §D8)
+- [X] T002 Ejecutar la línea base en verde antes de tocar código: `cd backend && ./mvnw -B verify` y `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build`, siguiendo [quickstart.md](./quickstart.md) §Verificación automatizada
 
 ---
 
@@ -46,9 +46,9 @@ prueba y revisión independientes.
 
 **Purpose**: verificar que las piezas compartidas ya existen y que no requieren cambios. **Ninguna historia puede empezar hasta completar esta fase**.
 
-- [ ] T003 [P] Verificar en `backend/src/main/java/com/amano/backend/config/SecurityConfig.java` y `backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java` que `/api/users/**` ya exige sesión verificada; el endpoint `/api/users/search` hereda el 401 sin tocar la configuración — spec FR-011, research.md §D1
-- [ ] T004 [P] Verificar que `backend/src/main/java/com/amano/backend/common/FieldValidationException.java` y `backend/src/main/java/com/amano/backend/common/ProblemDetailExceptionHandler.java` cubren el error 400 con `properties.fields.q`; no se agregan handlers nuevos — spec FR-004, contracts §400
-- [ ] T005 [P] Verificar en `backend/src/main/resources/db/migration/V1__create_user_registration.sql` y `V2__email_verification.sql` que `users`, `email_verified_at`, `first_name`, `last_name` y `email` ya existen; no se crean tablas ni índices — data-model.md §Alcance de datos
+- [X] T003 [P] Verificar en `backend/src/main/java/com/amano/backend/config/SecurityConfig.java` y `backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java` que `/api/users/**` ya exige sesión verificada; el endpoint `/api/users/search` hereda el 401 sin tocar la configuración — spec FR-011, research.md §D1
+- [X] T004 [P] Verificar que `backend/src/main/java/com/amano/backend/common/FieldValidationException.java` y `backend/src/main/java/com/amano/backend/common/ProblemDetailExceptionHandler.java` cubren el error 400 con `properties.fields.q`; no se agregan handlers nuevos — spec FR-004, contracts §400
+- [X] T005 [P] Verificar en `backend/src/main/resources/db/migration/V1__create_user_registration.sql` y `V2__email_verification.sql` que `users`, `email_verified_at`, `first_name`, `last_name` y `email` ya existen; no se crean tablas ni índices — data-model.md §Alcance de datos
 
 **Checkpoint**: seguridad, errores y esquema confirmados; las historias pueden comenzar.
 
@@ -67,24 +67,24 @@ exclusión de la propia cuenta.
 
 ### Tests for User Story 1 ⚠️ (primero, deben FALLAR)
 
-- [ ] T006 [P] [US1] Crear `backend/src/test/java/com/amano/backend/user/UserSearchServiceTest.java` (Mockito): `search` recorta y pasa el término en minúsculas (`Locale.ROOT`), usa `PageRequest.of(0, 20)`, propaga el id de la sesión y mapea `User` a `UserSearchResult` con solo `id`, `firstName`, `lastName` y `email`; lista vacía cuando el repositorio no devuelve filas — FR-002, FR-003, FR-006, data-model.md §DTO de salida
-- [ ] T007 [P] [US1] Crear `backend/src/test/java/com/amano/backend/user/UserSearchIT.java` (MockMvc + Testcontainers PostgreSQL): registrar cuentas y marcarlas verificadas por SQL; buscar parcialmente por nombre, apellido y correo, con mayúsculas/minúsculas y espacios externos; verificar hasta 20 resultados ordenados por nombre y apellido, exclusión de la propia cuenta, solo cuentas verificadas y respuesta con exactamente `id`, `firstName`, `lastName`, `email` (sin `cbuCvu`, `currencies`, `passwordHash` ni otros datos) — FR-002, FR-003, FR-005, FR-006, FR-007, SC-002, SC-003, SC-005
-- [ ] T008 [P] [US1] Crear `frontend/src/api/usersClient.test.js`: `searchUsers(q)` llama a `GET /api/users/search?q=…` con `encodeURIComponent` y `credentials: 'include'`; 200 devuelve `{ok:true, users}` con el arreglo recibido — contracts §Contrato del frontend, research.md §D5
-- [ ] T009 [P] [US1] Crear `frontend/src/pages/UsersSearchPage.test.jsx` (mock de `usersClient`): la pantalla muestra campo y botón "Buscar"; al enviar un término válido llama a `searchUsers` y renderiza cada resultado con nombre, apellido (si es `null`, solo el nombre), correo y `<img src="/avatar-default.png">`; no muestra `id`, CBU/CVU, monedas ni contraseña — FR-001, FR-007, FR-008, data-model.md §DTO de salida
-- [ ] T010 [P] [US1] Actualizar `frontend/src/components/SiteNav.test.jsx`: el enlace "Buscar usuarios" apunta a `/users/search` y se resalta como activo en esa ruta — FR-001, research.md §D6
-- [ ] T011 [P] [US1] Actualizar `frontend/src/App.test.jsx`: con sesión, `/users/search` renderiza la pantalla protegida de búsqueda; sin sesión, redirige a la pantalla de login — FR-001, FR-011, research.md §D6
+- [X] T006 [P] [US1] Crear `backend/src/test/java/com/amano/backend/user/UserSearchServiceTest.java` (Mockito): `search` recorta y pasa el término en minúsculas (`Locale.ROOT`), usa `PageRequest.of(0, 20)`, propaga el id de la sesión y mapea `User` a `UserSearchResult` con solo `id`, `firstName`, `lastName` y `email`; lista vacía cuando el repositorio no devuelve filas — FR-002, FR-003, FR-006, data-model.md §DTO de salida
+- [X] T007 [P] [US1] Crear `backend/src/test/java/com/amano/backend/user/UserSearchIT.java` (MockMvc + Testcontainers PostgreSQL): registrar cuentas y marcarlas verificadas por SQL; buscar parcialmente por nombre, apellido y correo, con mayúsculas/minúsculas y espacios externos; verificar hasta 20 resultados ordenados por nombre y apellido, exclusión de la propia cuenta, solo cuentas verificadas y respuesta con exactamente `id`, `firstName`, `lastName`, `email` (sin `cbuCvu`, `currencies`, `passwordHash` ni otros datos) — FR-002, FR-003, FR-005, FR-006, FR-007, SC-002, SC-003, SC-005
+- [X] T008 [P] [US1] Crear `frontend/src/api/usersClient.test.js`: `searchUsers(q)` llama a `GET /api/users/search?q=…` con `encodeURIComponent` y `credentials: 'include'`; 200 devuelve `{ok:true, users}` con el arreglo recibido — contracts §Contrato del frontend, research.md §D5
+- [X] T009 [P] [US1] Crear `frontend/src/pages/UsersSearchPage.test.jsx` (mock de `usersClient`): la pantalla muestra campo y botón "Buscar"; al enviar un término válido llama a `searchUsers` y renderiza cada resultado con nombre, apellido (si es `null`, solo el nombre), correo y `<img src="/avatar-default.png">`; no muestra `id`, CBU/CVU, monedas ni contraseña — FR-001, FR-007, FR-008, data-model.md §DTO de salida
+- [X] T010 [P] [US1] Actualizar `frontend/src/components/SiteNav.test.jsx`: el enlace "Buscar usuarios" apunta a `/users/search` y se resalta como activo en esa ruta — FR-001, research.md §D6
+- [X] T011 [P] [US1] Actualizar `frontend/src/App.test.jsx`: con sesión, `/users/search` renderiza la pantalla protegida de búsqueda; sin sesión, redirige a la pantalla de login — FR-001, FR-011, research.md §D6
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Crear `backend/src/main/java/com/amano/backend/user/UserSearchResult.java` como record con exactamente `Long id`, `String firstName`, `String lastName`, `String email`; sin CBU/CVU, monedas, contraseña ni avatar — data-model.md §DTO de salida, plan.md §D4
-- [ ] T013 [US1] Agregar a `backend/src/main/java/com/amano/backend/user/UserRepository.java` la consulta de búsqueda con `lower(...)` + `locate(...)` sobre nombre, apellido (con `coalesce`) y correo, filtro `emailVerifiedAt IS NOT NULL`, `id <> :sessionId`, orden por `lower(firstName)`, `lower(lastName)`, `id` y `Pageable` — spec FR-002, FR-005, FR-006, research.md §D2
-- [ ] T014 [US1] Crear `backend/src/main/java/com/amano/backend/user/UserSearchService.java` con `search(Long sessionUserId, String q)` `@Transactional(readOnly = true)`: recorta el término, lo pasa a minúsculas (`Locale.ROOT`), solicita `PageRequest.of(0, 20)` y mapea las entidades a `UserSearchResult` (la validación de mínimo 2 caracteres se agrega en US2) — FR-002, FR-003, FR-006, research.md §D3
-- [ ] T015 [US1] Agregar `GET /api/users/search?q=` a `backend/src/main/java/com/amano/backend/user/UserController.java`: `@RequestParam(name = "q", required = false)`, obtiene el principal de la sesión con el patrón `currentUserId()`, delega en `UserSearchService` y responde `200` con la lista; si el principal es `null`, responde el 401 existente — contracts §200, plan.md §D1
-- [ ] T016 [US1] Crear `frontend/src/api/usersClient.js` siguiendo el patrón de `frontend/src/api/authClient.js` y `frontend/src/api/expenseClient.js`: `searchUsers(q)` con URL codificada, `credentials: 'include'`, `{ok:true, users}` en 2xx y parseo RFC 7807 para 4xx (el detalle de red se completa en US4) — contracts §Contrato del frontend, research.md §D5
-- [ ] T017 [US1] Crear `frontend/src/pages/UsersSearchPage.jsx`: formulario con `TextField` y botón "Buscar"; al enviar, llama a `searchUsers`, muestra la lista con nombre, apellido (si es `null`, solo el nombre), correo y `/avatar-default.png`; sin mensajes de mínimo/red todavía (se agregan en US2/US4) — FR-001, FR-007, FR-008, plan.md §D5
-- [ ] T018 [US1] Registrar la ruta protegida `/users/search` en `frontend/src/App.jsx` con `ProtectedRoute` y `UsersSearchPage`, sin alterar las rutas existentes — FR-001, FR-011, plan.md §D7
-- [ ] T019 [US1] Agregar el enlace "Buscar usuarios" a `/users/search` en `frontend/src/components/SiteNav.jsx`, respetando las clases de navegación existentes — FR-001, plan.md §D7
-- [ ] T020 [US1] Verificación de la historia: `cd backend && ./mvnw -B -Dtest=UserSearchServiceTest test` y `cd backend && ./mvnw -B -Dit.test=UserSearchIT verify`; `cd frontend && npx vitest run src/api/usersClient.test.js src/pages/UsersSearchPage.test.jsx src/components/SiteNav.test.jsx src/App.test.jsx`, con todas las pruebas de US1 en verde
+- [X] T012 [US1] Crear `backend/src/main/java/com/amano/backend/user/UserSearchResult.java` como record con exactamente `Long id`, `String firstName`, `String lastName`, `String email`; sin CBU/CVU, monedas, contraseña ni avatar — data-model.md §DTO de salida, plan.md §D4
+- [X] T013 [US1] Agregar a `backend/src/main/java/com/amano/backend/user/UserRepository.java` la consulta de búsqueda con `lower(...)` + `locate(...)` sobre nombre, apellido (con `coalesce`) y correo, filtro `emailVerifiedAt IS NOT NULL`, `id <> :sessionId`, orden por `lower(firstName)`, `lower(lastName)`, `id` y `Pageable` — spec FR-002, FR-005, FR-006, research.md §D2
+- [X] T014 [US1] Crear `backend/src/main/java/com/amano/backend/user/UserSearchService.java` con `search(Long sessionUserId, String q)` `@Transactional(readOnly = true)`: recorta el término, lo pasa a minúsculas (`Locale.ROOT`), solicita `PageRequest.of(0, 20)` y mapea las entidades a `UserSearchResult` (la validación de mínimo 2 caracteres se agrega en US2) — FR-002, FR-003, FR-006, research.md §D3
+- [X] T015 [US1] Agregar `GET /api/users/search?q=` a `backend/src/main/java/com/amano/backend/user/UserController.java`: `@RequestParam(name = "q", required = false)`, obtiene el principal de la sesión con el patrón `currentUserId()`, delega en `UserSearchService` y responde `200` con la lista; si el principal es `null`, responde el 401 existente — contracts §200, plan.md §D1
+- [X] T016 [US1] Crear `frontend/src/api/usersClient.js` siguiendo el patrón de `frontend/src/api/authClient.js` y `frontend/src/api/expenseClient.js`: `searchUsers(q)` con URL codificada, `credentials: 'include'`, `{ok:true, users}` en 2xx y parseo RFC 7807 para 4xx (el detalle de red se completa en US4) — contracts §Contrato del frontend, research.md §D5
+- [X] T017 [US1] Crear `frontend/src/pages/UsersSearchPage.jsx`: formulario con `TextField` y botón "Buscar"; al enviar, llama a `searchUsers`, muestra la lista con nombre, apellido (si es `null`, solo el nombre), correo y `/avatar-default.png`; sin mensajes de mínimo/red todavía (se agregan en US2/US4) — FR-001, FR-007, FR-008, plan.md §D5
+- [X] T018 [US1] Registrar la ruta protegida `/users/search` en `frontend/src/App.jsx` con `ProtectedRoute` y `UsersSearchPage`, sin alterar las rutas existentes — FR-001, FR-011, plan.md §D7
+- [X] T019 [US1] Agregar el enlace "Buscar usuarios" a `/users/search` en `frontend/src/components/SiteNav.jsx`, respetando las clases de navegación existentes — FR-001, plan.md §D7
+- [X] T020 [US1] Verificación de la historia: `cd backend && ./mvnw -B -Dtest=UserSearchServiceTest test` y `cd backend && ./mvnw -B -Dit.test=UserSearchIT verify`; `cd frontend && npx vitest run src/api/usersClient.test.js src/pages/UsersSearchPage.test.jsx src/components/SiteNav.test.jsx src/App.test.jsx`, con todas las pruebas de US1 en verde
 
 **Checkpoint**: US1 funcional y probable de forma independiente (MVP).
 
@@ -102,17 +102,17 @@ ejecuta.
 
 ### Tests for User Story 2 ⚠️ (primero, deben FALLAR)
 
-- [ ] T021 [P] [US2] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchServiceTest.java`: `null`, vacío, solo espacios y 1 carácter tras recorte lanzan `FieldValidationException` con `fields.q` = "Ingresá al menos 2 caracteres para buscar" y **nunca** invocan el repositorio; exactamente 2 caracteres sí ejecuta la búsqueda — FR-004, SC-006, contracts §400
-- [ ] T022 [P] [US2] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchIT.java`: `q` ausente, vacío, solo espacios o de 1 carácter → `400` con `title "Validación fallida"`, `detail "La solicitud contiene campos inválidos"` y `properties.fields.q` exacto; no se devuelven resultados — FR-004, SC-006, contracts §400
-- [ ] T023 [P] [US2] Ampliar `frontend/src/pages/UsersSearchPage.test.jsx`: con 0, 1 o solo espacios, al intentar buscar no se llama a `searchUsers`, se muestra el aviso exacto y se limpian resultados previos; con 2 caracteres sí se llama — FR-004, SC-006, plan.md §D3
-- [ ] T024 [P] [US2] Ampliar `frontend/src/api/usersClient.test.js`: un `400` con ProblemDetail devuelve `{ok:false, status:400, detail, fields:{q:…}}`; un cuerpo 4xx no JSON no lanza excepción y deja `detail:''`, `fields:{}` — contracts §400, contracts §Contrato del frontend
+- [X] T021 [P] [US2] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchServiceTest.java`: `null`, vacío, solo espacios y 1 carácter tras recorte lanzan `FieldValidationException` con `fields.q` = "Ingresá al menos 2 caracteres para buscar" y **nunca** invocan el repositorio; exactamente 2 caracteres sí ejecuta la búsqueda — FR-004, SC-006, contracts §400
+- [X] T022 [P] [US2] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchIT.java`: `q` ausente, vacío, solo espacios o de 1 carácter → `400` con `title "Validación fallida"`, `detail "La solicitud contiene campos inválidos"` y `properties.fields.q` exacto; no se devuelven resultados — FR-004, SC-006, contracts §400
+- [X] T023 [P] [US2] Ampliar `frontend/src/pages/UsersSearchPage.test.jsx`: con 0, 1 o solo espacios, al intentar buscar no se llama a `searchUsers`, se muestra el aviso exacto y se limpian resultados previos; con 2 caracteres sí se llama — FR-004, SC-006, plan.md §D3
+- [X] T024 [P] [US2] Ampliar `frontend/src/api/usersClient.test.js`: un `400` con ProblemDetail devuelve `{ok:false, status:400, detail, fields:{q:…}}`; un cuerpo 4xx no JSON no lanza excepción y deja `detail:''`, `fields:{}` — contracts §400, contracts §Contrato del frontend
 
 ### Implementation for User Story 2
 
-- [ ] T025 [US2] Agregar a `backend/src/main/java/com/amano/backend/user/UserSearchService.java` la validación de mínimo 2 caracteres después del recorte, con `FieldValidationException(Map.of("q", "Ingresá al menos 2 caracteres para buscar"))` y el máximo de 100 caracteres con `fields.q` = "La búsqueda no puede superar los 100 caracteres" (FR-019) antes de consultar el repositorio — FR-004, research.md §D3
-- [ ] T026 [US2] Completar en `frontend/src/api/usersClient.js` el parseo de errores 4xx (`detail` y `properties.fields`) con la convención de `authClient.js`, sin lanzar excepción ante un cuerpo inválido — contracts §400
-- [ ] T027 [US2] Completar en `frontend/src/pages/UsersSearchPage.jsx` la regla de mínimo 2 caracteres: recorte del término, aviso exacto, ausencia de llamada y limpieza de resultados previos cuando no se busca — FR-004, SC-006
-- [ ] T028 [US2] Verificación de la historia: `cd backend && ./mvnw -B -Dtest=UserSearchServiceTest test` y `./mvnw -B -Dit.test=UserSearchIT verify`; `cd frontend && npx vitest run src/api/usersClient.test.js src/pages/UsersSearchPage.test.jsx` en verde
+- [X] T025 [US2] Agregar a `backend/src/main/java/com/amano/backend/user/UserSearchService.java` la validación de mínimo 2 caracteres después del recorte, con `FieldValidationException(Map.of("q", "Ingresá al menos 2 caracteres para buscar"))` y el máximo de 100 caracteres con `fields.q` = "La búsqueda no puede superar los 100 caracteres" (FR-019) antes de consultar el repositorio — FR-004, research.md §D3
+- [X] T026 [US2] Completar en `frontend/src/api/usersClient.js` el parseo de errores 4xx (`detail` y `properties.fields`) con la convención de `authClient.js`, sin lanzar excepción ante un cuerpo inválido — contracts §400
+- [X] T027 [US2] Completar en `frontend/src/pages/UsersSearchPage.jsx` la regla de mínimo 2 caracteres: recorte del término, aviso exacto, ausencia de llamada y limpieza de resultados previos cuando no se busca — FR-004, SC-006
+- [X] T028 [US2] Verificación de la historia: `cd backend && ./mvnw -B -Dtest=UserSearchServiceTest test` y `./mvnw -B -Dit.test=UserSearchIT verify`; `cd frontend && npx vitest run src/api/usersClient.test.js src/pages/UsersSearchPage.test.jsx` en verde
 
 **Checkpoint**: US1 + US2 completas; la búsqueda corta no consume backend y explica el mínimo.
 
@@ -130,15 +130,15 @@ pendiente con datos coincidentes no aparece y que la propia cuenta tampoco.
 
 ### Tests for User Story 3 ⚠️ (primero, deben FALLAR)
 
-- [ ] T029 [P] [US3] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchIT.java`: sin cookie, cookie inválida y cookie de cuenta no verificada → `401` con ProblemDetail (`title "No autorizado"`, detail "Necesitas iniciar sesión para continuar") sin resultados; una cuenta no verificada cuyos datos coinciden con `q` no aparece en la respuesta de una sesión verificada — FR-011, SC-004, contracts §401
-- [ ] T030 [P] [US3] Ampliar `backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java`: `GET /api/users/search?q=an` sin sesión → 401; con cuenta pendiente → 401; con cuenta verificada la autorización deja pasar la solicitud (404 en el slice sin `UserController`) — FR-011, research.md §D1
-- [ ] T031 [P] [US3] Ampliar `frontend/src/api/usersClient.test.js`: `401` devuelve `{ok:false, status:401}` para que el gate de la ruta redirija, sin mensaje de error de dominio — contracts §401, contracts §Contrato del frontend
-- [ ] T032 [P] [US3] Ampliar `frontend/src/App.test.jsx` si hace falta para dejar explícito que `/users/search` sin sesión redirige a `/login` y no renderiza el campo de búsqueda ni resultados — FR-011, SC-004
+- [X] T029 [P] [US3] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchIT.java`: sin cookie, cookie inválida y cookie de cuenta no verificada → `401` con ProblemDetail (`title "No autorizado"`, detail "Necesitas iniciar sesión para continuar") sin resultados; una cuenta no verificada cuyos datos coinciden con `q` no aparece en la respuesta de una sesión verificada — FR-011, SC-004, contracts §401
+- [X] T030 [P] [US3] Ampliar `backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java`: `GET /api/users/search?q=an` sin sesión → 401; con cuenta pendiente → 401; con cuenta verificada la autorización deja pasar la solicitud (404 en el slice sin `UserController`) — FR-011, research.md §D1 (cubierto en UserSearchIT.withoutSessionOrWithUnverifiedAccountIsA401)
+- [X] T031 [P] [US3] Ampliar `frontend/src/api/usersClient.test.js`: `401` devuelve `{ok:false, status:401}` para que el gate de la ruta redirija, sin mensaje de error de dominio — contracts §401, contracts §Contrato del frontend
+- [X] T032 [P] [US3] Ampliar `frontend/src/App.test.jsx` si hace falta para dejar explícito que `/users/search` sin sesión redirige a `/login` y no renderiza el campo de búsqueda ni resultados — FR-011, SC-004
 
 ### Implementation for User Story 3
 
-- [ ] T033 [US3] Asegurar en `backend/src/main/java/com/amano/backend/user/UserController.java` que el endpoint de búsqueda responde el 401 existente cuando `currentUserId()` es `null`, y confirmar en `backend/src/main/java/com/amano/backend/user/UserRepository.java` los filtros `emailVerifiedAt IS NOT NULL` e `id <> :sessionId` — FR-005, FR-011, contracts §Autorización
-- [ ] T034 [US3] Verificación de la historia: `cd backend && ./mvnw -B -Dit.test=UserSearchIT,SecurityConfigTest verify` y `cd frontend && npx vitest run src/App.test.jsx src/api/usersClient.test.jsx` en verde, incluyendo la regresión de `/api/users/me` y `/api/expenses/**`
+- [X] T033 [US3] Asegurar en `backend/src/main/java/com/amano/backend/user/UserController.java` que el endpoint de búsqueda responde el 401 existente cuando `currentUserId()` es `null`, y confirmar en `backend/src/main/java/com/amano/backend/user/UserRepository.java` los filtros `emailVerifiedAt IS NOT NULL` e `id <> :sessionId` — FR-005, FR-011, contracts §Autorización
+- [X] T034 [US3] Verificación de la historia: `cd backend && ./mvnw -B -Dit.test=UserSearchIT,SecurityConfigTest verify` y `cd frontend && npx vitest run src/App.test.jsx src/api/usersClient.test.jsx` en verde, incluyendo la regresión de `/api/users/me` y `/api/expenses/**`
 
 **Checkpoint**: US1–US3 completas; el buscador y el 401 heredado de 003 quedan verificados.
 
@@ -156,15 +156,15 @@ resultados previos y que un nuevo envío vuelve a consultar.
 
 ### Tests for User Story 4 ⚠️ (primero, deben FALLAR)
 
-- [ ] T035 [P] [US4] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchIT.java`: una búsqueda válida sin coincidencias responde `200` con `[]` (sin error ni datos inventados) — FR-009, contracts §Respuesta 200
-- [ ] T036 [P] [US4] Ampliar `frontend/src/api/usersClient.test.js`: 5xx y rechazo de `fetch` devuelven `{ok:false, network:true}`; exportar y asertar el texto exacto de `SEARCH_NETWORK_ERROR_MESSAGE` = "No se pudo completar la búsqueda. Intenta nuevamente" — FR-010, contracts §Contrato del frontend
-- [ ] T037 [P] [US4] Ampliar `frontend/src/pages/UsersSearchPage.test.jsx`: sin coincidencias muestra exactamente "No se encontraron usuarios"; con `{ok:false, network:true}` muestra el mensaje fijo, no conserva resultados de una búsqueda anterior y un nuevo envío vuelve a llamar a `searchUsers` — FR-009, FR-010, SC-007
+- [X] T035 [P] [US4] Ampliar `backend/src/test/java/com/amano/backend/user/UserSearchIT.java`: una búsqueda válida sin coincidencias responde `200` con `[]` (sin error ni datos inventados) — FR-009, contracts §Respuesta 200
+- [X] T036 [P] [US4] Ampliar `frontend/src/api/usersClient.test.js`: 5xx y rechazo de `fetch` devuelven `{ok:false, network:true}`; exportar y asertar el texto exacto de `SEARCH_NETWORK_ERROR_MESSAGE` = "No se pudo completar la búsqueda. Intenta nuevamente" — FR-010, contracts §Contrato del frontend
+- [X] T037 [P] [US4] Ampliar `frontend/src/pages/UsersSearchPage.test.jsx`: sin coincidencias muestra exactamente "No se encontraron usuarios"; con `{ok:false, network:true}` muestra el mensaje fijo, no conserva resultados de una búsqueda anterior y un nuevo envío vuelve a llamar a `searchUsers` — FR-009, FR-010, SC-007
 
 ### Implementation for User Story 4
 
-- [ ] T038 [US4] Completar `frontend/src/api/usersClient.js` con el manejo de 5xx y fallos de `fetch` como `{ok:false, network:true}` y exportar `SEARCH_NETWORK_ERROR_MESSAGE` — FR-010, contracts §Contrato del frontend
-- [ ] T039 [US4] Completar `frontend/src/pages/UsersSearchPage.jsx`: estado sin resultados con el texto exacto, estado de error de red con el mensaje fijo, limpieza de resultados obsoletos y reintento mediante el mismo botón "Buscar" — FR-009, FR-010, SC-007, plan.md §D5
-- [ ] T040 [US4] Verificación de la historia: `cd backend && ./mvnw -B -Dit.test=UserSearchIT verify` y `cd frontend && npx vitest run src/api/usersClient.test.js src/pages/UsersSearchPage.test.jsx` en verde
+- [X] T038 [US4] Completar `frontend/src/api/usersClient.js` con el manejo de 5xx y fallos de `fetch` como `{ok:false, network:true}` y exportar `SEARCH_NETWORK_ERROR_MESSAGE` — FR-010, contracts §Contrato del frontend
+- [X] T039 [US4] Completar `frontend/src/pages/UsersSearchPage.jsx`: estado sin resultados con el texto exacto, estado de error de red con el mensaje fijo, limpieza de resultados obsoletos y reintento mediante el mismo botón "Buscar" — FR-009, FR-010, SC-007, plan.md §D5
+- [X] T040 [US4] Verificación de la historia: `cd backend && ./mvnw -B -Dit.test=UserSearchIT verify` y `cd frontend && npx vitest run src/api/usersClient.test.js src/pages/UsersSearchPage.test.jsx` en verde
 
 **Checkpoint**: las cuatro historias funcionan y se prueban de forma independiente.
 
@@ -174,11 +174,11 @@ resultados previos y que un nuevo envío vuelve a consultar.
 
 **Purpose**: regresiones, cobertura, validación manual, artefactos SDD y Pull Request.
 
-- [ ] T041 [P] Ejecutar la verificación completa del backend: `cd backend && ./mvnw -B verify`; confirmar JaCoCo ≥ 85 % de líneas sin reducir el umbral ni excluir código arbitrario — constitución V, XI
-- [ ] T042 [P] Ejecutar la verificación completa del frontend: `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build`; confirmar cobertura ≥ 85 % sin reducir umbrales ni excluir archivos arbitrarios — constitución V, XI
-- [ ] T043 [P] Ejecutar la validación de [quickstart.md](./quickstart.md) de punta a punta (búsqueda, mínimo de 2 caracteres, sin resultados, error de red, 401, límite de 20 y datos expuestos) y registrar el resultado — constitución II, DoD
-- [ ] T044 [P] Verificar regresiones relevantes: `backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java`, `LoginIT.java`, `backend/src/test/java/com/amano/backend/user/ProfileEditIT.java`, `backend/src/test/java/com/amano/backend/expense/RegisterExpenseIT.java`, `frontend/src/pages/ProfilePage.test.jsx` y `frontend/src/pages/NewExpensePage.test.jsx` siguen pasando — constitución V, DoD
-- [ ] T045 Actualizar los artefactos SDD si la implementación difiere del diseño: `specs/008-user-search/plan.md`, `research.md`, `data-model.md`, `contracts/users-search-api.md` y `checklists/requirements.md` — constitución II, DoD
+- [X] T041 [P] Ejecutar la verificación completa del backend: `cd backend && ./mvnw -B verify`; confirmar JaCoCo ≥ 85 % de líneas sin reducir el umbral ni excluir código arbitrario — constitución V, XI
+- [X] T042 [P] Ejecutar la verificación completa del frontend: `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build`; confirmar cobertura ≥ 85 % sin reducir umbrales ni excluir archivos arbitrarios — constitución V, XI
+- [X] T043 [P] Ejecutar la validación de [quickstart.md](./quickstart.md) de punta a punta (búsqueda, mínimo de 2 caracteres, sin resultados, error de red, 401, límite de 20 y datos expuestos) y registrar el resultado — constitución II, DoD
+- [X] T044 [P] Verificar regresiones relevantes: `backend/src/test/java/com/amano/backend/auth/SecurityConfigTest.java`, `LoginIT.java`, `backend/src/test/java/com/amano/backend/user/ProfileEditIT.java`, `backend/src/test/java/com/amano/backend/expense/RegisterExpenseIT.java`, `frontend/src/pages/ProfilePage.test.jsx` y `frontend/src/pages/NewExpensePage.test.jsx` siguen pasando — constitución V, DoD
+- [X] T045 Actualizar los artefactos SDD si la implementación difiere del diseño: `specs/008-user-search/plan.md`, `research.md`, `data-model.md`, `contracts/users-search-api.md` y `checklists/requirements.md` — constitución II, DoD
 - [ ] T046 Abrir el Pull Request de `feat/user-search` hacia la rama de sprint correspondiente, con resumen de FR/SC cubiertos, evidencia de `./mvnw -B verify` y `npm run test:coverage`, y sin información sensible ni artefactos de depuración — constitución XII, XIII
 
 ---
