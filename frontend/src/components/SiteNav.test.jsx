@@ -12,7 +12,7 @@ function renderNav(entry = '/') {
 }
 
 describe('SiteNav', () => {
-  it('muestra los accesos al dashboard y al registro de gastos', () => {
+  it('muestra los accesos al dashboard, al registro de gastos y al buscador', () => {
     renderNav()
 
     expect(
@@ -26,6 +26,10 @@ describe('SiteNav', () => {
       'href',
       '/expenses/new',
     )
+    expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveAttribute(
+      'href',
+      '/users/search',
+    )
   })
 
   it('resalta el acceso de la ruta actual', () => {
@@ -37,5 +41,12 @@ describe('SiteNav', () => {
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveClass(
       'is-active',
     )
+  })
+
+  it('resalta el buscador cuando se está en /users/search (008)', () => {
+    renderNav('/users/search')
+
+    expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveClass('is-active')
+    expect(screen.getByRole('link', { name: 'Registrar gasto' })).not.toHaveClass('is-active')
   })
 })

@@ -16,6 +16,7 @@ import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import ProfileEditPage from './pages/ProfileEditPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
+import UsersSearchPage from './pages/UsersSearchPage'
 import NewExpensePage from './pages/NewExpensePage'
 import SiteNav from './components/SiteNav'
 import './App.scss'
@@ -165,6 +166,15 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <NewExpensePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Buscador de usuarios (specs/008-user-search, FR-001/FR-011). */}
+      <Route
+        path="/users/search"
+        element={
+          <ProtectedRoute>
+            <UsersSearchPage />
           </ProtectedRoute>
         }
       />

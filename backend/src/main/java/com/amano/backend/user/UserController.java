@@ -1,5 +1,7 @@
 package com.amano.backend.user;
 
+import java.util.List;
+
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,13 +22,16 @@ import org.springframework.web.multipart.MultipartFile;
 import com.amano.backend.user.UserAccountResponse;
 
 /**
- * Authenticated user endpoints (tasks T020 + T034 of 001, T006 of 005): the
+ * Authenticated user endpoints (tasks T020 + T034 of 001, T006 of 005, 008): the
  * principal is the user id placed by JwtCookieAuthenticationFilter.
  *
  * Reads (001/002): GET /api/users/me returns the owner's own profile
  * (FR-009/FR-021: cbuCvu is private to the session owner by design);
  * GET /api/users/{id}/avatar serves the session user's own avatar binaries —
  * any other id is 404.
+ *
+ * Search (008): GET /api/users/search?q= returns verified accounts matching the
+ * term (minimal DTO, never the caller, at most 20).
  *
  * Mutations (feature 005, contracts/users-api.md): every endpoint resolves the
  * session principal AGAIN (FR-017) — the request NEVER carries a user id of
@@ -38,12 +44,14 @@ public class UserController {
     private final UserMapper userMapper;
     private final UserAvatarRepository userAvatarRepository;
     private final UserAccountService userAccountService;
+    private final UserSearchService userSearchService;
 
     public UserController(UserMapper userMapper, UserAvatarRepository userAvatarRepository,
-            UserAccountService userAccountService) {
+            UserAccountService userAccountService, UserSearchService userSearchService) {
         this.userMapper = userMapper;
         this.userAvatarRepository = userAvatarRepository;
         this.userAccountService = userAccountService;
+        this.userSearchService = userSearchService;
     }
 
     @GetMapping("/api/users/me")
@@ -54,6 +62,21 @@ public class UserController {
             return unauthorized();
         }
         return ResponseEntity.ok(profile);
+    }
+
+    /**
+     * GET /api/users/search?q= (feature 008): verified accounts matching the term,
+     * excluding the caller, at most 20. The verified-session rule is enforced by
+     * SecurityConfig on /api/users/**; an invalid term is a 400 (FR-004/FR-019).
+     */
+    @GetMapping("/api/users/search")
+    public ResponseEntity<?> search(@RequestParam(value = "q", required = false) String q) {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return unauthorized();
+        }
+        List<UserSearchResult> results = userSearchService.search(userId, q);
+        return ResponseEntity.ok(results);
     }
 
     @GetMapping("/api/users/{id}/avatar")

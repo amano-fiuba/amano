@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -37,4 +38,24 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     List<User> findExpirableUnverifiedAccounts(@Param("now") OffsetDateTime now,
             @Param("cutoff") OffsetDateTime cutoff);
+
+    /**
+     * User search (feature 008, D2): partial, case-insensitive match on first
+     * name, last name or email, ONLY verified accounts, never the caller.
+     * {@code term} arrives already trimmed and lowercased. locate() matches the
+     * text literally, so '%' and '_' are NOT wildcards. Ordered by first name,
+     * then last name (missing last names last), then id for a stable order; the
+     * caller caps the size with {@code pageable} (20).
+     */
+    @Query("""
+            select u from User u
+            where u.emailVerifiedAt is not null
+              and u.id <> :currentUserId
+              and (locate(:term, lower(u.firstName)) > 0
+                   or locate(:term, lower(coalesce(u.lastName, ''))) > 0
+                   or locate(:term, lower(u.email)) > 0)
+            order by lower(u.firstName), lower(u.lastName) nulls last, u.id
+            """)
+    List<User> searchVerified(@Param("term") String term,
+            @Param("currentUserId") Long currentUserId, Pageable pageable);
 }
