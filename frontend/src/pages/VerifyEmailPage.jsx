@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { verifyEmail } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
+import AuthPage from '../components/AuthPage'
 
 // Exact messages of the redemption contract (task T034; FR-006..FR-008).
 // They are exported so the tests assert the same text the user sees.
@@ -57,9 +58,13 @@ export default function VerifyEmailPage() {
   const displayedMessage = message ?? (token ? null : INVALID_LINK_MESSAGE)
 
   return (
-    <main>
-      <h1>Verificando tu correo…</h1>
+    <AuthPage title="Verificando tu correo…">
       {displayedMessage && <p role="alert">{displayedMessage}</p>}
-    </main>
+      <nav aria-label="Enlaces de verificación">
+        <p>
+          <Link to="/login">Volver a iniciar sesión</Link>
+        </p>
+      </nav>
+    </AuthPage>
   )
 }

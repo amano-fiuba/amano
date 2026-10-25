@@ -8,6 +8,7 @@ export default function TextField({
   label,
   type = 'text',
   error,
+  hint,
   transformOnBlur,
   ...inputProps
 }) {
@@ -23,7 +24,12 @@ export default function TextField({
   }
 
   const isPassword = type === 'password'
-  const describedBy = error ? `${id}-error` : undefined
+  const describedBy = [
+    hint ? `${id}-hint` : null,
+    error ? `${id}-error` : null,
+  ]
+    .filter(Boolean)
+    .join(' ') || undefined
 
   return (
     <div className={error ? 'field field--invalid' : 'field'}>
@@ -45,6 +51,11 @@ export default function TextField({
         >
           {revealed ? 'Ocultar' : 'Mostrar'}
         </button>
+      )}
+      {hint && (
+        <p className="field__hint" id={`${id}-hint`}>
+          {hint}
+        </p>
       )}
       {error && (
         <p role="alert" id={`${id}-error`} data-testid={`${id}-error`}>

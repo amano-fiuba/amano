@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router'
+import AuthPage from '../components/AuthPage'
 import RegisterForm from '../components/RegisterForm'
 import { CHECK_EMAIL_STORAGE_KEY } from './CheckEmailPage'
 
@@ -16,9 +17,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="page">
-      <h1>Crear tu cuenta</h1>
+    <AuthPage title="Crear tu cuenta">
       <RegisterForm onRegistered={handleRegistered} />
-    </main>
+    </AuthPage>
   )
 }

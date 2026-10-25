@@ -1,4 +1,5 @@
 import { Link, Navigate, useLocation, useNavigate } from 'react-router'
+import AuthPage from '../components/AuthPage'
 import LoginForm from '../components/LoginForm'
 import { useAuth } from '../auth/AuthContext'
 
@@ -27,10 +28,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="page">
-      <h1>Iniciar sesión</h1>
+    <AuthPage title="Iniciar sesión">
       {notice && (
-        <p role="status" data-testid="login-notice">
+        <p role="status" data-testid="login-notice" className="form-success">
           {notice}
         </p>
       )}
@@ -43,6 +43,6 @@ export default function LoginPage() {
           ¿No tenés cuenta? <Link to="/register">Regístrate</Link>
         </p>
       </nav>
-    </main>
+    </AuthPage>
   )
 }

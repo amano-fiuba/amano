@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CheckEmailPage, { CHECK_EMAIL_STORAGE_KEY } from './CheckEmailPage'
@@ -47,7 +48,11 @@ describe('CheckEmailPage resend (T046)', () => {
     sessionStorage.setItem(CHECK_EMAIL_STORAGE_KEY, 'ana.perez@example.com')
     stubResend(300)
 
-    render(<CheckEmailPage />)
+    render(
+      <MemoryRouter>
+        <CheckEmailPage />
+      </MemoryRouter>,
+    )
     await clickResend()
 
     expect(screen.getByText(NEUTRAL_MESSAGE)).toBeInTheDocument()
@@ -59,7 +64,11 @@ describe('CheckEmailPage resend (T046)', () => {
     sessionStorage.setItem(deadlineKey('ana@example.com'), String(Date.now() + 200_000))
     stubResend(150)
 
-    render(<CheckEmailPage />)
+    render(
+      <MemoryRouter>
+        <CheckEmailPage />
+      </MemoryRouter>,
+    )
 
     // The reload restored the countdown from sessionStorage: no request was made.
     expect(screen.getByRole('timer')).toHaveTextContent(formatCountdown(200)) // 03:20

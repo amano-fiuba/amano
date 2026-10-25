@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
+  PASSWORD_REQUIREMENTS,
   normalizeCbu,
   normalizeEmail,
   trim,
@@ -15,6 +16,7 @@ import {
 import { NETWORK_ERROR_MESSAGE, register } from '../api/authClient'
 import AvatarUploader from './AvatarUploader'
 import CurrencySelector from './CurrencySelector'
+import SubmitButton from './SubmitButton'
 import TextField from './TextField'
 
 // Registration form (tasks T022 + T030; FR-001, FR-008, FR-009, FR-012, FR-013,
@@ -143,6 +145,7 @@ export default function RegisterForm({ onRegistered }) {
         label="Contraseña"
         type="password"
         autoComplete="new-password"
+        hint={PASSWORD_REQUIREMENTS}
         error={errors.password?.message}
         {...bindField('password', {
           required: 'La contraseña es obligatoria',
@@ -190,9 +193,7 @@ export default function RegisterForm({ onRegistered }) {
       )}
 
       {/* FR-015: disabled immediately on submit; re-enabled by RHF on any outcome. */}
-      <button type="submit" disabled={isSubmitting}>
-        Crear cuenta
-      </button>
+      <SubmitButton loading={isSubmitting}>Crear cuenta</SubmitButton>
     </form>
   )
 }
