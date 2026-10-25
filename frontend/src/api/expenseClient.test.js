@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { EXPENSE_NETWORK_ERROR_MESSAGE, createExpense } from './expenseClient'
+import {
+  EXPENSE_NETWORK_ERROR_MESSAGE,
+  RECURRING_LOAD_ERROR_MESSAGE,
+  RECURRING_UPDATE_ERROR_MESSAGE,
+  createExpense,
+  listRecurringExpenses,
+  updateRecurringExpenseStatus,
+} from './expenseClient'
 
 const PAYLOAD = {
   amount: '10.10',
@@ -151,5 +158,105 @@ describe('createExpense (T024)', () => {
       detail: '',
       fields: {},
     })
+  })
+})
+
+describe('listRecurringExpenses (009, FR-012)', () => {
+  it('pide GET /api/expenses/recurring con cookie y devuelve la lista', async () => {
+    const series = [{ id: 81, status: 'ACTIVE' }]
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: series }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await listRecurringExpenses()).toEqual({ ok: true, expenses: series })
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/recurring', { credentials: 'include' })
+  })
+
+  it('un cuerpo que no es lista se trata como lista vacía', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ok: true, body: {} })))
+
+    expect(await listRecurringExpenses()).toEqual({ ok: true, expenses: [] })
+  })
+
+  it('4xx devuelve el status; 5xx y fallo de red son network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 401 })))
+    expect(await listRecurringExpenses()).toEqual({ ok: false, status: 401 })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 503 })))
+    expect(await listRecurringExpenses()).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await listRecurringExpenses()).toEqual({ ok: false, network: true })
+  })
+
+  it('expone el mensaje fijo de carga', () => {
+    expect(RECURRING_LOAD_ERROR_MESSAGE).toBe(
+      'No se pudieron cargar tus gastos recurrentes. Intentá nuevamente',
+    )
+  })
+})
+
+describe('updateRecurringExpenseStatus (009, FR-009/FR-010)', () => {
+  it('envía PATCH con el estado como JSON y devuelve la serie actualizada', async () => {
+    const updated = { id: 81, status: 'PAUSED' }
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: updated }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await updateRecurringExpenseStatus(81, 'PAUSED')).toEqual({ ok: true, expense: updated })
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/81/status', {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'PAUSED' }),
+    })
+  })
+
+  it('409 expone el detalle y el código del ProblemDetail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({
+          status: 409,
+          body: {
+            detail: 'El gasto recurrente ya está finalizado y no puede modificarse',
+            properties: { code: 'RECURRENCE_FINISHED' },
+          },
+        }),
+      ),
+    )
+
+    expect(await updateRecurringExpenseStatus(81, 'ACTIVE')).toEqual({
+      ok: false,
+      status: 409,
+      detail: 'El gasto recurrente ya está finalizado y no puede modificarse',
+      code: 'RECURRENCE_FINISHED',
+    })
+  })
+
+  it('un 4xx sin cuerpo JSON no lanza', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, json: () => Promise.reject(new Error('x')) }),
+    )
+
+    expect(await updateRecurringExpenseStatus(81, 'PAUSED')).toEqual({
+      ok: false,
+      status: 404,
+      detail: '',
+      code: null,
+    })
+  })
+
+  it('5xx y fallo de red son network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 500 })))
+    expect(await updateRecurringExpenseStatus(81, 'PAUSED')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await updateRecurringExpenseStatus(81, 'PAUSED')).toEqual({ ok: false, network: true })
+  })
+
+  it('expone el mensaje fijo de actualización', () => {
+    expect(RECURRING_UPDATE_ERROR_MESSAGE).toBe(
+      'No se pudo actualizar el gasto recurrente. Intentá nuevamente',
+    )
   })
 })

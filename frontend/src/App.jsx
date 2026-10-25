@@ -18,6 +18,7 @@ import ProfileEditPage from './pages/ProfileEditPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import UsersSearchPage from './pages/UsersSearchPage'
 import NewExpensePage from './pages/NewExpensePage'
+import RecurringExpensesPage from './pages/RecurringExpensesPage'
 import SiteNav from './components/SiteNav'
 import './App.scss'
 
@@ -166,6 +167,15 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <NewExpensePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Gastos recurrentes: pausar o finalizar (specs/009-pause-recurring-expense, FR-012). */}
+      <Route
+        path="/expenses/recurring"
+        element={
+          <ProtectedRoute>
+            <RecurringExpensesPage />
           </ProtectedRoute>
         }
       />

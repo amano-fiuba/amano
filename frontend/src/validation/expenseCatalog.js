@@ -26,6 +26,20 @@ export const TYPE_OPTIONS = Object.freeze([
   { code: 'ONE_TIME', label: 'Único' },
 ])
 
+// Feature 009 (specs/009-pause-recurring-expense): frequency of a recurring series
+// and its state. Codes match RecurrenceFrequency/RecurrenceStatus and the V5 CHECKs.
+export const FREQUENCY_OPTIONS = Object.freeze([
+  { code: 'WEEKLY', label: 'Semanal' },
+  { code: 'MONTHLY', label: 'Mensual' },
+  { code: 'YEARLY', label: 'Anual' },
+])
+
+export const STATUS_OPTIONS = Object.freeze([
+  { code: 'ACTIVE', label: 'Activo' },
+  { code: 'PAUSED', label: 'Pausado' },
+  { code: 'FINISHED', label: 'Finalizado' },
+])
+
 export const PAYMENT_METHOD_OPTIONS = Object.freeze([
   { code: 'CASH', label: 'Efectivo' },
   { code: 'DEBIT_CARD', label: 'Tarjeta de débito' },
