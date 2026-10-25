@@ -67,14 +67,41 @@ describe('LoginPage (feature 004)', () => {
   it('muestra el formulario con la contraseña oculta y el enlace al registro', async () => {
     renderLogin()
 
-    expect(await screen.findByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument()
+    const heading = await screen.findByRole('heading', { name: /iniciar sesión/i })
+    // Mismo contenedor/tarjeta que RegisterPage (`main.page`).
+    expect(heading.closest('main')).toHaveClass('page')
     expect(screen.getByLabelText('Contraseña')).toHaveAttribute('type', 'password')
     expect(screen.getByRole('link', { name: /regístrate/i })).toHaveAttribute('href', '/register')
+    expect(screen.getByText(/¿No tenés cuenta\?/)).toBeInTheDocument()
     // Feature 006: entry point to the password recovery request.
     expect(screen.getByRole('link', { name: /olvidaste tu contraseña/i })).toHaveAttribute(
       'href',
       '/forgot-password',
     )
+  })
+
+  it('mientras se envía, el botón queda deshabilitado y muestra el progreso', async () => {
+    let releaseResponse
+    authClient.login.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseResponse = () => resolve({ ok: false, network: true })
+        }),
+    )
+    const user = userEvent.setup()
+    renderLogin()
+    await screen.findByRole('heading', { name: /iniciar sesión/i })
+
+    const button = screen.getByRole('button', { name: /iniciar sesión/i })
+    await fillAndSubmit(user, 'ana@example.com', 'Password123!')
+
+    expect(button).toBeDisabled()
+    expect(button).toHaveTextContent('Ingresando…')
+    expect(authClient.login).toHaveBeenCalledTimes(1)
+
+    releaseResponse()
+    expect(await screen.findByTestId('login-error')).toBeInTheDocument()
+    expect(button).toBeEnabled()
   })
 
   it('muestra el aviso recibido en state.notice (feature 006: contraseña actualizada)', async () => {

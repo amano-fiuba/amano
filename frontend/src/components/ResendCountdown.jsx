@@ -24,7 +24,11 @@ export default function ResendCountdown({ email, autoResend = false }) {
       <button type="button" onClick={resend}>
         {RESEND_LABEL}
       </button>
-      {message && <p role="status">{message}</p>}
+      {message && (
+        <p role="status" className="form-success">
+          {message}
+        </p>
+      )}
       {remaining > 0 && (
         <p role="timer">Podrás solicitar otro correo en {formatCountdown(remaining)}</p>
       )}

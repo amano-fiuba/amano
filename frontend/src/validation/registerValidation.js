@@ -7,6 +7,10 @@
 export const PASSWORD_MIN_LENGTH = 8
 export const PASSWORD_MAX_LENGTH = 64
 
+/** Visible rule shared by every password field (register, reset, change). */
+export const PASSWORD_REQUIREMENTS =
+  'Mínimo 8 caracteres, con al menos una mayúscula, una minúscula, un número y un símbolo'
+
 /** FR-010: avatar size limit. */
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024
 

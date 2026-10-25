@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
+import AuthPage from '../components/AuthPage'
 import ResendCountdown from '../components/ResendCountdown'
 
 // "Revisa tu correo" screen (task T023 + T052, feature 003: FR-002, FR-010, FR-012).
@@ -15,14 +17,18 @@ export default function CheckEmailPage() {
   )
 
   return (
-    <main>
-      <h1>Revisa tu correo</h1>
+    <AuthPage title="Revisa tu correo">
       <p>
         {email
           ? `Enviamos un enlace de verificación a ${email}. Haz clic en el enlace para verificar tu cuenta y poder iniciar sesión.`
           : 'Enviamos un enlace de verificación a tu correo electrónico. Haz clic en el enlace para verificar tu cuenta y poder iniciar sesión.'}
       </p>
       <ResendCountdown email={email} />
-    </main>
+      <nav aria-label="Enlaces de verificación">
+        <p>
+          <Link to="/login">Volver a iniciar sesión</Link>
+        </p>
+      </nav>
+    </AuthPage>
   )
 }

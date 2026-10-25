@@ -8,6 +8,8 @@ export default function TextField({
   label,
   type = 'text',
   error,
+  hint,
+  leadingIcon,
   transformOnBlur,
   ...inputProps
 }) {
@@ -23,19 +25,37 @@ export default function TextField({
   }
 
   const isPassword = type === 'password'
-  const describedBy = error ? `${id}-error` : undefined
+  const describedBy = [
+    hint ? `${id}-hint` : null,
+    error ? `${id}-error` : null,
+  ]
+    .filter(Boolean)
+    .join(' ') || undefined
+
+  const input = (
+    <input
+      {...inputProps}
+      id={id}
+      type={inputType}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy}
+      onBlur={handleBlur}
+    />
+  )
 
   return (
     <div className={error ? 'field field--invalid' : 'field'}>
       <label htmlFor={id}>{label}</label>
-      <input
-        {...inputProps}
-        id={id}
-        type={inputType}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        onBlur={handleBlur}
-      />
+      {leadingIcon ? (
+        <span className="field__control field__control--with-icon">
+          <span className="field__icon" aria-hidden="true">
+            {leadingIcon}
+          </span>
+          {input}
+        </span>
+      ) : (
+        input
+      )}
       {isPassword && (
         <button
           type="button"
@@ -45,6 +65,11 @@ export default function TextField({
         >
           {revealed ? 'Ocultar' : 'Mostrar'}
         </button>
+      )}
+      {hint && (
+        <p className="field__hint" id={`${id}-hint`}>
+          {hint}
+        </p>
       )}
       {error && (
         <p role="alert" id={`${id}-error`} data-testid={`${id}-error`}>
