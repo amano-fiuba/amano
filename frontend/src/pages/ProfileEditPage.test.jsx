@@ -222,14 +222,14 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  it('cancelar vuelve a la visualización sin guardar nada (FR-008)', async () => {
+  it('el botón Volver atrás regresa a la visualización sin guardar nada (FR-008)', async () => {
     const user = userEvent.setup()
     stubSesion(PERFIL_COMPLETO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
     await editarCompletamente(user)
-    await user.click(screen.getByRole('button', { name: /cancelar/i }))
+    await user.click(screen.getByRole('button', { name: /volver atrás/i }))
 
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateProfile).not.toHaveBeenCalled()
