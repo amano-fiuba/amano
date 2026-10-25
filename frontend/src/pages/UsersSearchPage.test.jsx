@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
@@ -62,12 +62,14 @@ async function search(user, text) {
 }
 
 describe('UsersSearchPage (feature 008)', () => {
-  it('muestra el título, el campo y el botón Buscar', async () => {
+  it('muestra el título, el campo y el botón Buscar dentro de la tarjeta de página', async () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Buscar usuarios' })).toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveClass('page', 'users-search-page')
     expect(screen.getByLabelText('Nombre, apellido o email')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Buscar' })).toBeEnabled()
+    expect(screen.getByTestId('search-initial')).toBeInTheDocument()
   })
 
   it.each([
@@ -81,7 +83,10 @@ describe('UsersSearchPage (feature 008)', () => {
 
     await search(user, text)
 
-    expect(await screen.findByTestId('search-notice')).toHaveTextContent(TOO_SHORT_MESSAGE)
+    const notice = await screen.findByTestId('search-notice')
+    expect(notice).toHaveTextContent(TOO_SHORT_MESSAGE)
+    expect(notice).toHaveClass('users-search-banner')
+    expect(notice).toHaveAttribute('role', 'alert')
     expect(usersClient.searchUsers).not.toHaveBeenCalled()
   })
 
@@ -103,6 +108,49 @@ describe('UsersSearchPage (feature 008)', () => {
     avatars.forEach((img) => expect(img).toHaveAttribute('src', '/avatar-default.png'))
   })
 
+  it('presenta cada resultado como tarjeta con su acción de agregar', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA, JUAN] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    expect(await screen.findByTestId('user-card-3')).toHaveClass('user-card')
+    expect(screen.getByTestId('user-card-4')).toHaveClass('user-card')
+    expect(screen.getByText('2 resultados')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Agregar a Ana Pérez (próximamente)' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Juan (próximamente)' })).toBeDisabled()
+  })
+
+  it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {
+    let resolveSearch
+    usersClient.searchUsers.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSearch = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    const input = await screen.findByLabelText('Nombre, apellido o email')
+    await user.type(input, 'ana')
+    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+
+    expect(await screen.findByTestId('search-loading')).toBeInTheDocument()
+    const pendingButton = screen.getByRole('button', { name: 'Buscando…' })
+    expect(pendingButton).toBeDisabled()
+    expect(pendingButton).toHaveAttribute('aria-busy', 'true')
+
+    await act(async () => {
+      resolveSearch({ ok: true, users: [ANA] })
+    })
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument()
+  })
+
   it('también busca al apretar Enter', async () => {
     usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
     const user = userEvent.setup()
@@ -121,7 +169,11 @@ describe('UsersSearchPage (feature 008)', () => {
 
     await search(user, 'zzz')
 
-    expect(await screen.findByTestId('search-notice')).toHaveTextContent(NO_RESULTS_MESSAGE)
+    const notice = await screen.findByTestId('search-notice')
+    expect(notice).toHaveTextContent(NO_RESULTS_MESSAGE)
+    expect(notice).toHaveClass('users-search-empty')
+    expect(notice).toHaveAttribute('role', 'status')
+    expect(screen.queryByTestId('search-initial')).not.toBeInTheDocument()
   })
 
   it('error de red: mensaje fijo, borra resultados previos y permite reintentar', async () => {
@@ -136,9 +188,10 @@ describe('UsersSearchPage (feature 008)', () => {
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
 
     await search(user, 'an')
-    expect(await screen.findByTestId('search-notice')).toHaveTextContent(
-      'No se pudo completar la búsqueda. Intenta nuevamente',
-    )
+    const notice = await screen.findByTestId('search-notice')
+    expect(notice).toHaveTextContent('No se pudo completar la búsqueda. Intenta nuevamente')
+    expect(notice).toHaveClass('users-search-banner')
+    expect(notice).toHaveAttribute('role', 'alert')
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
 
     await search(user, 'an')

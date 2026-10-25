@@ -9,6 +9,7 @@ export default function TextField({
   type = 'text',
   error,
   hint,
+  leadingIcon,
   transformOnBlur,
   ...inputProps
 }) {
@@ -31,17 +32,30 @@ export default function TextField({
     .filter(Boolean)
     .join(' ') || undefined
 
+  const input = (
+    <input
+      {...inputProps}
+      id={id}
+      type={inputType}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy}
+      onBlur={handleBlur}
+    />
+  )
+
   return (
     <div className={error ? 'field field--invalid' : 'field'}>
       <label htmlFor={id}>{label}</label>
-      <input
-        {...inputProps}
-        id={id}
-        type={inputType}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={describedBy}
-        onBlur={handleBlur}
-      />
+      {leadingIcon ? (
+        <span className="field__control field__control--with-icon">
+          <span className="field__icon" aria-hidden="true">
+            {leadingIcon}
+          </span>
+          {input}
+        </span>
+      ) : (
+        input
+      )}
       {isPassword && (
         <button
           type="button"
