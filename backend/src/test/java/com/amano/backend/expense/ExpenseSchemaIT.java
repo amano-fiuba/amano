@@ -48,7 +48,10 @@ class ExpenseSchemaIT {
 
         assertThat(columns).containsExactly(
                 "id", "user_id", "amount", "currency", "expense_date", "category",
-                "expense_type", "payment_method", "description", "idempotency_key", "created_at");
+                "expense_type", "payment_method", "description", "idempotency_key", "created_at",
+                // V5 (feature 009): recurrence columns, all nullable.
+                "recurrence_frequency", "recurrence_status", "recurrence_next_date",
+                "recurrence_source_id");
     }
 
     @Test

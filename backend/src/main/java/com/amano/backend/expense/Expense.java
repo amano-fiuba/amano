@@ -25,6 +25,12 @@ import jakarta.persistence.Table;
  * single creator ({@link #userId}) and has no participants, splits, debts,
  * friends or groups (FR-006). Pure persistence mapping: normalization and
  * business rules live in the service layer.
+ *
+ * <p>Feature 009 adds the recurrence columns (specs/009-pause-recurring-expense,
+ * data-model.md). One row is either a one-time expense, a recurring <em>series</em>
+ * (frequency + status, plus a next date while not finished), an automatically
+ * generated <em>occurrence</em> (source id of its series) or a legacy 007
+ * recurring expense without frequency (all recurrence columns null).
  */
 @Entity
 @Table(name = "expenses")
@@ -73,6 +79,24 @@ public class Expense {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
+
+    /** Series only (009, FR-001); null for one-time expenses, occurrences and legacy rows. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_frequency", length = 10)
+    private RecurrenceFrequency recurrenceFrequency;
+
+    /** Series only (009, FR-007); present exactly when the frequency is. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_status", length = 10)
+    private RecurrenceStatus recurrenceStatus;
+
+    /** Next date to generate; set while ACTIVE/PAUSED, null once FINISHED (FR-008/FR-009). */
+    @Column(name = "recurrence_next_date")
+    private LocalDate recurrenceNextDate;
+
+    /** Series an occurrence was generated from (FR-005); plain id to avoid loading it. */
+    @Column(name = "recurrence_source_id")
+    private Long recurrenceSourceId;
 
     public Long getId() {
         return id;
@@ -156,5 +180,42 @@ public class Expense {
 
     public OffsetDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public RecurrenceFrequency getRecurrenceFrequency() {
+        return recurrenceFrequency;
+    }
+
+    public void setRecurrenceFrequency(RecurrenceFrequency recurrenceFrequency) {
+        this.recurrenceFrequency = recurrenceFrequency;
+    }
+
+    public RecurrenceStatus getRecurrenceStatus() {
+        return recurrenceStatus;
+    }
+
+    public void setRecurrenceStatus(RecurrenceStatus recurrenceStatus) {
+        this.recurrenceStatus = recurrenceStatus;
+    }
+
+    public LocalDate getRecurrenceNextDate() {
+        return recurrenceNextDate;
+    }
+
+    public void setRecurrenceNextDate(LocalDate recurrenceNextDate) {
+        this.recurrenceNextDate = recurrenceNextDate;
+    }
+
+    public Long getRecurrenceSourceId() {
+        return recurrenceSourceId;
+    }
+
+    public void setRecurrenceSourceId(Long recurrenceSourceId) {
+        this.recurrenceSourceId = recurrenceSourceId;
+    }
+
+    /** A recurring series registered since 009 (has a frequency). */
+    public boolean isRecurringSeries() {
+        return recurrenceFrequency != null;
     }
 }

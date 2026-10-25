@@ -20,6 +20,8 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.IdempotencyConflictException;
+import com.amano.backend.expense.RecurringExpenseFinishedException;
+import com.amano.backend.expense.RecurringExpenseNotFoundException;
 
 /**
  * Global REST error handling following RFC 7807 ProblemDetail, as defined in
@@ -183,6 +185,25 @@ public class ProblemDetailExceptionHandler {
                 HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
         problem.setTitle("Operación ya registrada");
         problem.setProperty("properties", Map.of("code", "IDEMPOTENCY_KEY_REUSED"));
+        return problem;
+    }
+
+    /** Not a series of the caller (feature 009, FR-011): one neutral 404 for every case. */
+    @ExceptionHandler(RecurringExpenseNotFoundException.class)
+    public ProblemDetail handleRecurringExpenseNotFound(RecurringExpenseNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Gasto recurrente no encontrado");
+        return problem;
+    }
+
+    /** Leaving a FINISHED series (feature 009, FR-009): 409 with a machine-readable code. */
+    @ExceptionHandler(RecurringExpenseFinishedException.class)
+    public ProblemDetail handleRecurringExpenseFinished(RecurringExpenseFinishedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Gasto recurrente finalizado");
+        problem.setProperty("properties", Map.of("code", RecurringExpenseFinishedException.CODE));
         return problem;
     }
 

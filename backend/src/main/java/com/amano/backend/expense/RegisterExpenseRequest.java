@@ -19,6 +19,8 @@ public class RegisterExpenseRequest {
     private String date;
     private String category;
     private String type;
+    /** Feature 009 (FR-001/FR-002): required for RECURRING, forbidden for ONE_TIME. */
+    private String frequency;
     private String paymentMethod;
     private String description;
     private String deviceTimeZone;
@@ -64,6 +66,14 @@ public class RegisterExpenseRequest {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public String getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(String frequency) {
+        this.frequency = frequency;
     }
 
     public String getPaymentMethod() {

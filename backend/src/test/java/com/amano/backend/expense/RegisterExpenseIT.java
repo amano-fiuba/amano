@@ -220,6 +220,7 @@ class RegisterExpenseIT {
                 "date", LocalDate.now(ZoneOffset.UTC).toString(),
                 "category", "OTHER",
                 "type", "RECURRING",
+                "frequency", "MONTHLY", // required since 009 (FR-001)
                 "paymentMethod", "OTHER",
                 "deviceTimeZone", "UTC");
 

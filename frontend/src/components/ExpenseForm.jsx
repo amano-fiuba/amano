@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import TextField from './TextField'
 import SelectField from './SelectField'
 import {
@@ -9,6 +9,7 @@ import {
 import {
   CATEGORY_OPTIONS,
   CURRENCY_OPTIONS,
+  FREQUENCY_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   TYPE_OPTIONS,
 } from '../validation/expenseCatalog'
@@ -35,12 +36,17 @@ const REQUIRED_SELECT_MESSAGES = {
   paymentMethod: 'El medio de pago es obligatorio',
 }
 
+// Feature 009 (FR-001): a recurring expense needs its frequency.
+export const FREQUENCY_REQUIRED_MESSAGE =
+  'La frecuencia es obligatoria para un gasto recurrente'
+
 const FIELD_NAMES = [
   'amount',
   'currency',
   'date',
   'category',
   'type',
+  'frequency',
   'paymentMethod',
   'description',
 ]
@@ -50,6 +56,8 @@ const FIELD_NAMES = [
  * the operation's Idempotency-Key (generated on the first confirm, kept across
  * failures, renewed only after success) and the exact FR-032 reset. Server field
  * errors are surfaced next to their field; network/5xx keep the entered data.
+ * Feature 009: choosing "Recurrente" reveals the required "Frecuencia" select,
+ * which is only sent for recurring expenses (FR-001/FR-002).
  */
 export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
   const {
@@ -59,6 +67,7 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     setValue,
     setError,
     clearErrors,
+    control,
     formState: { errors, isSubmitting, dirtyFields },
   } = useForm({
     mode: 'onBlur',
@@ -68,10 +77,13 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
       date: today,
       category: '',
       type: '',
+      frequency: '',
       paymentMethod: '',
       description: '',
     },
   })
+  const selectedType = useWatch({ control, name: 'type' })
+  const isRecurring = selectedType === 'RECURRING'
 
   const [idempotencyKey, setIdempotencyKey] = useState(null)
   const [success, setSuccess] = useState('')
@@ -108,6 +120,7 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
       date: today,
       category: '',
       type: '',
+      frequency: '',
       paymentMethod: '',
       description: '',
     })
@@ -147,6 +160,9 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     }
     if (description !== null) {
       payload.description = description
+    }
+    if (values.type === 'RECURRING') {
+      payload.frequency = values.frequency
     }
 
     // One key per save operation: kept on any failure, renewed on success.
@@ -263,6 +279,18 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
           validate: validateRequiredSelect('type'),
         })}
       />
+
+      {isRecurring && (
+        <SelectField
+          label="Frecuencia"
+          options={FREQUENCY_OPTIONS}
+          error={errors.frequency?.message}
+          {...register('frequency', {
+            validate: (value, values) =>
+              values.type !== 'RECURRING' || value ? true : FREQUENCY_REQUIRED_MESSAGE,
+          })}
+        />
+      )}
 
       <SelectField
         label="Medio de pago"

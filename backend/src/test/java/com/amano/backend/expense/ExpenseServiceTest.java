@@ -357,6 +357,10 @@ class ExpenseServiceTest {
         expense.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod()));
         expense.setDescription(ExpenseDescriptionNormalizer.normalize(request.getDescription()));
         expense.setIdempotencyKey(KEY);
+        if (request.getFrequency() != null) {
+            expense.setRecurrenceFrequency(RecurrenceFrequency.valueOf(request.getFrequency()));
+            expense.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+        }
         return expense;
     }
 
@@ -396,7 +400,11 @@ class ExpenseServiceTest {
                 request -> request.setCurrency("USD"),
                 request -> request.setDate(LocalDate.now(ZoneOffset.UTC).minusDays(1).toString()),
                 request -> request.setCategory("OTHER"),
-                request -> request.setType("RECURRING"),
+                request -> {
+                    // Since 009 (FR-001) a RECURRING type needs its frequency.
+                    request.setType("RECURRING");
+                    request.setFrequency("MONTHLY");
+                },
                 request -> request.setPaymentMethod("TRANSFER"),
                 request -> request.setDescription("Cena"),
                 request -> request.setDescription(" "));

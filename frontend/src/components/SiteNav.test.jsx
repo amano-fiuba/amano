@@ -30,6 +30,10 @@ describe('SiteNav', () => {
       'href',
       '/users/search',
     )
+    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).toHaveAttribute(
+      'href',
+      '/expenses/recurring',
+    )
   })
 
   it('resalta el acceso de la ruta actual', () => {
@@ -47,6 +51,13 @@ describe('SiteNav', () => {
     renderNav('/users/search')
 
     expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveClass('is-active')
+    expect(screen.getByRole('link', { name: 'Registrar gasto' })).not.toHaveClass('is-active')
+  })
+
+  it('resalta los gastos recurrentes cuando se está en /expenses/recurring (009)', () => {
+    renderNav('/expenses/recurring')
+
+    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).toHaveClass('is-active')
     expect(screen.getByRole('link', { name: 'Registrar gasto' })).not.toHaveClass('is-active')
   })
 })

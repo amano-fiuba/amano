@@ -11,6 +11,7 @@ vi.mock('../api/expenseClient', () => ({
 import { createExpense } from '../api/expenseClient'
 import ExpenseForm, {
   EXPENSE_REUSED_KEY_MESSAGE,
+  FREQUENCY_REQUIRED_MESSAGE,
   EXPENSE_SESSION_EXPIRED_MESSAGE,
   EXPENSE_SUCCESS_MESSAGE,
   SUCCESS_VISIBLE_MS,
@@ -574,3 +575,93 @@ describe('ExpenseForm accesibilidad y móvil (T047)', () => {
     }
   })
 })
+
+describe('ExpenseForm frecuencia de gastos recurrentes (009, FR-001/FR-002)', () => {
+  async function completeRecurring(user) {
+    await user.type(screen.getByLabelText('Monto'), '250.000,00')
+    await user.selectOptions(screen.getByLabelText('Categoría'), 'HOUSING')
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'RECURRING')
+    await user.selectOptions(screen.getByLabelText('Medio de pago'), 'TRANSFER')
+  }
+
+  it('muestra "Frecuencia" solo cuando el tipo es Recurrente', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.queryByLabelText('Frecuencia')).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'RECURRING')
+    const frequency = screen.getByLabelText('Frecuencia')
+    expect(
+      Array.from(frequency.options)
+        .map((option) => option.textContent)
+        .slice(1),
+    ).toEqual(['Semanal', 'Mensual', 'Anual'])
+
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
+    expect(screen.queryByLabelText('Frecuencia')).not.toBeInTheDocument()
+  })
+
+  it('exige la frecuencia de un gasto recurrente y no envía nada sin ella', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await completeRecurring(user)
+    await user.click(submitButton())
+
+    expect(await screen.findByText(FREQUENCY_REQUIRED_MESSAGE)).toBeInTheDocument()
+    expect(createExpense).not.toHaveBeenCalled()
+  })
+
+  it('envía la frecuencia elegida y la limpia tras el éxito', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 81 } })
+    renderForm()
+
+    await completeRecurring(user)
+    await user.selectOptions(screen.getByLabelText('Frecuencia'), 'MONTHLY')
+    await user.click(submitButton())
+
+    await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
+    expect(createExpense.mock.calls[0][0]).toMatchObject({
+      amount: '250000.00',
+      type: 'RECURRING',
+      frequency: 'MONTHLY',
+    })
+    expect(await screen.findByRole('status')).toHaveTextContent(EXPENSE_SUCCESS_MESSAGE)
+    expect(screen.queryByLabelText('Frecuencia')).not.toBeInTheDocument()
+  })
+
+  it('no envía la frecuencia de un gasto único aunque se haya elegido antes', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 82 } })
+    renderForm()
+
+    await completeRecurring(user)
+    await user.selectOptions(screen.getByLabelText('Frecuencia'), 'WEEKLY')
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
+    await user.click(submitButton())
+
+    await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
+    expect(createExpense.mock.calls[0][0]).not.toHaveProperty('frequency')
+    expect(createExpense.mock.calls[0][0].type).toBe('ONE_TIME')
+  })
+
+  it('muestra el error de servidor de la frecuencia junto al campo', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({
+      ok: false,
+      status: 400,
+      detail: 'La solicitud contiene campos inválidos',
+      fields: { frequency: 'La frecuencia no es válida' },
+    })
+    renderForm()
+
+    await completeRecurring(user)
+    await user.selectOptions(screen.getByLabelText('Frecuencia'), 'YEARLY')
+    await user.click(submitButton())
+
+    expect(await screen.findByText('La frecuencia no es válida')).toBeInTheDocument()
+    expect(screen.getByLabelText('Frecuencia')).toHaveValue('YEARLY')
+  })
+})
+

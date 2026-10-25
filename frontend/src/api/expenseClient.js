@@ -62,3 +62,69 @@ export async function createExpense(payload, idempotencyKey) {
     return { ok: false, network: true }
   }
 }
+
+// Feature 009 (specs/009-pause-recurring-expense/contracts/recurring-expenses-api.md).
+export const RECURRING_LOAD_ERROR_MESSAGE =
+  'No se pudieron cargar tus gastos recurrentes. Intentá nuevamente'
+export const RECURRING_UPDATE_ERROR_MESSAGE =
+  'No se pudo actualizar el gasto recurrente. Intentá nuevamente'
+
+async function problemOf(response) {
+  try {
+    return await response.json()
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * GET /api/expenses/recurring: { ok: true, expenses } on 200, { ok: false, status }
+ * on 4xx (401 = no session) and { ok: false, network: true } on 5xx or network.
+ */
+export async function listRecurringExpenses() {
+  try {
+    const response = await fetch('/api/expenses/recurring', { credentials: 'include' })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, expenses: Array.isArray(body) ? body : [] }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return { ok: false, status: response.status }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * PATCH /api/expenses/{id}/status with { status } (ACTIVE | PAUSED | FINISHED):
+ * { ok: true, expense } on 200, { ok: false, status, detail, code } on 4xx (400
+ * invalid status, 401 no session, 404 not a series of the user, 409 finished) and
+ * { ok: false, network: true } on 5xx or network.
+ */
+export async function updateRecurringExpenseStatus(id, status) {
+  try {
+    const response = await fetch(`/api/expenses/${encodeURIComponent(id)}/status`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    if (response.ok) {
+      return { ok: true, expense: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await problemOf(response)
+    return {
+      ok: false,
+      status: response.status,
+      detail: problem.detail ?? '',
+      code: problem.properties?.code ?? null,
+    }
+  } catch {
+    return { ok: false, network: true }
+  }
+}

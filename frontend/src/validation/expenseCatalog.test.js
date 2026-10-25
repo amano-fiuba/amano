@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest'
 import {
   CATEGORY_OPTIONS,
   CURRENCY_OPTIONS,
+  FREQUENCY_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
+  STATUS_OPTIONS,
   TYPE_OPTIONS,
   codesOf,
   labelOf,
@@ -63,5 +65,21 @@ describe('expenseCatalog', () => {
     expect(Object.isFrozen(CATEGORY_OPTIONS)).toBe(true)
     expect(Object.isFrozen(TYPE_OPTIONS)).toBe(true)
     expect(Object.isFrozen(PAYMENT_METHOD_OPTIONS)).toBe(true)
+    expect(Object.isFrozen(FREQUENCY_OPTIONS)).toBe(true)
+    expect(Object.isFrozen(STATUS_OPTIONS)).toBe(true)
+  })
+
+  it('fixes the recurrence frequency codes (009, FR-001)', () => {
+    expect(codesOf(FREQUENCY_OPTIONS)).toEqual(['WEEKLY', 'MONTHLY', 'YEARLY'])
+    expect(labelOf(FREQUENCY_OPTIONS, 'WEEKLY')).toBe('Semanal')
+    expect(labelOf(FREQUENCY_OPTIONS, 'MONTHLY')).toBe('Mensual')
+    expect(labelOf(FREQUENCY_OPTIONS, 'YEARLY')).toBe('Anual')
+  })
+
+  it('fixes the series status codes (009, FR-007)', () => {
+    expect(codesOf(STATUS_OPTIONS)).toEqual(['ACTIVE', 'PAUSED', 'FINISHED'])
+    expect(labelOf(STATUS_OPTIONS, 'ACTIVE')).toBe('Activo')
+    expect(labelOf(STATUS_OPTIONS, 'PAUSED')).toBe('Pausado')
+    expect(labelOf(STATUS_OPTIONS, 'FINISHED')).toBe('Finalizado')
   })
 })
