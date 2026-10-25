@@ -1,5 +1,4 @@
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { AppRoutes } from './App'
@@ -17,15 +16,22 @@ afterEach(() => {
 })
 
 describe('App (T015)', () => {
-  it('incrementa el contador al hacer clic en el botón (landing en /)', async () => {
-    const user = userEvent.setup()
+  it('renderiza la landing pública en / con las llamadas a la acción', () => {
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /count is 0/i }))
-
     expect(
-      screen.getByRole('button', { name: /count is 1/i }),
+      screen.getByRole('heading', {
+        name: /compartí gastos sin fricción ni cuentas complicadas/i,
+      }),
     ).toBeInTheDocument()
+
+    const main = screen.getByRole('main')
+    expect(
+      within(main).getByRole('link', { name: /empezar gratis/i }),
+    ).toHaveAttribute('href', '/register')
+    expect(
+      within(main).getByRole('link', { name: /iniciar sesión/i }),
+    ).toHaveAttribute('href', '/login')
   })
 })
 

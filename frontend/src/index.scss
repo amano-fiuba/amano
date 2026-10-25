@@ -183,6 +183,38 @@ ul {
   }
 }
 
+.site-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-texto);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--color-acento-oscuro);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+}
+
+.site-nav__mark {
+  display: inline-grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-texto);
+  color: var(--color-superficie);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .site-nav__links {
   display: flex;
   align-items: center;
@@ -202,9 +234,36 @@ ul {
     color: var(--color-texto);
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+
   &.is-active {
     background: var(--color-acento);
     color: #fff;
+  }
+}
+
+@media (max-width: 560px) {
+  .site-nav {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .site-nav__brand {
+    font-size: 0.95rem;
+  }
+
+  .site-nav__links {
+    order: 3;
+    justify-content: center;
+    width: 100%;
+    gap: 0.25rem;
+  }
+
+  .site-nav__link {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
   }
 }
 
