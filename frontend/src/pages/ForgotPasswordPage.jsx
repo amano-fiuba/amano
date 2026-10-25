@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form'
 import { Link } from 'react-router'
 import { normalizeEmail, validateEmail } from '../validation/registerValidation'
 import { FORGOT_PASSWORD_NETWORK_ERROR_MESSAGE, forgotPassword } from '../api/authClient'
+import AuthPage from '../components/AuthPage'
+import SubmitButton from '../components/SubmitButton'
 import TextField from '../components/TextField'
 
 export const CHECK_INBOX_MESSAGE = 'Revisa tu bandeja de entrada'
@@ -31,11 +33,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main>
-      <h1>Recuperar contraseña</h1>
-
+    <AuthPage title="Recuperar contraseña">
       {sentMessage ? (
-        <section role="status" data-testid="forgot-password-sent">
+        <section
+          role="status"
+          data-testid="forgot-password-sent"
+          className="form-success"
+        >
           <h2>{CHECK_INBOX_MESSAGE}</h2>
           <p>{sentMessage}</p>
         </section>
@@ -60,15 +64,17 @@ export default function ForgotPasswordPage() {
             </p>
           )}
 
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Enviando…' : 'Enviar enlace'}
-          </button>
+          <SubmitButton loading={isSubmitting} loadingLabel="Enviando…">
+            Restablecer contraseña
+          </SubmitButton>
         </form>
       )}
 
-      <p>
-        <Link to="/login">Volver a iniciar sesión</Link>
-      </p>
-    </main>
+      <nav aria-label="Enlaces de recuperación">
+        <p>
+          <Link to="/login">Volver a iniciar sesión</Link>
+        </p>
+      </nav>
+    </AuthPage>
   )
 }
