@@ -1,31 +1,58 @@
-import { NavLink } from 'react-router'
+import { Link, NavLink } from 'react-router'
+import { useAuth } from '../auth/AuthContext'
 import ThemeToggle from './ThemeToggle'
 
 // Barra global de navegación (pedido fuera de specs): visible en todas las
-// páginas, con accesos directos al dashboard, al registro de gastos, a los gastos
-// recurrentes (specs/009-pause-recurring-expense, FR-012) y al buscador de usuarios
-// (specs/008-user-search, FR-001). Todas las rutas son protegidas, así que sin
-// sesión ProtectedRoute redirige al login.
+// páginas. Los visitantes ven los accesos públicos y, con sesión, los accesos
+// directos al dashboard, al registro de gastos, a los gastos recurrentes
+// (specs/009-pause-recurring-expense, FR-012) y al buscador de usuarios
+// (specs/008-user-search, FR-001).
 const linkClass = ({ isActive }) =>
   isActive ? 'site-nav__link is-active' : 'site-nav__link'
 
 export default function SiteNav() {
+  const { user } = useAuth() ?? {}
+
   return (
     <header className="site-nav">
+      <Link to="/" className="site-nav__brand" aria-label="A mano, ir al inicio">
+        <span className="site-nav__mark" aria-hidden="true">
+          a
+        </span>
+        A mano
+      </Link>
+
       <nav className="site-nav__links" aria-label="Navegación principal">
-        <NavLink to="/dashboard" className={linkClass}>
-          Dashboard
-        </NavLink>
-        <NavLink to="/expenses/new" className={linkClass}>
-          Registrar gasto
-        </NavLink>
-        <NavLink to="/expenses/recurring" className={linkClass}>
-          Gastos recurrentes
-        </NavLink>
-        <NavLink to="/users/search" className={linkClass}>
-          Buscar usuarios
-        </NavLink>
+        {user ? (
+          <>
+            <NavLink to="/dashboard" className={linkClass}>
+              Dashboard
+            </NavLink>
+            <NavLink to="/expenses/new" className={linkClass}>
+              Registrar gasto
+            </NavLink>
+            <NavLink to="/expenses/recurring" className={linkClass}>
+              Gastos recurrentes
+            </NavLink>
+            <NavLink to="/users/search" className={linkClass}>
+              Buscar usuarios
+            </NavLink>
+          </>
+        ) : (
+          <>
+            <NavLink to="/" end className={linkClass}>
+              Inicio
+            </NavLink>
+            <NavLink to="/login" className={linkClass}>
+              Iniciar sesión
+            </NavLink>
+            <NavLink to="/register" className={linkClass}>
+              Registrarse
+            </NavLink>
+          </>
+        )}
       </nav>
+
       <ThemeToggle />
     </header>
   )
