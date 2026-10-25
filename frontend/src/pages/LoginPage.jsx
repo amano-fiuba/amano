@@ -27,7 +27,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main>
+    <main className="page">
       <h1>Iniciar sesión</h1>
       {notice && (
         <p role="status" data-testid="login-notice">
@@ -35,12 +35,14 @@ export default function LoginPage() {
         </p>
       )}
       <LoginForm onLoggedIn={handleLoggedIn} />
-      <p>
-        <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
-      </p>
-      <p>
-        ¿No tienes cuenta? <Link to="/register">Regístrate</Link>
-      </p>
+      <nav aria-label="Enlaces de inicio de sesión">
+        <p>
+          <Link to="/forgot-password">¿Olvidaste tu contraseña?</Link>
+        </p>
+        <p>
+          ¿No tenés cuenta? <Link to="/register">Regístrate</Link>
+        </p>
+      </nav>
     </main>
   )
 }
