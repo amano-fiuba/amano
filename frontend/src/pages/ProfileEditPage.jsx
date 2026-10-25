@@ -241,7 +241,7 @@ export default function ProfileEditPage() {
         width={96}
         height={96}
       />
-      <div>
+      <div className="avatar-actions">
         <label htmlFor="avatar-edit">
           Avatar: <input
             id="avatar-edit"
@@ -251,17 +251,17 @@ export default function ProfileEditPage() {
             disabled={avatarBusy}
           />
         </label>
-        {avatarError && (
-          <p role="alert" data-testid="avatar-error">
-            {avatarError}
-          </p>
-        )}
         {hasCustomAvatar && (
           <button type="button" onClick={eliminarAvatar} disabled={avatarBusy}>
             Eliminar avatar
           </button>
         )}
       </div>
+      {avatarError && (
+        <p role="alert" data-testid="avatar-error">
+          {avatarError}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         {/* FR-007: el correo es la identidad de la cuenta; solo lectura. */}
@@ -314,15 +314,17 @@ export default function ProfileEditPage() {
 
         {/* FR-011: deshabilitado durante el envío; rehabilitado ante cualquier
             error por react-hook-form (isSubmitting). */}
-        <button type="submit" disabled={isSubmitting}>
-          Guardar cambios
-        </button>
+        <div className="form-actions">
+          <button type="submit" disabled={isSubmitting}>
+            Guardar cambios
+          </button>
+          {/* Vuelve a la visualización de 002 (los cambios exitosos ya quedaron guardados). */}
+          <button type="button" onClick={() => navigate('/profile')}>
+            Volver atrás
+          </button>
+        </div>
       </form>
 
-      {/* FR-008: cancelar no envía nada y vuelve a la visualización de 002. */}
-      <button type="button" onClick={() => navigate('/profile')}>
-        Cancelar
-      </button>
       <p>
         <Link to="/profile/password">Cambiar contraseña</Link>
       </p>

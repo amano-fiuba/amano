@@ -16,9 +16,13 @@ export default function SiteNav() {
   return (
     <header className="site-nav">
       <Link to="/" className="site-nav__brand" aria-label="A mano, ir al inicio">
-        <span className="site-nav__mark" aria-hidden="true">
-          a
-        </span>
+        <img
+          src="/logo.jpeg"
+          alt=""
+          className="site-nav__logo"
+          width={59}
+          height={32}
+        />
         A mano
       </Link>
 
