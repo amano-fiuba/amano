@@ -17,6 +17,13 @@ function renderSelector() {
 }
 
 describe('CurrencySelector (T035)', () => {
+  it('la legend no lleva "(opcional" y mantiene el default ARS (T044, FR-023)', () => {
+    renderSelector()
+
+    expect(screen.getByText(/monedas \(default ARS\)/i)).toBeInTheDocument()
+    expect(screen.queryByText(/opcional/i)).not.toBeInTheDocument()
+  })
+
   it('arranca sin selección y sin error (opcional, Q1)', () => {
     renderSelector()
 

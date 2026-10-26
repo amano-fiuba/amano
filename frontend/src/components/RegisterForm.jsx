@@ -114,7 +114,8 @@ export default function RegisterForm({ onRegistered }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
       <TextField
-        label="Nombre"
+        label="Nombre *"
+        required
         transformOnBlur={blurTransform('firstName', trim)}
         error={errors.firstName?.message}
         {...bindField('firstName', {
@@ -131,8 +132,9 @@ export default function RegisterForm({ onRegistered }) {
       />
 
       <TextField
-        label="Correo electrónico"
+        label="Correo electrónico *"
         type="email"
+        required
         error={errors.email?.message}
         {...bindField('email', {
           required: 'El correo electrónico es obligatorio',
@@ -142,8 +144,9 @@ export default function RegisterForm({ onRegistered }) {
 
       {/* FR-008: hidden by default; TextField offers the Mostrar/Ocultar toggle. */}
       <TextField
-        label="Contraseña"
+        label="Contraseña *"
         type="password"
+        required
         autoComplete="new-password"
         hint={PASSWORD_REQUIREMENTS}
         error={errors.password?.message}
@@ -154,8 +157,9 @@ export default function RegisterForm({ onRegistered }) {
       />
 
       <TextField
-        label="Confirmar contraseña"
+        label="Confirmar contraseña *"
         type="password"
+        required
         autoComplete="new-password"
         error={errors.confirmPassword?.message}
         {...bindField('confirmPassword', {
@@ -177,7 +181,7 @@ export default function RegisterForm({ onRegistered }) {
             type="checkbox"
             {...bindField('acceptTerms', rules(validateAcceptTerms))}
           />
-          Acepto los Términos y Condiciones
+          Acepto los Términos y Condiciones *
         </label>
         {errors.acceptTerms && <p role="alert">{errors.acceptTerms.message}</p>}
       </div>
@@ -191,6 +195,10 @@ export default function RegisterForm({ onRegistered }) {
           {formError}
         </p>
       )}
+
+      <p className="field__hint" data-testid="required-fields-note">
+        Los campos con (*) son obligatorios
+      </p>
 
       {/* FR-015: disabled immediately on submit; re-enabled by RHF on any outcome. */}
       <SubmitButton loading={isSubmitting}>Crear cuenta</SubmitButton>

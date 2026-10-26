@@ -10,6 +10,7 @@ export default function TextField({
   error,
   hint,
   leadingIcon,
+  required,
   transformOnBlur,
   ...inputProps
 }) {
@@ -38,6 +39,7 @@ export default function TextField({
       id={id}
       type={inputType}
       aria-invalid={error ? true : undefined}
+      aria-required={required ? true : undefined}
       aria-describedby={describedBy}
       onBlur={handleBlur}
     />

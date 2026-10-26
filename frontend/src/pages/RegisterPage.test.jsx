@@ -68,10 +68,10 @@ function setupApp() {
 }
 
 async function fillForm(user) {
-  await user.type(screen.getByLabelText('Nombre'), 'Ana')
-  await user.type(screen.getByLabelText('Correo electrónico'), 'ana.perez@example.com')
-  await user.type(screen.getByLabelText('Contraseña'), 'Password123!')
-  await user.type(screen.getByLabelText('Confirmar contraseña'), 'Password123!')
+  await user.type(screen.getByLabelText(/^Nombre \*/), 'Ana')
+  await user.type(screen.getByLabelText(/^Correo electrónico \*/), 'ana.perez@example.com')
+  await user.type(screen.getByLabelText(/^Contraseña \*/), 'Password123!')
+  await user.type(screen.getByLabelText(/^Confirmar contraseña \*/), 'Password123!')
   await user.click(screen.getByLabelText(/Términos y Condiciones/i))
 }
 
@@ -108,7 +108,7 @@ describe('RegisterPage (US1/US2 behaviors after feature 003)', () => {
     expect(
       await screen.findByText('El correo electrónico ya se encuentra registrado'),
     ).toBeInTheDocument()
-    expect(screen.getByLabelText('Correo electrónico')).toHaveDisplayValue(
+    expect(screen.getByLabelText(/^Correo electrónico \*/)).toHaveDisplayValue(
       'ana.perez@example.com',
     )
     expect(authClient.register).toHaveBeenCalledTimes(1)
@@ -123,7 +123,7 @@ describe('RegisterPage (US1/US2 behaviors after feature 003)', () => {
     await user.click(screen.getByRole('button', { name: /crear cuenta/i }))
 
     expect(await screen.findByText("No se pudo completar el registro. Intenta nuevamente")).toBeInTheDocument()
-    expect(screen.getByLabelText('Correo electrónico')).toHaveDisplayValue(
+    expect(screen.getByLabelText(/^Correo electrónico \*/)).toHaveDisplayValue(
       'ana.perez@example.com',
     )
     expect(screen.getByRole('button', { name: /crear cuenta/i })).toBeEnabled()
