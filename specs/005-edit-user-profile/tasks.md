@@ -129,6 +129,16 @@
 
 ---
 
+## Phase 8: Post-plan fixes (FR-008/FR-009 enmendados)
+
+- [x] T025 [FE] Ajuste UX del guardado/cancelación (pedido del usuario): en `frontend/src/pages/ProfileEditPage.jsx` el envío exitoso de "Guardar cambios" ahora aplica los datos frescos al contexto de sesión, marca la clave one-shot `amano.profile.saved` (exportada desde `ProfilePage.jsx`) y navega a `/profile`; se elimina el mensaje de éxito de la pantalla de edición. Nuevo botón "Cancelar cambios" (navega a `/profile` sin `PUT`, cubre FR-008); el botón "Volver atrás" se elimina (su rol queda cubierto). En `frontend/src/pages/ProfilePage.jsx` al montar se consume y remueve la clave y se muestra "Los cambios se guardaron correctamente" (`role="status"`, `data-testid="profile-saved"`, `className="form-success"`) una única vez tras un guardado novedoso; ni refresco ni ingresos posteriores lo repiten (FR-009 enmendado). Espec actualizada: FR-008/FR-009 enmendadas en `spec.md` y flujo Guardar/Cancelar en `contracts/users-api.md`. Tests co-ubicados extendidos en ambos archivos.
+- [x] T026 [FE] Verificación tras T025: `npm run lint` (0 errores) y `npx vitest run src/pages/ProfileEditPage.test.jsx src/pages/ProfilePage.test.jsx` en verde (~1 min; suite completa diferida a cierre).
+- [x] T027 [FE] Estados pendientes y botón dinámico (FR-011 enmendada, pedido del usuario): en `frontend/src/pages/ProfileEditPage.jsx` "Guardar cambios" se deshabilita (gris + `cursor:not-allowed` vía `.form-actions button:disabled` en `index.scss`) mientras no haya modificaciones pendientes; se habilita al modificar nombre/apellido/CBU (`isDirty` de RHF contra los defaultValues de la precarga), monedas (comparación por conjunto contra las iniciales) o tener avatar pendiente (subida/eliminación). "Cancelar cambios" queda siempre habilitado.
+- [x] T028 [FE] Avatar aplazado (FR-015/FR-016 enmendadas): subida y eliminación como **pendientes** confirmadas con "Guardar cambios". La elección de archivo valida en vivo (tamaño→magic bytes) y retiene el File con preview por `URL.createObjectURL` (revoke al descartar/desmontar/confirmar). "Eliminar avatar" (presente solo con avatar propio) marca la eliminación: preview del default y botón deshabilitado mientras la marca está pendiente; "Cancelar cambios" es la única vía de anular (0 llamadas). El guardado ejecuta `DELETE` (si corresponde) → `PUT` de avatar → navegación con aviso one-shot; ante fallo no hay navegación (pendientes retenidos; reintento repite el `PUT /api/users/me`, idempotente). Tests co-ubicados reescritos (US1 guardar/cancelar/estado del botón; US3 pendientes y guardado).
+- [x] T029 [FE] Bugfix del salto a `/login` tras marcar eliminación y guardar: `DELETE /api/users/me/avatar` responde 204 sin cuerpo — `deleteAvatar()` devuelve `{ ok: true }` sin `profile`; el flujo anterior hacía `setUser(eliminacion.profile)` → `undefined` → sesión vacía → redirección del gate. `perfilFinal` se compone con el `result.profile` del `PUT /api/users/me` ajustado post-DELETE (`hasCustomAvatar:false`, `avatarUrl:null`), o con `subida.profile` si hubo subida pendiente. Documentado en `contracts/users-api.md`.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

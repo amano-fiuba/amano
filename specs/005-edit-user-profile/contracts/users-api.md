@@ -138,17 +138,33 @@ Quita el avatar propio y devuelve la cuenta al estado "sin avatar propio".
 
 - **Precarga** (FR-002): `GET /api/users/me` fresco al montar la edición (patrón
   `DashboardPage`/`ProfilePage` de `002`); 401 → redirección vía `ProtectedRoute`.
-- **Guardar** (US1): `PUT /api/users/me` con todos los campos editables; éxito ⇒ mensaje
-  "Los cambios se guardaron correctamente" (u equivalente) y datos frescos en pantalla;
-  `400` ⇒ mensajes por campo de `properties.fields` sin limpiar el formulario (FR-010);
+- **Guardar** (US1): `PUT /api/users/me` con todos los campos editables; si además hay
+  avatar pendiente, primero `DELETE /api/users/me/avatar` (si se marcó eliminación) y luego
+  `PUT /api/users/me/avatar` con el archivo retenido, en ese orden; todo éxito ⇒ navegación
+  a la visualización del perfil de `002`, que muestra los datos frescos junto al mensaje
+  "Los cambios se guardaron correctamente" una única vez (aviso one-shot por sessionStorage,
+  FR-009 enmendado). El botón queda deshabilitado (gris) mientras no haya cambios pendientes
+  (FR-011 enmendada).
+  `400` ⇒ mensajes por campo de `properties.fields` sin limpiar el formulario (FR-010),
+  sin navegación;
   fallo de red/`5xx` ⇒ "No se pudo completar la actualización. Intenta nuevamente"
-  (FR-019) con botón rehabilitado (FR-011).
-- **Cancelar** (FR-008): navegación sin `PUT`; ningún cambio persistido.
+  (FR-019) con botón rehabilitado (FR-011), sin navegación. Fallo parcial (perfil ok +
+  avatar fallo): se muestra el error del avatar, se conservan los pendientes y la
+  navegación no ocurre; un reintento repite el `PUT /api/users/me` ya aplicado
+  (idempotente).
+- **Cancelar** (FR-008): botón "Cancelar cambios"; navegación a la visualización sin
+  `PUT`/`DELETE`; ningún cambio persistido; los cambios pendientes de avatar se descartan
+  (preview vuelve al vigente). (El botón "Volver atrás" fue reemplazado por "Cancelar cambios".)
 - **Contraseña** (US2): `PUT /api/users/me/password`; `400` con `currentPassword` ⇒ mensaje
   específico en el campo, sin limpiar el resto del formulario.
 - **Avatar** (US3): validación en vivo de formato/tamaño en el cliente antes de enviar
-  (patrón FR-013 de `001`); `PUT` para reemplazar, `DELETE` para volver al default; ante
-  error, reconsiderar `me()` para restablecer el estado visual real.
+  (patrón FR-013 de `001`); la subida (FR-015) y la eliminación (FR-016) se retienen como
+  **pendientes**: "Eliminar avatar" solo marca (preview del default y botón deshabilitado;
+  anular su marca solo vía "Cancelar cambios") y se consolida con "Guardar cambios"
+  (`PUT` para reemplazar, `DELETE` para volver al default); ante error, reconsiderar `me()`
+  para restablecer el estado visual real. `DELETE /api/users/me/avatar` responde 204 sin
+  cuerpo: el cliente NO debe esperar un `profile` en esa respuesta (un `setUser(undefined)`
+  vacía la sesión y el gate redirige a /login).
 - **Correo** (FR-007): el campo `email` de la precarga se renderiza siempre deshabilitado/
   solo lectura; el cliente no lo envía en ninguna petición.
 - **Doble envío** (FR-011): botones deshabilitados durante cada mutación; rehabilitados ante

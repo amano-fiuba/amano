@@ -3,6 +3,14 @@ import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
 
+/**
+ * Aviso de éxito de 005 (FR-009 enmendado): el botón "Guardar cambios" de la
+ * edición marca esta clave de sessionStorage antes de navegar a /profile; esta
+ * pantalla la consume y la remueve en el mismo montaje, así el mensaje aparece
+ * una única vez tras guardar y no reaparece al refrescar o volver a entrar.
+ */
+export const PROFILE_SAVED_KEY = 'amano.profile.saved'
+
 // Pantalla "Mi perfil" (specs/002-user-profile): los datos provienen
 // únicamente del contrato de sesión GET /api/users/me vía me();
 // refresco explícito al montar (igual que el dashboard). La contraseña nunca
@@ -13,6 +21,16 @@ import { useAuth } from '../auth/AuthContext'
 export default function ProfilePage() {
   const { user, setUser } = useAuth()
   const [error, setError] = useState(false)
+  // One-shot (FR-009 enmendado): se consume en el montaje vía lazy init de
+  // estado (sin setState dentro de un efecto, React Compiler Friendly) —
+  // leer y remover la clave hace el aviso único y no repetible en refresco.
+  const [savedNotice] = useState(() => {
+    const saved = sessionStorage.getItem(PROFILE_SAVED_KEY) === 'true'
+    if (saved) {
+      sessionStorage.removeItem(PROFILE_SAVED_KEY)
+    }
+    return saved
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +83,11 @@ export default function ProfilePage() {
         className="app-avatar"
       />
       <h1>Mi perfil</h1>
+      {savedNotice && (
+        <p role="status" data-testid="profile-saved" className="form-success">
+          Los cambios se guardaron correctamente
+        </p>
+      )}
       <p>
         Nombre: <span data-testid="profile-name">{user.firstName}</span>
       </p>
