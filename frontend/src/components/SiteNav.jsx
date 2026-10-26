@@ -17,7 +17,7 @@ export default function SiteNav() {
     <header className="site-nav">
       <Link to="/" className="site-nav__brand" aria-label="A mano, ir al inicio">
         <img
-          src="/logo.jpeg"
+          src="/logo.png"
           alt=""
           className="site-nav__logo"
           width={59}
