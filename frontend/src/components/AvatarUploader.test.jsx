@@ -45,6 +45,14 @@ function renderUploader() {
 }
 
 describe('AvatarUploader (T035)', () => {
+  it('el label no lleva la marca "(opcional)" (T044, FR-023)', () => {
+    renderUploader()
+
+    const label = screen.getByLabelText(/avatar/i).closest('label')
+    expect(label).toHaveTextContent('Avatar')
+    expect(label.textContent).not.toContain('(opcional)')
+  })
+
   it('sin archivo no muestra error y no bloquea el resto del form (FR-003)', () => {
     renderUploader()
 

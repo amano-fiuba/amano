@@ -58,7 +58,7 @@ export default function AvatarUploader({ onFileSelected }) {
   return (
     <div>
       <label>
-        Avatar (opcional){' '}
+        Avatar{' '}
         <input
           type="file"
           /* FR-010: only jpg/png are accepted by the backend either way. */

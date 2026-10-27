@@ -140,7 +140,10 @@ Referencias de contratos: [contracts/auth-api.md](contracts/auth-api.md), [contr
 
 ---
 
-## Dependencies & Execution Order
+## Phase 7: Post-plan fixes (FR-023)
+
+- [x] T044 [P] **[FE]** Indicar visualmente los campos obligatorios del registro (FR-023, pedido del usuario): en `frontend/src/components/RegisterForm.jsx` renombrar las etiquetas a "Nombre *", "Correo electrónico *", "Contraseña *", "Confirmar contraseña *" y agregar `*` al label del checkbox de Términos; insertar antes del `SubmitButton` el aviso "Los campos con (*) son obligatorios". En `frontend/src/components/AvatarUploader.jsx` quitar " (opcional)" del label (queda "Avatar") y en `frontend/src/components/CurrencySelector.jsx` cambiar la legend a "Monedas (default ARS)". En `frontend/src/components/TextField.jsx` exponer prop `required` que traduce a `aria-required` (accesibilidad; pasada por los 4 TextFields obligatorios). Tests: actualizar los matchers exactos de `RegisterForm.validation.test.jsx` y `RegisterPage.test.jsx` a regexes con asterisco, y agregar asertos de la nota de obligatorios, del asterisco NO en Apellido/CBU/CVU (opcionales) y del label "Avatar" sin "(opcional)".
+- [x] T045 **[FE]** Suite en verde tras T044: `cd frontend && npm run lint && npm run test` (cubre FR-023 en RegForm/Avatar/Currency). 
 
 ### Phase Dependencies
 

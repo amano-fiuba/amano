@@ -92,6 +92,7 @@ Solo un usuario con sesión válida puede ver la pantalla de perfil. Sin sesión
 - **FR-009**: Ante error de red o del servidor al consultar el perfil, el sistema MUST mostrar un mensaje de error y MUST NOT renderizar datos incompletos ni ficticios.
 - **FR-010**: El sistema MUST reutilizar la infraestructura de `001-user-registration` (endpoints `GET /api/users/me` y `GET /api/users/{id}/avatar`, cookie de sesión `amano_auth`); esta feature MUST NOT introducir nuevos endpoints ni cambios de esquema (ver [contracts/users-api.md](contracts/users-api.md) y [data-model.md](data-model.md)).
 - **FR-011**: El sistema MUST presentar la pantalla de perfil como de solo lectura: ningún control de esta pantalla modifica datos; la edición del perfil queda diferida a una historia futura (Clarificación 2026-10-19).
+- **FR-012**: El sistema MUST mostrar en el dashboard el saludo "Te damos la bienvenida, {nombre}" utilizando únicamente el nombre del usuario de la sesión, sin el apellido. (Añadido por ajuste de UI 2026-10-26; el saludo anterior —"Bienvenida," con nombre y apellido— queda reemplazado.)
 
 ### Key Entities *(include if feature involves data)*
 

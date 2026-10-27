@@ -56,6 +56,7 @@ import ProfileEditPage from './ProfileEditPage'
 
 beforeEach(() => {
   vi.unstubAllGlobals()
+  sessionStorage.clear()
   me.mockReset()
   updateProfile.mockReset()
   updateAvatar.mockReset()
@@ -64,6 +65,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  sessionStorage.clear()
 })
 
 function stubSesion(perfil) {
@@ -152,7 +154,7 @@ describe('ProfileEditPage (US1: precarga)', () => {
 })
 
 describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
-  it('guarda datos válidos normalizados, confirma el éxito y aplica los datos frescos (FR-009, FR-012)', async () => {
+  it('guarda datos válidos normalizados, vuelve a la visualización y marca el aviso one-shot (FR-009, FR-012)', async () => {
     const user = userEvent.setup()
     stubSesion(PERFIL_COMPLETO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
@@ -172,15 +174,10 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
       currencies: ['ARS', 'USD', 'EUR'],
       cbuCvu: '2850591001234567890123',
     })
-    // FR-009: confirmación visible en pantalla.
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /los cambios se guardaron correctamente/i,
-    )
-    // FR-012: los datos frescos del servidor quedan visibles.
-    expect(screen.getByLabelText('Nombre')).toHaveValue('Anabel')
-    expect(screen.getByLabelText('Correo electrónico')).toHaveValue(
-      'ana.perez@example.com', // SC-003: el mail sigue siendo el mismo
-    )
+    // FR-009 enmendado: el éxito navega a la visualización de 002.
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+    // Aviso one-shot para que la visualización muestre el mensaje de éxito.
+    expect(sessionStorage.getItem('amano.profile.saved')).toBe('true')
   })
 
   it('error de validación del servidor informa por campo y conserva los datos (FR-010)', async () => {
@@ -222,19 +219,81 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  it('el botón Volver atrás regresa a la visualización sin guardar nada (FR-008)', async () => {
+  it('el botón Cancelar cambios regresa a la visualización sin guardar nada (FR-008)', async () => {
     const user = userEvent.setup()
     stubSesion(PERFIL_COMPLETO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
     await editarCompletamente(user)
-    await user.click(screen.getByRole('button', { name: /volver atrás/i }))
+    await user.click(screen.getByRole('button', { name: /cancelar cambios/i }))
 
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateProfile).not.toHaveBeenCalled()
+    // Cancelar nunca marca el aviso de guardado (FR-008).
+    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
+  })
+
+  it('no existe el botón "Volver atrás" (reemplazado por "Cancelar cambios")', async () => {
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderEdit()
+
+    expect(await screen.findByRole('button', { name: /cancelar cambios/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /volver atrás/i })).not.toBeInTheDocument()
   })
 })
+
+describe('ProfileEditPage (US1: estado del botón Guardar, FR-011 enmendada, T027)', () => {
+  it('sin modificaciones: Guardar deshabilitado y Cancelar habilitado', async () => {
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderEdit()
+
+    expect(await screen.findByRole('button', { name: /guardar cambios/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /cancelar cambios/i })).toBeEnabled()
+  })
+
+  it('modificar un campo habilita Guardar; volver al valor original lo deshabilita', async () => {
+    const user = userEvent.setup()
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderEdit()
+
+    const guardar = await screen.findByRole('button', { name: /guardar cambios/i })
+    expect(guardar).toBeDisabled()
+
+    const nombre = screen.getByLabelText('Nombre')
+    await user.clear(nombre)
+    await user.type(nombre, 'Anabel')
+    await waitFor(() => expect(guardar).toBeEnabled())
+
+    // Volver al valor precargado limpia la pendiente: vuelve a deshabilitarse.
+    await user.clear(nombre)
+    await user.type(nombre, 'Ana')
+    await waitFor(() => expect(guardar).toBeDisabled())
+  })
+  it('Modificar una moneda habilita; desmarcar la misma vuelve a cualquiera (conjunto)', async () => {
+    const user = userEvent.setup()
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderEdit()
+
+    const guardar = await screen.findByRole('button', { name: /guardar cambios/i })
+    const euro = screen.getByRole('checkbox', { name: /euro/i })
+
+    await user.click(euro)
+    expect(await waitFor(() => guardar)).toBeEnabled()
+
+    await user.click(euro)
+    await waitFor(() => expect(guardar).toBeDisabled())
+  })
+})
+
+const prepararCarga = async () => {
+  stubSesion(PERFIL_COMPLETO)
+  me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+}
 
 function pngFile(name = 'nueva.png') {
   // PNG magic bytes (89 50 4E 47) reales para la validación por contenido.
@@ -253,126 +312,204 @@ function gifFile(name = 'trampa.gif') {
   )
 }
 
-describe('ProfileEditPage (US3: avatar)', () => {
-  it('subir una imagen válida la hace el avatar vigente (preview actualizado)', async () => {
+describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 enmendadas, T028)', () => {
+  it('subir imagen válida NO dispara updateAvatar: queda pendiente y habilita Guardar', async () => {
     const user = userEvent.setup()
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
-    const avatarActualizado = {
+    await prepararCarga()
+    renderEdit()
+
+    await user.upload(await screen.findByLabelText(/avatar:/i), pngFile())
+
+    await waitFor(() => {
+      const preview = screen.getByRole('img', { name: /avatar de ana/i })
+      expect(preview.getAttribute('src')).toMatch(/^blob:/)
+    })
+    expect(updateAvatar).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /guardar cambios/i })).toBeEnabled()
+  })
+
+  it('Guardar con avatar pendiente llama updateAvatar y vuelve a la visualización con el aviso one-shot', async () => {
+    const user = userEvent.setup()
+    await prepararCarga()
+    updateProfile.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    const avatarSubido = {
       ...PERFIL_COMPLETO,
-      hasCustomAvatar: true,
-      // La respuesta del servidor lleva su propia versión de contenido (?v=):
-      // distinta de la precargada, el preview refetchea siempre.
       avatarUrl: '/api/users/7/avatar?v=7',
     }
-    updateAvatar.mockResolvedValue({ ok: true, profile: avatarActualizado })
+    updateAvatar.mockResolvedValue({ ok: true, profile: avatarSubido })
     renderEdit()
 
-    const input = await screen.findByLabelText(/avatar:/i)
-    await user.upload(input, pngFile())
+    await user.upload(await screen.findByLabelText(/avatar:/i), pngFile())
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
 
-    const archivo = await waitFor(async () => {
-      expect(updateAvatar).toHaveBeenCalledTimes(1)
-      return updateAvatar.mock.calls[0][0]
-    })
-    // El cliente arma el FormData con el part "avatar": el mock captura el
-    // archivo original tal como la página se lo entrega.
-    expect(archivo).toBeInstanceOf(File)
-
-    const preview = await screen.findByRole('img', { name: /avatar de ana/i })
     await waitFor(() => {
-      // Tras el reemplazo la versión sube: ?v=1 invalida cualquier imagen
-      // cacheada bajo la misma URL (specs/005, contenido mutable).
-      expect(preview.getAttribute('src')).toBe('/api/users/7/avatar?v=7')
+      expect(updateAvatar).toHaveBeenCalledTimes(1)
     })
+    expect(updateAvatar.mock.calls[0][0]).toBeInstanceOf(File)
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+    expect(sessionStorage.getItem('amano.profile.saved')).toBe('true')
   })
 
-  it('rechaza en vivo archivos sin magic bytes JPG/PNG sin alterar el vigente', async () => {
-    // applyAccept:false (config de setup, no de upload): accept= del input
-    // filtra por MIME declarado, y acá justamente se prueba que un MIME
-    // mentiroso ("image/gif" con bytes GIF) no pasa el control real.
-    const user = userEvent.setup({ applyAccept: false })
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
-    renderEdit()
-
-    const input = await screen.findByLabelText(/avatar:/i)
-    await user.upload(input, gifFile())
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /el archivo debe ser una imagen jpg o png válida/i,
-    )
-    expect(updateAvatar).not.toHaveBeenCalled()
-    // El avatar vigente sigue servido, con su versión de precarga intacta
-    // (FR-010 de 001 aplicada a la edición).
-    expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src')).toBe(
-      '/api/users/7/avatar?v=3',
-    )
-  })
-
-  it('rechaza archivos mayores a 2 MB en vivo (FR-015)', async () => {
+  it('Cancelar con avatar pendiente descarta el pendiente sin ninguna llamada', async () => {
     const user = userEvent.setup()
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    await prepararCarga()
     renderEdit()
 
-    const bytes = new Uint8Array(2 * 1024 * 1024 + 1)
-    bytes.set([0x89, 0x50, 0x4e, 0x47], 0)
-    const grandes = new File([bytes], 'grande.png', { type: 'image/png' })
-    const input = await screen.findByLabelText(/avatar:/i)
-    await user.upload(input, grandes)
+    await user.upload(await screen.findByLabelText(/avatar:/i), pngFile())
+    await user.click(screen.getByRole('button', { name: /cancelar cambios/i }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      /el archivo es demasiado grande/i,
-    )
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateAvatar).not.toHaveBeenCalled()
+    expect(updateProfile).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
   })
 
-  it('eliminar el avatar propio vuelve al predeterminado (FR-016)', async () => {
+  it('Eliminar avatar queda pendiente: preview del default, botón deshabilitado, DELETE solo al Guardar', async () => {
     const user = userEvent.setup()
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
-    deleteAvatar.mockResolvedValue({
-      ok: true,
-      profile: { ...PERFIL_COMPLETO, hasCustomAvatar: false, avatarUrl: undefined },
-    })
+    await prepararCarga()
+    updateProfile.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    deleteAvatar.mockResolvedValue({ ok: true }) // 204 sin cuerpo
     renderEdit()
 
-    expect(await screen.findByRole('img', { name: /avatar de ana/i })).toHaveAttribute(
-      'src',
-      '/api/users/7/avatar?v=3',
-    )
+    expect(await screen.findByRole('button', { name: /eliminar avatar/i })).toBeEnabled()
+    expect(deleteAvatar).not.toHaveBeenCalled()
+
     await user.click(screen.getByRole('button', { name: /eliminar avatar/i }))
+    expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+      .toBe('/avatar-default.png')
+    expect(screen.getByRole('button', { name: /eliminar avatar/i })).toBeDisabled()
+    expect(deleteAvatar).not.toHaveBeenCalled()
 
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
     await waitFor(() => {
       expect(deleteAvatar).toHaveBeenCalledTimes(1)
     })
-    await waitFor(() => {
-      expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src')).toBe(
-        '/avatar-default.png',
-      )
-    })
-    // Sin avatar propio no se ofrece eliminar de nuevo.
-    expect(screen.queryByRole('button', { name: /eliminar avatar/i })).not.toBeInTheDocument()
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+    expect(sessionStorage.getItem('amano.profile.saved')).toBe('true')
   })
 
-  it('sin avatar propio no se ofrece eliminar y al subirlo se muestra con preview', async () => {
+  it('Cancelar con eliminación pendiente: ninguna llamada, pendiente descartado', async () => {
     const user = userEvent.setup()
-    stubSesion(PERFIL_MINIMO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_MINIMO })
-    updateAvatar.mockResolvedValue({
-      ok: true,
-      profile: { ...PERFIL_MINIMO, hasCustomAvatar: true, avatarUrl: '/api/users/7/avatar' },
-    })
+    await prepararCarga()
     renderEdit()
 
-    const preview = await screen.findByAltText(/avatar de beto/i)
-    expect(preview).toHaveAttribute('src', '/avatar-default.png')
-    expect(screen.queryByRole('button', { name: /eliminar avatar/i })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /eliminar avatar/i }))
+    await user.click(screen.getByRole('button', { name: /cancelar cambios/i }))
 
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+    expect(deleteAvatar).not.toHaveBeenCalled()
+    expect(updateProfile).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
+  })
+
+  it('subida pendiente reemplaza la marca de eliminación: Guardar solo hace PUT', async () => {
+    const user = userEvent.setup()
+    await prepararCarga()
+    updateProfile.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    updateAvatar.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderEdit()
+
+    // Marca la eliminación…
+    await user.click(await screen.findByRole('button', { name: /eliminar avatar/i }))
+    expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+      .toBe('/avatar-default.png')
+    // …y luego elige un archivo: la subida reemplaza la marca.
     await user.upload(screen.getByLabelText(/avatar:/i), pngFile())
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+        .toMatch(/^blob:/)
+    })
+
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
     await waitFor(() => {
       expect(updateAvatar).toHaveBeenCalledTimes(1)
     })
+    expect(deleteAvatar).not.toHaveBeenCalled()
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+  })
+
+  it('con subida pendiente, presionar Eliminar descarta el archivo y marca la eliminación', async () => {
+    const user = userEvent.setup()
+    await prepararCarga()
+    updateProfile.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    deleteAvatar.mockResolvedValue({ ok: true }) // 204 sin cuerpo
+    renderEdit()
+
+    await user.upload(await screen.findByLabelText(/avatar:/i), pngFile())
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+        .toMatch(/^blob:/)
+    })
+
+    await user.click(screen.getByRole('button', { name: /eliminar avatar/i }))
+    // El preview vuelve al default (marca de eliminación del vigente) y el
+    // archivo pendiente se descarta; al Guardar solo va el DELETE.
+    expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+      .toBe('/avatar-default.png')
+    expect(screen.getByRole('button', { name: /eliminar avatar/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await waitFor(() => {
+      expect(deleteAvatar).toHaveBeenCalledTimes(1)
+    })
+    expect(updateAvatar).not.toHaveBeenCalled()
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+  })
+
+  it('fallo del DELETE al Guardar: sin navegación, pendiente retenido y error visible', async () => {
+    const user = userEvent.setup()
+    await prepararCarga()
+    updateProfile.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    deleteAvatar.mockResolvedValue({ ok: false, network: true })
+    renderEdit()
+
+    await user.click(await screen.findByRole('button', { name: /eliminar avatar/i }))
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+
+    expect(await screen.findByText(/no se pudo completar la actualización/i))
+      .toBeInTheDocument()
+    // Sin navegación: seguimos en la pantalla de edición con la marca pendiente.
+    expect(screen.getByRole('button', { name: /eliminar avatar/i })).toBeDisabled()
+    expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+      .toBe('/avatar-default.png')
+  })
+
+  it('MIME mentiroso o > 2 MB no marca pendiente (mensajes en vivo, Guardar sigue deshabilitado si solo se intentó el avatar)', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    await prepararCarga()
+    renderEdit()
+
+    await user.upload(await screen.findByLabelText(/avatar:/i), gifFile())
+    expect(await screen.findByText('El archivo debe ser una imagen JPG o PNG válida'))
+      .toBeInTheDocument()
+    expect(updateAvatar).not.toHaveBeenCalled()
+    // El preview sigue con el avatar vigente (nada pendiente).
+    expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
+      .toBe('/api/users/7/avatar?v=3')
+    expect(screen.getByRole('button', { name: /guardar cambios/i })).toBeDisabled()
+
+    const bytes = new Uint8Array(2 * 1024 * 1024 + 1)
+    bytes.set([0x89, 0x50, 0x4e, 0x47], 0)
+    await user.upload(screen.getByLabelText(/avatar:/i),
+      new File([bytes], 'grande.png', { type: 'image/png' }))
+    expect(await screen.findByText(/el archivo es demasiado grande/i)).toBeInTheDocument()
+    expect(updateAvatar).not.toHaveBeenCalled()
+  })
+
+  it('Guardar sin avatar pendiente se comporta como antes (sin DELETE ni PATCH de avatar)', async () => {
+    const user = userEvent.setup()
+    await prepararCarga()
+    updateProfile.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderEdit()
+
+    const nombre = await screen.findByLabelText('Nombre')
+    await user.clear(nombre)
+    await user.type(nombre, 'Anabel')
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+
+    expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
+    expect(updateProfile).toHaveBeenCalledTimes(1)
+    expect(updateAvatar).not.toHaveBeenCalled()
+    expect(deleteAvatar).not.toHaveBeenCalled()
   })
 })

@@ -324,7 +324,7 @@ ul {
 }
 
 // Acciones en fila con separación entre controles (editar perfil:
-// selector de archivo + eliminar avatar, y guardar cambios + volver atrás).
+// selector de archivo + eliminar avatar, y guardar cambios + cancelar).
 .avatar-actions,
 .form-actions {
   display: flex;
@@ -332,6 +332,15 @@ ul {
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 1rem;
+}
+
+// FR-011 enmendada de 005: "Guardar cambios" se ve deshabilitado (gris, cursor
+// bloqueado) mientras no haya modificaciones pendientes por confirmar.
+.form-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: var(--color-borde);
+  border-color: var(--color-borde);
 }
 
 // Acciones del dashboard: "Mi perfil" (link con aspecto de botón) y el botón

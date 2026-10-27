@@ -22,7 +22,7 @@ export default function CurrencySelector({ onChange }) {
 
   return (
     <fieldset>
-      <legend>Monedas (opcional, default ARS)</legend>
+      <legend>Monedas (default ARS)</legend>
       {CURRENCIES.map(({ code, label }) => (
         <label key={code}>
           <input

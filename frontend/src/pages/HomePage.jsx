@@ -436,9 +436,12 @@ export default function HomePage() {
         <div className="home-footer__inner">
           <div className="home-footer__brand">
             <Link className="home-footer__logo" to="/">
-              <span className="home-footer__mark" aria-hidden="true">
-                a
-              </span>
+              <img
+                className="home-footer__mark"
+                src="/logo.png"
+                alt=""
+                aria-hidden="true"
+              />
               A mano
             </Link>
             <p>

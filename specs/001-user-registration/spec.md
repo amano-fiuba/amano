@@ -109,6 +109,7 @@ El usuario puede, de forma opcional, completar datos adicionales de perfil duran
 - **FR-020**: Si el usuario cierra la aplicación o navega hacia otra pantalla antes de confirmar, el sistema MUST no guardar ninguno de los datos ingresados.
 - **FR-021**: Tras completar el registro, el usuario MUST poder consultar de inmediato en su perfil la información y preferencias que guardó (datos de perfil, avatar, CBU/CVU solo visible para él y monedas).
 - **FR-022**: El sistema MUST validar los datos de entrada en sus fronteras: las validaciones de la interfaz de usuario no son el único control, y el servidor también debe rechazar datos inválidos o duplicados sin crear cuentas inconsistentes.
+- **FR-023**: El sistema MUST indicar visualmente cuáles campos del formulario de registro son obligatorios mediante un asterisco (*) junto al nombre del campo, y MUST mostrar el mensaje "Los campos con (*) son obligatorios" antes del botón de registro. Los campos opcionales (apellido, CBU/CVU, avatar y monedas) MUST presentarse sin dicho asterisco y sin la marca "(opcional)" en su etiqueta: su carácter opcional queda implícito por la ausencia de asterisco y la leyenda de obligatorios.
 
 ### Key Entities *(include if feature involves data)*
 

@@ -99,6 +99,13 @@
 
 ---
 
+## Phase 6: Post-plan fixes (FR-012)
+
+- [x] T015 [P] [FE] Ajuste del saludo del dashboard (FR-012, pedido del usuario): en `frontend/src/pages/DashboardPage.jsx` el `h1` pasa de "Bienvenida, {nombre apellido}" a "Te damos la bienvenida, {nombre}" — solo el nombre, sin apellido (se elimina el cálculo `fullName`). Test co-ubicado extendido con asertos exactos (saludo exacto y apellido ausente del saludo).
+- [x] T016 [FE] Verificación tras T015: `npm run lint` (0 errores) y `npx vitest run src/pages/DashboardPage.test.jsx` en verde (~1 min; suite completa diferida a cierre).
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

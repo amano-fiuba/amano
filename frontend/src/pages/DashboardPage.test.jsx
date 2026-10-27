@@ -57,6 +57,9 @@ describe('DashboardPage (T024)', () => {
     renderDashboard(PROFILE)
 
     expect(await screen.findByText(/bienvenida, ana/i)).toBeInTheDocument()
+    // FR-012: el saludo usa únicamente el nombre (el fixture trae apellido).
+    expect(screen.getByText('Te damos la bienvenida, Ana')).toBeInTheDocument()
+    expect(screen.queryByText(/bienvenida, ana pérez/i)).not.toBeInTheDocument()
     expect(screen.getByTestId('dashboard-email')).toHaveTextContent('ana.perez@example.com')
     expect(screen.getByRole('img', { name: '@avatar' })).toHaveAttribute(
       'src',

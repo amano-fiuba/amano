@@ -3,8 +3,9 @@
 // CBU/CVU y monedas con las reglas de 001 reutilizadas (FR-003..FR-006), correo
 // SIEMPRE deshabilitado (FR-007: identidad invariante de la cuenta), avatar
 // reemplazable/eliminable (US3) y cancelación sin guardar (FR-008). Guardar
-// confirma el éxito y muestra los datos frescos (FR-009/FR-012); fallos de
-// red/servidor conservan los datos (FR-019). La actualización vive en el
+// persiste, aplica los datos frescos (FR-009/FR-012) y vuelve a la
+// visualización de 002 con un aviso de éxito one-shot; fallos de red/servidor
+// conservan los datos en esta pantalla (FR-019). La actualización vive en el
 // contexto de sesión (setUser) para que el resto de la app vea los cambios.
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -22,6 +23,7 @@ import {
 } from '../validation/avatarValidation'
 import TextField from '../components/TextField'
 import { useAuth } from '../auth/AuthContext'
+import { PROFILE_SAVED_KEY } from './ProfilePage'
 import {
   AVATAR_MAX_BYTES,
   normalizeCbu,
@@ -48,17 +50,23 @@ export default function ProfileEditPage() {
     register: bindField,
     reset,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm({ mode: 'onBlur' })
 
   const [loadError, setLoadError] = useState(false)
   const [formError, setFormError] = useState('')
   const [success, setSuccess] = useState('')
   const [currencies, setCurrencies] = useState([])
+  const [monedasIniciales, setMonedasIniciales] = useState([])
   const [avatarUrl, setAvatarUrl] = useState('')
   const [hasCustomAvatar, setHasCustomAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState('')
-  const [avatarBusy, setAvatarBusy] = useState(false)
+  // US3 (FR-015/FR-016 enmendadas): el avatar es un cambio PENDIENTE del
+  // guardado — ni la subida ni la eliminación contactan al backend al instante
+  // (Cancelar cambios puede descartarlas); se aplican al presionar Guardar.
+  const [avatarPendiente, setAvatarPendiente] = useState(null)
+  const [eliminarPendiente, setEliminarPendiente] = useState(false)
+  const [avatarPendienteUrl, setAvatarPendienteUrl] = useState('')
 
   const aplicarPerfil = (profile) => {
     reset({
@@ -66,10 +74,21 @@ export default function ProfileEditPage() {
       lastName: profile.lastName ?? '',
       cbuCvu: profile.cbuCvu ?? '',
     })
-    setCurrencies(Array.isArray(profile.currencies) ? profile.currencies : [])
+    const monedas = Array.isArray(profile.currencies) ? profile.currencies : []
+    setCurrencies(monedas)
+    setMonedasIniciales(monedas)
     setHasCustomAvatar(Boolean(profile.hasCustomAvatar))
     setAvatarUrl(profile.hasCustomAvatar && profile.avatarUrl ? profile.avatarUrl : '')
   }
+
+  // Limpieza del object URL del preview pendiente (descarte/desmonte).
+  useEffect(() => {
+    return () => {
+      if (avatarPendienteUrl) {
+        URL.revokeObjectURL(avatarPendienteUrl)
+      }
+    }
+  }, [avatarPendienteUrl])
 
   // FR-002: precarga fresca del servidor (sin caché), con estados loading/
   // datos/error como en 002. El correo precargado es el del servidor y queda
@@ -106,8 +125,18 @@ export default function ProfileEditPage() {
     )
   }
 
+  // FR-011 enmendada: hay modificaciones pendientes si algún campo del form
+  // se apartó de la precarga, las monedas difieren de las iniciales (conjunto,
+  // no orden) o hay avatar pendiente de subir/eliminar.
+  const monedasCambiadas =
+    currencies.length !== monedasIniciales.length ||
+    monedasIniciales.some((code) => !currencies.includes(code))
+  const avatarPendienteCambio = avatarPendiente !== null || eliminarPendiente
+  const canSave = isDirty || monedasCambiadas || avatarPendienteCambio
+
   const onSubmit = async (values) => {
     setFormError('')
+    setAvatarError('')
     setSuccess('')
     const result = await updateProfile({
       firstName: trim(values.firstName),
@@ -116,37 +145,67 @@ export default function ProfileEditPage() {
       currencies,
     })
 
-    if (result.ok) {
-      // FR-009/FR-012: confirmación + datos frescos del servidor en pantalla
-      // y en el contexto de sesión (la visualización de 002 los refleja).
-      setUser(result.profile)
-      aplicarPerfil(result.profile)
-      setSuccess('Los cambios se guardaron correctamente')
-      return
-    }
-    if (result.network || result.status >= 500) {
-      setFormError(UPDATE_NETWORK_ERROR_MESSAGE)
-      return
-    }
-    const { fields, detail } = result
-    const fieldNames = ['firstName', 'lastName', 'cbuCvu']
-    if (fields) {
-      for (const [field, message] of Object.entries(fields)) {
-        if (fieldNames.includes(field)) {
-          setError(field, { type: 'server', message })
-          continue
-        }
-        if (field === 'currencies') {
-          setFormError(message)
-          return
+    if (!result.ok) {
+      const { fields, detail } = result
+      const fieldNames = ['firstName', 'lastName', 'cbuCvu']
+      if (result.network || result.status >= 500) {
+        setFormError(UPDATE_NETWORK_ERROR_MESSAGE)
+        return
+      }
+      if (fields) {
+        for (const [field, message] of Object.entries(fields)) {
+          if (fieldNames.includes(field)) {
+            setError(field, { type: 'server', message })
+            continue
+          }
+          if (field === 'currencies') {
+            setFormError(message)
+            return
+          }
         }
       }
+      setFormError(detail || UPDATE_NETWORK_ERROR_MESSAGE)
+      return
     }
-    if (detail) {
-      setFormError(detail)
-    } else {
-      setFormError(UPDATE_NETWORK_ERROR_MESSAGE)
+
+    // FR-015/FR-016 enmendadas: si hay avatar pendiente, se aplica ahora.
+    // Primero la eliminación, luego la subida. Ante fallo del avatar quedan
+    // los pendientes y sin navegación (el PUT del perfil ya fue aplicado:
+    // idempotente al reintentar — documentado en contracts/users-api.md).
+    // IMPORTANTE: deleteAvatar responde 204 SIN cuerpo (sin `profile`); el
+    // perfil final se compone con el estado post-DELETE, nunca desde su
+    // respuesta (de ahí venía el salto a /login al setUser(undefined)).
+    let perfilFinal = result.profile
+    if (eliminarPendiente) {
+      const eliminacion = await deleteAvatar()
+      if (!eliminacion.ok) {
+        setAvatarError(eliminacion.fields?.avatar ?? eliminacion.detail ?? UPDATE_NETWORK_ERROR_MESSAGE)
+        return
+      }
+      perfilFinal = { ...perfilFinal, hasCustomAvatar: false, avatarUrl: null }
     }
+    if (avatarPendiente) {
+      const subida = await updateAvatar(avatarPendiente)
+      if (!subida.ok) {
+        setAvatarError(subida.fields?.avatar ?? subida.detail ?? UPDATE_NETWORK_ERROR_MESSAGE)
+        return
+      }
+      perfilFinal = subida.profile
+    }
+
+    // FR-009 enmendado: persistir, aplicar los datos frescos al contexto de
+    // sesión y volver a la visualización de 002; el mensaje de éxito se
+    // muestra UNA sola vez en esa pantalla (clave one-shot de sessionStorage).
+    setUser(perfilFinal)
+    aplicarPerfil(perfilFinal)
+    if (avatarPendienteUrl) {
+      URL.revokeObjectURL(avatarPendienteUrl)
+    }
+    setAvatarPendiente(null)
+    setAvatarPendienteUrl('')
+    setEliminarPendiente(false)
+    sessionStorage.setItem(PROFILE_SAVED_KEY, 'true')
+    navigate('/profile')
   }
 
   const subirAvatar = async (event) => {
@@ -156,7 +215,8 @@ export default function ProfileEditPage() {
     setAvatarError('')
     setSuccess('')
     // Validación en vivo igual que en el registro (FR-010/FR-013 de 001):
-    // tamaño primero, luego magic bytes reales.
+    // tamaño primero, luego magic bytes reales. Se retiene pendiente: no hay
+    // llamada al backend hasta "Guardar cambios".
     if (file.size > AVATAR_MAX_BYTES) {
       setAvatarError(AVATAR_SIZE_MESSAGE)
       return
@@ -166,40 +226,31 @@ export default function ProfileEditPage() {
       setAvatarError(FORMAT_MESSAGE)
       return
     }
-    setAvatarBusy(true)
-    const result = await updateAvatar(file)
-    setAvatarBusy(false)
-    if (result.ok) {
-      setUser(result.profile)
-      setHasCustomAvatar(Boolean(result.profile?.hasCustomAvatar))
-      setAvatarUrl(result.profile?.avatarUrl ?? '')
-      setSuccess('Los cambios se guardaron correctamente')
-      return
+    if (avatarPendienteUrl) {
+      URL.revokeObjectURL(avatarPendienteUrl)
     }
-    if (result.network) {
-      setFormError(UPDATE_NETWORK_ERROR_MESSAGE)
-      return
-    }
-    setAvatarError(result.fields?.avatar ?? result.detail ?? UPDATE_NETWORK_ERROR_MESSAGE)
+    setEliminarPendiente(false) // si había eliminación marcada, la subida la reemplaza
+    setAvatarPendiente(file)
+    setAvatarPendienteUrl(URL.createObjectURL(file))
   }
 
-  const eliminarAvatar = async () => {
+  const eliminarAvatar = () => {
+    if (!hasCustomAvatar || eliminarPendiente) {
+      return
+    }
+    if (avatarPendiente) {
+      // Con una subida pendiente, "Eliminar" pasa a significa "no quiero
+      // este archivo ni el vigente": descarta la subida y marca la
+      // eliminación del vigente (se confirma con Guardar).
+      if (avatarPendienteUrl) {
+        URL.revokeObjectURL(avatarPendienteUrl)
+      }
+      setAvatarPendiente(null)
+      setAvatarPendienteUrl('')
+    }
     setAvatarError('')
     setSuccess('')
-    setAvatarBusy(true)
-    const result = await deleteAvatar()
-    setAvatarBusy(false)
-    if (result.ok) {
-      setHasCustomAvatar(false)
-      setAvatarUrl('')
-      setSuccess('Los cambios se guardaron correctamente')
-      return
-    }
-    if (result.network) {
-      setFormError(UPDATE_NETWORK_ERROR_MESSAGE)
-      return
-    }
-    setAvatarError(result.fields?.avatar ?? result.detail ?? UPDATE_NETWORK_ERROR_MESSAGE)
+    setEliminarPendiente(true)
   }
 
   if (loadError) {
@@ -211,7 +262,11 @@ export default function ProfileEditPage() {
     )
   }
 
-  const previewUrl = avatarUrl || '/avatar-default.png'
+  const previewUrl = avatarPendiente
+    ? avatarPendienteUrl
+    : eliminarPendiente
+      ? '/avatar-default.png'
+      : avatarUrl || '/avatar-default.png'
   const rules = (validate) => ({
     validate: (value) => {
       const message = validate(value)
@@ -248,11 +303,10 @@ export default function ProfileEditPage() {
             type="file"
             accept="image/jpeg,image/png"
             onChange={subirAvatar}
-            disabled={avatarBusy}
           />
         </label>
         {hasCustomAvatar && (
-          <button type="button" onClick={eliminarAvatar} disabled={avatarBusy}>
+          <button type="button" onClick={eliminarAvatar} disabled={eliminarPendiente}>
             Eliminar avatar
           </button>
         )}
@@ -312,15 +366,27 @@ export default function ProfileEditPage() {
           ))}
         </fieldset>
 
-        {/* FR-011: deshabilitado durante el envío; rehabilitado ante cualquier
-            error por react-hook-form (isSubmitting). */}
+        {/* FR-011 enmendada: Guardar solo cuando hay cambios pendientes;
+            siempre deshabilitado durante el envío. */}
         <div className="form-actions">
-          <button type="submit" disabled={isSubmitting}>
+          <button type="submit" disabled={!canSave || isSubmitting}>
             Guardar cambios
           </button>
-          {/* Vuelve a la visualización de 002 (los cambios exitosos ya quedaron guardados). */}
-          <button type="button" onClick={() => navigate('/profile')}>
-            Volver atrás
+          {/* Vuelve a la visualización de 002 sin guardar nada (FR-008);
+              siempre habilitado y descarta avatar pendiente. */}
+          <button
+            type="button"
+            onClick={() => {
+              if (avatarPendienteUrl) {
+                URL.revokeObjectURL(avatarPendienteUrl)
+              }
+              setAvatarPendiente(null)
+              setAvatarPendienteUrl('')
+              setEliminarPendiente(false)
+              navigate('/profile')
+            }}
+          >
+            Cancelar cambios
           </button>
         </div>
       </form>
