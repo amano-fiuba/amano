@@ -13,6 +13,7 @@ import com.amano.backend.groups.dto.CreateGroupRequest;
 import com.amano.backend.groups.dto.GroupDetailResponse;
 import com.amano.backend.groups.dto.GroupResponse;
 import com.amano.backend.groups.dto.GroupSummaryResponse;
+import com.amano.backend.groups.dto.UpdateGroupRequest;
 import com.amano.backend.groups.port.FriendshipPort;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
@@ -32,19 +33,25 @@ public class GroupService {
     private final GroupPermissionsRepository groupPermissionsRepository;
     private final FriendshipPort friendshipPort;
     private final UserRepository userRepository;
+    private final GroupPermissionChecker permissionChecker;
+    private final ActivityEventService activityEventService;
 
     public GroupService(GroupRepository groupRepository,
             GroupMemberRepository groupMemberRepository,
             SimulatedProfileRepository simulatedProfileRepository,
             GroupPermissionsRepository groupPermissionsRepository,
             FriendshipPort friendshipPort,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            GroupPermissionChecker permissionChecker,
+            ActivityEventService activityEventService) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.simulatedProfileRepository = simulatedProfileRepository;
         this.groupPermissionsRepository = groupPermissionsRepository;
         this.friendshipPort = friendshipPort;
         this.userRepository = userRepository;
+        this.permissionChecker = permissionChecker;
+        this.activityEventService = activityEventService;
     }
 
     @Transactional
@@ -158,6 +165,103 @@ public class GroupService {
         response.setMembersCount(membersCount);
         response.setCreatorRole(GroupMember.ROLE_ADMIN);
         return response;
+    }
+
+    /**
+     * T037/T039 (US2): partial update of name, description and the permission
+     * casillas. Authorization always goes through {@link GroupPermissionChecker}
+     * (ADMIN always; MEMBER only when members_cannot_edit_settings = false);
+     * server-side enforcement so calling the endpoint directly cannot bypass the
+     * casillas. Unspecified casillas keep their stored value.
+     */
+    @Transactional
+    public GroupDetailResponse updateGroupSettings(Long userId, Long groupId, UpdateGroupRequest request) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        GroupMember membership = activeMembership(userId, groupId);
+        GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId)
+                .orElseGet(() -> defaultPermissions(groupId));
+
+        if (!permissionChecker.canEditSettings(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException("No podés editar los ajustes de este grupo");
+        }
+
+        if (request == null) {
+            throw new FieldValidationException(Map.of("name", "El nombre del grupo es obligatorio"));
+        }
+
+        boolean permissionsChanged = false;
+        UpdateGroupRequest.PermissionsInput input = request.getPermissions();
+        if (input != null) {
+            if (input.getMembersCannotMakeExpenses() != null
+                    && input.getMembersCannotMakeExpenses() != permissions.isMembersCannotMakeExpenses()) {
+                permissions.setMembersCannotMakeExpenses(input.getMembersCannotMakeExpenses());
+                permissionsChanged = true;
+            }
+            if (input.getMembersCannotInvite() != null
+                    && input.getMembersCannotInvite() != permissions.isMembersCannotInvite()) {
+                permissions.setMembersCannotInvite(input.getMembersCannotInvite());
+                permissionsChanged = true;
+            }
+            if (input.getMembersCannotEditSettings() != null
+                    && input.getMembersCannotEditSettings() != permissions.isMembersCannotEditSettings()) {
+                permissions.setMembersCannotEditSettings(input.getMembersCannotEditSettings());
+                permissionsChanged = true;
+            }
+            if (input.getMembersCanManageSimulatedProfiles() != null
+                    && input.getMembersCanManageSimulatedProfiles() != permissions
+                            .isMembersCanManageSimulatedProfiles()) {
+                permissions.setMembersCanManageSimulatedProfiles(input.getMembersCanManageSimulatedProfiles());
+                permissionsChanged = true;
+            }
+            if (input.getMembersCanGenerateExpensesForOthers() != null
+                    && input.getMembersCanGenerateExpensesForOthers() != permissions
+                            .isMembersCanGenerateExpensesForOthers()) {
+                permissions.setMembersCanGenerateExpensesForOthers(
+                        input.getMembersCanGenerateExpensesForOthers());
+                permissionsChanged = true;
+            }
+            if (input.getPaymentsRequireValidation() != null
+                    && input.getPaymentsRequireValidation() != permissions.isPaymentsRequireValidation()) {
+                permissions.setPaymentsRequireValidation(input.getPaymentsRequireValidation());
+                permissionsChanged = true;
+            }
+        }
+
+        if (request.getDescription() != null) {
+            group.setDescription(trimOrNull(request.getDescription()));
+        }
+        if (request.getName() != null) {
+            String name = request.getName().trim();
+            if (name.isEmpty()) {
+                throw new FieldValidationException(Map.of("name", "El nombre del grupo es obligatorio"));
+            }
+            group.setName(name);
+        }
+
+        if (permissionsChanged) {
+            groupPermissionsRepository.save(permissions);
+            activityEventService.record(groupId, GroupActivity.GroupActivityType.PERMISSION_CHANGED,
+                    userId, "{\"fields\":[\"permissions\"]}");
+        }
+
+        return toDetail(userId, group, membership);
+    }
+
+    /**
+     * Active membership of the user in the group, or the neutral 404 when the
+     * row does not exist or left_at is set (non-members never see the group).
+     */
+    private GroupMember activeMembership(Long userId, Long groupId) {
+        GroupMember membership =
+                groupMemberRepository.findByIdGroupIdAndIdUserId(groupId, userId)
+                        .orElseThrow(() -> new GroupNotFoundException(
+                                "No existe el grupo solicitado o no sos miembro"));
+        if (membership.getLeftAt() != null) {
+            throw new GroupNotFoundException("No existe el grupo solicitado o no sos miembro");
+        }
+        return membership;
     }
 
     /** T029: groups where the caller is an active member, newest first. */

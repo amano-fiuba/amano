@@ -63,7 +63,8 @@ class GroupServiceTest {
                 Optional.of(registeredUser(CREATOR_ID, "creator@example.com")));
 
         service = new GroupService(groupRepository, groupMemberRepository, simulatedProfileRepository,
-                groupPermissionsRepository, friendshipPort, userRepository);
+                groupPermissionsRepository, friendshipPort, userRepository,
+                Mockito.mock(GroupPermissionChecker.class), Mockito.mock(ActivityEventService.class));
     }
 
     private static User registeredUser(Long id, String email) {

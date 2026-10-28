@@ -85,5 +85,109 @@ export async function getGroup(groupId) {
   }
 }
 
+/**
+ * PUT /api/groups/{id}: partial update of group settings (name, description,
+ * permission casillas). Authz is server-side (GroupPermissionChecker); the
+ * client only renders reasons.
+ */
+export async function updateGroup(groupId, payload) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      const fields = body?.properties?.fields ? safeFields(body.properties.fields) : {}
+      return {
+        ok: false,
+        status: response.status,
+        fields: Object.keys(fields).length ? { ...fields } : {},
+        detail: body?.detail || CANNOT_CREATE_MESSAGE,
+      }
+    }
+    return { ok: true, group: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * GET /api/groups/{id}/candidates?q=: only the caller's friends (server-side
+ * restriction; never the whole user base).
+ */
+export async function searchCandidates(groupId, query) {
+  try {
+    const response = await fetch(
+      `/api/groups/${groupId}/candidates?q=${encodeURIComponent(query)}`,
+      { method: 'GET', credentials: 'include' },
+    )
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail, fields: fieldsFrom(body?.detail) }
+    }
+    const data = await response.json()
+    return { ok: true, content: Array.isArray(data.content) ? data.content : [] }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * POST /api/groups/{id}/members: registered friend (identifier = email) or
+ * simulated profile (identifier + name). Reasons (ya es miembro, no es amigo,
+ * casilla de invitación) come in `detail` for the UI.
+ */
+export async function addMember(groupId, payload) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/members`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      const fields = body?.properties?.fields ? safeFields(body.properties.fields) : {}
+      return {
+        ok: false,
+        status: response.status,
+        fields,
+        detail: body?.detail,
+      }
+    }
+    return { ok: true, member: (await response.json()).member }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * GET /api/groups/{id}/activity: paginated descending history (todos los
+ * miembros). Gastos y pagos son puntos de enganche que aparecerán cuando
+ * exista la integración de gastos.
+ */
+export async function getActivity(groupId, { page = 1, size = 20, eventType } = {}) {
+  try {
+    const params = new URLSearchParams({ page: String(page), size: String(size) })
+    if (eventType) {
+      params.set('eventType', eventType)
+    }
+    const response = await fetch(`/api/groups/${groupId}/activity?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail }
+    }
+    return { ok: true, ...(await response.json()) }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 export const GROUPS_NETWORK_ERROR_MESSAGE =
   'No se pudo conectar con el servidor. Intenta nuevamente'

@@ -45,6 +45,7 @@ export default function GroupInfoView() {
             Tu rol: {roleLabel(group.currentUserRole)} · {group.memberCount}{' '}
             {group.memberCount === 1 ? 'miembro' : 'miembros'}
           </p>
+          <Link to={`/groups/${id}/history`}>Ver historial de actividad</Link>
         </section>
       )}
     </main>

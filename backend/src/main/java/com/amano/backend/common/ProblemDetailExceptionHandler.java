@@ -232,6 +232,26 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Spec motive 1 — ya es miembro (FR-007, US3): 400 with the exact reason. */
+    @ExceptionHandler(com.amano.backend.groups.AlreadyMemberException.class)
+    public ProblemDetail handleAlreadyMember(com.amano.backend.groups.AlreadyMemberException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, com.amano.backend.groups.AlreadyMemberException.MESSAGE);
+        problem.setTitle("Validación fallida");
+        problem.setProperty("properties", Map.of(FIELDS_PROPERTY, exception.getFields()));
+        return problem;
+    }
+
+    /** Service-level authorization rejection (US2/US3): 403 with the reason. */
+    @ExceptionHandler(com.amano.backend.groups.GroupPermissionDeniedException.class)
+    public ProblemDetail handleGroupPermissionDenied(
+            com.amano.backend.groups.GroupPermissionDeniedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación no permitida");
+        return problem;
+    }
+
     /** Adding a registered member outside the friendship relation (US1/US3): one neutral 404. */
     @ExceptionHandler(com.amano.backend.groups.NotFriendException.class)
     public ProblemDetail handleNotFriend(com.amano.backend.groups.NotFriendException exception) {

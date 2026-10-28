@@ -116,16 +116,16 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 2
 
-- [ ] T034 [P] [US2] Write `GroupSettingsServiceTest.java`: authorization via `GroupPermissionChecker` (ADMIN always; MEMBER only when `members_cannot_edit_settings` = false), the 6 checkboxes changed independently, assumptions for member-denied case, defaults created at group creation (all casillas false per T007)
-- [ ] T035 [P] [US2] Write `GroupSettingsUpdateIT.java` for `PUT /api/groups/{id}`: 200 with updated state, 403 for a MEMBER when `members_cannot_edit_settings` = true, 404 unknown group
-- [ ] T036 [P] [US2] Write `GroupPermissionsPanel.test.jsx` in `frontend/src/`: renders 6 checkboxes with current values, submits changes, shows confirmation
+- [X] T034 [P] [US2] Write `GroupSettingsServiceTest.java`: authorization via `GroupPermissionChecker` (ADMIN always; MEMBER only when `members_cannot_edit_settings` = false), the 6 checkboxes changed independently, assumptions for member-denied case, defaults created at group creation (all casillas false per T007)
+- [X] T035 [P] [US2] Write `GroupSettingsUpdateIT.java` for `PUT /api/groups/{id}`: 200 with updated state, 403 for a MEMBER when `members_cannot_edit_settings` = true, 404 unknown group
+- [X] T036 [P] [US2] Write `GroupPermissionsPanel.test.jsx` in `frontend/src/`: renders 6 checkboxes with current values, submits changes, shows confirmation
 
 ### Implementation for User Story 2
 
-- [ ] T037 [US2] Implement `GroupService.updateGroupSettings()` in `GroupService.java`: authorization through `GroupPermissionChecker` (ADMIN siempre puede; MEMBER solo si `members_cannot_edit_settings` = false); persists the 6 permission booleans with the defaults from T007 (all false); no new persistence structures
-- [ ] T038 [US2] Implement `PUT /api/groups/{id}` endpoint in `GroupController.java` (name/description/permissions partial update; 200/403/404; name still only required-if-present and non-empty)
-- [ ] T039 [US2] Record `PERMISSION_CHANGED` event via `ActivityEventService` in `GroupService.updateGroupSettings()`
-- [ ] T040 [US2] Create `frontend/src/components/groups/GroupPermissionsPanel.jsx`: 6 casillas ("No podrán hacer gastos", "No podrán invitar gente", "No podrán editar ajustes del grupo", "Pueden administrar perfiles simulados", "Pueden generar gastos en nombre de otras personas", "Los pagos requieren validación"), saved with confirmation message in the UI; responsive
+- [X] T037 [US2] Implement `GroupService.updateGroupSettings()` in `GroupService.java`: authorization through `GroupPermissionChecker` (ADMIN siempre puede; MEMBER solo si `members_cannot_edit_settings` = false); persists the 6 permission booleans with the defaults from T007 (all false); no new persistence structures
+- [X] T038 [US2] Implement `PUT /api/groups/{id}` endpoint in `GroupController.java` (name/description/permissions partial update; 200/403/404; name still only required-if-present and non-empty)
+- [X] T039 [US2] Record `PERMISSION_CHANGED` event via `ActivityEventService` in `GroupService.updateGroupSettings()`
+- [X] T040 [US2] Create `frontend/src/components/groups/GroupPermissionsPanel.jsx`: 6 casillas ("No podrán hacer gastos", "No podrán invitar gente", "No podrán editar ajustes del grupo", "Pueden administrar perfiles simulados", "Pueden generar gastos en nombre de otras personas", "Los pagos requieren validación"), saved with confirmation message in the UI; responsive
 
 **Checkpoint**: Story 2 is independently testable — an ADMIN can reconfigure the group's permission checkboxes and members are affected.
 
@@ -139,18 +139,18 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 3
 
-- [ ] T041 [P] [US3] Write `GroupMemberServiceTest.java`: add registered friend (via `FriendshipPort`, returns empty friends for non-friends), duplicate rejection with reason, simulated profile created with `MEMBER` role, and authorization via `GroupPermissionChecker`: MEMBER can add when `members_cannot_invite` = false and is rejected when the casilla is true
-- [ ] T042 [P] [US3] Write `MemberAdditionIT.java` for `POST /api/groups/{id}/members` and `GET /api/groups/{id}/candidates`
-- [ ] T043 [P] [US3] Write `AddMemberView.test.jsx` in `frontend/src/`: search limited to friends, simulated form validation, duplicate rejection message
+- [X] T041 [P] [US3] Write `GroupMemberServiceTest.java`: add registered friend (via `FriendshipPort`, returns empty friends for non-friends), duplicate rejection with reason, simulated profile created with `MEMBER` role, and authorization via `GroupPermissionChecker`: MEMBER can add when `members_cannot_invite` = false and is rejected when the casilla is true
+- [X] T042 [P] [US3] Write `MemberAdditionIT.java` for `POST /api/groups/{id}/members` and `GET /api/groups/{id}/candidates`
+- [X] T043 [P] [US3] Write `AddMemberView.test.jsx` in `frontend/src/`: search limited to friends, simulated form validation, duplicate rejection message
 
 ### Implementation for User Story 3
 
-- [ ] T044 [US3] Implement friend candidates search in `GroupController.java`: `GET /api/groups/{id}/candidates?q=` returns ONLY the ADMIN's friends (via `FriendshipPort`, filtered server-side; never the whole user base — decision 8; note at Polish task to sync research.md)
-- [ ] T045 [US3] Implement `GroupMemberService.addRegisteredMember()` in `backend/src/main/java/com/amano/backend/groups/GroupMemberService.java`: authorization through `GroupPermissionChecker` (ADMIN siempre puede; MEMBER solo si `members_cannot_invite` = false); identifier is the friend's email, must be in the caller's friendship relation, not already a member (exists check), role `MEMBER` assigned on incorporation
-- [ ] T046 [US3] Implement `GroupMemberService.addSimulatedProfile()` in `GroupMemberService.java`: `name` required (per T006 String(100) NOT NULL), `email` valid and required (VARCHAR(191)), UNIQUE (`group_id`,`email`), stored in `simulated_profiles`, becomes MEMBER of the group
-- [ ] T047 [US3] Implement `POST /api/groups/{id}/members` endpoint in `GroupController.java` with `memberType` = `REGISTERED | SIMULATED`; returns 201 with the member info or 400/403 with the rejection reason
-- [ ] T048 [US3] Record `MEMBER_ADDED` via `ActivityEventService` in both addition paths (event service already exists from Foundational)
-- [ ] T049 [US3] Create `frontend/src/pages/groups/AddMemberView.jsx`: friend search limited to the user's friends, form for simulated profile (name + email), success and rejection messages in the UI; responsive
+- [X] T044 [US3] Implement friend candidates search in `GroupController.java`: `GET /api/groups/{id}/candidates?q=` returns ONLY the ADMIN's friends (via `FriendshipPort`, filtered server-side; never the whole user base — decision 8; note at Polish task to sync research.md)
+- [X] T045 [US3] Implement `GroupMemberService.addRegisteredMember()` in `backend/src/main/java/com/amano/backend/groups/GroupMemberService.java`: authorization through `GroupPermissionChecker` (ADMIN siempre puede; MEMBER solo si `members_cannot_invite` = false); identifier is the friend's email, must be in the caller's friendship relation, not already a member (exists check), role `MEMBER` assigned on incorporation
+- [X] T046 [US3] Implement `GroupMemberService.addSimulatedProfile()` in `GroupMemberService.java`: `name` required (per T006 String(100) NOT NULL), `email` valid and required (VARCHAR(191)), UNIQUE (`group_id`,`email`), stored in `simulated_profiles`, becomes MEMBER of the group
+- [X] T047 [US3] Implement `POST /api/groups/{id}/members` endpoint in `GroupController.java` with `memberType` = `REGISTERED | SIMULATED`; returns 201 with the member info or 400/403 with the rejection reason
+- [X] T048 [US3] Record `MEMBER_ADDED` via `ActivityEventService` in both addition paths (event service already exists from Foundational)
+- [X] T049 [US3] Create `frontend/src/pages/groups/AddMemberView.jsx`: friend search limited to the user's friends, form for simulated profile (name + email), success and rejection messages in the UI; responsive
 
 **Checkpoint**: Story 3 is independently testable — members can be added and appear in the history.
 
@@ -164,14 +164,14 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 9
 
-- [ ] T050 [P] [US9] Write `GroupActivityControllerIT.java` for `GET /api/groups/{id}/activity`: pagination, `eventType` filter, descending order, actor and timestamp present, entries preserved after member removal
-- [ ] T051 [P] [US9] Write `GroupHistoryView.test.jsx` in `frontend/src/`: renders entries with actor name, humanized date and event description; warning message shown when no entries
+- [X] T050 [P] [US9] Write `GroupActivityControllerIT.java` for `GET /api/groups/{id}/activity`: pagination, `eventType` filter, descending order, actor and timestamp present, entries preserved after member removal
+- [X] T051 [P] [US9] Write `GroupHistoryView.test.jsx` in `frontend/src/`: renders entries with actor name, humanized date and event description; warning message shown when no entries
 
 ### Implementation for User Story 9
 
-- [ ] T052 [US9] Implement `GroupActivityService.java` read layer in `backend/src/main/java/com/amano/backend/groups/`: paginated descending queries with optional `eventType` filter (repository from T018 already provides this)
-- [ ] T053 [US9] Implement `GET /api/groups/{id}/activity` endpoint with `page`/`size` (default 20) and `eventType` parameters returning content, `totalElements`, `totalPages`; 404/401 handled
-- [ ] T054 [US9] Create `frontend/src/pages/groups/GroupHistoryView.jsx`: descending list "quién la hizo y cuándo", accessible from group info, tablet/mobile responsive; shows hook-point note that expenses/payments entries will be recorded when the expense integration exists
+- [X] T052 [US9] Implement `GroupActivityService.java` read layer in `backend/src/main/java/com/amano/backend/groups/`: paginated descending queries with optional `eventType` filter (repository from T018 already provides this)
+- [X] T053 [US9] Implement `GET /api/groups/{id}/activity` endpoint with `page`/`size` (default 20) and `eventType` parameters returning content, `totalElements`, `totalPages`; 404/401 handled
+- [X] T054 [US9] Create `frontend/src/pages/groups/GroupHistoryView.jsx`: descending list "quién la hizo y cuándo", accessible from group info, tablet/mobile responsive; shows hook-point note that expenses/payments entries will be recorded when the expense integration exists
 
 **Checkpoint**: Story 9 is independently testable — the history shows preserved, dated, attributed member events (the write side was completed in Foundational + US3/US4 events).
 

@@ -19,6 +19,8 @@ import RecurringExpensesPage from './pages/RecurringExpensesPage'
 import GroupListView from './pages/groups/GroupListView'
 import CreateGroupView from './pages/groups/CreateGroupView'
 import GroupInfoView from './pages/groups/GroupInfoView'
+import GroupHistoryView from './pages/groups/GroupHistoryView'
+import { useParams } from 'react-router'
 import SiteNav from './components/SiteNav'
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
@@ -27,6 +29,11 @@ import SiteNav from './components/SiteNav'
 // '/forgot-password' y '/reset-password' (specs/006-password-recovery), todas
 // públicas por diseño; '/dashboard', '/profile' y sus rutas de edición y de
 // cambio de contraseña (specs/005-edit-user-profile) quedan protegidas.
+function GroupHistoryPage() {
+  const { id } = useParams()
+  return <GroupHistoryView groupId={id} />
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -96,6 +103,15 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <GroupInfoView />
+          </ProtectedRoute>
+        }
+      />
+      {/* Grupos (specs/010-groups-management, US9): historial de actividad. */}
+      <Route
+        path="/groups/:id/history"
+        element={
+          <ProtectedRoute>
+            <GroupHistoryPage />
           </ProtectedRoute>
         }
       />
