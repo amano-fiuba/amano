@@ -49,11 +49,27 @@ public class GroupPermissionChecker {
         return GroupMember.ROLE_ADMIN.equals(callerRole);
     }
 
-    /**
-     * US10 role management (assign/revoke admin): ADMIN-only, no casilla —
+    /** US10 role management (assign/revoke admin): ADMIN-only, no casilla —
      * per-group decision, the authorization always resolves here.
      */
     public boolean canManageRoles(String callerRole, GroupPermissions permissions) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    /**
+     * US6 members list read: both roles (any active member of the group) may
+     * view it; there are no casillas gating the plain read.
+     */
+    public boolean canViewMembers(String callerRole, GroupPermissions permissions) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole)
+                || GroupMember.ROLE_MEMBER.equals(callerRole);
+    }
+
+    /**
+     * US8 group photo upload/replace: ADMIN-only with no casilla (spec
+     * "Solo ADMIN"; the check concentrates here).
+     */
+    public boolean canManagePhoto(String callerRole, GroupPermissions permissions) {
         return GroupMember.ROLE_ADMIN.equals(callerRole);
     }
 

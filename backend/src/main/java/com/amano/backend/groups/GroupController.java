@@ -196,6 +196,49 @@ public class GroupController {
         return ResponseEntity.ok(response);
     }
 
+    /** T084 (US8): only an ADMIN uploads/replaces the group photo (multipart). */
+    @PostMapping(path = "/api/groups/{id}/photo", consumes = "multipart/form-data",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> uploadGroupPhoto(@PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestPart(value = "file",
+                    required = false) org.springframework.web.multipart.MultipartFile file) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        com.amano.backend.groups.dto.GroupPhotoResponse response =
+                groupService.uploadPhoto(callerId, id, file);
+        return ResponseEntity.ok(response);
+    }
+
+    /** T084 (US8): serves the group photo bytes (members only, neutral 404). */
+    @GetMapping(path = "/api/groups/{id}/photo")
+    public ResponseEntity<?> getGroupPhoto(@PathVariable Long id) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        com.amano.backend.groups.dto.GroupPhotoContent content = groupService.getPhoto(callerId, id);
+        MediaType mediaType = MediaType.valueOf(content.contentType());
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(org.springframework.http.CacheControl.noCache()
+                        .cachePrivate()
+                        .mustRevalidate())
+                .body(content.data());
+    }
+
+    /** T078 (US6): active members (registered + simulated), viewable by both roles. */
+    @GetMapping(path = "/api/groups/{id}/members", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getMembers(@PathVariable Long id) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        return ResponseEntity.ok(groupService.getMembers(callerId, id));
+    }
+
     private static Long currentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof Long userId) {

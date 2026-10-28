@@ -52,7 +52,10 @@ class GroupLeaveServiceTest {
 
         service = new GroupService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService, debtPort);
+                activityEventService, debtPort,
+                Mockito.mock(com.amano.backend.user.UserAvatarRepository.class),
+                Mockito.mock(GroupPhotoRepository.class),
+                Mockito.mock(com.amano.backend.user.AvatarValidator.class));
 
         Group group = new Group();
         org.springframework.test.util.ReflectionTestUtils.setField(group, "id", GROUP_ID);

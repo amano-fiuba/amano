@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.groups.dto.CreateGroupRequest;
 import com.amano.backend.groups.dto.GroupDetailResponse;
+import com.amano.backend.groups.dto.GroupMemberView;
 import com.amano.backend.groups.dto.GroupResponse;
 import com.amano.backend.groups.dto.GroupSummaryResponse;
 import com.amano.backend.groups.dto.LeaveGroupResponse;
@@ -18,6 +19,8 @@ import com.amano.backend.groups.dto.UpdateGroupRequest;
 import com.amano.backend.groups.port.DebtPort;
 import com.amano.backend.groups.port.FriendshipPort;
 import com.amano.backend.user.User;
+import com.amano.backend.user.UserAvatar;
+import com.amano.backend.user.UserAvatarRepository;
 import com.amano.backend.user.UserRepository;
 
 /**
@@ -38,6 +41,9 @@ public class GroupService {
     private final GroupPermissionChecker permissionChecker;
     private final ActivityEventService activityEventService;
     private final DebtPort debtPort;
+    private final UserAvatarRepository userAvatarRepository;
+    private final GroupPhotoRepository groupPhotoRepository;
+    private final com.amano.backend.user.AvatarValidator avatarValidator;
 
     public GroupService(GroupRepository groupRepository,
             GroupMemberRepository groupMemberRepository,
@@ -47,7 +53,10 @@ public class GroupService {
             UserRepository userRepository,
             GroupPermissionChecker permissionChecker,
             ActivityEventService activityEventService,
-            DebtPort debtPort) {
+            DebtPort debtPort,
+            UserAvatarRepository userAvatarRepository,
+            GroupPhotoRepository groupPhotoRepository,
+            com.amano.backend.user.AvatarValidator avatarValidator) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.simulatedProfileRepository = simulatedProfileRepository;
@@ -57,6 +66,9 @@ public class GroupService {
         this.permissionChecker = permissionChecker;
         this.activityEventService = activityEventService;
         this.debtPort = debtPort;
+        this.userAvatarRepository = userAvatarRepository;
+        this.groupPhotoRepository = groupPhotoRepository;
+        this.avatarValidator = avatarValidator;
     }
 
     @Transactional
@@ -252,6 +264,114 @@ public class GroupService {
         }
 
         return toDetail(userId, group, membership);
+    }
+
+    /**
+     * T078 (US6): active members of the group (group_members with left_at
+     * NULL + the simulated profiles, which are members by group_id alone)
+     * with display name, avatar URL (existing user-avatar mechanism; NULL →
+     * the UI renders the gray default) and the per-group role. Viewed by both
+     * roles — the decision goes through {@link GroupPermissionChecker#canViewMembers}.
+     */
+    @Transactional(readOnly = true)
+    public List<GroupMemberView> getMembers(Long userId, Long groupId) {
+        groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        GroupMember membership = activeMembership(userId, groupId);
+        GroupPermissions permissions =
+                groupPermissionsRepository.findByGroupId(groupId).orElse(null);
+        if (!permissionChecker.canViewMembers(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException("No podés ver los miembros de este grupo");
+        }
+
+        List<GroupMemberView> members = new java.util.ArrayList<>();
+        for (GroupMember row : groupMemberRepository.findByIdGroupIdAndLeftAtIsNull(groupId)) {
+            User user = userRepository.findById(row.getId().getUserId()).orElse(null);
+            if (user == null) {
+                continue;
+            }
+            String fullName = user.getFirstName() + (user.getLastName() != null
+                    ? " " + user.getLastName()
+                    : "");
+            String avatarUrl = userAvatarRepository.findById(user.getId())
+                    .<String>map(stored -> "/api/users/" + user.getId() + "/avatar")
+                    .orElse(null); // no custom avatar → NULL → gray default in the UI
+            members.add(new GroupMemberView(user.getId(), null, fullName, avatarUrl,
+                    row.getRole()));
+        }
+        for (SimulatedProfile simulated : simulatedProfileRepository.findByGroupId(groupId)) {
+            members.add(new GroupMemberView(null, simulated.getId(), simulated.getName(),
+                    null, GroupMember.ROLE_MEMBER));
+        }
+        return members;
+    }
+
+    /**
+     * T084/T085 (US8): the ADMIN uploads or replaces the group photo. The
+     * format/size gate REUSES the existing {@code AvatarValidator} (content
+     * based JPG/PNG; oversize → 413 via its MaxUploadSize semantics; the
+     * contract's "5MB/400" wording is the documented drift resolved in favor
+     * of reusing the validator). On any failure the previous photo is
+     * conserved (nothing is touched before validation). Success stores the
+     * bytes in {@code group_photos} (V11) and the URL in {@code groups.photo},
+     * and records PHOTO_CHANGED.
+     */
+    @Transactional
+    public com.amano.backend.groups.dto.GroupPhotoResponse uploadPhoto(Long userId, Long groupId,
+            org.springframework.web.multipart.MultipartFile photo) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        GroupMember membership = activeMembership(userId, groupId);
+        GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId).orElse(null);
+        if (!permissionChecker.canManagePhoto(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException(
+                    "Solo un administrador puede cambiar la foto del grupo");
+        }
+        if (photo == null || photo.isEmpty()) {
+            throw new com.amano.backend.common.FieldValidationException(java.util.Map.of("photo",
+                    "Debés seleccionar un archivo de imagen"));
+        }
+        avatarValidator.validate(photo); // 400 format / 413 size (existing mechanism)
+
+        GroupPhoto stored = groupPhotoRepository.findById(groupId).orElseGet(GroupPhoto::new);
+        stored.setGroupId(groupId);
+        stored.setContentType(avatarValidator.realContentType(photo));
+        try {
+            stored.setData(photo.getBytes());
+        }
+        catch (java.io.IOException exception) {
+            throw new java.io.UncheckedIOException(exception);
+        }
+        GroupPhoto saved = groupPhotoRepository.saveAndFlush(stored); // timestamp set by Hibernate
+
+        String url = photoUrlOf(saved);
+        group.setPhoto(url);
+        groupRepository.save(group);
+        activityEventService.record(groupId, GroupActivity.GroupActivityType.PHOTO_CHANGED,
+                userId, "{}");
+        return new com.amano.backend.groups.dto.GroupPhotoResponse(url, saved.getUpdatedAt());
+    }
+
+    /** Served bytes for GET /api/groups/{id}/photo: members only (neutral 404 otherwise). */
+    @Transactional(readOnly = true)
+    public com.amano.backend.groups.dto.GroupPhotoContent getPhoto(Long userId, Long groupId) {
+        groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        activeMembership(userId, groupId);
+        GroupPhoto stored = groupPhotoRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "Este grupo no tiene foto"));
+        return new com.amano.backend.groups.dto.GroupPhotoContent(
+                stored.getContentType(), stored.getData());
+    }
+
+    private static String photoUrlOf(GroupPhoto stored) {
+        return "/api/groups/" + stored.getGroupId() + "/photo?v="
+                + Long.toHexString(com.amano.backend.user.UserAccountResponse
+                        .versionOf(stored.getData()));
     }
 
     /**

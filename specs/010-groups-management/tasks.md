@@ -254,13 +254,13 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 6
 
-- [ ] T076 [P] [US6] Write `MembersListIT.java` for `GET /api/groups/{id}/members`: active registered members + simulated profiles with name, avatar, role
-- [ ] T077 [P] [US6] Write `MemberListView.test.jsx` in `frontend/src/`: renders all members, distinguishes current user, default avatar when photo is NULL
+- [X] T076 [P] [US6] Write `MembersListIT.java` for `GET /api/groups/{id}/members`: active registered members + simulated profiles with name, avatar, role
+- [X] T077 [P] [US6] Write `MemberListView.test.jsx` in `frontend/src/`: renders all members, distinguishes current user, default avatar when photo is NULL
 
 ### Implementation for User Story 6
 
-- [ ] T078 [US6] Implement `GET /api/groups/{id}/members` endpoint in `GroupController.java` returning active members (registered + simulated) with `name`, `avatar`, `role` (read from `GroupMemberRepository` + `UserRepository` / `SimulatedProfileRepository`)
-- [ ] T079 [US6] Create `frontend/src/components/groups/MemberListView.jsx`: name + avatar (gray default avatar when the member has none, same mechanism as user avatars — existente), current user visually distinguished ("Vos"), list refreshes on info changes; accessible from `GroupInfoView`; responsive
+- [X] T078 [US6] Implement `GET /api/groups/{id}/members` endpoint in `GroupController.java` returning active members (registered + simulated) with `name`, `avatar`, `role` (read from `GroupMemberRepository` + `UserRepository` / `SimulatedProfileRepository`)
+- [X] T079 [US6] Create `frontend/src/components/groups/MemberListView.jsx`: name + avatar (gray default avatar when the member has none, same mechanism as user avatars — existente), current user visually distinguished ("Vos"), list refreshes on info changes; accessible from `GroupInfoView`; responsive
 
 **Checkpoint**: Story 6 is independently testable — the member list reflects reality and is refreshed with member changes.
 
@@ -274,11 +274,11 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 7
 
-- [ ] T080 [P] [US7] Write `GroupDescriptionPanel.test.jsx` in `frontend/src/`: renders description when present and the "no tiene descripción" message when NULL
+- [X] T080 [P] [US7] Write `GroupDescriptionPanel.test.jsx` in `frontend/src/`: renders description when present and the "no tiene descripción" message when NULL
 
 ### Implementation for User Story 7
 
-- [ ] T081 [US7] Create `frontend/src/components/groups/GroupDescriptionPanel.jsx` shown next to the principal group info (uses existing `GET /api/groups/{id}` from US1; only UI work is needed); responsive
+- [X] T081 [US7] Create `frontend/src/components/groups/GroupDescriptionPanel.jsx` shown next to the principal group info (uses existing `GET /api/groups/{id}` from US1; only UI work is needed); responsive
 
 **Checkpoint**: Story 7 is independently testable — pure UI read of the existing description field.
 
@@ -292,14 +292,14 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 8
 
-- [ ] T082 [P] [US8] Write `GroupPhotoControllerIT.java` for `POST /api/groups/{id}/photo`: 200 with valid JPG/PNG ≤5MB, 400 for invalid type — the validator reuses the existente user-avatar upload validation mechanism — and for oversize, 403 non-admin, previous photo preserved on failure
-- [ ] T083 [P] [US8] Write `GroupPhotoPanel.test.jsx` in `frontend/src/`: upload UI, rejection messages, gray default avatar rendering
+- [X] T082 [P] [US8] Write `GroupPhotoControllerIT.java` for `POST /api/groups/{id}/photo`: 200 with valid JPG/PNG ≤5MB, 400 for invalid type — the validator reuses the existente user-avatar upload validation mechanism — and for oversize, 403 non-admin, previous photo preserved on failure
+- [X] T083 [P] [US8] Write `GroupPhotoPanel.test.jsx` in `frontend/src/`: upload UI, rejection messages, gray default avatar rendering
 
 ### Implementation for User Story 8
 
-- [ ] T084 [US8] Implement `GroupService.uploadPhoto()` in `GroupService.java`: ADMIN-only; multipart JPG/JPEG/PNG ≤5MB reusing the existente avatar upload validator (no new validation pattern); stores the new filename/URL in `groups.photo` keeping the old one on failure; informative message on failure
-- [ ] T085 [US8] Record `PHOTO_CHANGED` via `ActivityEventService` on every successful upload/replace
-- [ ] T086 [US8] Create `frontend/src/components/groups/GroupPhotoPanel.jsx`: photo upload/replace with file picker, explicit file-type and size errors, and the gray default avatar when the photo is NULL; responsive
+- [X] T084 [US8] Implement `GroupService.uploadPhoto()` in `GroupService.java`: ADMIN-only; multipart JPG/JPEG/PNG ≤5MB reusing the existente avatar upload validator (no new validation pattern); stores the new filename/URL in `groups.photo` keeping the old one on failure; informative message on failure
+- [X] T085 [US8] Record `PHOTO_CHANGED` via `ActivityEventService` on every successful upload/replace
+- [X] T086 [US8] Create `frontend/src/components/groups/GroupPhotoPanel.jsx`: photo upload/replace with file picker, explicit file-type and size errors, and the gray default avatar when the photo is NULL; responsive
 
 **Checkpoint**: Story 8 is independently testable — photos respect type/size rules and failures conserve the previous photo.
 

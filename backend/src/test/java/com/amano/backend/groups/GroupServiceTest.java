@@ -65,7 +65,10 @@ class GroupServiceTest {
         service = new GroupService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository,
                 Mockito.mock(GroupPermissionChecker.class), Mockito.mock(ActivityEventService.class),
-                Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
+                Mockito.mock(com.amano.backend.groups.port.DebtPort.class),
+                Mockito.mock(com.amano.backend.user.UserAvatarRepository.class),
+                Mockito.mock(GroupPhotoRepository.class),
+                Mockito.mock(com.amano.backend.user.AvatarValidator.class));
     }
 
     private static User registeredUser(Long id, String email) {

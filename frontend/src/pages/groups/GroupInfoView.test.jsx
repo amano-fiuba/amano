@@ -10,6 +10,7 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
 
 import { getGroup, leaveGroup } from '../../api/groupsClient'
 import GroupInfoView from './GroupInfoView'
+import { AuthProvider } from '../../auth/AuthContext'
 
 beforeEach(() => {
   getGroup.mockReset()
@@ -27,7 +28,9 @@ const GROUP = {
 function renderView() {
   return render(
     <MemoryRouter initialEntries={['/groups/3']}>
-      <GroupInfoView />
+      <AuthProvider>
+        <GroupInfoView />
+      </AuthProvider>
     </MemoryRouter>,
   )
 }

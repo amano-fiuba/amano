@@ -246,6 +246,47 @@ export async function revokeAdminRole(groupId, userId) {
   return jsonRequest(`/api/groups/${groupId}/members/${userId}/admin`, 'DELETE')
 }
 
+/** GET /api/groups/{id}/members: active registered members + simulated profiles (US6). */
+export async function getMembers(groupId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/members`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail }
+    }
+    const body = await response.json()
+    return {
+      ok: true,
+      members: Array.isArray(body) ? body : [],
+    }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/** POST /api/groups/{id}/photo: multipart upload/replacement (US8). */
+export async function uploadGroupPhoto(groupId, file) {
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await fetch(`/api/groups/${groupId}/photo`, {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail }
+    }
+    return { ok: true, ...(await response.json()) }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 async function jsonRequest(url, method) {
   try {
     const response = await fetch(url, { method, credentials: 'include' })
