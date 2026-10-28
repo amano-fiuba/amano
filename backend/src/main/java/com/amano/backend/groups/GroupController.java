@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,11 +17,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.amano.backend.groups.dto.AddMemberResponse;
+import com.amano.backend.groups.dto.AdminRoleResponse;
 import com.amano.backend.groups.dto.ActivityHistoryResponse;
+import com.amano.backend.groups.dto.RemovalResponse;
 import com.amano.backend.groups.dto.CreateGroupRequest;
 import com.amano.backend.groups.dto.GroupDetailResponse;
 import com.amano.backend.groups.dto.GroupResponse;
 import com.amano.backend.groups.dto.GroupSummaryResponse;
+import com.amano.backend.groups.dto.LeaveGroupResponse;
 import com.amano.backend.groups.dto.SearchCandidatesResponse;
 import com.amano.backend.groups.dto.UpdateGroupRequest;
 
@@ -131,6 +135,64 @@ public class GroupController {
             return unauthorized();
         }
         ActivityHistoryResponse response = activityService.getHistory(userId, id, page, size, eventType);
+        return ResponseEntity.ok(response);
+    }
+
+    /** T060 (US4): admin-only soft baja of a registered member. */
+    @DeleteMapping(path = "/api/groups/{id}/members/{userId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> removeMember(@PathVariable Long id, @PathVariable Long userId) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        RemovalResponse response = memberService.removeMember(callerId, id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /** T061 (US4): admin (or authorized member) removal of a simulated profile. */
+    @DeleteMapping(path = "/api/groups/{id}/simulated-profiles/{profileId}",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> removeSimulatedProfile(@PathVariable Long id, @PathVariable Long profileId) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        RemovalResponse response = memberService.removeSimulatedProfile(callerId, id, profileId);
+        return ResponseEntity.ok(response);
+    }
+
+    /** T067 (US5): the caller leaves the group (soft baja, MEMBER_LEFT). */
+    @PostMapping(path = "/api/groups/{id}/leave", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> leaveGroup(@PathVariable Long id) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        LeaveGroupResponse response = groupService.leaveGroup(callerId, id);
+        return ResponseEntity.ok(response);
+    }
+
+    /** T074 (US10): assign the ADMIN role (solo ADMIN, per-group). */
+    @PostMapping(path = "/api/groups/{id}/members/{userId}/admin",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> grantAdminRole(@PathVariable Long id, @PathVariable Long userId) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        AdminRoleResponse response = memberService.grantAdminRole(callerId, id, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    /** T074 (US10): revoke the ADMIN role (solo ADMIN; last admin blocked). */
+    @DeleteMapping(path = "/api/groups/{id}/members/{userId}/admin",
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> revokeAdminRole(@PathVariable Long id, @PathVariable Long userId) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        AdminRoleResponse response = memberService.revokeAdminRole(callerId, id, userId);
         return ResponseEntity.ok(response);
     }
 

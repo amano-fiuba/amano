@@ -41,6 +41,22 @@ public class GroupPermissionChecker {
                 && permissions.isMembersCanManageSimulatedProfiles();
     }
 
+    /**
+     * Removing a registered member (DELETE /api/groups/{id}/members/{userId}):
+     * ADMIN-only with no casilla — a MEMBER never removes another member.
+     */
+    public boolean canRemoveMembers(String callerRole, GroupPermissions permissions) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    /**
+     * US10 role management (assign/revoke admin): ADMIN-only, no casilla —
+     * per-group decision, the authorization always resolves here.
+     */
+    public boolean canManageRoles(String callerRole, GroupPermissions permissions) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
     private boolean allowedUnless(String callerRole, boolean denied) {
         if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
             return true;

@@ -232,6 +232,37 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Spec motive 2 — deudas pendientes (FR-010, US4): 403, member remains. */
+    @ExceptionHandler(com.amano.backend.groups.PendingDebtsException.class)
+    public ProblemDetail handlePendingDebts(com.amano.backend.groups.PendingDebtsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada por deudas pendientes");
+        problem.setProperty("properties", Map.of("code", "PENDING_DEBTS"));
+        return problem;
+    }
+
+    /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
+    @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
+    public ProblemDetail handleAdminRemovalBlocked(
+            com.amano.backend.groups.AdminRemovalBlockedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada");
+        problem.setProperty("properties", Map.of("code", "REVOKE_ROLE_FIRST"));
+        return problem;
+    }
+
+    /** Spec motive 4 — último admin (US5/US10): 403, operation blocked. */
+    @ExceptionHandler(com.amano.backend.groups.LastAdminException.class)
+    public ProblemDetail handleLastAdmin(com.amano.backend.groups.LastAdminException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada");
+        problem.setProperty("properties", Map.of("code", "LAST_ADMIN"));
+        return problem;
+    }
+
     /** Spec motive 1 — ya es miembro (FR-007, US3): 400 with the exact reason. */
     @ExceptionHandler(com.amano.backend.groups.AlreadyMemberException.class)
     public ProblemDetail handleAlreadyMember(com.amano.backend.groups.AlreadyMemberException exception) {

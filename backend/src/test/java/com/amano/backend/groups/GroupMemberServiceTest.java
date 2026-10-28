@@ -57,7 +57,7 @@ class GroupMemberServiceTest {
 
         service = new GroupMemberService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService);
+                activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
 
         when(simulatedProfileRepository.save(any(SimulatedProfile.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -108,7 +108,7 @@ class GroupMemberServiceTest {
         userRepository = FRIEND_REPOSITORY(friend);
         service = new GroupMemberService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService);
+                activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
         when(friendshipPort.isFriend(ADMIN_ID, "friend@example.com")).thenReturn(true);
         when(groupMemberRepository.existsByIdGroupIdAndIdUserId(GROUP_ID, 15L)).thenReturn(false);
 
@@ -135,7 +135,7 @@ class GroupMemberServiceTest {
         userRepository = FRIEND_REPOSITORY(stranger);
         service = new GroupMemberService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService);
+                activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
         when(friendshipPort.isFriend(ADMIN_ID, "stranger@example.com")).thenReturn(false);
 
         var exception = catchThrowableOfType(
@@ -144,7 +144,7 @@ class GroupMemberServiceTest {
 
         assertThat(exception).isNotNull();
         assertThat(exception.getMessage()).contains("amigos");
-        Mockito.verifyNoInteractions(activityEventService);
+        Mockito.verifyNoInteractions(activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
     }
 
     @Test
@@ -154,7 +154,7 @@ class GroupMemberServiceTest {
         userRepository = FRIEND_REPOSITORY(friend);
         service = new GroupMemberService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService);
+                activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
         when(friendshipPort.isFriend(ADMIN_ID, "friend@example.com")).thenReturn(true);
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, 15L)).thenReturn(
                 Optional.of(new GroupMember(15L, GROUP_ID, GroupMember.ROLE_MEMBER)));
@@ -217,7 +217,7 @@ class GroupMemberServiceTest {
         userRepository = FRIEND_REPOSITORY(friend);
         service = new GroupMemberService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService);
+                activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
         when(friendshipPort.isFriend(MEMBER_ID, "friend@example.com")).thenReturn(true);
         when(groupMemberRepository.existsByIdGroupIdAndIdUserId(GROUP_ID, 15L)).thenReturn(false);
 
@@ -240,7 +240,7 @@ class GroupMemberServiceTest {
 
         assertThat(exception).isNotNull();
         assertThat(exception.getMessage()).contains("No podés invitar gente");
-        Mockito.verifyNoInteractions(activityEventService);
+        Mockito.verifyNoInteractions(activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
     }
 
     @Test

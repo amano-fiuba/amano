@@ -189,5 +189,75 @@ export async function getActivity(groupId, { page = 1, size = 20, eventType } = 
   }
 }
 
+/** DELETE /api/groups/{id}/members/{userId}: soft baja by an ADMIN (US4). */
+export async function removeMember(groupId, userId) {
+  return deletionRequest(`/api/groups/${groupId}/members/${userId}`)
+}
+
+/**
+ * DELETE /api/groups/{id}/simulated-profiles/{profileId}: physical DELETE of
+ * the row, by an ADMIN or a MEMBER with the casilla active (US4).
+ */
+export async function removeSimulatedProfile(groupId, profileId) {
+  return deletionRequest(`/api/groups/${groupId}/simulated-profiles/${profileId}`)
+}
+
+/**
+ * POST /api/groups/{id}/leave: the caller leaves the group (US5). The server
+ * decides the last-admin and pending-balance motives and answers with a
+ * user-facing message.
+ */
+export async function leaveGroup(groupId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/leave`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, fields: {}, detail: body?.detail }
+    }
+    return { ok: true, ...(await response.json()) }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+async function deletionRequest(url) {
+  try {
+    const response = await fetch(url, { method: 'DELETE', credentials: 'include' })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, fields: {}, detail: body?.detail }
+    }
+    return { ok: true, ...(await response.json()) }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/** POST …/admin: assign the ADMIN role (US10). */
+export async function grantAdminRole(groupId, userId) {
+  return jsonRequest(`/api/groups/${groupId}/members/${userId}/admin`, 'POST')
+}
+
+/** DELETE …/admin: revoke the ADMIN role (US10). */
+export async function revokeAdminRole(groupId, userId) {
+  return jsonRequest(`/api/groups/${groupId}/members/${userId}/admin`, 'DELETE')
+}
+
+async function jsonRequest(url, method) {
+  try {
+    const response = await fetch(url, { method, credentials: 'include' })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, fields: {}, detail: body?.detail }
+    }
+    return { ok: true, ...(await response.json()) }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 export const GROUPS_NETWORK_ERROR_MESSAGE =
   'No se pudo conectar con el servidor. Intenta nuevamente'

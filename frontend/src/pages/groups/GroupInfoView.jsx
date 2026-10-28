@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { getGroup, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import LeaveGroupPanel from '../../components/groups/LeaveGroupPanel'
 
 export default function GroupInfoView() {
   const { id } = useParams()
@@ -24,9 +25,12 @@ export default function GroupInfoView() {
     }
   }, [id])
 
-  function roleLabel(role) {
+    function roleLabel(role) {
     return role === 'ADMIN' ? 'Administrador' : 'Miembro'
   }
+
+  // UI anticipation only: the server always rules the last-admin motive.
+  const isLastAdmin = group?.currentUserRole === 'ADMIN' && group?.memberCount === 1
 
   return (
     <main className="page">
@@ -46,6 +50,7 @@ export default function GroupInfoView() {
             {group.memberCount === 1 ? 'miembro' : 'miembros'}
           </p>
           <Link to={`/groups/${id}/history`}>Ver historial de actividad</Link>
+          <LeaveGroupPanel groupId={Number(id)} isLastAdmin={isLastAdmin} />
         </section>
       )}
     </main>

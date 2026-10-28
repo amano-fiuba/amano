@@ -13,7 +13,9 @@ import com.amano.backend.groups.dto.CreateGroupRequest;
 import com.amano.backend.groups.dto.GroupDetailResponse;
 import com.amano.backend.groups.dto.GroupResponse;
 import com.amano.backend.groups.dto.GroupSummaryResponse;
+import com.amano.backend.groups.dto.LeaveGroupResponse;
 import com.amano.backend.groups.dto.UpdateGroupRequest;
+import com.amano.backend.groups.port.DebtPort;
 import com.amano.backend.groups.port.FriendshipPort;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
@@ -35,6 +37,7 @@ public class GroupService {
     private final UserRepository userRepository;
     private final GroupPermissionChecker permissionChecker;
     private final ActivityEventService activityEventService;
+    private final DebtPort debtPort;
 
     public GroupService(GroupRepository groupRepository,
             GroupMemberRepository groupMemberRepository,
@@ -43,7 +46,8 @@ public class GroupService {
             FriendshipPort friendshipPort,
             UserRepository userRepository,
             GroupPermissionChecker permissionChecker,
-            ActivityEventService activityEventService) {
+            ActivityEventService activityEventService,
+            DebtPort debtPort) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.simulatedProfileRepository = simulatedProfileRepository;
@@ -52,6 +56,7 @@ public class GroupService {
         this.userRepository = userRepository;
         this.permissionChecker = permissionChecker;
         this.activityEventService = activityEventService;
+        this.debtPort = debtPort;
     }
 
     @Transactional
@@ -247,6 +252,36 @@ public class GroupService {
         }
 
         return toDetail(userId, group, membership);
+    }
+
+    /**
+     * T066 (US5): the user leaves the group. Blocked by pending balances via
+     * {@link DebtPort} (spec motive 2, own wording) or by the last-admin guard
+     * (spec motive 4). Success completes left_at (soft baja; the row is
+     * preserved), records MEMBER_LEFT (NOT MEMBER_REMOVED) and the group is
+     * NEVER dissolved — it persists for the remaining members.
+     */
+    @Transactional
+    public LeaveGroupResponse leaveGroup(Long userId, Long groupId) {
+        groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        GroupMember membership = activeMembership(userId, groupId);
+        if (debtPort.hasPendingDebts(groupId, userId)) {
+            throw new PendingDebtsException(
+                    "No podés abandonar el grupo: tenés saldos pendientes con otros miembros");
+        }
+        if (GroupMember.ROLE_ADMIN.equals(membership.getRole())
+                && groupMemberRepository.countActiveAdminsByGroupId(groupId) <= 1) {
+            throw new LastAdminException();
+        }
+
+        membership.setLeftAt(java.time.OffsetDateTime.now());
+        groupMemberRepository.save(membership);
+        activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_LEFT,
+                userId, "{}");
+        return new LeaveGroupResponse("Se abandonó el grupo. Tus gastos previos se conservan.",
+                true);
     }
 
     /**

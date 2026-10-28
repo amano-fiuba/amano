@@ -185,17 +185,17 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 4
 
-- [ ] T055 [P] [US4] Write `MemberRemovalServiceTest.java` in `backend/src/test/java/com/amano/backend/groups/`: removal of member, blocked when `DebtPort` reports pending debts, blocked when target is ADMIN (role revocation required first), simulated removal by admin and by enabled member, simulated removal blocked by debts
-- [ ] T056 [P] [US4] Write `MemberRemovalIT.java` for `DELETE /api/groups/{id}/members/{userId}` and `DELETE /api/groups/{id}/simulated-profiles/{profileId}`
-- [ ] T057 [P] [US4] Write `RemoveMemberDialog.test.jsx` in `frontend/src/`: confirmation step, rejection reasons rendered, debt-related message
+- [X] T055 [P] [US4] Write `MemberRemovalServiceTest.java` in `backend/src/test/java/com/amano/backend/groups/`: removal of member, blocked when `DebtPort` reports pending debts, blocked when target is ADMIN (role revocation required first), simulated removal by admin and by enabled member, simulated removal blocked by debts
+- [X] T056 [P] [US4] Write `MemberRemovalIT.java` for `DELETE /api/groups/{id}/members/{userId}` and `DELETE /api/groups/{id}/simulated-profiles/{profileId}`
+- [X] T057 [P] [US4] Write `RemoveMemberDialog.test.jsx` in `frontend/src/`: confirmation step, rejection reasons rendered, debt-related message
 
 ### Implementation for User Story 4
 
-- [ ] T058 [US4] Implement `GroupMemberService.removeMember()` in `GroupMemberService.java`: ADMIN-only; rejects targets whose role is ADMIN with "primero quitale el rol" (no direct admin-to-admin removal); consults `DebtPort` for pending debts from T019 and blocks the removal with the reason; preserves prior expenses (they belong to users, not the group); records `MEMBER_REMOVED`
-- [ ] T059 [US4] Implement `GroupMemberService.removeSimulatedProfile()` in `GroupMemberService.java`: authorization through `GroupPermissionChecker` (ADMIN siempre puede; MEMBER solo si `members_can_manage_simulated_profiles` = true); applies the same debt rule via `DebtPort`; physical DELETE of the `simulated_profiles` row (per T006 model); records `MEMBER_REMOVED`; by design simulated profiles expose no self-removal flow
-- [ ] T060 [US4] Implement `DELETE /api/groups/{id}/members/{userId}` endpoint in `GroupController.java` (verb agreed with the user; contract in `contracts/api-contracts.md` still documents POST — sync in Polish task); 200/400/403/404
-- [ ] T061 [US4] Implement `DELETE /api/groups/{id}/simulated-profiles/{profileId}` endpoint in `GroupController.java`
-- [ ] T062 [US4] Create `frontend/src/components/groups/RemoveMemberDialog.jsx`: confirmation dialog before removal, distinct handling for other admin ("revoke the role first"), pending-debts and simulated-profile cases; messages in the UI; responsive
+- [X] T058 [US4] Implement `GroupMemberService.removeMember()` in `GroupMemberService.java`: ADMIN-only; rejects targets whose role is ADMIN with "primero quitale el rol" (no direct admin-to-admin removal); consults `DebtPort` for pending debts from T019 and blocks the removal with the reason; preserves prior expenses (they belong to users, not the group); records `MEMBER_REMOVED`
+- [X] T059 [US4] Implement `GroupMemberService.removeSimulatedProfile()` in `GroupMemberService.java`: authorization through `GroupPermissionChecker` (ADMIN siempre puede; MEMBER solo si `members_can_manage_simulated_profiles` = true); applies the same debt rule via `DebtPort`; physical DELETE of the `simulated_profiles` row (per T006 model); records `MEMBER_REMOVED`; by design simulated profiles expose no self-removal flow
+- [X] T060 [US4] Implement `DELETE /api/groups/{id}/members/{userId}` endpoint in `GroupController.java` (verb agreed with the user; contract in `contracts/api-contracts.md` still documents POST — sync in Polish task); 200/400/403/404
+- [X] T061 [US4] Implement `DELETE /api/groups/{id}/simulated-profiles/{profileId}` endpoint in `GroupController.java`
+- [X] T062 [US4] Create `frontend/src/components/groups/RemoveMemberDialog.jsx`: confirmation dialog before removal, distinct handling for other admin ("revoke the role first"), pending-debts and simulated-profile cases; messages in the UI; responsive
 
 **Checkpoint**: Story 4 is independently testable — removals respect debts, admin protection and permissions, and are recorded in the history.
 
@@ -209,15 +209,15 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 5
 
-- [ ] T063 [P] [US5] Write `GroupLeaveServiceTest.java`: success path, blocked by pending balances, blocked by last-admin guard, group persists for remaining members, simulated profiles cannot leave (there is no path for them)
-- [ ] T064 [P] [US5] Write `LeaveGroupIT.java` for `POST /api/groups/{id}/leave`
-- [ ] T065 [P] [US5] Write `LeaveGroupPanel.test.jsx` in `frontend/src/`: confirmation, last-admin hint rendered, debts message rendered
+- [X] T063 [P] [US5] Write `GroupLeaveServiceTest.java`: success path, blocked by pending balances, blocked by last-admin guard, group persists for remaining members, simulated profiles cannot leave (there is no path for them)
+- [X] T064 [P] [US5] Write `LeaveGroupIT.java` for `POST /api/groups/{id}/leave`
+- [X] T065 [P] [US5] Write `LeaveGroupPanel.test.jsx` in `frontend/src/`: confirmation, last-admin hint rendered, debts message rendered
 
 ### Implementation for User Story 5
 
-- [ ] T066 [US5] Implement `GroupService.leaveGroup()` in `GroupService.java`: blocks on pending balances via `DebtPort` (from T019) and blocks when `GroupMemberRepository.countByGroupIdAndRole(ADMIN)` would reach zero (last-admin guard per decision 6); sets `left_at` on the `group_members` row (soft baja per T005 — the row is preserved so prior expenses and activity entries remain traceable) instead of dissolving the group (no dissolution in this version); active-members counting excludes the `left_at` row and keeps counting simulated profiles (T005/T006); records `MEMBER_LEFT` via `ActivityEventService`
-- [ ] T067 [US5] Implement `POST /api/groups/{id}/leave` endpoint in `GroupController.java` returning message + `groupLeft` boolean (200), 403 with reason
-- [ ] T068 [US5] Create `frontend/src/components/groups/LeaveGroupPanel.jsx`: leave button with confirmation; when the user is the last admin show guidance "asigná otro administrador antes de salir" (linking to US10 grant UI) and the debts message; responsive
+- [X] T066 [US5] Implement `GroupService.leaveGroup()` in `GroupService.java`: blocks on pending balances via `DebtPort` (from T019) and blocks when `GroupMemberRepository.countByGroupIdAndRole(ADMIN)` would reach zero (last-admin guard per decision 6); sets `left_at` on the `group_members` row (soft baja per T005 — the row is preserved so prior expenses and activity entries remain traceable) instead of dissolving the group (no dissolution in this version); active-members counting excludes the `left_at` row and keeps counting simulated profiles (T005/T006); records `MEMBER_LEFT` via `ActivityEventService`
+- [X] T067 [US5] Implement `POST /api/groups/{id}/leave` endpoint in `GroupController.java` returning message + `groupLeft` boolean (200), 403 with reason
+- [X] T068 [US5] Create `frontend/src/components/groups/LeaveGroupPanel.jsx`: leave button with confirmation; when the user is the last admin show guidance "asigná otro administrador antes de salir" (linking to US10 grant UI) and the debts message; responsive
 
 **Checkpoint**: Story 5 is independently testable — leaving respects debts and last-admin rules without dissolving the group.
 
@@ -231,16 +231,16 @@ description: "Task list for groups-management feature implementation"
 
 ### Tests for User Story 10
 
-- [ ] T069 [P] [US10] Write `AdminRoleServiceTest.java` in `backend/src/test/java/com/amano/backend/groups/`: GRANT member→admin, REVOKE admin→member keeps membership, last-admin revocation blocked, failure preserves prior role, role scope is per group only
-- [ ] T070 [P] [US10] Write `AdminRoleIT.java` for the two separate endpoints
-- [ ] T071 [P] [US10] Write `AdminRolePanel.test.jsx` in `frontend/src/`: grant and revoke actions, last-admin disabled with explanation
+- [X] T069 [P] [US10] Write `AdminRoleServiceTest.java` in `backend/src/test/java/com/amano/backend/groups/`: GRANT member→admin, REVOKE admin→member keeps membership, last-admin revocation blocked, failure preserves prior role, role scope is per group only
+- [X] T070 [P] [US10] Write `AdminRoleIT.java` for the two separate endpoints
+- [X] T071 [P] [US10] Write `AdminRolePanel.test.jsx` in `frontend/src/`: grant and revoke actions, last-admin disabled with explanation
 
 ### Implementation for User Story 10
 
-- [ ] T072 [US10] Implement `GroupMemberService.grantAdminRole()` in `GroupMemberService.java`: caller must be ADMIN; target must be an active MEMBER; sets role ADMIN without touching other admins; transactional so a failure preserves the previous assignment
-- [ ] T073 [US10] Implement `GroupMemberService.revokeAdminRole()` in `GroupMemberService.java`: caller must be ADMIN; target must be ADMIN → becomes MEMBER retaining membership; blocked when target is the last admin (guard per decision 6); transactional failure preserves the prior role
-- [ ] T074 [US10] Implement the two separate endpoints `POST /api/groups/{id}/members/{userId}/admin` (assign) and `DELETE /api/groups/{id}/members/{userId}/admin` (revoke) in `GroupController.java` (contract currently combines them in `POST /api/groups/{id}/admin` — sync in Polish task)
-- [ ] T075 [US10] Create `frontend/src/components/groups/AdminRolePanel.jsx`: grant/revoke actions per member, action disabled for the last admin with explanatory message, success/failure messages in the UI; responsive
+- [X] T072 [US10] Implement `GroupMemberService.grantAdminRole()` in `GroupMemberService.java`: caller must be ADMIN; target must be an active MEMBER; sets role ADMIN without touching other admins; transactional so a failure preserves the previous assignment
+- [X] T073 [US10] Implement `GroupMemberService.revokeAdminRole()` in `GroupMemberService.java`: caller must be ADMIN; target must be ADMIN → becomes MEMBER retaining membership; blocked when target is the last admin (guard per decision 6); transactional failure preserves the prior role
+- [X] T074 [US10] Implement the two separate endpoints `POST /api/groups/{id}/members/{userId}/admin` (assign) and `DELETE /api/groups/{id}/members/{userId}/admin` (revoke) in `GroupController.java` (contract currently combines them in `POST /api/groups/{id}/admin` — sync in Polish task)
+- [X] T075 [US10] Create `frontend/src/components/groups/AdminRolePanel.jsx`: grant/revoke actions per member, action disabled for the last admin with explanatory message, success/failure messages in the UI; responsive
 
 **Checkpoint**: Story 10 is independently testable — roles can be granted/revoked with last-admin protection and per-group scope.
 

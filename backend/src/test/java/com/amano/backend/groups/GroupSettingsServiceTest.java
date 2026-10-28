@@ -57,7 +57,7 @@ class GroupSettingsServiceTest {
 
         service = new GroupService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository, permissionChecker,
-                activityEventService);
+                activityEventService, Mockito.mock(com.amano.backend.groups.port.DebtPort.class));
 
         when(groupRepository.save(any(Group.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(groupMemberRepository.save(any(GroupMember.class))).thenAnswer(invocation -> invocation.getArgument(0));
