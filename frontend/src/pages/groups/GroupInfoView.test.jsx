@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 
@@ -97,5 +97,29 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
         /Sos el último administrador: asigná otro administrador antes de salir/i,
       ),
     ).toBeInTheDocument()
+  })
+
+  it('siendo admin muestra agregar miembro y la configuración del grupo', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Agregar miembro$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Configuración del grupo/i }))
+
+    expect(screen.getByTestId('admin-controls')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /Actualizar lista/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('siendo miembro no ve los controles de administración del grupo', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: { ...GROUP, currentUserRole: 'MEMBER' } })
+
+    renderView()
+
+    await waitFor(() => expect(screen.getByTestId('members-list')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Configuración del grupo/i }))
+      .not.toBeInTheDocument()
   })
 })

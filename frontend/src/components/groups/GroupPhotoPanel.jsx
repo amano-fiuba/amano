@@ -10,7 +10,7 @@ const FORMAT_MESSAGE = 'El archivo debe ser una imagen JPG o PNG válida'
  * message for immediate feedback and keeps the current photo rendered on any
  * failure (FR-021); success swaps the URL for the freshly returned one.
  */
-export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin = false }) {
+export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin = false, compact = false }) {
   const [photo, setPhoto] = useState(currentPhoto)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
@@ -51,12 +51,16 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
   }
 
   return (
-    <section data-testid="group-photo" aria-label="Foto del grupo">
+    <section
+      data-testid="group-photo"
+      aria-label="Foto del grupo"
+      className={compact ? 'group-photo group-photo--compact' : 'group-photo'}
+    >
       <img
         src={photo || DEFAULT_AVATAR}
         alt=""
-        width={96}
-        height={96}
+        width={compact ? 56 : 96}
+        height={compact ? 56 : 96}
         data-testid="group-photo-image"
       />
       {status && <p role="status">{status}</p>}
@@ -70,7 +74,7 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
           Solo un administrador puede cambiar la foto del grupo
         </p>
       )}
-      <label htmlFor="group-photo-input">Cambiar foto del grupo</label>
+      <label className="visually-hidden" htmlFor="group-photo-input">Cambiar foto del grupo</label>
       <input
         id="group-photo-input"
         ref={inputRef}
@@ -79,9 +83,10 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
         disabled={busy || !isAdmin}
         onChange={handleChange}
         data-testid="group-photo-input"
+        hidden
       />
       <button type="button" disabled={!isAdmin} onClick={() => inputRef.current?.click()}>
-        Cambiar foto
+        {compact ? 'Cambiar' : 'Cambiar foto'}
       </button>
     </section>
   )

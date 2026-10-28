@@ -54,8 +54,31 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     render(<MemberListView groupId={3} currentUserId={7} />)
 
-    await waitFor(() => expect(screen.getByTestId('member-role-7')).toHaveTextContent(/Administrador/))
-    expect(screen.getByTestId('member-role-15')).toHaveTextContent(/Miembro/)
+    await waitFor(() =>
+      expect(screen.getByTestId('member-role-user-7')).toHaveTextContent(/Administrador/),
+    )
+    expect(screen.getByTestId('member-role-user-15')).toHaveTextContent(/Miembro/)
+    expect(screen.getByTestId('member-role-sim-33')).toHaveTextContent(/Miembro/)
+  })
+
+  it('sin ser admin no muestra las acciones por fila', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin={false} />)
+
+    await waitFor(() => expect(screen.getByText('Juan Simulado')).toBeInTheDocument())
+    expect(screen.queryByTestId('grant-admin-user-15')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('revoke-admin-user-7')).not.toBeInTheDocument()
+  })
+
+  it('siendo admin muestra "Hacer admin" en miembros y elimina perfiles simulados', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    expect(await screen.findByTestId('grant-admin-user-15')).toHaveTextContent(/Hacer admin/)
+    expect(screen.queryByTestId('grant-admin-sim-33')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Eliminar/i }).length).toBeLessThan(10)
   })
 
   it('muestra el error de conexión cuando getMembers falla', async () => {
