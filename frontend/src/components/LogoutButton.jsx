@@ -12,13 +12,15 @@ export default function LogoutButton() {
 
   const handleLogout = async () => {
     // El outcome del backend no bloquea: la cookie HttpOnly ya se expiró (o
-    // expira aunque falle la fetch), así que se limpia la sesión igual.
+    // expira aunque falle la fetch), así que se limpia la sesión igual; el
+    // error se traga para no quedar como unhandled rejection.
     try {
       await logout()
-    } finally {
-      setUser(null)
-      navigate('/login', { replace: true })
+    } catch {
+      // Sin sesión del backend: el cleanup local alcanza.
     }
+    setUser(null)
+    navigate('/login', { replace: true })
   }
 
   return (
