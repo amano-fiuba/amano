@@ -92,14 +92,14 @@ describe('HomePage', () => {
     expect(screen.getByText('2 transferencias')).toBeInTheDocument()
   })
 
-  it('cambia el CTA principal por grupos cuando hay sesión', () => {
+  it('cambia el CTA principal por el panel cuando hay sesión', () => {
     useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
     renderPage()
 
     const main = screen.getByRole('main')
     expect(
-      within(main).getByRole('link', { name: /ir a mis grupos/i }),
-    ).toHaveAttribute('href', '/groups')
+      within(main).getByRole('link', { name: /ir a mi panel/i }),
+    ).toHaveAttribute('href', '/dashboard')
     expect(
       within(main).queryByRole('link', { name: /empezar gratis/i }),
     ).not.toBeInTheDocument()

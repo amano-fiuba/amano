@@ -38,7 +38,7 @@ export default function VerifyEmailPage() {
     verifyEmail(token).then((result) => {
       if (result.ok) {
         setUser(result.profile)
-        navigate('/groups', { replace: true, state: { verifiedWelcome: true } })
+        navigate('/dashboard', { replace: true, state: { verifiedWelcome: true } })
         return
       }
       if (result.status === 410) {
