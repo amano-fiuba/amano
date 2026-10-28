@@ -71,6 +71,7 @@ class MemberRemovalServiceTest {
 
         when(groupMemberRepository.countActiveAdminsByGroupId(GROUP_ID)).thenReturn(2L);
         when(permissionChecker.canRemoveMembers(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
+        when(permissionChecker.canViewGroup(Mockito.anyString(), any())).thenReturn(true);
         when(groupMemberRepository.save(any(GroupMember.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(groupPermissionsRepository.save(any(GroupPermissions.class)))

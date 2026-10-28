@@ -227,6 +227,6 @@ Cuando una operación se rechaza, el sistema informa el motivo con un mensaje cl
 
 1. **Ya es miembro**: la persona a agregar ya pertenece al grupo (FR-007).
 2. **Deudas pendientes**: la persona tiene deudas pendientes con otros miembros del grupo (FR-010 y reglas de perfiles simulados).
-3. **No es amigo**: la persona a agregar no está en la relación de amistad del usuario (FR-006; solo se puede agregar entre amigos).
+3. **No es amigo**: la persona a agregar no está en la relación de amistad del usuario (FR-006; solo se puede agregar entre amigos). Este motivo se informa con un **404 neutral** que no confirma si el usuario existe: la respuesta no revela la existencia de la persona en cuestión.
 4. **Último admin**: la operación dejaría al grupo sin administrador activo (abandono del último admin o quita de su rol).
 5. **Admin: primero quitar el rol**: un administrador no puede eliminar directamente a otro administrador (US10/Clarifications); se exige revocarle el rol antes de la baja.

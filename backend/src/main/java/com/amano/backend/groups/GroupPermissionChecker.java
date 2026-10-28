@@ -73,6 +73,16 @@ public class GroupPermissionChecker {
         return GroupMember.ROLE_ADMIN.equals(callerRole);
     }
 
+    /**
+     * US1/US6/US9 plain reads of a group (detail, members, activity): both
+     * roles may view; gated here so any direct API call resolves the
+     * authorization through this single point.
+     */
+    public boolean canViewGroup(String callerRole, GroupPermissions permissions) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole)
+                || GroupMember.ROLE_MEMBER.equals(callerRole);
+    }
+
     private boolean allowedUnless(String callerRole, boolean denied) {
         if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
             return true;

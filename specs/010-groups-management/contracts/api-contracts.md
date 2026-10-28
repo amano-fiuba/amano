@@ -50,7 +50,7 @@ This module defines the API contracts for the groups-management feature. All end
 **Errors**:
 - 400: Invalid name (missing or empty — el spec FR-001 solo exige obligatorio/no vacío)
 - 400: Missing additional member (al menos un amigo registrado — vía `FriendshipPort` — o un perfil simulado)
-- 404: Selected friend no existe en la relación de amistad del caller
+- 404: Selected friend no existe en la relación de amistad del caller (404 neutral: la respuesta no confirma si el usuario existe)
 - 401: Unauthenticated
 
 ## Contract: Get Group
@@ -179,7 +179,7 @@ This module defines the API contracts for the groups-management feature. All end
 **Errors**:
 - 400: Invalid identifier, user already member
 - 403: Caller no tiene permiso (ADMIN siempre; MEMBER solo si la casilla "no pueden invitar gente" = false)
-- 403: REGISTERED identifier is not a friend of the caller (via `FriendshipPort`)
+- 404: REGISTERED identifier is not a friend of the caller (via `FriendshipPort`) — 404 neutral: se responde "no está entre tus amigos" sin confirmar si el usuario existe
 - 400: simulated profile: email inválido o ya existe otro perfil simulado con ese email en el grupo (UNIQUE `group_id`,`email`)
 - 404: Group not found
 - 401: Unauthenticated
@@ -286,7 +286,10 @@ This module defines the API contracts for the groups-management feature. All end
 **Endpoint**: `/api/groups/{id}/photo`
 
 **Request**: `multipart/form-data`
-- `file`: file (JPG, JPEG, or PNG only, max 5MB)
+- `file`: file (JPG, JPEG, or PNG only). Size limit: reused from the shared
+  `AvatarValidator` (2 MB, content-based via magic bytes; oversize → 413,
+  same as the user-avatar flow) — decision D6 makes the existing validator
+  the single gate, so the originally sketched "5 MB / 400" is superseded.
 
 **Response (200 OK)**:
 ```json
@@ -297,7 +300,8 @@ This module defines the API contracts for the groups-management feature. All end
 ```
 
 **Errors**:
-- 400: Invalid file type (not JPG/JPEG/PNG), file too large (>5MB)
+- 400: Invalid file type (not JPG/JPEG/PNG; magic-byte check, never the declared MIME)
+- 413: File too large (existing `MaxUploadSize` handler, reused)
 - 403: Not an admin
 - 404: Group not found
 - 401: Unauthenticated
@@ -382,7 +386,7 @@ This module defines the API contracts for the groups-management feature. All end
 | `/api/groups/{id}/simulated-profiles/{profileId}` | DELETE | Remove simulated profile (ADMIN o miembro con casilla activa) | Required |
 | `/api/groups/{id}/members/{userId}/admin` | POST | Assign admin role (solo ADMIN) | Required |
 | `/api/groups/{id}/members/{userId}/admin` | DELETE | Revoke admin role (solo ADMIN; bloqueado el último admin) | Required |
-| `/api/groups/{id}/photo` | POST | Upload group photo (ADMIN; JPG/JPEG/PNG ≤5MB) | Required |
+| `/api/groups/{id}/photo` | POST | Upload group photo (ADMIN; JPG/JPEG/PNG ≤2MB via the shared `AvatarValidator`; oversize → 413) | Required |
 | `/api/groups/{id}/activity` | GET | Get activity history | Required |
 | `/api/groups/{id}/candidates?q=` | GET | Search friend candidates (solo amigos via FriendshipPort) | Required |
 

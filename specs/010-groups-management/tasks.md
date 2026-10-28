@@ -288,16 +288,16 @@ description: "Task list for groups-management feature implementation"
 
 **Goal**: Se puede cargar o reemplazar la foto del grupo admitiendo solo JPG/JPEG/PNG; sin foto se muestra un avatar gris por defecto; si la carga falla o el archivo es inválido, se informa y se conserva la foto anterior.
 
-**Independent Test**: Given an ADMIN uploading a valid JPG/PNG ≤5MB, the photo is saved and displayed replacing the previous one. Given an invalid file (e.g. GIF/PDF), the system informs the invalid file type, preserves the previous photo and no change is applied.
+**Independent Test**: Given an ADMIN uploading a valid JPG/PNG ≤2MB, the photo is saved and displayed replacing the previous one. Given an oversize file, 413. Given an invalid file (e.g. GIF/PDF), the system informs the invalid file type, preserves the previous photo and no change is applied.
 
 ### Tests for User Story 8
 
-- [X] T082 [P] [US8] Write `GroupPhotoControllerIT.java` for `POST /api/groups/{id}/photo`: 200 with valid JPG/PNG ≤5MB, 400 for invalid type — the validator reuses the existente user-avatar upload validation mechanism — and for oversize, 403 non-admin, previous photo preserved on failure
+- [X] T082 [P] [US8] Write `GroupPhotoControllerIT.java` for `POST /api/groups/{id}/photo`: 200 with valid JPG/PNG ≤2MB, 400 for invalid type — the validator reuses the existente user-avatar upload validation mechanism — and for oversize 413, 403 non-admin, previous photo preserved on failure
 - [X] T083 [P] [US8] Write `GroupPhotoPanel.test.jsx` in `frontend/src/`: upload UI, rejection messages, gray default avatar rendering
 
 ### Implementation for User Story 8
 
-- [X] T084 [US8] Implement `GroupService.uploadPhoto()` in `GroupService.java`: ADMIN-only; multipart JPG/JPEG/PNG ≤5MB reusing the existente avatar upload validator (no new validation pattern); stores the new filename/URL in `groups.photo` keeping the old one on failure; informative message on failure
+- [X] T084 [US8] Implement `GroupService.uploadPhoto()` in `GroupService.java`: ADMIN-only; multipart JPG/JPEG/PNG ≤2MB (413 al superarlo) reusing the existente avatar upload validator (no new validation pattern); stores the new filename/URL in `groups.photo` keeping the old one on failure; informative message on failure
 - [X] T085 [US8] Record `PHOTO_CHANGED` via `ActivityEventService` on every successful upload/replace
 - [X] T086 [US8] Create `frontend/src/components/groups/GroupPhotoPanel.jsx`: photo upload/replace with file picker, explicit file-type and size errors, and the gray default avatar when the photo is NULL; responsive
 
@@ -307,11 +307,11 @@ description: "Task list for groups-management feature implementation"
 
 ## Final Phase: Polish & Cross-Cutting Concerns
 
-- [ ] T087 Verify consistency across the design artifacts against the decisions in this task list (`specs/010-groups-management/data-model.md`, `contracts/api-contracts.md`, `research.md`, `quickstart.md`): group name without uniqueness/length limit, permission casillas defaults all false, member removal via DELETE, separate admin grant/revoke endpoints, friend search restricted to `FriendshipPort`, terminology "perfil simulado" — the sync already happened during `/speckit.plan` (2026-10-27); this task only re-checks and fixes any drift before implementation
-- [ ] T088 [P] Run backend coverage: `mvn -B verify` in `backend/` ensuring JaCoCo ≥85% and all `*Test`/`*IT` suites pass
-- [ ] T089 [P] Run frontend coverage: `npm run test:coverage` in `frontend/` ensuring all `.test.jsx` suites pass
-- [ ] T090 Run the 12 scenarios in `specs/010-groups-management/quickstart.md` end-to-end and document results
-- [ ] T091 Review the `com.amano.backend.groups` package for leftovers and consistency with existing patterns (`User`, `Expense` entities and controllers as reference)
+- [X] T087 Verify consistency across the design artifacts against the decisions in this task list (`specs/010-groups-management/data-model.md`, `contracts/api-contracts.md`, `research.md`, `quickstart.md`): group name without uniqueness/length limit, permission casillas defaults all false, member removal via DELETE, separate admin grant/revoke endpoints, friend search restricted to `FriendshipPort`, terminology "perfil simulado" — the sync already happened during `/speckit.plan` (2026-10-27); this task only re-checks and fixes any drift before implementation
+- [X] T088 [P] Run backend coverage: `mvn -B verify` in `backend/` ensuring JaCoCo ≥85% and all `*Test`/`*IT` suites pass
+- [X] T089 [P] Run frontend coverage: `npm run test:coverage` in `frontend/` ensuring all `.test.jsx` suites pass
+- [X] T090 Run the 12 scenarios in `specs/010-groups-management/quickstart.md` end-to-end and document results
+- [X] T091 Review the `com.amano.backend.groups` package for leftovers and consistency with existing patterns (`User`, `Expense` entities and controllers as reference)
 
 **Checkpoint**: All stories validated independently and together.
 

@@ -47,6 +47,7 @@ class GroupLeaveServiceTest {
         friendshipPort = Mockito.mock(com.amano.backend.groups.port.FriendshipPort.class);
         userRepository = Mockito.mock(com.amano.backend.user.UserRepository.class);
         permissionChecker = Mockito.mock(GroupPermissionChecker.class);
+        when(permissionChecker.canViewGroup(Mockito.anyString(), any())).thenReturn(true);
         activityEventService = Mockito.mock(ActivityEventService.class);
         debtPort = Mockito.mock(DebtPort.class);
 

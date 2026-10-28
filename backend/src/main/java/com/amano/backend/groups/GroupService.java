@@ -416,6 +416,10 @@ public class GroupService {
         if (membership.getLeftAt() != null) {
             throw new GroupNotFoundException("No existe el grupo solicitado o no sos miembro");
         }
+        if (!permissionChecker.canViewGroup(membership.getRole(),
+                groupPermissionsRepository.findByGroupId(groupId).orElse(null))) {
+            throw new GroupPermissionDeniedException("No podés ver este grupo");
+        }
         return membership;
     }
 

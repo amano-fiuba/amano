@@ -52,7 +52,7 @@ This research documents the integration of the groups-management feature with th
 - Authentication: `POST /api/auth/login`, `POST /api/auth/register`
 
 ### Existing UI Components (relevant)
-- `AvatarUploader.jsx.html` — user photo upload (JPG/PNG, up to 5MB implied)
+- `AvatarUploader.jsx.html` — user photo upload (JPG/PNG, `AvatarValidator` content-based limit 2MB)
 - `AuthContext.jsx.html` — authentication context
 - `AuthPage.jsx.html` — login/register page
 - `SiteNav.jsx.html` — site navigation
@@ -112,7 +112,7 @@ The spec says: "Cargar/reemplazar la foto del grupo: solo JPG, JPEG o PNG; sin f
 - New `GroupPhoto` entity or add `photo` field to Group entity
 - New `POST /api/groups/{id}/photo` endpoint
 - File type validation (JPG/JPEG/PNG only)
-- Size limit (spec doesn't specify, reasonable default: 5MB like user avatars)
+- Size limit (2 MB, same content-based `AvatarValidator` limit as user avatars; oversize → 413 — decision finalized in T087/review, replacing the originally sketched 5MB default)
 
 **Frontend changes needed**:
 - Group photo upload component (similar to AvatarUploader but for groups)

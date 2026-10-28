@@ -47,7 +47,7 @@ This quickstart guide provides runnable validation scenarios to prove the groups
 3. Verify response shows member added with `role: "MEMBER"`
 4. Verify `GET /api/groups/{groupId}` shows updated `memberCount`
 
-**Expected outcome**: Registered friend added as member; member count increases. Un usuario que NO es amigo del caller no puede agregarse (llega el motivo del rechazo).
+**Expected outcome**: Registered friend added as member; member count increases. Un usuario que NO es amigo del caller no puede agregarse: se responde con un **404 neutral** ("La persona que querés agregar no está entre tus amigos") que informa el motivo del rechazo sin confirmar si el usuario existe.
 
 ### Scenario 3: Add Simulated Profile (Perfil Simulado)
 
@@ -173,7 +173,7 @@ This quickstart guide provides runnable validation scenarios to prove the groups
 **Prerequisite**: Group created
 
 **Steps**:
-1. `POST /api/groups/{groupId}/photo` with multipart/form-data containing a JPG or PNG file (≤5MB)
+1. `POST /api/groups/{groupId}/photo` with multipart/form-data containing a JPG or PNG file (≤2MB; oversize → 413)
 2. Verify response shows `photo` field with filename/URL
 3. Verify the group photo appears in `GET /api/groups/{groupId}`
 4. Test with invalid file type (GIF) — should return 400 error
@@ -197,18 +197,43 @@ This quickstart guide provides runnable validation scenarios to prove the groups
 
 | Scenario | Expected HTTP Status | Expected Response Key |
 |---|---|---|
-| Unauthenticated access | 401 | `error` or authentication header missing |
-| Group not found | 404 | `error` or `not found` |
-| Not an admin | 403 | `error: "No sos admin de este grupo"` |
-| Validation error | 400 | `error` with field details |
-| Pending debts blocking operation | 403 | `error: "No tenés saldos pendientes"` or similar |
-| Last admin protection | 403 | `error: "Siempre debe quedar un admin"` |
+| Unauthenticated access | 401 | `detail` (ProblemDetail authentication) |
+| Group not found | 404 | `detail: "No existe el grupo solicitado o no sos miembro"` (neutral) |
+| Not an admin | 403 | `detail: "No sos admin de este grupo"` |
+| Validation error | 400 | `fields` with field details |
+| Pending debts blocking a baja (US4) | 403 | `detail: "No se permite la baja: la persona tiene deudas pendientes con otros miembros del grupo"` |
+| Pending debts blocking leaving (US5) | 403 | `detail: "No podés abandonar el grupo: tenés saldos pendientes con otros miembros"` |
+| Last admin protection (US5/US10) | 403 | `detail: "Sos el último administrador: asigná otro administrador antes de salir"` |
+| Removing another ADMIN (US4) | 403 | `detail: "No podés eliminar directamente a otro administrador: primero quitale el rol"` |
 
 ## Running the Validations
 
 These scenarios can be tested using:
-- **curl** (JWT es cookie, mecanismo existente): `curl -X POST --cookie "jwt=<token>" -H "Content-Type: application/json" -d '{"name": "Test", "members": [{"memberType": "REGISTERED", "identifier": "amigo@ejemplo.com"}]}' http://localhost:8080/api/groups`
+- **curl** (La sesión viva es la cookie HttpOnly `amano_auth`, mecanismo existente — first login to obtain it):
+  `curl -c cookies.txt -X POST -H "Content-Type: application/json" -d '{"email":"...","password":"..."}' http://localhost:8081/api/auth/login`
+  `curl -X POST --cookie cookies.txt -H "Content-Type: application/json" -d '{"name": "Test", "member": {"memberType": "REGISTERED", "identifier": "amigo@ejemplo.com"}}' http://localhost:8081/api/groups`
 - **Postman**: Import the collection using the endpoints above
 - **Frontend**: Use the groups-management UI components after frontend integration
 
 All scenarios assume the backend is running with the groups-management Flyway migrations applied and the frontend is connected to the same API base URL.
+
+## Validation Results (T090, executed 2026-10-28 against the dockerized stack: backend image built from this branch, Flyway schema v11, API via `http://localhost:8081`)
+
+Sesiones: cookies `amano_auth` HttpOnly (`ana/beto/carla/dana@amano.dev`, `Passw0rd!`). Grupo de prueba creado en S1: **id=2 "Amigos para viajar"**. Seed real: group id=1 "Departamento compartido 2026" con ana/beto ADMIN y carla dada de baja.
+
+| # | Escenario | Resultado | Cómo se validó |
+|---|-----------|-----------|----------------|
+| 1 | Create a group | ✅ PASS | `POST /api/groups` (ana): 201 con `id:2`, `creatorRole:ADMIN`, `membersCount:2` (ana + dana del stub). |
+| 2 | Add a friend (Registered) | ✅ PASS | `GET candidates?q=car` devolvió solo amigos del stub (carla); `POST members` agregó a beto (201/ADDED); outsider no-amigo (`ifabregat@fi.uba.ar`) → **404 neutral** `"La persona que querés agregar no está entre tus amigos"` (la respuesta no confirma si el usuario existe; ver Motivos de rechazo en spec.md — esta redacción reemplaza la anotación previa que señalaba ambigüedad). |
+| 3 | Add a simulated profile | ✅ PASS | `POST members` `memberType:SIMULATED` (sin cuenta): 201, aparece en la lista sin fila activa en `group_members` (perfil creado con nombre "Juan Simulado"). |
+| 4 | Casillas (permissions) | ✅ PASS | `PUT /api/groups/2` con todas las casillas: persistidas y visibles en `GET /api/groups/2` (`memberCount` recalculado, `membersCannotInvite` on). Casilla `members_cannot_invite` **enforced**: MEMBER (carla) → 403 `"No podés invitar gente a este grupo"`; ADMIN ignora la casilla. Casilla `members_cannot_make_expenses`: **sin endpoint de gastos todavía** — enforced sólo en la tabla + hook-point del módulo futuro (validado vía unit tests T063). |
+| 5 | Assign admin role | ✅ PASS | `POST /api/groups/2/members/2/admin` → `{"newRole":"ADMIN","previousRole":"MEMBER","success":true}`. |
+| 6 | Permissions restrict members | ✅ PASS (parcial) | Ver S4: la casilla de invitación bloquea al MEMBER end-to-end. La casilla de gastos queda **sin verificar end-to-end** (módulo de gastos no existe). |
+| 7 | Leave group (member) | ✅ PASS | `POST/DELETE leave` de dana → `{groupLeft:true}`, `left_at` set en DB, el grupo persiste (`memberCount` baja de 5 a 4) y ana/beto siguen. **Nota**: con el stub `NoOpDebtPort` (deudas siempre 0) el caso "no puede salir por deudas" no dispara end-to-end; cubierto por unit tests T063/T055 (403 `"No podés abandonar el grupo: tenés saldos pendientes con otros miembros"`). |
+| 8 | Remove member | ✅ PASS | `DELETE /api/groups/2/members/3` (beto ADMIN): `{removed:true}`, `left_at` de carla seteado, actividad `MEMBER_REMOVED` registrada. |
+| 9 | Pending debts block removal | ⚠️ Stub only | La ruta de deudas > 0 no es alcanzable end-to-end con `NoOpDebtPort` (siempre 0). Cubierto con unit tests mockeando `DebtPort` (403 `"No se permite la baja: la persona tiene deudas pendientes con otros miembros del grupo"`). |
+| 10 | Last admin protection | ✅ PASS | Con dos ADMIN: revocar a ana OK (quedó MEMBER). Intentos siguientes: revocación por un no-admin → 403 `"No sos admin de este grupo"`; auto-revocación del último ADMIN → 403 `"Sos el último administrador: asigná otro administrador antes de salir"` (`code:LAST_ADMIN`). |
+| 11 | Group photo | ✅ PASS | `POST /api/groups/2/photo` PNG (magic bytes reales): 200 `{photo:"/api/groups/2/photo?v=...",updatedAt}`, `GET photo` → 200 `image/png`. GIF (magic `GIF`) → 400 `"El archivo debe ser una imagen JPG o PNG válida"` con `fields`. MEMBER activo → 403 `"Solo un administrador puede cambiar la foto del grupo"`; ex-miembro → 404 neutral. |
+| 12 | Activity history persistence | ✅ PASS | `GET /api/groups/2/activity`: 7 entradas en orden descendente (`MEMBER_REMOVED`, `PHOTO_CHANGED`, `MEMBER_LEFT`, `PERMISSION_CHANGED`, 3× `MEMBER_ADDED`); tras remover a carla las entradas previas se preservan. `eventType` filter + paginación via unit/IT. |
+
+**Sin verificar end-to-end por stubs**: escenarios 9 y parte del 6 (deudas, vía `NoOpDebtPort`) y el flujo real de amistades (vía `NoOpFriendshipPort` con la lista de emails de `GROUPS_FRIENDSHIP_STUBFRIENDEMAILS`). Ambos quedan cubiertos por tests unitarios que mockean los ports.

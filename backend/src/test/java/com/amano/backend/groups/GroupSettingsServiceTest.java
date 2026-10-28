@@ -53,6 +53,7 @@ class GroupSettingsServiceTest {
         friendshipPort = Mockito.mock(com.amano.backend.groups.port.FriendshipPort.class);
         userRepository = Mockito.mock(UserRepository.class);
         permissionChecker = Mockito.mock(GroupPermissionChecker.class);
+        when(permissionChecker.canViewGroup(Mockito.anyString(), any())).thenReturn(true);
         activityEventService = Mockito.mock(ActivityEventService.class);
 
         service = new GroupService(groupRepository, groupMemberRepository, simulatedProfileRepository,

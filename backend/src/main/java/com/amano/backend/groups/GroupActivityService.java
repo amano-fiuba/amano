@@ -24,12 +24,18 @@ public class GroupActivityService {
     private final GroupActivityRepository activityRepository;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupPermissionChecker groupPermissionChecker;
+    private final GroupPermissionsRepository groupPermissionsRepository;
 
     public GroupActivityService(GroupActivityRepository activityRepository, UserRepository userRepository,
-            GroupMemberRepository groupMemberRepository) {
+            GroupMemberRepository groupMemberRepository,
+            GroupPermissionChecker groupPermissionChecker,
+            GroupPermissionsRepository groupPermissionsRepository) {
         this.activityRepository = activityRepository;
         this.userRepository = userRepository;
         this.groupMemberRepository = groupMemberRepository;
+        this.groupPermissionChecker = groupPermissionChecker;
+        this.groupPermissionsRepository = groupPermissionsRepository;
     }
 
     /**
@@ -39,10 +45,14 @@ public class GroupActivityService {
     @Transactional(readOnly = true)
     public ActivityHistoryResponse getHistory(Long callerId, Long groupId, Integer page, Integer size,
             String eventType) {
-        groupMemberRepository.findByIdGroupIdAndIdUserId(groupId, callerId)
-                .filter(membership -> membership.getLeftAt() == null)
+        GroupMember membership = groupMemberRepository.findByIdGroupIdAndIdUserId(groupId, callerId)
+                .filter(row -> row.getLeftAt() == null)
                 .orElseThrow(() -> new GroupNotFoundException(
                         "No existe el grupo solicitado o no sos miembro"));
+        if (!groupPermissionChecker.canViewGroup(membership.getRole(),
+                permissionsOf(groupId))) {
+            throw new GroupPermissionDeniedException("No podés ver el historial de este grupo");
+        }
         Pageable pageable = PageRequest.of(normalizedPage(page), normalizedSize(size));
         boolean filtered = eventType != null && !eventType.isBlank();
         Page<GroupActivity> result =
@@ -74,8 +84,11 @@ public class GroupActivityService {
                 event.getDetailsJson(), event.getCreatedAt());
     }
 
-    private static int normalizedPage(Integer page) {
-        if (page == null || page < 1) {
+    private GroupPermissions permissionsOf(Long groupId) {
+        return groupPermissionsRepository.findByGroupId(groupId).orElse(null);
+    }
+
+    private static int normalizedPage(Integer page) {        if (page == null || page < 1) {
             return 0;
         }
         return page - 1;
