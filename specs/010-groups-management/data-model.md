@@ -175,7 +175,9 @@ User (1)─(N) GroupMember (N)─(1) Group
 
 Group (1)─(1) GroupPermissions
      │
-     │ (1) GroupPhoto (via Group.photo field, optional)
+     │ (1─0..1) GroupPhoto — bytes in `group_photos` (PK = group_id; 2 MB
+     │          AvatarValidator limit w/ 413; `groups.photo` stores only
+     │          the serving URL, NULLable → gray default)
      │
      │ (N) GroupActivity
      │
@@ -194,6 +196,7 @@ New migrations required for:
 3. `V###__Create_simulated_profiles_table.sql` — Create SimulatedProfile entity
 4. `V###__Create_group_permissions_table.sql` — Create GroupPermissions entity
 5. `V###__Create_group_activity_table.sql` — Create GroupActivity entity
+6. `V11__create_group_photos_table.sql` — Create `group_photos` (US8, added during implementation): one row per group, `group_id` BIGINT PK + FK → `groups(id)` ON DELETE CASCADE, `content_type` VARCHAR(50) NOT NULL CHECK IN ('image/jpeg','image/png'), `data` BYTEA NOT NULL CHECK (octet_length(data) <= 2097152 — the 2 MB `AvatarValidator` limit, 413 when exceeded), `updated_at` TIMESTAMPTZ NOT NULL DEFAULT NOW(). `groups.photo` keeps only a URL reference (`/api/groups/{id}/photo?v=<fingerprint>`, NULLable = no photo → gray default avatar); the bytes live exclusively in `group_photos`, mirroring the existing `user_avatars` mechanism.
 
 Existing migrations should NOT be modified. New migrations follow the `V<version>__<description>.sql` naming convention used by the project.
 

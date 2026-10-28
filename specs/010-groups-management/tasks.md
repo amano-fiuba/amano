@@ -33,7 +33,7 @@ description: "Task list for groups-management feature implementation"
 
 - **Backend main**: `backend/src/main/java/com/amano/backend/groups/` (new package `groups`)
 - **Backend tests**: `backend/src/test/java/com/amano/backend/groups/`
-- **Flyway migrations**: `backend/src/main/resources/db/migration/` (next versions: V6–V10; existing tail is V5)
+- **Flyway migrations**: `backend/src/main/resources/db/migration/` (next versions: V6–V11; existing tail is V5)
 - **Frontend views**: `frontend/src/pages/groups/` and `frontend/src/components/groups/`
 - **Frontend tests**: `.test.jsx` next to each component
 
@@ -43,7 +43,7 @@ description: "Task list for groups-management feature implementation"
 
 **Purpose**: Verify existing infrastructure — nothing new to initialize.
 
-- [X] T001 Verify Flyway migration numbering: current tail is `V5__expense_recurrence.sql`; confirm new migrations must use V6–V10 in `backend/src/main/resources/db/migration/` and existing migrations are not modified
+- [X] T001 Verify Flyway migration numbering: current tail is `V5__expense_recurrence.sql`; confirm new migrations must use V6–V11 (6 migrations for this module, including `V11__create_group_photos_table.sql` for US8 bytes) in `backend/src/main/resources/db/migration/` and existing migrations are not modified
 - [X] T002 [P] Verify existing JWT cookie authentication and user resolution (existente in `com.amano.backend.auth`) exposes the current authenticated user to new group endpoints without new configuration
 - [X] T003 [P] Verify frontend test setup (Vitest, `.test.jsx`, `npm run test:coverage` in `frontend/package.json`) and backend test commands (`mvn -B verify`, JaCoCo ≥85% in `backend/pom.xml`)
 
@@ -392,4 +392,4 @@ Task: "CreateGroupView.jsx + GroupListView.jsx + GroupInfoView.jsx in frontend/s
 - Each story phase ends with a checkpoint for independent validation
 - Fixtures: `*Test` = fast (Mockito/JPA), `*IT` = Testcontainers against real PostgreSQL
 - Artifacts/UI strings in Spanish; code identifiers and file names in English
-- Do not modify existing migrations; do not reuse them beyond reading — feature only adds V6–V10
+- Do not modify existing migrations; do not reuse them beyond reading — feature only adds V6–V11

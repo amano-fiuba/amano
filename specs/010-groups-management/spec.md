@@ -89,7 +89,7 @@
 ### User Story 9 - Ver historial de actividad del grupo
 **Priority**: P1
 
-**Describe this user journey in plain language**: Se muestra el historial de actividad del grupo (todos los miembros), incluyendo altas y bajas de miembros, gastos y pagos. Cada entrada indica quién la hizo y cuándo. El orden es cronológico descendente (más reciente primero). El historial se conserva aunque el elemento relacionado luego se modifique o elimine.
+**Describe this user journey in plain language**: Se muestra el historial de actividad del grupo (todos los miembros), incluyendo altas y bajas de miembros, gastos y pagos. Cada entrada indica quién la hizo y cuándo. El orden es cronológico descendente (más reciente primero): `created_at DESC` y, ante empate de timestamp, `id DESC` (el identificador de inserción desempata de forma determinista). El historial se conserva aunque el elemento relacionado luego se modifique o elimine.
 
 **Why this priority**: The activity history provides transparency and accountability for all group actions.
 
@@ -206,7 +206,7 @@
 La integración de gastos y pagos con grupos queda para un **módulo posterior**. En este módulo de gestión de grupos:
 
 - Las casillas de permisos `Miembros no pueden hacer gastos`, `Miembros pueden generar gastos en nombre de otras personas` y `Los pagos requieren validación` **se crean, se guardan y se aplican como configuración**, pero su comportamiento gatillado (grabar gastos en un grupo, generar gastos en nombre de otros, validar pagos) se implementa cuando exista la integración de gastos por grupo.
-- El historial de actividad de este módulo registra **solo altas y bajas de miembros** (más cambios de permisos y de foto). Los tipos de evento `EXPENSE_CREATED` y `PAYMENT_MADE` quedan definidos como **puntos de enganche** sin implementación; los escenarios de historial que los mencionan (US9) se completarán con el módulo de gastos.
+- El historial de actividad de este módulo registra **solo altas y bajas de miembros** (más cambios de permisos y de foto). Los tipos de evento `EXPENSE_CREATED` y `PAYMENT_MADE` quedan definidos como **puntos de enganche** sin implementación; los escenarios de historial que los mencionan (US9) se completarán con el módulo de gastos. A nivel de base de datos, el CHECK de `event_type` en `group_activity` ya declara los **7 valores** del enum (`MEMBER_ADDED`, `MEMBER_REMOVED`, `MEMBER_LEFT`, `PERMISSION_CHANGED`, `PHOTO_CHANGED`, `EXPENSE_CREATED`, `PAYMENT_MADE`): los hook points están contemplados en la migración V10 para que el módulo de gastos no necesite alterar la tabla.
 - Mientras tanto, el historial muestra únicamente las entradas de altas y bajas de miembros (y de configuración si las hubo).
 
 ### Conservación de los gastos
