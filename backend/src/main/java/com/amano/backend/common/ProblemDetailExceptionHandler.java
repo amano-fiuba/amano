@@ -232,6 +232,24 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Adding a registered member outside the friendship relation (US1/US3): one neutral 404. */
+    @ExceptionHandler(com.amano.backend.groups.NotFriendException.class)
+    public ProblemDetail handleNotFriend(com.amano.backend.groups.NotFriendException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("No encontrado");
+        return problem;
+    }
+
+    /** The group does not exist or the caller is not a member (US1 detail): one neutral 404. */
+    @ExceptionHandler(com.amano.backend.groups.GroupNotFoundException.class)
+    public ProblemDetail handleGroupNotFound(com.amano.backend.groups.GroupNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Grupo no encontrado");
+        return problem;
+    }
+
     /** Framework 404s must not be swallowed by the generic 500 handler (contract "Errores"). */
     @ExceptionHandler({ NoHandlerFoundException.class, NoResourceFoundException.class })
     public ProblemDetail handleNoHandlerFound(Exception exception) {

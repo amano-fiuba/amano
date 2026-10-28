@@ -16,6 +16,9 @@ import ChangePasswordPage from './pages/ChangePasswordPage'
 import UsersSearchPage from './pages/UsersSearchPage'
 import NewExpensePage from './pages/NewExpensePage'
 import RecurringExpensesPage from './pages/RecurringExpensesPage'
+import GroupListView from './pages/groups/GroupListView'
+import CreateGroupView from './pages/groups/CreateGroupView'
+import GroupInfoView from './pages/groups/GroupInfoView'
 import SiteNav from './components/SiteNav'
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
@@ -68,6 +71,31 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <UsersSearchPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Grupos (specs/010-groups-management, US1): listado, creación y detalle. */}
+      <Route
+        path="/groups"
+        element={
+          <ProtectedRoute>
+            <GroupListView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/new"
+        element={
+          <ProtectedRoute>
+            <CreateGroupView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/:id"
+        element={
+          <ProtectedRoute>
+            <GroupInfoView />
           </ProtectedRoute>
         }
       />
