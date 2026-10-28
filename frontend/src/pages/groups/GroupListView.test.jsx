@@ -14,15 +14,44 @@ beforeEach(() => {
   listGroups.mockReset()
 })
 
-function renderView() {
+function renderView(entry = '/groups') {
   return render(
-    <MemoryRouter initialEntries={['/groups']}>
+    <MemoryRouter initialEntries={[entry]}>
       <GroupListView />
     </MemoryRouter>,
   )
 }
 
 describe('GroupListView (T029/T031 read view)', () => {
+  it('muestra la bienvenida de cuenta verificada cuando llega con state verifiedWelcome', async () => {
+    listGroups.mockResolvedValue({ ok: true, groups: [] })
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: '/groups', state: { verifiedWelcome: true } },
+        ]}
+      >
+        <GroupListView />
+      </MemoryRouter>,
+    )
+
+    expect(
+      await screen.findByTestId('groups-verified-welcome'),
+    ).toBeInTheDocument()
+  })
+
+  it('no muestra la bienvenida sin state de verificación', async () => {
+    listGroups.mockResolvedValue({ ok: true, groups: [] })
+
+    renderView()
+
+    await screen.findByTestId('groups-empty')
+    expect(
+      screen.queryByTestId('groups-verified-welcome'),
+    ).not.toBeInTheDocument()
+  })
+
   it('renderiza los grupos con foto, nombre y rol del usuario', async () => {
     listGroups.mockResolvedValue({
       ok: true,

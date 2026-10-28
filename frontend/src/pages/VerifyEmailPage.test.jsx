@@ -13,9 +13,10 @@ vi.mock('../auth/AuthContext', () => ({
 }))
 
 // US2 contract (task T029, TDD: written BEFORE the implementation): a valid
-// token signs the user in and lands on the dashboard (FR-005); 400 shows the
-// exact invalid message (FR-008); 409 the already-used one (FR-007); 410 is
-// routed to the expired screen (FR-006); a missing token is invalid too.
+// token signs the user in and lands on /groups (primer paso tras el registro,
+// specs/010-groups-management); 400 shows the exact invalid message (FR-008);
+// 409 the already-used one (FR-007); 410 is routed to the expired screen
+// (FR-006); a missing token is invalid too.
 const PROFILE = { id: 7, firstName: 'Ana', email: 'ana.perez@example.com' }
 
 beforeEach(() => {
@@ -45,18 +46,19 @@ function renderPage(initialEntry) {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/verify-email/expired" element={<div>PANTALLA EXPIRADO</div>} />
         <Route path="/dashboard" element={<div>DASHBOARD</div>} />
+        <Route path="/groups" element={<div>GRUPOS</div>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
 describe('VerifyEmailPage (T029)', () => {
-  it('token válido: setUser con el perfil y navegación al dashboard (FR-005)', async () => {
+  it('token válido: setUser con el perfil y navegación a /groups con bienvenida verificada', async () => {
     stubFetch(200, PROFILE)
 
     renderPage('/verify-email?token=token-valido')
 
-    expect(await screen.findByText('DASHBOARD')).toBeInTheDocument()
+    expect(await screen.findByText('GRUPOS')).toBeInTheDocument()
     expect(setUser).toHaveBeenCalledWith(PROFILE)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       '/api/auth/verify-email',

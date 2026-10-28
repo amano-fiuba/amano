@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { AuthProvider, useAuth } from '../auth/AuthContext'
 import RegisterPage from './RegisterPage'
-import DashboardPage from '../pages/DashboardPage'
 import ProtectedRoute from '../auth/ProtectedRoute'
 
 // The auth client is task T021: mocked here so the page contract is defined
@@ -54,10 +53,10 @@ function setupApp() {
             }
           />
           <Route
-            path="/dashboard"
+            path="/groups"
             element={
               <ProtectedRoute>
-                <DashboardPage />
+                <div data-testid="groups-page">Mis grupos</div>
               </ProtectedRoute>
             }
           />
