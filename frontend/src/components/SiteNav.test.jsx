@@ -38,7 +38,7 @@ describe('SiteNav', () => {
       'href',
       '/register',
     )
-    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
   })
 
   it('muestra los accesos de la app con sesión iniciada', () => {
@@ -48,9 +48,9 @@ describe('SiteNav', () => {
     expect(
       screen.getByRole('navigation', { name: 'Navegación principal' }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Mi perfil' })).toHaveAttribute(
       'href',
-      '/dashboard',
+      '/profile',
     )
     expect(screen.getByRole('link', { name: 'Registrar gasto' })).toHaveAttribute(
       'href',
@@ -64,6 +64,10 @@ describe('SiteNav', () => {
       'href',
       '/expenses/recurring',
     )
+    expect(screen.getByRole('link', { name: 'Grupos' })).toHaveAttribute(
+      'href',
+      '/groups',
+    )
     expect(
       screen.queryByRole('link', { name: 'Registrarse' }),
     ).not.toBeInTheDocument()
@@ -76,7 +80,7 @@ describe('SiteNav', () => {
     expect(screen.getByRole('link', { name: 'Registrar gasto' })).toHaveClass(
       'is-active',
     )
-    expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveClass(
+    expect(screen.getByRole('link', { name: 'Mi perfil' })).not.toHaveClass(
       'is-active',
     )
   })
@@ -95,6 +99,14 @@ describe('SiteNav', () => {
 
     expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).toHaveClass('is-active')
     expect(screen.getByRole('link', { name: 'Registrar gasto' })).not.toHaveClass('is-active')
+  })
+
+  it('resalta grupos cuando se está en /groups (010)', () => {
+    useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
+    renderNav('/groups')
+
+    expect(screen.getByRole('link', { name: 'Grupos' })).toHaveClass('is-active')
+    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).not.toHaveClass('is-active')
   })
 
   it('resalta el inicio en la landing pública', () => {
