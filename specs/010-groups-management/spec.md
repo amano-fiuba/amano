@@ -1,10 +1,12 @@
 # Feature Specification: groups-management
 
-**Feature Branch**: `feat/groups-management`
+**Feature Branch**: `feat/groups-management` (integración a `sprint-n` por PR, según constitución)
 
-**Created**: [DATE]
+**Created**: 2026-10-23
 
-**Status**: Draft
+**Last Updated**: 2026-10-27
+
+**Status**: Aprobada — lista para implementación (plan.md completo; artifacts Fase 0/1 y tasks.md alineados)
 
 **Input**: User description: "Módulo 'groups-management': gestión de grupos de gastos compartidos, sus miembros, roles y permisos, dentro de una app web y móvil de gestión de gastos personales y compartidos (herramienta para organizar gastos, acordar quién debe a quién y saldar deudas sin fricción; no es billetera, banco ni red social/chat)."
 
@@ -193,3 +195,38 @@
 - Q: What happens if the last administrator abandons the group or se le quita el rol? → A: Se bloquea que el último admin abandone o pierda el rol; debe asignar antes el rol de Administrador a otro miembro.
 - Q: ¿Se puede eliminar/disolver un grupo? ¿Quién y en qué condiciones? → A: En esta versión no hay disolución de grupos; el grupo persiste mientras tenga al menos un miembro activo y conserva su historial. La salida se resuelve con Abandonar grupo y Eliminar miembros. La disolución queda como mejora futura.
 - Q: Un perfil simulado puede abandonar o ser eliminado con deudas? ¿Puede el admin eliminar a otro admin directamente? → A: Un perfil simulado no puede abandonar por sí mismo (no tiene cuenta). Lo elimina un admin, o un miembro si la casilla "Miembros pueden administrar perfiles simulados" está activa. Aplica la misma regla de deudas pendientes que a usuarios registrados, con confirmación y registro en el historial. Un admin no puede eliminar directamente a otro admin: primero debe quitarle el rol.
+- Q: ¿Qué valores por defecto tienen las casillas de permisos al crear un grupo? → A: `spec.md` (FR-005) no las define; decisión acordada (2026-10-27): **todas las casillas en false** (CANNOT/REQUIRE desactivadas), es decir, sin restricciones activas al crear el grupo; el Administrador las activa explícitamente desde la configuración de permisos.
+
+---
+
+## Alcance y limitaciones
+
+### Integración de gastos y pagos (módulo posterior)
+
+La integración de gastos y pagos con grupos queda para un **módulo posterior**. En este módulo de gestión de grupos:
+
+- Las casillas de permisos `Miembros no pueden hacer gastos`, `Miembros pueden generar gastos en nombre de otras personas` y `Los pagos requieren validación` **se crean, se guardan y se aplican como configuración**, pero su comportamiento gatillado (grabar gastos en un grupo, generar gastos en nombre de otros, validar pagos) se implementa cuando exista la integración de gastos por grupo.
+- El historial de actividad de este módulo registra **solo altas y bajas de miembros** (más cambios de permisos y de foto). Los tipos de evento `EXPENSE_CREATED` y `PAYMENT_MADE` quedan definidos como **puntos de enganche** sin implementación; los escenarios de historial que los mencionan (US9) se completarán con el módulo de gastos.
+- Mientras tanto, el historial muestra únicamente las entradas de altas y bajas de miembros (y de configuración si las hubo).
+
+### Conservación de los gastos
+
+Los **gastos pertenecen a la persona que los registró** (usuario), no al grupo. "Los gastos previos se conservan" (FR-011, FR-015) significa que al eliminar un miembro o al abandonar un grupo **no se elimina ningún gasto**: la eliminación/salida se realiza con baja lógica de la membresía y los gastos del usuario quedan intactos. La asociación gasto–grupo (qué gastos pertenece a qué grupo, y su visibilidad en el historial del grupo) la definirá el módulo de gastos por grupo; en este módulo no se modela esa relación.
+
+### Reglas de deudas pendientes (con stub)
+
+Las reglas de deudas pendientes de FR-010 y FR-014 se implementan contra un **puerto de consulta de deudas** (`DebtPort`, en `com.amano.backend.groups.port`) con un **stub hasta que exista el módulo de deudas**. Mientras exista el stub:
+
+- Las verificaciones de deudas responden siempre "sin deudas pendientes", por lo que FR-010 y FR-014 quedan implementadas en su estructura pero sin efecto observable end-to-end.
+- Los casos de deudas pendientes solo son verificables con tests unitarios que reemplazan el stub (mock del puerto).
+- Al implementarse el módulo de deudas, se conecta a este puerto sin cambiar las reglas o historias de este módulo.
+
+### Motivos de rechazo documentados (FR-008 y afines)
+
+Cuando una operación se rechaza, el sistema informa el motivo con un mensaje claro en la UI. Los motivos de rechazo que este módulo debe reportar son, exactamente:
+
+1. **Ya es miembro**: la persona a agregar ya pertenece al grupo (FR-007).
+2. **Deudas pendientes**: la persona tiene deudas pendientes con otros miembros del grupo (FR-010 y reglas de perfiles simulados).
+3. **No es amigo**: la persona a agregar no está en la relación de amistad del usuario (FR-006; solo se puede agregar entre amigos).
+4. **Último admin**: la operación dejaría al grupo sin administrador activo (abandono del último admin o quita de su rol).
+5. **Admin: primero quitar el rol**: un administrador no puede eliminar directamente a otro administrador (US10/Clarifications); se exige revocarle el rol antes de la baja.

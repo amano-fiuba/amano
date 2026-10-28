@@ -71,7 +71,7 @@ No existing Group entity found. Must be created from scratch.
 
 **Fields for Group entity**:
 - `id` (Long, generated)
-- `name` (String, 2-50 chars, required)
+- `name` (String/VARCHAR(255), required and non-empty — **sin unicidad ni límite 2-50**: decisión 2026-10-27, el spec solo exige obligatorio/no vacío)
 - `description` (String, optional, 200 chars)
 - `photo` (String, URL or file reference, JPG/JPEG/PNG only)
 - `createdAt` (OffsetDateTime)
@@ -80,17 +80,18 @@ No existing Group entity found. Must be created from scratch.
 **Group-Membership join table** (`group_members`):
 - `user_id` (Long, FK to users)
 - `group_id` (Long, FK to groups)
-- `role` (ENUM: ADMIN, MEMBER)
+- `role` (VARCHAR + CHECK: ADMIN, MEMBER — no native ENUM)
 - `joinedAt` (OffsetDateTime)
+- `leftAt` (OffsetDateTime, nullable — baja lógica: la fila se conserva para trazabilidad de gastos previos e historial; membresía activa = `left_at` IS NULL)
 
-### 2. Simulated Profile (Perfil Simulado / Invitado)
-The spec defines "perfil simulado" as a person within a group without a registered account (has name and email, no full user account).
+### 2. Simulated Profile (Perfil Simulado)
+The spec defines "perfil simulado" as a person within a group without a registered account (has name and email, no full user account). **Terminología acordada: "perfil simulado" (no "invitado").**
 
 **Design options:**
 - **Option A**: Create `SimulatedProfile` entity linked to Group, with `name`, `email`, `createdAt`
 - **Option B**: Use a flag on the group-members table (e.g., `is_simulated = true`) with name/email columns
 
-**Decision**: Option A — separate `SimulatedProfile` entity. This cleanly separates invited guests from registered users and matches the spec's distinction between "usuarios registrados" and "perfiles simulados." The spec says simulated profiles have "nombre y mail, sin registrarse."
+**Decision**: Option A — separate `SimulatedProfile` entity. This cleanly separates simulated profiles from registered users and matches the spec's distinction between "usuarios registrados" and "perfiles simulados." The spec says simulated profiles have "nombre y mail, sin registrarse." Simulated profiles do **not** get a `group_members` row (no user account); they are members of the group implicitly via `group_id`, counted as active members alongside `group_members` rows with `left_at` IS NULL, and their removal is a physical DELETE of the row recorded as `MEMBER_REMOVED`.
 
 **Fields for SimulatedProfile**:
 - `id` (Long, generated)
@@ -134,12 +135,12 @@ The spec defines these permission checkboxes for members:
 **Fields for GroupPermissions**:
 - `id` (Long, generated)
 - `group_id` (Long, FK to groups, unique)
-- `members_cannot_make_expenses` (boolean, default: true/follow config)
-- `members_cannot_invite` (boolean, default: true)
-- `members_cannot_edit_settings` (boolean, default: true)
+- `members_cannot_make_expenses` (boolean, default: false — `spec.md` no define defaults; decisión 2026-10-27: todas las casillas en false)
+- `members_cannot_invite` (boolean, default: false)
+- `members_cannot_edit_settings` (boolean, default: false)
 - `members_can_manage_simulated_profiles` (boolean, default: false)
 - `members_can_generate_expenses_for_others` (boolean, default: false)
-- `payments_require_validation` (boolean, default: true)
+- `payments_require_validation` (boolean, default: false)
 
 ### 5. Activity History Design
 The spec says: "Ver el historial de actividad del grupo (todos los miembros): altas y bajas de miembros, gastos y pagos; cada entrada indica quién la hizo y cuándo; orden cronológico descendente; se conserva aunque el elemento relacionado luego se modifique o elimine."
@@ -149,7 +150,7 @@ The spec says: "Ver el historial de actividad del grupo (todos los miembros): al
 **Fields for GroupActivity**:
 - `id` (Long, generated)
 - `group_id` (Long, FK to groups)
-- `event_type` (ENUM: MEMBER_ADDED, MEMBER_REMOVED, EXPENSE_CREATED, PAYMENT_MADE, PERMISSION_CHANGED, PHOTO_CHANGED)
+- `event_type` (VARCHAR + CHECK: MEMBER_ADDED, MEMBER_REMOVED, MEMBER_LEFT, PERMISSION_CHANGED, PHOTO_CHANGED, EXPENSE_CREATED, PAYMENT_MADE — gastos y pagos quedan como puntos de enganche **sin implementarse en este módulo**)
 - `actor_user_id` (Long, FK to users who performed the action, nullable for system actions)
 - `details_json` (JSON or text for additional context)
 - `createdAt` (OffsetDateTime)
@@ -167,9 +168,9 @@ The spec says: "A todo usuario que se incorpora se le asigna automáticamente el
 The spec says: "elegir entre los amigos del usuario (debe ser usuario registrado) o crear un perfil simulado con nombre y mail."
 
 **Integration with existing search**:
-- Backend has `UserRepository.searchVerified()` which searches by firstName, lastName, or email (excluding current user)
-- Frontend has user search component
-- **Decision**: Reuse the existing `UserRepository.searchVerified()` method for finding friends to add to groups. The search results will show registered users who can be added as group members.
+- Backend has `UserRepository.searchVerified()` which searches by firstName, lastName, or email (excluding current user) — **pero busca en TODA la base de usuarios, no solo amigos**
+- No existe un módulo/entidad de amistades en el repo (verificado en Fase 0)
+- **Decision (corregida 2026-10-27, reemplaza la decisión previa de `searchVerified()`)**: FR-006 exige elegir entre **amigos registrados del usuario**; buscar en toda la base es más amplio de lo que permite el spec. Se define el puerto `FriendshipPort.java` (sub-package `com.amano.backend.groups.port`) para consultar la relación de amistad del usuario, con stub `NoOpFriendshipPort.java` (lista vacía por default, configurable vía properties/fixtures para dev/tests) hasta que exista el módulo de amistades. Toda búsqueda de candidatos para agregar miembros pasa por este puerto (nunca por la base completa).
 
 **Frontend integration**: When "agregar miembros" is triggered, show a searchable list of the user's friends (registered users) plus an option to "crear perfil simulado."
 
@@ -201,4 +202,4 @@ The following questions were resolved during the clarification phase (3 question
 | Permission configuration | GroupPermissions entity | Clean separation from member roles; extensible for future needs |
 | Activity history design | GroupActivity entity with standalone rows | Preserves entries even when related elements are modified/deleted, as spec requires |
 | Role assignment | ENUM in group-members join table | Supports "rol por grupo" (different roles in different groups) as spec requires |
-| Friend lookup | Reuse UserRepository.searchVerified() | Leverages existing search infrastructure; no need to duplicate |
+| Friend lookup | `FriendshipPort` (port) + stub configurable hasta que exista el módulo de amistades | FR-006 exige "amigos del usuario"; `searchVerified()` busca en toda la base y no distingue amistades |
