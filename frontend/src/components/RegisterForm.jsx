@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import {
+  PASSWORD_REQUIREMENTS,
   normalizeCbu,
   normalizeEmail,
   trim,
@@ -15,6 +16,7 @@ import {
 import { NETWORK_ERROR_MESSAGE, register } from '../api/authClient'
 import AvatarUploader from './AvatarUploader'
 import CurrencySelector from './CurrencySelector'
+import SubmitButton from './SubmitButton'
 import TextField from './TextField'
 
 // Registration form (tasks T022 + T030; FR-001, FR-008, FR-009, FR-012, FR-013,
@@ -112,7 +114,8 @@ export default function RegisterForm({ onRegistered }) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate>
       <TextField
-        label="Nombre"
+        label="Nombre *"
+        required
         transformOnBlur={blurTransform('firstName', trim)}
         error={errors.firstName?.message}
         {...bindField('firstName', {
@@ -129,8 +132,9 @@ export default function RegisterForm({ onRegistered }) {
       />
 
       <TextField
-        label="Correo electrónico"
+        label="Correo electrónico *"
         type="email"
+        required
         error={errors.email?.message}
         {...bindField('email', {
           required: 'El correo electrónico es obligatorio',
@@ -140,9 +144,11 @@ export default function RegisterForm({ onRegistered }) {
 
       {/* FR-008: hidden by default; TextField offers the Mostrar/Ocultar toggle. */}
       <TextField
-        label="Contraseña"
+        label="Contraseña *"
         type="password"
+        required
         autoComplete="new-password"
+        hint={PASSWORD_REQUIREMENTS}
         error={errors.password?.message}
         {...bindField('password', {
           required: 'La contraseña es obligatoria',
@@ -151,8 +157,9 @@ export default function RegisterForm({ onRegistered }) {
       />
 
       <TextField
-        label="Confirmar contraseña"
+        label="Confirmar contraseña *"
         type="password"
+        required
         autoComplete="new-password"
         error={errors.confirmPassword?.message}
         {...bindField('confirmPassword', {
@@ -174,7 +181,7 @@ export default function RegisterForm({ onRegistered }) {
             type="checkbox"
             {...bindField('acceptTerms', rules(validateAcceptTerms))}
           />
-          Acepto los Términos y Condiciones
+          Acepto los Términos y Condiciones *
         </label>
         {errors.acceptTerms && <p role="alert">{errors.acceptTerms.message}</p>}
       </div>
@@ -189,10 +196,12 @@ export default function RegisterForm({ onRegistered }) {
         </p>
       )}
 
+      <p className="field__hint" data-testid="required-fields-note">
+        Los campos con (*) son obligatorios
+      </p>
+
       {/* FR-015: disabled immediately on submit; re-enabled by RHF on any outcome. */}
-      <button type="submit" disabled={isSubmitting}>
-        Crear cuenta
-      </button>
+      <SubmitButton loading={isSubmitting}>Crear cuenta</SubmitButton>
     </form>
   )
 }

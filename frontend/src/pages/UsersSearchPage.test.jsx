@@ -1,0 +1,228 @@
+import { act, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { AuthProvider } from '../auth/AuthContext'
+import ProtectedRoute from '../auth/ProtectedRoute'
+import UsersSearchPage, { NO_RESULTS_MESSAGE, TOO_SHORT_MESSAGE } from './UsersSearchPage'
+
+// The API client is mocked so each backend outcome is driven explicitly;
+// AuthProvider's session check goes through the global fetch (logged in).
+vi.mock('../api/usersClient', () => ({
+  SEARCH_NETWORK_ERROR_MESSAGE: 'No se pudo completar la búsqueda. Intenta nuevamente',
+  searchUsers: vi.fn(),
+}))
+
+const usersClient = await import('../api/usersClient')
+
+const ME = { id: 1, firstName: 'Camila', email: 'camila@example.com', currencies: [] }
+const ANA = { id: 3, firstName: 'Ana', lastName: 'Pérez', email: 'ana@example.com' }
+const JUAN = { id: 4, firstName: 'Juan', lastName: null, email: 'juan@example.com' }
+
+beforeEach(() => {
+  vi.unstubAllGlobals()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(ME) }),
+  )
+  usersClient.searchUsers.mockReset()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+function renderPage() {
+  return render(
+    <AuthProvider>
+      <MemoryRouter initialEntries={['/users/search']}>
+        <Routes>
+          <Route
+            path="/users/search"
+            element={
+              <ProtectedRoute>
+                <UsersSearchPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/login" element={<div>PANTALLA LOGIN</div>} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
+  )
+}
+
+async function search(user, text) {
+  const input = await screen.findByLabelText('Nombre, apellido o email')
+  await user.clear(input)
+  if (text) {
+    await user.type(input, text)
+  }
+  await user.click(screen.getByRole('button', { name: 'Buscar' }))
+}
+
+describe('UsersSearchPage (feature 008)', () => {
+  it('muestra el título, el campo y el botón Buscar dentro de la tarjeta de página', async () => {
+    renderPage()
+
+    expect(await screen.findByRole('heading', { name: 'Buscar usuarios' })).toBeInTheDocument()
+    expect(screen.getByRole('main')).toHaveClass('page', 'users-search-page')
+    expect(screen.getByLabelText('Nombre, apellido o email')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Buscar' })).toBeEnabled()
+    expect(screen.getByTestId('search-initial')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['vacío', ''],
+    ['un carácter', 'a'],
+    ['solo espacios', '   '],
+    ['un carácter con espacios', '  a  '],
+  ])('término %s: muestra el aviso y no busca', async (_label, text) => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, text)
+
+    const notice = await screen.findByTestId('search-notice')
+    expect(notice).toHaveTextContent(TOO_SHORT_MESSAGE)
+    expect(notice).toHaveClass('users-search-banner')
+    expect(notice).toHaveAttribute('role', 'alert')
+    expect(usersClient.searchUsers).not.toHaveBeenCalled()
+  })
+
+  it('busca con el término recortado y muestra nombre, email y avatar por defecto', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA, JUAN] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, '  an  ')
+
+    expect(usersClient.searchUsers).toHaveBeenCalledWith('an')
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.getByText('ana@example.com')).toBeInTheDocument()
+    expect(screen.getByText('Juan')).toBeInTheDocument()
+    expect(screen.queryByText(/null/)).not.toBeInTheDocument()
+    const list = screen.getByRole('list', { name: 'Resultados de la búsqueda' })
+    const avatars = list.querySelectorAll('img')
+    expect(avatars).toHaveLength(2)
+    avatars.forEach((img) => expect(img).toHaveAttribute('src', '/avatar-default.png'))
+  })
+
+  it('presenta cada resultado como tarjeta con su acción de agregar', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA, JUAN] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    expect(await screen.findByTestId('user-card-3')).toHaveClass('user-card')
+    expect(screen.getByTestId('user-card-4')).toHaveClass('user-card')
+    expect(screen.getByText('2 resultados')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Agregar a Ana Pérez (próximamente)' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Juan (próximamente)' })).toBeDisabled()
+  })
+
+  it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {
+    let resolveSearch
+    usersClient.searchUsers.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSearch = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    const input = await screen.findByLabelText('Nombre, apellido o email')
+    await user.type(input, 'ana')
+    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+
+    expect(await screen.findByTestId('search-loading')).toBeInTheDocument()
+    const pendingButton = screen.getByRole('button', { name: 'Buscando…' })
+    expect(pendingButton).toBeDisabled()
+    expect(pendingButton).toHaveAttribute('aria-busy', 'true')
+
+    await act(async () => {
+      resolveSearch({ ok: true, users: [ANA] })
+    })
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument()
+  })
+
+  it('también busca al apretar Enter', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText('Nombre, apellido o email'), 'ana{Enter}')
+
+    expect(usersClient.searchUsers).toHaveBeenCalledWith('ana')
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+  })
+
+  it('sin coincidencias muestra "No se encontraron usuarios"', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'zzz')
+
+    const notice = await screen.findByTestId('search-notice')
+    expect(notice).toHaveTextContent(NO_RESULTS_MESSAGE)
+    expect(notice).toHaveClass('users-search-empty')
+    expect(notice).toHaveAttribute('role', 'status')
+    expect(screen.queryByTestId('search-initial')).not.toBeInTheDocument()
+  })
+
+  it('error de red: mensaje fijo, borra resultados previos y permite reintentar', async () => {
+    usersClient.searchUsers
+      .mockResolvedValueOnce({ ok: true, users: [ANA] })
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValueOnce({ ok: true, users: [JUAN] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+
+    await search(user, 'an')
+    const notice = await screen.findByTestId('search-notice')
+    expect(notice).toHaveTextContent('No se pudo completar la búsqueda. Intenta nuevamente')
+    expect(notice).toHaveClass('users-search-banner')
+    expect(notice).toHaveAttribute('role', 'alert')
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+
+    await search(user, 'an')
+    expect(await screen.findByText('Juan')).toBeInTheDocument()
+    expect(usersClient.searchUsers).toHaveBeenCalledTimes(3)
+  })
+
+  it('400 del servidor muestra el mensaje del campo', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: false,
+      status: 400,
+      detail: 'La solicitud contiene campos inválidos',
+      fields: { q: 'La búsqueda no puede superar los 100 caracteres' },
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'ab')
+
+    expect(await screen.findByTestId('search-notice')).toHaveTextContent(
+      'La búsqueda no puede superar los 100 caracteres',
+    )
+  })
+
+  it('401 (sesión vencida): cierra la sesión y lleva al login', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: false, status: 401, detail: '', fields: {} })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
+  })
+})

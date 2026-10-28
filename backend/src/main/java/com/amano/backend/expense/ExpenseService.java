@@ -1,7 +1,10 @@
 package com.amano.backend.expense;
 
 import java.math.BigDecimal;
+import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,6 +29,11 @@ import com.amano.backend.user.Currency;
  * (FR-021/FR-022). An existing {@code (user, Idempotency-Key)} is replayed when
  * the normalized payload matches and rejected with {@code 422} when it differs
  * (FR-027); the unique index is the concurrency backstop.
+ *
+ * <p>Feature 009 (specs/009-pause-recurring-expense): a RECURRING expense requires a
+ * frequency and is saved as the first occurrence of an ACTIVE series whose next date
+ * is the first series date after today, so nothing is generated retroactively
+ * (FR-001..FR-003). A ONE_TIME expense must not carry a frequency.
  */
 @Service
 public class ExpenseService {
@@ -37,6 +45,10 @@ public class ExpenseService {
     private static final String CATEGORY_INVALID = "La categoría no es válida";
     private static final String TYPE_REQUIRED = "El tipo de gasto es obligatorio";
     private static final String TYPE_INVALID = "El tipo de gasto no es válido";
+    private static final String FREQUENCY_REQUIRED =
+            "La frecuencia es obligatoria para un gasto recurrente";
+    private static final String FREQUENCY_INVALID = "La frecuencia no es válida";
+    private static final String FREQUENCY_NOT_ALLOWED = "Un gasto único no puede tener frecuencia";
     private static final String PAYMENT_REQUIRED = "El medio de pago es obligatorio";
     private static final String PAYMENT_INVALID = "El medio de pago no es válido";
     private static final String RESERVED_PROPERTY = "No se permite informar este campo";
@@ -58,7 +70,7 @@ public class ExpenseService {
 
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date,
             ExpenseCategory category, ExpenseType type, PaymentMethod paymentMethod,
-            String description) {
+            String description, RecurrenceFrequency frequency, LocalDate today) {
     }
 
     /**
@@ -86,6 +98,12 @@ public class ExpenseService {
         expense.setPaymentMethod(normalized.paymentMethod());
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
+        if (normalized.frequency() != null) {
+            expense.setRecurrenceFrequency(normalized.frequency());
+            expense.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+            expense.setRecurrenceNextDate(
+                    normalized.frequency().firstAfter(normalized.date(), normalized.today()));
+        }
 
         return new Registration(ExpenseResponse.from(expenseRepository.save(expense)), true);
     }
@@ -119,7 +137,8 @@ public class ExpenseService {
                 && existing.getCategory() == normalized.category()
                 && existing.getType() == normalized.type()
                 && existing.getPaymentMethod() == normalized.paymentMethod()
-                && Objects.equals(existing.getDescription(), normalized.description());
+                && Objects.equals(existing.getDescription(), normalized.description())
+                && existing.getRecurrenceFrequency() == normalized.frequency();
     }
 
     private static NormalizedExpense validateAndNormalize(RegisterExpenseRequest request) {
@@ -136,6 +155,7 @@ public class ExpenseService {
                 "category", CATEGORY_REQUIRED, CATEGORY_INVALID, fieldErrors);
         ExpenseType type = parseCatalog(request.getType(), ExpenseType.class, "type",
                 TYPE_REQUIRED, TYPE_INVALID, fieldErrors);
+        RecurrenceFrequency frequency = parseFrequency(request.getFrequency(), type, fieldErrors);
         PaymentMethod paymentMethod = parseCatalog(request.getPaymentMethod(), PaymentMethod.class,
                 "paymentMethod", PAYMENT_REQUIRED, PAYMENT_INVALID, fieldErrors);
         String descriptionError = ExpenseDescriptionNormalizer.validationError(
@@ -155,7 +175,47 @@ public class ExpenseService {
 
         return new NormalizedExpense(ExpenseAmountNormalizer.normalize(request.getAmount()),
                 currency, date, category, type, paymentMethod,
-                ExpenseDescriptionNormalizer.normalize(request.getDescription()));
+                ExpenseDescriptionNormalizer.normalize(request.getDescription()),
+                frequency, todayOf(request.getDeviceTimeZone()));
+    }
+
+    /**
+     * FR-001/FR-002: a RECURRING type requires a catalog frequency and a ONE_TIME type
+     * rejects any. With an absent or invalid type only the catalog is checked, since
+     * the type error is already reported.
+     */
+    private static RecurrenceFrequency parseFrequency(String raw, ExpenseType type,
+            Map<String, String> fieldErrors) {
+        boolean absent = raw == null || raw.isBlank();
+        if (type == ExpenseType.ONE_TIME) {
+            if (!absent) {
+                fieldErrors.put("frequency", FREQUENCY_NOT_ALLOWED);
+            }
+            return null;
+        }
+        if (absent) {
+            if (type == ExpenseType.RECURRING) {
+                fieldErrors.put("frequency", FREQUENCY_REQUIRED);
+            }
+            return null;
+        }
+        try {
+            return RecurrenceFrequency.valueOf(raw);
+        }
+        catch (IllegalArgumentException exception) {
+            fieldErrors.put("frequency", FREQUENCY_INVALID);
+            return null;
+        }
+    }
+
+    /** Today in the device zone (FR-003); UTC when the zone is absent or invalid. */
+    private static LocalDate todayOf(String deviceTimeZone) {
+        try {
+            return LocalDate.now(ZoneId.of(deviceTimeZone));
+        }
+        catch (DateTimeException | NullPointerException exception) {
+            return LocalDate.now(ZoneOffset.UTC);
+        }
     }
 
     private static <E extends Enum<E>> E parseCatalog(String raw, Class<E> type, String field,

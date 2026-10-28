@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { normalizeEmail, validateEmail } from '../validation/registerValidation'
 import { LOGIN_NETWORK_ERROR_MESSAGE, login } from '../api/authClient'
 import ResendCountdown from './ResendCountdown'
+import SubmitButton from './SubmitButton'
 import TextField from './TextField'
 
 export const BAD_CREDENTIALS_MESSAGE =
@@ -91,9 +92,9 @@ export default function LoginForm({ onLoggedIn }) {
           </p>
         )}
 
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Ingresando…' : 'Iniciar sesión'}
-        </button>
+        <SubmitButton loading={isSubmitting} loadingLabel="Ingresando…">
+          Iniciar sesión
+        </SubmitButton>
       </form>
 
       {unverifiedEmail && (

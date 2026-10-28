@@ -47,12 +47,11 @@ export default function DashboardPage() {
     Array.isArray(user.currencies) && user.currencies.length > 0
       ? user.currencies
       : ['ARS']
-  const fullName = user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName
-
+  // FR-012 de 002 enmendada (T0XX): el saludo usa únicamente el nombre.
   return (
     <main className="page">
       <img src={avatarUrl} alt="@avatar" className="app-avatar" />
-      <h1>Bienvenida, {fullName}</h1>
+      <h1>Te damos la bienvenida, {user.firstName}</h1>
       {verifiedWelcome && (
         <p data-testid="dashboard-verified-welcome">
           ¡Tu cuenta fue verificada correctamente!
@@ -62,9 +61,11 @@ export default function DashboardPage() {
       {/* FR-009: the CBU/CVU is only shown to the session owner (FR-021), here. */}
       {user.cbuCvu && <p data-testid="dashboard-cbu">CBU/CVU: {user.cbuCvu}</p>}
       <p data-testid="dashboard-currencies">Monedas: {currencies.join(', ')}</p>
-      <nav>
+      <nav className="dashboard-actions">
         {/* T007 (specs/002-user-profile): acceso al perfil a 1 clic de distancia (SC-001). */}
-        <Link to="/profile">Mi perfil</Link>
+        <Link to="/profile" className="buttonLink">
+          Mi perfil
+        </Link>
         <button type="button" onClick={handleLogout}>
           Cerrar sesión
         </button>

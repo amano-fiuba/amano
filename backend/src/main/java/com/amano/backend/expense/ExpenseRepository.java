@@ -1,5 +1,7 @@
 package com.amano.backend.expense;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +18,11 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     Optional<Expense> findByUserIdAndIdempotencyKey(Long userId, UUID idempotencyKey);
 
     Optional<Expense> findByIdAndUserId(Long id, Long userId);
+
+    /** Series of a user for the "Gastos recurrentes" screen, newest first (009, FR-012). */
+    List<Expense> findByUserIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(Long userId);
+
+    /** Active series whose next date is due (009, FR-005). */
+    List<Expense> findByRecurrenceStatusAndRecurrenceNextDateLessThanEqualOrderByIdAsc(
+            RecurrenceStatus status, LocalDate date);
 }

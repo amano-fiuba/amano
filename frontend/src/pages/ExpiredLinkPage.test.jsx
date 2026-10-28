@@ -26,14 +26,17 @@ describe('ExpiredLinkPage (T030/T053)', () => {
   it('explica que el enlace expiró y ofrece el formulario de reenvío (FR-006)', () => {
     renderPage()
 
-    expect(
-      screen.getByRole('heading', { name: /el enlace expiró/i }),
-    ).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { name: /el enlace expiró/i })
+    expect(heading.closest('main')).toHaveClass('page')
     expect(screen.getByText(/enlace de verificación ha expirado/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/correo electrónico/i)).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: /reenviar correo de verificación/i }),
+      screen.getByRole('button', { name: /enviar correo de verificación/i }),
     ).toBeEnabled()
+    expect(screen.getByRole('link', { name: /volver a iniciar sesión/i })).toHaveAttribute(
+      'href',
+      '/login',
+    )
   })
 
   it('al enviar el correo dispara el reenvío neutro y muestra la cuenta regresiva (FR-012/T053)', async () => {
@@ -48,7 +51,7 @@ describe('ExpiredLinkPage (T030/T053)', () => {
     renderPage()
 
     await user.type(screen.getByLabelText(/correo electrónico/i), 'ana.perez@example.com')
-    await user.click(screen.getByRole('button', { name: /reenviar correo de verificación/i }))
+    await user.click(screen.getByRole('button', { name: /enviar correo de verificación/i }))
 
     expect(await screen.findByText(NEUTRAL_MESSAGE)).toBeInTheDocument()
     expect(screen.getByRole('timer')).toHaveTextContent('05:00')

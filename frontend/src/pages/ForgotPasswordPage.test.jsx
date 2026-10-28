@@ -33,14 +33,15 @@ function renderPage() {
 
 async function submitEmail(user, email) {
   await user.type(screen.getByLabelText('Correo electrónico'), email)
-  await user.click(screen.getByRole('button', { name: /enviar enlace/i }))
+  await user.click(screen.getByRole('button', { name: /restablecer contraseña/i }))
 }
 
 describe('ForgotPasswordPage (feature 006)', () => {
   it('muestra el formulario y el enlace de vuelta al login', () => {
     renderPage()
 
-    expect(screen.getByRole('heading', { name: /recuperar contraseña/i })).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { name: /recuperar contraseña/i })
+    expect(heading.closest('main')).toHaveClass('page')
     expect(screen.getByLabelText('Correo electrónico')).toHaveAttribute('type', 'email')
     expect(screen.getByRole('link', { name: /volver a iniciar sesión/i })).toHaveAttribute(
       'href',
@@ -52,7 +53,7 @@ describe('ForgotPasswordPage (feature 006)', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: /enviar enlace/i }))
+    await user.click(screen.getByRole('button', { name: /restablecer contraseña/i }))
 
     expect(await screen.findByText('El correo electrónico es obligatorio')).toBeInTheDocument()
     expect(authClient.forgotPassword).not.toHaveBeenCalled()
@@ -82,6 +83,7 @@ describe('ForgotPasswordPage (feature 006)', () => {
 
     const button = await screen.findByRole('button', { name: /enviando/i })
     expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('aria-busy', 'true')
 
     resolve({ ok: true, message: NEUTRAL_MESSAGE })
     expect(await screen.findByTestId('forgot-password-sent')).toBeInTheDocument()
@@ -98,7 +100,9 @@ describe('ForgotPasswordPage (feature 006)', () => {
     expect(sent).toHaveTextContent(CHECK_INBOX_MESSAGE)
     expect(sent).toHaveTextContent(NEUTRAL_MESSAGE)
     expect(authClient.forgotPassword).toHaveBeenCalledWith('ana@example.com')
-    expect(screen.queryByRole('button', { name: /enviar enlace/i })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /restablecer contraseña/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('fallo de red: mensaje fijo y el botón vuelve a habilitarse', async () => {
@@ -111,7 +115,7 @@ describe('ForgotPasswordPage (feature 006)', () => {
     expect(await screen.findByTestId('forgot-password-error')).toHaveTextContent(
       'No se pudo enviar la solicitud. Intenta nuevamente',
     )
-    expect(screen.getByRole('button', { name: /enviar enlace/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /restablecer contraseña/i })).toBeEnabled()
     expect(screen.queryByTestId('forgot-password-sent')).not.toBeInTheDocument()
   })
 })

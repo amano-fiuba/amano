@@ -24,8 +24,11 @@
   --color-acento-oscuro: #28548c;
   --color-oliva: #668b83;
   --color-error: #b42336;
-  --color-acento-tono: var(--color-acento);
-  --color-error-tono: var(--color-error);
+  // Tono base fijo: si apuntara a var(--color-acento), el modo oscuro
+  // (que redefiniría --color-acento en función del tono) crearía una
+  // referencia circular entre variables y las invalidaría a todas.
+  --color-acento-tono: #4b80c5;
+  --color-error-tono: #b42336;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -85,6 +88,7 @@ button,
 .buttonLink {
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
   border: 1px solid var(--color-texto);
   border-radius: 0.5rem;
   padding: 0.7rem 1rem;
@@ -143,6 +147,31 @@ input {
   accent-color: var(--color-acento);
 }
 
+// El control nativo de subida de archivos trae un botón gris del navegador que
+// rompe con el tema; se le aplica el mismo lenguaje visual del resto de botones.
+input[type="file"] {
+  &::file-selector-button {
+    margin-right: 0.6rem;
+    border: 1px solid var(--color-texto);
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.8rem;
+    color: var(--color-superficie);
+    background: var(--color-texto);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    transition:
+      background-color 160ms ease,
+      color 160ms ease;
+  }
+
+  &:hover::file-selector-button,
+  &:focus-visible::file-selector-button {
+    background: var(--color-acento-oscuro);
+    color: var(--color-superficie);
+  }
+}
+
 input[type="checkbox"] {
   width: 1rem;
   height: 1rem;
@@ -182,6 +211,35 @@ ul {
   }
 }
 
+.site-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-texto);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--color-acento-oscuro);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+}
+
+// Logo real de la app (public/logo.jpeg, 1408x768) a la izquierda de la marca.
+.site-nav__logo {
+  display: block;
+  height: 2rem;
+  width: auto;
+  border-radius: 0.375rem;
+  object-fit: contain;
+}
+
 .site-nav__links {
   display: flex;
   align-items: center;
@@ -201,9 +259,36 @@ ul {
     color: var(--color-texto);
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+
   &.is-active {
     background: var(--color-acento);
     color: #fff;
+  }
+}
+
+@media (max-width: 560px) {
+  .site-nav {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .site-nav__brand {
+    font-size: 0.95rem;
+  }
+
+  .site-nav__links {
+    order: 3;
+    justify-content: center;
+    width: 100%;
+    gap: 0.25rem;
+  }
+
+  .site-nav__link {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.9rem;
   }
 }
 
@@ -238,6 +323,35 @@ ul {
   background: var(--color-superficie-fuerte);
 }
 
+// Acciones en fila con separación entre controles (editar perfil:
+// selector de archivo + eliminar avatar, y guardar cambios + cancelar).
+.avatar-actions,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+// FR-011 enmendada de 005: "Guardar cambios" se ve deshabilitado (gris, cursor
+// bloqueado) mientras no haya modificaciones pendientes por confirmar.
+.form-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background-color: var(--color-borde);
+  border-color: var(--color-borde);
+}
+
+// Acciones del dashboard: "Mi perfil" (link con aspecto de botón) y el botón
+// de cerrar sesión comparten fila sin quedar pegados entre sí.
+.dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 // Formulario (TextField + RegisterForm)
 
 .field {
@@ -267,6 +381,12 @@ ul {
   &.field--invalid select {
     border-color: var(--color-error);
   }
+}
+
+.field__hint {
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
 }
 
 @media (max-width: 420px) {
@@ -303,6 +423,47 @@ p[role="alert"] {
   color: var(--color-error);
   font-size: 0.9rem;
   margin: 0.1rem 0 0;
+}
+
+.form-success {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-oliva) 45%, var(--color-borde));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-oliva) 10%, var(--color-superficie));
+  color: var(--color-texto);
+
+  h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.1rem;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.button-spinner {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: button-spin 0.7s linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button-spinner {
+    animation-duration: 1.4s;
+  }
 }
 
 fieldset {
@@ -354,3 +515,366 @@ fieldset {
     fill: currentColor;
   }
 }
+
+// Gastos recurrentes (specs/009-pause-recurring-expense, FR-012/FR-013)
+.recurring-list {
+  display: grid;
+  gap: 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.recurring-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-superficie);
+
+  p {
+    margin: 0;
+  }
+}
+
+.recurring-item__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.recurring-item__dates {
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+}
+
+.recurring-item__actions,
+.recurring-item__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+}
+
+.recurring-item__confirm p {
+  flex-basis: 100%;
+}
+
+.recurring-status {
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--color-superficie-fuerte);
+  color: var(--color-texto);
+
+  &--ACTIVE {
+    background: var(--color-acento);
+    color: var(--color-superficie);
+  }
+
+  &--FINISHED {
+    color: var(--color-texto-suave);
+  }
+}
+
+// Buscador de usuarios (specs/008-user-search). Reuses the `.page`,
+// `.field` and button language of the register screen.
+
+.search-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.field__control {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.field__icon {
+  position: absolute;
+  top: 50%;
+  left: 0.8rem;
+  display: inline-flex;
+  color: var(--color-texto-suave);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.field__control--with-icon input:not([type="checkbox"]) {
+  padding-left: 2.5rem;
+}
+
+.users-search-page {
+  h1 {
+    margin-bottom: 0.4rem;
+  }
+}
+
+.users-search-page__lead {
+  max-width: 42ch;
+  margin: 0 0 1.5rem;
+  font-size: 0.95rem;
+}
+
+.users-search-form__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+
+  .field {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 0;
+  }
+}
+
+.users-search-form__submit {
+  flex: 0 0 auto;
+  padding-block: 0.6rem;
+  white-space: nowrap;
+}
+
+.users-search-form__hint {
+  margin: 0.45rem 0 0;
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+}
+
+.users-search-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px dashed var(--color-borde);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-fondo) 65%, var(--color-superficie));
+  color: var(--color-texto-suave);
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.users-search-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie));
+
+  strong {
+    display: block;
+    color: var(--color-error);
+    font-size: 0.9rem;
+  }
+
+  p {
+    margin: 0.15rem 0 0;
+    color: var(--color-texto);
+    font-size: 0.9rem;
+  }
+}
+
+.users-search-banner__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 14%, transparent);
+}
+
+.users-search-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 1.5rem;
+  padding: 2rem 1.25rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--color-fondo) 60%, var(--color-superficie));
+  text-align: center;
+
+  h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+    line-height: 1.25;
+  }
+
+  p {
+    max-width: 38ch;
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.users-search-empty--initial {
+  border-style: dashed;
+}
+
+.users-search-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-bottom: 0.75rem;
+  border-radius: 999px;
+  color: var(--color-acento-oscuro);
+  background: color-mix(in srgb, var(--color-acento) 12%, transparent);
+
+  .search-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+}
+
+.users-search__results {
+  margin-top: 1.5rem;
+}
+
+.users-search__results-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.25;
+  }
+}
+
+.users-search__count {
+  color: var(--color-texto-suave);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.users-search__friendship-note {
+  margin: 0.65rem 0 0;
+  color: var(--color-texto-suave);
+  font-size: 0.78rem;
+}
+
+.user-results {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0;
+  list-style: none;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-fondo);
+}
+
+.user-card__avatar {
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 2px solid var(--color-borde);
+  border-radius: 50%;
+  background: var(--color-superficie-fuerte);
+  object-fit: cover;
+}
+
+.user-card__identity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  strong {
+    color: var(--color-texto);
+    font-size: 0.95rem;
+  }
+
+  span {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+}
+
+.user-card__action {
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  border: 1px solid var(--color-acento);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  color: var(--color-acento-oscuro);
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--color-superficie);
+    background: var(--color-acento);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+  }
+
+  &:disabled:hover {
+    color: var(--color-acento-oscuro);
+    background: transparent;
+  }
+}
+
+@media (max-width: 480px) {
+  .users-search-form__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .users-search-form__submit {
+    justify-content: center;
+  }
+
+  .user-card {
+    flex-wrap: wrap;
+  }
+
+  .user-card__identity {
+    flex-basis: calc(100% - 3.6rem);
+  }
+
+  .user-card__action {
+    justify-content: center;
+    width: 100%;
+  }
+}
+

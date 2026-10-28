@@ -44,15 +44,20 @@ function renderPage(url = '/reset-password?token=token-del-correo') {
 async function fillAndSubmit(user, password, confirmation) {
   await user.type(screen.getByLabelText('Nueva contraseña'), password)
   await user.type(screen.getByLabelText('Confirmar contraseña'), confirmation)
-  await user.click(screen.getByRole('button', { name: /guardar contraseña/i }))
+  await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 }
 
 describe('ResetPasswordPage (feature 006, US2)', () => {
-  it('muestra los dos campos de contraseña ocultos', () => {
+  it('muestra los dos campos de contraseña ocultos y los requisitos compartidos', () => {
     renderPage()
 
-    expect(screen.getByRole('heading', { name: /nueva contraseña/i })).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { name: /nueva contraseña/i })
+    expect(heading.closest('main')).toHaveClass('page')
     expect(screen.getByLabelText('Nueva contraseña')).toHaveAttribute('type', 'password')
+    expect(screen.getByLabelText('Nueva contraseña')).toHaveAccessibleDescription(
+      /Mínimo 8 caracteres/i,
+    )
+    expect(screen.getByText(/Mínimo 8 caracteres/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Confirmar contraseña')).toHaveAttribute('type', 'password')
   })
 
@@ -74,7 +79,7 @@ describe('ResetPasswordPage (feature 006, US2)', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: /guardar contraseña/i }))
+    await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
 
     expect(await screen.findByText('La contraseña es obligatoria')).toBeInTheDocument()
     expect(screen.getByText('Debes confirmar la contraseña')).toBeInTheDocument()
@@ -198,6 +203,6 @@ describe('ResetPasswordPage (feature 006, US2)', () => {
     expect(await screen.findByTestId('reset-password-error')).toHaveTextContent(
       'No se pudo actualizar la contraseña. Intenta nuevamente',
     )
-    expect(screen.getByRole('button', { name: /guardar contraseña/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /guardar nueva contraseña/i })).toBeEnabled()
   })
 })

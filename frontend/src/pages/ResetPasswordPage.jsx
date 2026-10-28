@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { validateConfirmPassword, validatePassword } from '../validation/registerValidation'
+import {
+  PASSWORD_REQUIREMENTS,
+  validateConfirmPassword,
+  validatePassword,
+} from '../validation/registerValidation'
 import { RESET_PASSWORD_NETWORK_ERROR_MESSAGE, resetPassword } from '../api/authClient'
+import AuthPage from '../components/AuthPage'
+import SubmitButton from '../components/SubmitButton'
 import TextField from '../components/TextField'
 
 // Exact messages of the redemption contract (feature 006, FR-012/FR-013/FR-015),
@@ -63,9 +69,7 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main>
-      <h1>Elegir una nueva contraseña</h1>
-
+    <AuthPage title="Elegir una nueva contraseña">
       {deadLinkMessage ? (
         <section data-testid="reset-password-dead-link">
           <p role="alert">{deadLinkMessage}</p>
@@ -80,6 +84,7 @@ export default function ResetPasswordPage() {
             label="Nueva contraseña"
             type="password"
             autoComplete="new-password"
+            hint={PASSWORD_REQUIREMENTS}
             error={errors.password?.message}
             {...bindField('password', {
               required: 'La contraseña es obligatoria',
@@ -106,15 +111,17 @@ export default function ResetPasswordPage() {
             </p>
           )}
 
-          <button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Guardando…' : 'Guardar contraseña'}
-          </button>
+          <SubmitButton loading={isSubmitting} loadingLabel="Guardando…">
+            Guardar nueva contraseña
+          </SubmitButton>
         </form>
       )}
 
-      <p>
-        <Link to="/login">Volver a iniciar sesión</Link>
-      </p>
-    </main>
+      <nav aria-label="Enlaces de recuperación">
+        <p>
+          <Link to="/login">Volver a iniciar sesión</Link>
+        </p>
+      </nav>
+    </AuthPage>
   )
 }
