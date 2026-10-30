@@ -14,6 +14,7 @@ import ProfilePage from './pages/ProfilePage'
 import ProfileEditPage from './pages/ProfileEditPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import UsersSearchPage from './pages/UsersSearchPage'
+import FriendsPage from './pages/FriendsPage'
 import NewExpensePage from './pages/NewExpensePage'
 import RecurringExpensesPage from './pages/RecurringExpensesPage'
 import SiteNav from './components/SiteNav'
@@ -68,6 +69,15 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <UsersSearchPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Amigos y solicitudes pendientes (specs/011-send-friend-request, FR-010). */}
+      <Route
+        path="/friends"
+        element={
+          <ProtectedRoute>
+            <FriendsPage />
           </ProtectedRoute>
         }
       />

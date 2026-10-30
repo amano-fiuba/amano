@@ -4,16 +4,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from '../auth/AuthContext'
 import ProtectedRoute from '../auth/ProtectedRoute'
-import UsersSearchPage, { NO_RESULTS_MESSAGE, TOO_SHORT_MESSAGE } from './UsersSearchPage'
+import UsersSearchPage, {
+  FRIENDSHIP_REQUEST_SENT_MESSAGE,
+  NO_RESULTS_MESSAGE,
+  TOO_SHORT_MESSAGE,
+} from './UsersSearchPage'
 
-// The API client is mocked so each backend outcome is driven explicitly;
+// The API clients are mocked so each backend outcome is driven explicitly;
 // AuthProvider's session check goes through the global fetch (logged in).
 vi.mock('../api/usersClient', () => ({
   SEARCH_NETWORK_ERROR_MESSAGE: 'No se pudo completar la búsqueda. Intenta nuevamente',
   searchUsers: vi.fn(),
 }))
 
+vi.mock('../api/friendsClient', () => ({
+  SEND_NETWORK_ERROR_MESSAGE: 'No se pudo enviar la solicitud. Intentá nuevamente',
+  sendFriendshipRequest: vi.fn(),
+}))
+
 const usersClient = await import('../api/usersClient')
+const friendsClient = await import('../api/friendsClient')
 
 const ME = { id: 1, firstName: 'Camila', email: 'camila@example.com', currencies: [] }
 const ANA = { id: 3, firstName: 'Ana', lastName: 'Pérez', email: 'ana@example.com' }
@@ -26,6 +36,7 @@ beforeEach(() => {
     vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(ME) }),
   )
   usersClient.searchUsers.mockReset()
+  friendsClient.sendFriendshipRequest.mockReset()
 })
 
 afterEach(() => {
@@ -118,10 +129,8 @@ describe('UsersSearchPage (feature 008)', () => {
     expect(await screen.findByTestId('user-card-3')).toHaveClass('user-card')
     expect(screen.getByTestId('user-card-4')).toHaveClass('user-card')
     expect(screen.getByText('2 resultados')).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: 'Agregar a Ana Pérez (próximamente)' }),
-    ).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Agregar a Juan (próximamente)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Ana Pérez' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Juan' })).toBeEnabled()
   })
 
   it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {
@@ -222,6 +231,142 @@ describe('UsersSearchPage (feature 008)', () => {
     renderPage()
 
     await search(user, 'an')
+
+    expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
+  })
+})
+
+describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
+  it('envía la solicitud de la fila y muestra Enviando… y luego Solicitud enviada', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA, JUAN] })
+    let resolveSend
+    friendsClient.sendFriendshipRequest.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSend = resolve
+      }),
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    await user.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+
+    expect(friendsClient.sendFriendshipRequest).toHaveBeenCalledWith(3)
+    expect(
+      screen.getByRole('button', { name: 'Enviando solicitud a Ana Pérez' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Juan' })).toBeEnabled()
+
+    await act(async () => {
+      resolveSend({ ok: true, request: { id: 9 } })
+    })
+
+    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+      FRIENDSHIP_REQUEST_SENT_MESSAGE,
+    )
+    expect(
+      screen.getByRole('button', { name: 'Solicitud enviada a Ana Pérez' }),
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Juan' })).toBeEnabled()
+  })
+
+  it.each([
+    ['Ya existe una solicitud de amistad pendiente entre ambos usuarios'],
+    ['Ya son amigos'],
+  ])('409 muestra "%s" y no marca la fila como enviada', async (detail) => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    friendsClient.sendFriendshipRequest.mockResolvedValue({
+      ok: false,
+      status: 409,
+      detail,
+      fields: {},
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    await user.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+
+    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(detail)
+    expect(screen.getByTestId('friendship-feedback')).toHaveAttribute('role', 'alert')
+    expect(screen.getByRole('button', { name: 'Agregar a Ana Pérez' })).toBeEnabled()
+  })
+
+  it('400 de auto-solicitud muestra el mensaje del campo recipientId', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    friendsClient.sendFriendshipRequest.mockResolvedValue({
+      ok: false,
+      status: 400,
+      detail: 'La solicitud contiene campos inválidos',
+      fields: { recipientId: 'No podés enviarte una solicitud de amistad a vos mismo' },
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    await user.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+
+    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+      'No podés enviarte una solicitud de amistad a vos mismo',
+    )
+  })
+
+  it('404 muestra "No se encontró el usuario" y no marca la fila como enviada', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    friendsClient.sendFriendshipRequest.mockResolvedValue({
+      ok: false,
+      status: 404,
+      detail: 'No se encontró el usuario',
+      fields: {},
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    await user.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+
+    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+      'No se encontró el usuario',
+    )
+    expect(screen.getByRole('button', { name: 'Agregar a Ana Pérez' })).toBeEnabled()
+  })
+
+  it('error de red muestra el mensaje fijo y permite reintentar', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    friendsClient.sendFriendshipRequest
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValueOnce({ ok: true, request: { id: 9 } })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    await user.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+
+    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+      'No se pudo enviar la solicitud. Intentá nuevamente',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Agregar a Ana Pérez' }))
+
+    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+      FRIENDSHIP_REQUEST_SENT_MESSAGE,
+    )
+    expect(friendsClient.sendFriendshipRequest).toHaveBeenCalledTimes(2)
+  })
+
+  it('401 al enviar cierra la sesión y lleva al login', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    friendsClient.sendFriendshipRequest.mockResolvedValue({
+      ok: false,
+      status: 401,
+      detail: '',
+      fields: {},
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+    await user.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
 
     expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
   })

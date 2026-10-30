@@ -41,6 +41,9 @@ export default function SiteNav() {
             <NavLink to="/users/search" className={linkClass}>
               Buscar usuarios
             </NavLink>
+            <NavLink to="/friends" className={linkClass}>
+              Amigos
+            </NavLink>
           </>
         ) : (
           <>
