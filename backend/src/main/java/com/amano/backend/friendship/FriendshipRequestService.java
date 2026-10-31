@@ -1,5 +1,6 @@
 package com.amano.backend.friendship;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,10 +17,12 @@ import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
 /**
- * Friendship requests (feature 011, research.md D3/D5/D10). The sender always
- * comes from the session; the server validates the recipient, the pair invariants
- * and maps responses to the minimal DTO. Accepting/rejecting is out of scope: only
- * PENDING rows are created and listed.
+ * Friendship requests (features 011 and 012, research.md D3/D5/D10). The sender
+ * always comes from the session; the server validates the recipient, the pair
+ * invariants and maps responses to the minimal DTO. Feature 012 adds the only
+ * mutation of the lifecycle: the respondent answers a pending request they
+ * received through a conditional UPDATE, so acceptance and rejection are the
+ * same statement and concurrency keeps exactly one transition.
  */
 @Service
 public class FriendshipRequestService {
@@ -28,6 +31,7 @@ public class FriendshipRequestService {
     public static final String RECIPIENT_INVALID_MESSAGE = "El destinatario no es válido";
     public static final String SELF_REQUEST_MESSAGE =
             "No podés enviarte una solicitud de amistad a vos mismo";
+    public static final String REQUEST_INVALID_MESSAGE = "La solicitud no es válida";
 
     private final FriendshipRequestRepository requestRepository;
     private final UserRepository userRepository;
@@ -104,5 +108,60 @@ public class FriendshipRequestService {
                 })
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    /**
+     * Answers a pending request received by the session user (feature 012,
+     * FR-007..FR-011). Validations happen before any query; the transition is a
+     * single conditional UPDATE and the re-read only disambiguates 404 from 409
+     * when it changed nothing (research.md D5/D6).
+     */
+    @Transactional
+    public AnsweredFriendshipRequestResponse respond(Long responderId, String requestIdRaw,
+            RespondFriendshipRequestRequest body) {
+        long requestId = parseRequestId(requestIdRaw);
+        FriendshipRequestAction action = body == null || body.action() == null
+                ? null
+                : FriendshipRequestAction.fromValue(body.action());
+        if (action == null) {
+            throw new FieldValidationException(
+                    Map.of("action", FriendshipRequestAction.INVALID_ACTION_MESSAGE));
+        }
+
+        int updated = requestRepository.respondPending(requestId, responderId,
+                action.targetStatus(), OffsetDateTime.now());
+        if (updated > 0) {
+            FriendshipRequest request = requestRepository.findById(requestId)
+                    .orElseThrow(FriendshipRequestNotFoundException::new);
+            User sender = userRepository.findById(request.getSenderId())
+                    .orElseThrow(FriendshipRequestNotFoundException::new);
+            return AnsweredFriendshipRequestResponse.from(request, sender);
+        }
+
+        // The conditional UPDATE affected nothing: either the row is missing or
+        // directed to someone else (404 neutral), or it was already answered
+        // (409 without revealing the previous outcome).
+        FriendshipRequest request = requestRepository.findById(requestId).orElse(null);
+        if (request == null || !responderId.equals(request.getRecipientId())) {
+            throw new FriendshipRequestNotFoundException();
+        }
+        throw new FriendshipRequestAlreadyRespondedException();
+    }
+
+    /** Non-numeric or non-positive path id is a 400 before any query (FR-010). */
+    private static long parseRequestId(String requestIdRaw) {
+        if (requestIdRaw == null || requestIdRaw.isBlank()) {
+            throw new FieldValidationException(Map.of("id", REQUEST_INVALID_MESSAGE));
+        }
+        try {
+            long requestId = Long.parseLong(requestIdRaw);
+            if (requestId <= 0) {
+                throw new FieldValidationException(Map.of("id", REQUEST_INVALID_MESSAGE));
+            }
+            return requestId;
+        }
+        catch (NumberFormatException exception) {
+            throw new FieldValidationException(Map.of("id", REQUEST_INVALID_MESSAGE));
+        }
     }
 }

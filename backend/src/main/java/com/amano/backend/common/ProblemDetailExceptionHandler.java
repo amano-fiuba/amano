@@ -22,6 +22,8 @@ import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.friendship.AlreadyFriendsException;
 import com.amano.backend.friendship.FriendshipRecipientNotFoundException;
+import com.amano.backend.friendship.FriendshipRequestAlreadyRespondedException;
+import com.amano.backend.friendship.FriendshipRequestNotFoundException;
 import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
@@ -233,6 +235,25 @@ public class ProblemDetailExceptionHandler {
     @ExceptionHandler(PendingFriendshipRequestExistsException.class)
     public ProblemDetail handlePendingFriendshipRequestExists(
             PendingFriendshipRequestExistsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Conflicto");
+        return problem;
+    }
+
+    /** Unknown request or not directed to the session user (feature 012, FR-007/FR-009): neutral 404. */
+    @ExceptionHandler(FriendshipRequestNotFoundException.class)
+    public ProblemDetail handleFriendshipRequestNotFound(FriendshipRequestNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /** Already answered request, outcome not revealed (feature 012, FR-008): 409. */
+    @ExceptionHandler(FriendshipRequestAlreadyRespondedException.class)
+    public ProblemDetail handleFriendshipRequestAlreadyResponded(
+            FriendshipRequestAlreadyRespondedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT, exception.getMessage());
         problem.setTitle("Conflicto");
