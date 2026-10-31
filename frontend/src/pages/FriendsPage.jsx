@@ -1,28 +1,40 @@
 import { useEffect, useState } from 'react'
 import {
   RECEIVED_NETWORK_ERROR_MESSAGE,
+  RESPOND_NETWORK_ERROR_MESSAGE,
   listReceivedFriendshipRequests,
+  respondFriendshipRequest,
 } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
 
-// Exact messages of the spec (FR-013, FR-019), exported for the tests.
+// Exact messages of the spec (FR-013), exported for the tests.
 export const NO_PENDING_REQUESTS_MESSAGE = 'No tenés solicitudes de amistad pendientes'
+export const ACCEPTED_MESSAGE = 'Solicitud de amistad aceptada'
+export const REJECTED_MESSAGE = 'Solicitud de amistad rechazada'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
+const ACCEPT_LABEL = 'Aceptar'
+const REJECT_LABEL = 'Rechazar'
 
 function fullName(sender) {
   return sender.lastName ? `${sender.firstName} ${sender.lastName}` : sender.firstName
 }
 
-// "Amigos" screen (feature 011, US3). In 011 it only contains the "Solicitudes"
-// section with the pending requests received by the session user; the friends
-// list and accepting/rejecting belong to a later story, so no actions are shown.
+// "Amigos" screen (features 011 US3 and 012 US1/US2/US3). The "Solicitudes"
+// section lists the pending requests received by the session user and lets the
+// recipient accept ("ACCEPT") or reject ("REJECT") each one. The row leaves the
+// list on 200/409/404 (it is no longer pending), the exact confirmation stays
+// visible until another action or navigation (research.md D8), network failures
+// keep the row reactive and 401 closes the session. The friends list itself
+// belongs to a later story.
 export default function FriendsPage() {
   const { setUser } = useAuth()
   const [requests, setRequests] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [reloadToken, setReloadToken] = useState(0)
+  const [responding, setResponding] = useState(null)
+  const [notice, setNotice] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -53,6 +65,47 @@ export default function FriendsPage() {
       cancelled = true
     }
   }, [reloadToken, setUser])
+
+  async function handleRespond(request, action) {
+    if (responding) return
+    setResponding({ requestId: request.id, action })
+    setNotice(null)
+    const result = await respondFriendshipRequest(request.id, action)
+    if (result.status === 401) {
+      setUser(null)
+      return
+    }
+    const removed = request.id
+    setResponding(null)
+    if (result.ok) {
+      setRequests((previous) => previous.filter((item) => item.id !== removed))
+      setNotice({
+        kind: 'success',
+        message:
+          action === 'ACCEPT' ? ACCEPTED_MESSAGE : REJECTED_MESSAGE,
+      })
+      return
+    }
+    if (result.network) {
+      // The row stays in the list (research.md D8): it is still pending as far
+      // as we know, and its actions go back to being available.
+      setNotice({ kind: 'error', message: RESPOND_NETWORK_ERROR_MESSAGE })
+      return
+    }
+    if (result.status === 409 || result.status === 404) {
+      setRequests((previous) => previous.filter((item) => item.id !== removed))
+      setNotice({ kind: 'conflict', message: result.detail })
+      return
+    }
+    const fieldMessage = result.fields?.action || result.fields?.id
+    setNotice({ kind: 'conflict', message: fieldMessage || result.detail })
+  }
+
+  const rowActionState = (request) => {
+    if (!responding) return 'idle'
+    if (responding.requestId !== request.id) return 'idle'
+    return responding.action === 'ACCEPT' ? 'accepting' : 'rejecting'
+  }
 
   return (
     <main className="page friends-page">
@@ -97,7 +150,16 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {!isLoading && !error && requests.length === 0 && (
+        {!isLoading && !error && notice && (
+          <p
+            className={`friends-requests__notice friends-requests__notice--${notice.kind}`}
+            role="status"
+          >
+            {notice.message}
+          </p>
+        )}
+
+        {!isLoading && !error && !notice && requests.length === 0 && (
           <p className="friends-requests__empty" role="status">
             {NO_PENDING_REQUESTS_MESSAGE}
           </p>
@@ -106,7 +168,7 @@ export default function FriendsPage() {
         {!isLoading && !error && requests.length > 0 && (
           <ul className="friends-requests__list" aria-label="Solicitudes pendientes">
             {requests.map((request) => {
-              const name = fullName(request.sender)
+              const actionState = rowActionState(request)
               return (
                 <li
                   key={request.id}
@@ -121,10 +183,28 @@ export default function FriendsPage() {
                     height={44}
                   />
                   <div className="friend-request-card__identity">
-                    <strong>{name}</strong>
+                    <strong>{fullName(request.sender)}</strong>
                     <span>{request.sender.email}</span>
                   </div>
                   <span className="friend-request-card__status">Pendiente</span>
+                  <div className="friend-request-card__actions">
+                    <button
+                      type="button"
+                      className="friend-request-card__accept"
+                      disabled={actionState !== 'idle'}
+                      onClick={() => handleRespond(request, 'ACCEPT')}
+                    >
+                      {actionState === 'accepting' ? 'Aceptando…' : ACCEPT_LABEL}
+                    </button>
+                    <button
+                      type="button"
+                      className="friend-request-card__reject"
+                      disabled={actionState !== 'idle'}
+                      onClick={() => handleRespond(request, 'REJECT')}
+                    >
+                      {actionState === 'rejecting' ? 'Rechazando…' : REJECT_LABEL}
+                    </button>
+                  </div>
                 </li>
               )
             })}

@@ -1054,3 +1054,67 @@ fieldset {
   font-size: 0.75rem;
   font-weight: 700;
 }
+
+// Response actions of each pending request (feature 012, FR-012).
+.friend-request-card__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.4rem;
+
+  button {
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--color-acento);
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+}
+
+.friend-request-card__accept,
+.friend-request-card__reject {
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+.friend-request-card__accept {
+  color: var(--color-superficie);
+  background: var(--color-acento);
+
+  &:hover:enabled {
+    background: var(--color-acento-oscuro);
+  }
+}
+
+.friend-request-card__reject {
+  color: var(--color-acento-oscuro);
+  background: transparent;
+
+  &:hover:enabled {
+    color: var(--color-superficie);
+    background: var(--color-acento);
+  }
+}
+
+// Notice of the outcome of a response (feature 012, FR-013..FR-016): success,
+// conflict (409/404) and network error keep the row visible when it applies.
+.friends-requests__notice {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+
+  &--success {
+    border: 1px solid color-mix(in srgb, var(--color-oliva) 35%, var(--color-borde));
+    background: color-mix(in srgb, var(--color-oliva) 12%, var(--color-superficie));
+    color: var(--color-texto);
+  }
+
+  &--conflict,
+  &--error {
+    border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
+    background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie));
+    color: var(--color-texto);
+  }
+}

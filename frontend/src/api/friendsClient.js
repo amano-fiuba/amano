@@ -1,4 +1,4 @@
-// API client for the friendship request endpoints (feature 011,
+// API client for the friendship request endpoints (features 011 and 012,
 // contracts/friendship-requests-api.md). Same convention as
 // authClient/usersClient/expenseClient: never throws, always returns
 // { ok: true, ... } or { ok: false, ... }.
@@ -7,6 +7,8 @@ export const SEND_NETWORK_ERROR_MESSAGE =
   'No se pudo enviar la solicitud. Intentá nuevamente'
 export const RECEIVED_NETWORK_ERROR_MESSAGE =
   'No se pudieron cargar tus solicitudes. Intentá nuevamente'
+export const RESPOND_NETWORK_ERROR_MESSAGE =
+  'No se pudo responder la solicitud. Intentá nuevamente'
 
 async function parseProblem(response) {
   try {
@@ -64,6 +66,33 @@ export async function listReceivedFriendshipRequests() {
     }
     const problem = await parseProblem(response)
     return { ok: false, status: response.status, detail: problem.detail }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * Answers a pending friendship request as the recipient (feature 012).
+ * `action` is 'ACCEPT' or 'REJECT'; the outcome is the response object on
+ * 200 ({ ok: true, request }); 4xx as { ok: false, status, detail, fields };
+ * network failures and 5xx as { ok: false, network: true }.
+ */
+export async function respondFriendshipRequest(id, action) {
+  try {
+    const response = await fetch(`/api/users/me/friendship-requests/${id}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    if (response.ok) {
+      return { ok: true, request: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await parseProblem(response)
+    return { ok: false, status: response.status, ...problem }
   } catch {
     return { ok: false, network: true }
   }
