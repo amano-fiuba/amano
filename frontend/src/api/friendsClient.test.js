@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   RECEIVED_NETWORK_ERROR_MESSAGE,
+  FRIENDS_NETWORK_ERROR_MESSAGE,
   RESPOND_NETWORK_ERROR_MESSAGE,
   SEND_NETWORK_ERROR_MESSAGE,
+  listFriends,
   listReceivedFriendshipRequests,
   respondFriendshipRequest,
   sendFriendshipRequest,
@@ -305,6 +307,75 @@ describe('respondFriendshipRequest (endpoint: PUT /api/users/me/friendship-reque
   it('RESPOND_NETWORK_ERROR_MESSAGE es el mensaje fijo de la spec', () => {
     expect(RESPOND_NETWORK_ERROR_MESSAGE).toBe(
       'No se pudo responder la solicitud. Intentá nuevamente',
+    )
+  })
+})
+
+describe('listFriends(endpoint: GET /api/users/me/friends) — feature 013', () => {
+  it('200 devuelve ok con los amigos y usa la cookie de sesión', async () => {
+    const friends = [
+      {
+        id: 12,
+        firstName: 'Ana',
+        lastName: 'Pérez',
+        email: 'ana@example.com',
+        friendsSince: '2026-10-31T14:05:00Z',
+      },
+    ]
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(friends) }),
+    )
+
+    expect(await listFriends()).toEqual({ ok: true, friends })
+    expect(fetch).toHaveBeenCalledWith('/api/users/me/friends', { credentials: 'include' })
+  })
+
+  it('401 devuelve el estado y el detalle para que la sección cierre la sesión', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ detail: 'Necesitas iniciar sesión para continuar' }),
+      }),
+    )
+
+    expect(await listFriends()).toEqual({
+      ok: false,
+      status: 401,
+      detail: 'Necesitas iniciar sesión para continuar',
+    })
+  })
+
+  it('4xx con cuerpo ilegible devuelve detalle vacío', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () => Promise.reject(new Error('no json')),
+      }),
+    )
+
+    expect(await listFriends()).toEqual({ ok: false, status: 403, detail: '' })
+  })
+
+  it('5xx se trata como error de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+
+    expect(await listFriends()).toEqual({ ok: false, network: true })
+  })
+
+  it('un fallo de red nunca lanza', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    expect(await listFriends()).toEqual({ ok: false, network: true })
+  })
+
+  it('expone el mensaje fijo de error de la lista', () => {
+    expect(FRIENDS_NETWORK_ERROR_MESSAGE).toBe(
+      'No se pudo cargar tu lista de amigos. Intentá nuevamente',
     )
   })
 })

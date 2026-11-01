@@ -1,0 +1,195 @@
+package com.amano.backend.friendship;
+
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.config.JwtService;
+
+import jakarta.servlet.http.Cookie;
+
+/**
+ * Contract tests of GET /api/users/me/friends (feature 013,
+ * contracts/friends-api.md) against a real PostgreSQL. Each test creates its own
+ * accounts and friendships, so the shared database never couples them.
+ */
+@SpringBootTest(properties = {
+        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
+})
+@AutoConfigureMockMvc
+@Testcontainers
+class FriendListIT {
+
+    private static final String FRIENDS_URL = "/api/users/me/friends";
+
+    @Container
+    @ServiceConnection
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private JwtService jwtService;
+
+    private long account(String firstName, String lastName, boolean verified) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO users (first_name, last_name, email, password_hash, cbu,
+                                   terms_accepted_at, email_verified_at)
+                VALUES (?, ?, ?, 'hash', '0000003100010000000001', now(),
+                        CASE WHEN ? THEN now() END)
+                RETURNING id
+                """, Long.class, firstName, lastName,
+                "friend." + UUID.randomUUID() + "@example.com", verified);
+    }
+
+    private long verified(String firstName, String lastName) {
+        return account(firstName, lastName, true);
+    }
+
+    private void request(long sender, long recipient, String status, String respondedAt) {
+        jdbcTemplate.update("""
+                INSERT INTO friendship_requests (sender_id, recipient_id, status, responded_at)
+                VALUES (?, ?, ?, CAST(? AS TIMESTAMPTZ))
+                """, sender, recipient, status, respondedAt);
+    }
+
+    private void friends(long sender, long recipient) {
+        request(sender, recipient, "ACCEPTED", "2026-10-31T14:05:00Z");
+    }
+
+    private ResultActions listAs(long userId) throws Exception {
+        return mockMvc.perform(get(FRIENDS_URL)
+                .cookie(new Cookie("amano_auth", jwtService.issueToken(userId))));
+    }
+
+    // ---- US1 ----
+
+    @Test
+    void listsTheOtherAccountOfFriendshipsInBothDirections() throws Exception {
+        long me = verified("Centro", "Uno");
+        long iSent = verified("Enviada", "Uno");
+        long theySent = verified("Recibida", "Uno");
+        friends(me, iSent);
+        friends(theySent, me);
+
+        listAs(me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].id").value(iSent))
+                .andExpect(jsonPath("$[0].firstName").value("Enviada"))
+                .andExpect(jsonPath("$[1].id").value(theySent))
+                .andExpect(jsonPath("$[1].firstName").value("Recibida"));
+
+        // The same friendship seen from the other side lists "me".
+        listAs(iSent)
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(me));
+    }
+
+    @Test
+    void exposesOnlyIdNamesEmailAndTheAcceptanceDate() throws Exception {
+        long me = verified("Privacidad", "Dos");
+        long friend = verified("Amiga", "Dos");
+        friends(me, friend);
+
+        listAs(me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(friend))
+                .andExpect(jsonPath("$[0].firstName").value("Amiga"))
+                .andExpect(jsonPath("$[0].lastName").value("Dos"))
+                .andExpect(jsonPath("$[0].email").exists())
+                .andExpect(jsonPath("$[0].friendsSince").exists())
+                .andExpect(jsonPath("$[0].cbu").doesNotExist())
+                .andExpect(jsonPath("$[0].cbuCvu").doesNotExist())
+                .andExpect(jsonPath("$[0].currencies").doesNotExist())
+                .andExpect(jsonPath("$[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$[0].emailVerifiedAt").doesNotExist())
+                .andExpect(jsonPath("$[0].status").doesNotExist());
+    }
+
+    @Test
+    void ordersByFirstNameThenLastNameIgnoringCaseWithMissingLastNamesLast() throws Exception {
+        long me = verified("Orden", "Tres");
+        long sinApellido = verified("mismo", null);
+        long benitez = verified("Mismo", "benitez");
+        long alvarez = verified("MISMO", "Alvarez");
+        long zeta = verified("Zeta", "Tres");
+        long alfa = verified("alfa", "Tres");
+        for (long friend : new long[] {zeta, sinApellido, benitez, alfa, alvarez}) {
+            friends(friend, me);
+        }
+
+        listAs(me)
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[0].id").value(alfa))
+                .andExpect(jsonPath("$[1].id").value(alvarez))
+                .andExpect(jsonPath("$[2].id").value(benitez))
+                .andExpect(jsonPath("$[3].id").value(sinApellido))
+                .andExpect(jsonPath("$[3].lastName").doesNotExist())
+                .andExpect(jsonPath("$[4].id").value(zeta));
+    }
+
+    // ---- US2 ----
+
+    @Test
+    void excludesPendingRejectedAndOtherPeoplesFriendships() throws Exception {
+        long me = verified("Filtro", "Cuatro");
+        long friend = verified("Amigo", "Cuatro");
+        long pendingSent = verified("Pendiente", "Enviada");
+        long pendingReceived = verified("Pendiente", "Recibida");
+        long rejected = verified("Rechazada", "Cuatro");
+        long stranger1 = verified("Ajena", "Uno");
+        long stranger2 = verified("Ajena", "Dos");
+        friends(me, friend);
+        request(me, pendingSent, "PENDING", null);
+        request(pendingReceived, me, "PENDING", null);
+        request(rejected, me, "REJECTED", "2026-10-30T10:00:00Z");
+        friends(stranger1, stranger2);
+
+        listAs(me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(friend));
+    }
+
+    @Test
+    void withoutFriendsIsAnEmptyArray() throws Exception {
+        long me = verified("Solitaria", "Cinco");
+        request(me, verified("Pendiente", "Cinco"), "PENDING", null);
+
+        listAs(me)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    // ---- US3 ----
+
+    @Test
+    void withoutSessionOrWithUnverifiedAccountIsA401() throws Exception {
+        long unverified = account("SinVerificar", "Seis", false);
+
+        mockMvc.perform(get(FRIENDS_URL))
+                .andExpect(status().isUnauthorized());
+        listAs(unverified)
+                .andExpect(status().isUnauthorized());
+    }
+}
