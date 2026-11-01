@@ -14,7 +14,7 @@ Las historias 27 y 29 piden que la destinataria pueda aceptar o rechazar las sol
 
 **Primary Dependencies**: Spring Boot 4.1.1 (Web MVC, Data JPA, Flyway, Security); React 19.2, react-router 8.4, Vite 8.3. **Sin dependencias nuevas.**
 
-**Storage**: PostgreSQL + Flyway. **Cero migraciones**: la historia opera sobre `friendship_requests` (`V6`, creada en 011). Única escritura del sistema en esta feature: la transición `PENDING → ACCEPTED | REJECTED` con `responded_at = now()` mediante `UPDATE` condicional; `ck_friendship_requests_responded` garantiza la coherencia estado/fecha.
+**Storage**: PostgreSQL + Flyway. **Cero migraciones**: la historia opera sobre `friendship_requests` (`V12`, creada en 011). Única escritura del sistema en esta feature: la transición `PENDING → ACCEPTED | REJECTED` con `responded_at = now()` mediante `UPDATE` condicional; `ck_friendship_requests_responded` garantiza la coherencia estado/fecha.
 
 **Testing**: JUnit 5 + Mockito (ampliación de `FriendshipRequestServiceTest`), Spring Boot Test + Testcontainers (ampliación de `FriendshipRequestIT`), Vitest + Testing Library (ampliaciones de `FriendsPage.test.jsx`, `friendsClient.test.js` y regresión de `UsersSearchPage.test.jsx`). Cobertura JaCoCo y Vitest ≥ 85 %.
 

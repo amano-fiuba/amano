@@ -38,7 +38,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Feature 012 contract tests over a real PostgreSQL: the respond endpoint
  * (PUT /api/users/me/friendship-requests/{id}) with its 200/400/401/404/409
- * codes, the persisted V6 transition (status + responded_at coherence) and the
+ * codes, the persisted V12 transition (status + responded_at coherence) and the
  * single mutation guarantee under a concurrent race (SC-005). The 011 POST and
  * GET endpoints run afterwards as a regression anchor.
  */

@@ -25,7 +25,7 @@ prueba y revisión independientes.
 
 - Backend: `backend/src/main/java/com/amano/backend/…`, pruebas en `backend/src/test/java/…`
 - Frontend: `frontend/src/…`, pruebas `*.test.jsx` / `*.test.js` colocadas junto al código
-- Migración: **sin migración nueva**; se reutiliza el esquema de `V6__create_friendship_requests.sql`
+- Migración: **sin migración nueva**; se reutiliza el esquema de `V12__create_friendship_requests.sql`
 
 ---
 

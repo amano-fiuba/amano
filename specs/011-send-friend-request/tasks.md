@@ -25,7 +25,7 @@ prueba y revisión independientes.
 
 - Backend: `backend/src/main/java/com/amano/backend/…`, pruebas en `backend/src/test/java/…`
 - Frontend: `frontend/src/…`, pruebas `*.test.jsx` / `*.test.js` colocadas junto al código
-- Migración nueva: `backend/src/main/resources/db/migration/V6__create_friendship_requests.sql`
+- Migración nueva: `backend/src/main/resources/db/migration/V12__create_friendship_requests.sql`
 
 ---
 
@@ -35,7 +35,7 @@ prueba y revisión independientes.
 
 - [ ] T001 Confirmar que la rama activa es `feat/send-friend-request` y que no se requieren dependencias nuevas: `backend/pom.xml` y `frontend/package.json` sin cambios — plan.md §Technical Context
 - [ ] T002 Ejecutar la línea base antes de tocar código: `cd backend && ./mvnw -B verify` y `cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build` — quickstart.md §1
-- [ ] T003 Crear `backend/src/main/resources/db/migration/V6__create_friendship_requests.sql` con la tabla `friendship_requests`, CHECK `ck_friendship_requests_not_self`, CHECK de estado, CHECK de `responded_at`, FKs a `users` con `ON DELETE CASCADE`, `uq_friendship_requests_pending_pair`, `uq_friendship_requests_accepted_pair` e `ix_friendship_requests_recipient_pending`; sin `UPDATE` ni `DELETE` — data-model.md §Cambios de esquema, FR-003/FR-005/FR-009
+- [ ] T003 Crear `backend/src/main/resources/db/migration/V12__create_friendship_requests.sql` con la tabla `friendship_requests`, CHECK `ck_friendship_requests_not_self`, CHECK de estado, CHECK de `responded_at`, FKs a `users` con `ON DELETE CASCADE`, `uq_friendship_requests_pending_pair`, `uq_friendship_requests_accepted_pair` e `ix_friendship_requests_recipient_pending`; sin `UPDATE` ni `DELETE` — data-model.md §Cambios de esquema, FR-003/FR-005/FR-009
 
 ---
 
@@ -52,7 +52,7 @@ prueba y revisión independientes.
 - [ ] T010 [P] Crear `backend/src/test/java/com/amano/backend/friendship/FriendshipRequestSchemaIT.java` con Testcontainers: auto-relación rechazada, estado fuera del catálogo rechazado, `PENDING` con `responded_at` no nulo rechazado, dos `PENDING` por pareja (misma e inversa dirección) rechazadas, dos `ACCEPTED` por pareja rechazadas y `ON DELETE CASCADE` al borrar una cuenta — data-model.md, FR-009
 - [ ] T011 Verificar que `/api/users/**` ya exige sesión verificada en `config/SecurityConfig.java`; no se modifica la configuración — FR-021/FR-022, research.md §D4
 
-**Checkpoint**: Hibernate valida la entidad contra `V6` (`ddl-auto=validate`); la base aplica los invariantes; las historias pueden comenzar.
+**Checkpoint**: Hibernate valida la entidad contra `V12` (`ddl-auto=validate`); la base aplica los invariantes; las historias pueden comenzar.
 
 ---
 
@@ -166,7 +166,7 @@ prueba y revisión independientes.
 - [ ] T053 **Validación manual primero (persona usuaria)**: levantar base, backend y frontend; ejecutar los escenarios A–E de `quickstart.md` §2 y registrar observaciones — plan.md §Summary, indicación del equipo
 - [ ] T054 **Automatizadas después de la validación visual**: `cd backend && ./mvnw -B verify` y `cd frontend && npm run lint && npm run test:coverage && npm run build`, ambos en verde y con cobertura ≥ 85 % — constitución V/XI
 - [ ] T055 Commits con Conventional Commits (por ejemplo `docs:` spec 011, `feat:` envío de solicitudes, `feat:` pantalla Amigos, `test:`) — constitución XIII
-- [ ] T056 PR de `feat/send-friend-request` hacia `sprint-2` con la migración V6, el contrato nuevo y la nota de que aceptar/rechazar queda fuera de alcance — constitución XII
+- [ ] T056 PR de `feat/send-friend-request` hacia `sprint-2` con la migración V12, el contrato nuevo y la nota de que aceptar/rechazar queda fuera de alcance — constitución XII
 
 ---
 

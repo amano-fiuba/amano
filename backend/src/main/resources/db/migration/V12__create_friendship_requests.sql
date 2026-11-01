@@ -1,4 +1,4 @@
--- V6__create_friendship_requests.sql
+-- V12__create_friendship_requests.sql
 -- Data model: specs/011-send-friend-request/data-model.md (source of truth, ddl-auto=validate)
 -- Covers FR-003, FR-005, FR-006, FR-009 and FR-012 (feature 011-send-friend-request).
 -- Sin UPDATE ni DELETE: solo CREATE TABLE e índices. Las cuentas (users) no se modifican.

@@ -12,7 +12,7 @@
 
 ## D2 — Tabla nueva `friendship_requests`
 
-- **Decisión**: crear una migración `V6__create_friendship_requests.sql` con una sola tabla de solicitudes; no se altera `users`.
+- **Decisión**: crear una migración `V12__create_friendship_requests.sql` con una sola tabla de solicitudes; no se altera `users`.
 - **Rationale**: la solicitud es una entidad propia con estado y fechas, y las cuentas no deben cargar con columnas de relación. Sigue el patrón de migraciones inmutables de la constitución: los cambios de esquema se agregan con un archivo nuevo.
 - **Alternativas consideradas**: tabla `friendships` simétrica con una fila por par (más difícil de auditar el flujo pendiente/rechazado); columnas en `users` (no representa N solicitudes).
 
@@ -76,7 +76,7 @@
 
 - **Decisión**:
   - Backend unitario con Mockito (`FriendshipRequestServiceTest`): validaciones, mensajes, mapeo y traducción de la carrera.
-  - Backend de integración con Testcontainers (`FriendshipRequestIT`): flujo HTTP completo, persistencia, listado por destinatario, aislamiento entre cuentas, 401, 404, 409, duplicado inverso y restricciones de `V6`.
+  - Backend de integración con Testcontainers (`FriendshipRequestIT`): flujo HTTP completo, persistencia, listado por destinatario, aislamiento entre cuentas, 401, 404, 409, duplicado inverso y restricciones de `V12`.
   - Frontend Vitest (`FriendshipRequestButton`/`UsersSearchPage`, `FriendsPage`, `friendsClient`, `SiteNav`, `App`): envío, estados de carga/éxito/error, bandeja, vacío, 401, reintento y acceso.
 - **Rationale**: principio V (cobertura ≥ 85 %). Las validaciones críticas se prueban en backend porque el frontend no es una frontera de seguridad.
 

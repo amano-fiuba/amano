@@ -2,7 +2,7 @@
 
 **Fecha**: 2026-10-30 | **Spec**: [spec.md](./spec.md)
 
-**Alcance de datos**: la feature **no crea ni modifica ninguna tabla ni migración**. Reutiliza la tabla `friendship_requests` de `V6__create_friendship_requests.sql` (011), que ya soporta los estados finales y la fecha de respuesta especialmente preparados para esta historia. No se agregan columnas.
+**Alcance de datos**: la feature **no crea ni modifica ninguna tabla ni migración**. Reutiliza la tabla `friendship_requests` de `V12__create_friendship_requests.sql` (011), que ya soporta los estados finales y la fecha de respuesta especialmente preparados para esta historia. No se agregan columnas.
 
 ## Entidades
 
@@ -19,7 +19,7 @@ En 011 solo se insertaban filas `PENDING`; esta historia introduce el único `UP
 | `created_at` | Conservado sin cambios |
 | `responded_at` | `NULL` → `now()` en la misma sentencia del `UPDATE` |
 
-Restricciones existentes que esta historia activa (todas de `V6`, sin cambios):
+Restricciones existentes que esta historia activa (todas de `V12`, sin cambios):
 
 | Nombre | Regla | Efecto en 012 |
 |--------|-------|---------------|
@@ -110,7 +110,7 @@ El DTO nunca incluye CBU/CVU, monedas, contraseña, hash, avatar ni fecha de ver
 ## Cambios de esquema
 
 ```sql
--- Ninguno. La historia opera sobre friendship_requests (V6, Feature 011):
+-- Ninguno. La historia opera sobre friendship_requests (V12, Feature 011):
 --   status          PENDING -> ACCEPTED | REJECTED
 --   responded_at    NULL    -> now()
 -- Restricciones e índices exactamente como fueron creados por 011.

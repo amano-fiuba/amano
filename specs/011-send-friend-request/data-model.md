@@ -2,7 +2,7 @@
 
 **Fecha**: 2026-10-30 | **Spec**: [spec.md](./spec.md)
 
-**Alcance de datos**: la feature crea **una tabla nueva**, `friendship_requests`, mediante `V6__create_friendship_requests.sql`. No modifica la tabla `users` ni ninguna fila existente de otras features.
+**Alcance de datos**: la feature crea **una tabla nueva**, `friendship_requests`, mediante `V12__create_friendship_requests.sql`. No modifica la tabla `users` ni ninguna fila existente de otras features.
 
 ## Entidades
 
@@ -123,7 +123,7 @@ Ninguno de los DTOs incluye CBU/CVU, monedas, contraseña, hash, avatar ni fecha
 ## Cambios de esquema
 
 ```sql
--- V6__create_friendship_requests.sql (Feature 011). Sin UPDATE ni DELETE.
+-- V12__create_friendship_requests.sql (Feature 011). Sin UPDATE ni DELETE.
 CREATE TABLE friendship_requests (
     id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     sender_id    BIGINT NOT NULL,

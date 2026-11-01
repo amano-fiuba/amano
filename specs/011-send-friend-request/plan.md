@@ -15,7 +15,7 @@ amistades existentes y destinatarios inexistentes/no verificados. **US3**: una p
 protegida "Amigos" (`/friends`, en `SiteNav`) muestra la sección "Solicitudes" con las
 pendientes recibidas; es la notificación in-app aprobada. **US4**: regla de cuenta
 verificada, protección contra envíos concurrentes mediante índice único parcial y manejo de
-errores. Una migración nueva (`V6`) crea solo `friendship_requests`; sin dependencias nuevas
+errores. Una migración nueva (`V12`) crea solo `friendship_requests`; sin dependencias nuevas
 ni cambios en `users`. Aceptar/rechazar y la lista de amigos quedan fuera de alcance.
 
 ## Technical Context
@@ -25,7 +25,7 @@ ni cambios en `users`. Aceptar/rechazar y la lista de amigos quedan fuera de alc
 **Primary Dependencies**: Spring Boot 4.1.1 (Web MVC, Data JPA, Flyway, Security); React
 19.2, react-router 8.4, Vite 8.3. **Sin dependencias nuevas.**
 
-**Storage**: PostgreSQL + Flyway. `V6__create_friendship_requests.sql` crea una tabla, tres
+**Storage**: PostgreSQL + Flyway. `V12__create_friendship_requests.sql` crea una tabla, tres
 restricciones, dos índices únicos parciales y un índice de bandeja. Sin `UPDATE` ni `DELETE`.
 
 **Testing**: JUnit 5 + Mockito (`FriendshipRequestServiceTest`, `FriendshipRequestValidationTest`),
@@ -94,7 +94,7 @@ specs/011-send-friend-request/
 
 ```text
 backend/src/main/
-├── resources/db/migration/V6__create_friendship_requests.sql   # A: tabla, CHECKs, FK, índices
+├── resources/db/migration/V12__create_friendship_requests.sql   # A: tabla, CHECKs, FK, índices
 └── java/com/amano/backend/
     ├── common/ProblemDetailExceptionHandler.java               # M: handlers 404 y 409
     └── friendship/
@@ -114,7 +114,7 @@ backend/src/main/
 backend/src/test/java/com/amano/backend/friendship/
 ├── FriendshipRequestServiceTest.java                           # A: unitarios de reglas
 ├── FriendshipRequestIT.java                                    # A: flujo HTTP completo
-└── FriendshipRequestSchemaIT.java                              # A: restricciones de V6
+└── FriendshipRequestSchemaIT.java                              # A: restricciones de V12
 
 frontend/src/
 ├── api/friendsClient.js                    # A: sendFriendshipRequest, listReceivedFriendshipRequests

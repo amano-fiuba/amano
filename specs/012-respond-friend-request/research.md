@@ -18,7 +18,7 @@
 
 ## D3 — Sin migración nueva
 
-- **Decisión**: no se agrega ni modifica ningún archivo de `db/migration`; la tabla `friendship_requests` de `V6` ya soporta esta historia.
+- **Decisión**: no se agrega ni modifica ningún archivo de `db/migration`; la tabla `friendship_requests` de `V12` ya soporta esta historia.
 - **Rationale**: 011 ya creó `status` con el catálogo `PENDING/ACCEPTED/REJECTED`, `responded_at` con su restricción de coherencia (`PENDING` ⇒ nulo; estados finales ⇒ no nulo) y la restricción `sender_id <> recipient_id`. El índice único de amistades (`uq_friendship_requests_accepted_pair`) ya garantiza a lo sumo una amistad por pareja una vez que existan aceptaciones. La aceptación activa piezas preparadas a propósito.
 - **Alternativas consideradas**: tabla `friendships` separada (duplica la relación y contradiere la decisión D3 de 011); migración para "arreglar" estados (innecesaria: el CHECK ya es válido).
 

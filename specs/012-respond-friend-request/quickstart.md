@@ -9,7 +9,7 @@ Guía para verificar de punta a punta la respuesta del destinatario sobre las so
 - Entorno de desarrollo de `first-steps.md` (base en Docker, backend con `mvn spring-boot:run`, frontend con `npm run dev`).
 - **Tres cuentas verificadas** (A, B y C) para probar emisora, destinataria y cuenta ajena.
 - **Solicitudes pendientes de base**: enviar desde A a B y desde C a B usando la pantalla de 011 ("Buscar usuarios" → "Agregar"), o creando filas `PENDING` por SQL.
-- **Sin migración nueva**: no hace falta reiniciar la base; el código vale sobre el esquema de 011 (`V6`).
+- **Sin migración nueva**: no hace falta reiniciar la base; el código vale sobre el esquema de 011 (`V12`).
 
 ## 1. Verificaciones automatizadas
 

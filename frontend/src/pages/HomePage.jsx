@@ -276,12 +276,12 @@ function DebtMockup() {
 function HeroActions({ user, variant = 'hero', showSecondary = true }) {
   const primaryLabel = user
     ? variant === 'hero'
-      ? 'Ir a mi Panel'
-      : 'Abrir mi panel'
+      ? 'Ir a mis Grupos'
+      : 'Abrir mis grupos'
     : variant === 'hero'
       ? 'Empezar gratis'
       : 'Crear mi cuenta'
-  const primaryDestination = user ? '/dashboard' : '/register'
+  const primaryDestination = user ? '/groups' : '/register'
 
   return (
     <div className={`home-actions home-actions--${variant}`}>

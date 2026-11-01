@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 
 /**
  * Persistence for {@code friendship_requests} (features 011 and 012). The
- * partial unique indexes of V6 are the race-proof backstop for the pair
+ * partial unique indexes of V12 are the race-proof backstop for the pair
  * invariants; the service queries below only produce readable 409s before
  * inserting. The conditional UPDATE is the single mutation of 012 (research.md D5).
  */

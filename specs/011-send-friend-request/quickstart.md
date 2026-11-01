@@ -11,7 +11,7 @@ comandos y escenarios observables.
   frontend con `npm run dev`).
 - **Dos cuentas verificadas** (A y B) para probar emisor y destinatario.
 - **Reiniciar el backend** después de actualizar la rama: Flyway aplica
-  `V6__create_friendship_requests.sql` al arrancar.
+  `V12__create_friendship_requests.sql` al arrancar.
 
 ## 1. Verificaciones automatizadas
 
@@ -24,7 +24,7 @@ cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build
 |-------|-------|
 | `friendship/FriendshipRequestServiceTest` | Envío válido, auto-solicitud, pendiente misma e inversa dirección, amistad existente, destinatario inexistente/no verificado, `recipientId` inválido, traducción de la carrera, listado y orden |
 | `friendship/FriendshipRequestIT` | Flujo HTTP completo sobre PostgreSQL: 201 y persistencia `PENDING`, listado solo del destinatario, 400/401/404/409, aislamiento entre cuentas y datos expuestos |
-| `friendship/FriendshipRequestSchemaIT` | Restricciones de `V6`: auto-relación, catálogo de estados, coherencia de `responded_at`, unicidad pendiente/aceptada por pareja |
+| `friendship/FriendshipRequestSchemaIT` | Restricciones de `V12`: auto-relación, catálogo de estados, coherencia de `responded_at`, unicidad pendiente/aceptada por pareja |
 | `pages/UsersSearchPage.test.jsx` | Botón "Agregar" habilitado, carga, éxito, 409, 400, 404, red, 401 y que no se alteren otras filas |
 | `pages/FriendsPage.test.jsx` | Carga, lista, vacío, error con reintento, 401, orden y datos visibles |
 | `api/friendsClient.test.js` | Contrato del cliente: URL, método, cuerpo, `credentials`, parseo de 2xx/4xx/red |
