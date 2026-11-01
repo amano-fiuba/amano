@@ -45,6 +45,9 @@ export default function SiteNav() {
             <NavLink to="/profile" className={linkClass}>
               Mi perfil
             </NavLink>
+            <NavLink to="/friends" className={linkClass}>
+              Amigos
+            </NavLink>
           </>
         ) : (
           <>
