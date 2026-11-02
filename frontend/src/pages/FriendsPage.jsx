@@ -6,6 +6,7 @@ import {
   respondFriendshipRequest,
 } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
+import FriendsList from '../components/FriendsList'
 
 // Exact messages of the spec (FR-013), exported for the tests.
 export const NO_PENDING_REQUESTS_MESSAGE = 'No tenés solicitudes de amistad pendientes'
@@ -25,8 +26,9 @@ function fullName(sender) {
 // recipient accept ("ACCEPT") or reject ("REJECT") each one. The row leaves the
 // list on 200/409/404 (it is no longer pending), the exact confirmation stays
 // visible until another action or navigation (research.md D8), network failures
-// keep the row reactive and 401 closes the session. The friends list itself
-// belongs to a later story.
+// keep the row reactive and 401 closes the session. The "Mis amigos" section
+// (feature 013) is rendered first and queried again after an accepted request
+// (FR-009 of 013).
 export default function FriendsPage() {
   const { setUser } = useAuth()
   const [requests, setRequests] = useState([])
@@ -35,6 +37,7 @@ export default function FriendsPage() {
   const [reloadToken, setReloadToken] = useState(0)
   const [responding, setResponding] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [friendsReloadKey, setFriendsReloadKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -79,6 +82,10 @@ export default function FriendsPage() {
     setResponding(null)
     if (result.ok) {
       setRequests((previous) => previous.filter((item) => item.id !== removed))
+      if (action === 'ACCEPT') {
+        // The new friendship must show up in "Mis amigos" (013, FR-009).
+        setFriendsReloadKey((key) => key + 1)
+      }
       setNotice({
         kind: 'success',
         message:
@@ -112,9 +119,11 @@ export default function FriendsPage() {
       <header className="friends-page__header">
         <h1>Amigos</h1>
         <p className="friends-page__lead">
-          Revisá las solicitudes de amistad que recibiste.
+          Consultá tus amigos y revisá las solicitudes de amistad que recibiste.
         </p>
       </header>
+
+      <FriendsList reloadKey={friendsReloadKey} />
 
       <section className="friends-requests" aria-labelledby="friends-requests-title">
         <div className="friends-requests__header">

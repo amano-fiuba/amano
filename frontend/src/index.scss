@@ -912,6 +912,48 @@ fieldset {
   margin-top: 0.5rem;
 }
 
+// ---- Mis amigos (specs/013-friends-list) ----
+// Reuses the "Solicitudes" header, states and card styles; only the section
+// spacing, the empty-state link and the "Amigos desde" label are new.
+.friends-list {
+  margin: 0.5rem 0 2rem;
+}
+
+.friends-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+.friends-list__search-link {
+  color: var(--color-acento-oscuro);
+  font-weight: 700;
+}
+
+.friend-card__since {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--color-texto-suave);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .friend-card {
+    flex-wrap: wrap;
+  }
+
+  .friend-card__since {
+    width: 100%;
+    margin-left: 3.4rem;
+  }
+}
+
 .friends-requests__header {
   display: flex;
   align-items: baseline;
@@ -995,6 +1037,9 @@ fieldset {
 
 .friends-requests__list {
   display: grid;
+  // minmax(0, 1fr) keeps the cards from growing past the panel with their
+  // min-content width (a plain 1fr track behaves like minmax(auto, 1fr)).
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.7rem;
   padding: 0;
   list-style: none;
@@ -1002,7 +1047,9 @@ fieldset {
 
 .friend-request-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  min-width: 0;
   gap: 0.8rem;
   padding: 0.85rem;
   border: 1px solid var(--color-borde);
@@ -1022,7 +1069,9 @@ fieldset {
 
 .friend-request-card__identity {
   display: flex;
-  flex: 1 1 auto;
+  // When the name/email would get narrower than this basis, the status and
+  // the actions wrap to a second line instead of overflowing the card.
+  flex: 1 1 13rem;
   flex-direction: column;
   gap: 0.1rem;
   min-width: 0;
@@ -1047,6 +1096,7 @@ fieldset {
 
 .friend-request-card__status {
   flex: 0 0 auto;
+  margin-left: auto;
   padding: 0.25rem 0.55rem;
   border-radius: 999px;
   color: var(--color-acento-oscuro);

@@ -17,6 +17,14 @@ vi.mock('../api/friendsClient', () => ({
   respondFriendshipRequest: vi.fn(),
 }))
 
+// "Mis amigos" (feature 013) is covered by FriendsList.test.jsx; here it is a
+// stub that exposes the reloadKey FriendsPage passes to it (013, FR-009).
+vi.mock('../components/FriendsList', () => ({
+  default: ({ reloadKey }) => (
+    <div data-testid="friends-list" data-reload-key={reloadKey} />
+  ),
+}))
+
 const friendsClient = await import('../api/friendsClient')
 
 const ME = { id: 1, firstName: 'Camila', email: 'camila@example.com', currencies: [] }
@@ -334,5 +342,73 @@ describe('FriendsPage (feature 012, responder solicitudes)', () => {
     await user.click(screen.getByRole('button', { name: 'Aceptar' }))
 
     expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
+  })
+})
+
+describe('FriendsPage + lista de amigos (feature 013, US3)', () => {
+  const reloadKey = () => screen.getByTestId('friends-list').dataset.reloadKey
+
+  it('renderiza "Mis amigos" antes de "Solicitudes"', async () => {
+    friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [] })
+    renderPage()
+
+    const list = await screen.findByTestId('friends-list')
+    const requests = screen.getByRole('heading', { name: 'Solicitudes' })
+    expect(
+      list.compareDocumentPosition(requests) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(reloadKey()).toBe('0')
+  })
+
+  it('aceptar con éxito vuelve a consultar la lista de amigos (FR-009)', async () => {
+    friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [ANA] })
+    friendsClient.respondFriendshipRequest.mockResolvedValue({
+      ok: true,
+      request: { ...ANA, status: 'ACCEPTED', respondedAt: '2026-10-30T13:00:00Z' },
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByTestId('friend-request-5')
+    expect(reloadKey()).toBe('0')
+    await user.click(screen.getByRole('button', { name: 'Aceptar' }))
+
+    expect(await screen.findByText(ACCEPTED_MESSAGE)).toBeInTheDocument()
+    expect(reloadKey()).toBe('1')
+  })
+
+  it('rechazar no recarga la lista de amigos', async () => {
+    friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [ANA] })
+    friendsClient.respondFriendshipRequest.mockResolvedValue({
+      ok: true,
+      request: { ...ANA, status: 'REJECTED', respondedAt: '2026-10-30T13:00:00Z' },
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByTestId('friend-request-5')
+    await user.click(screen.getByRole('button', { name: 'Rechazar' }))
+
+    expect(await screen.findByText(REJECTED_MESSAGE)).toBeInTheDocument()
+    expect(reloadKey()).toBe('0')
+  })
+
+  it('un 409 al aceptar no recarga la lista de amigos', async () => {
+    friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [ANA] })
+    friendsClient.respondFriendshipRequest.mockResolvedValue({
+      ok: false,
+      status: 409,
+      detail: 'La solicitud de amistad ya fue respondida',
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await screen.findByTestId('friend-request-5')
+    await user.click(screen.getByRole('button', { name: 'Aceptar' }))
+
+    expect(
+      await screen.findByText('La solicitud de amistad ya fue respondida'),
+    ).toBeInTheDocument()
+    expect(reloadKey()).toBe('0')
   })
 })

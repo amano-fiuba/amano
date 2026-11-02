@@ -9,7 +9,7 @@ import org.springframework.data.repository.query.Param;
 import java.time.OffsetDateTime;
 
 /**
- * Persistence for {@code friendship_requests} (features 011 and 012). The
+ * Persistence for {@code friendship_requests} (features 011, 012 and 013). The
  * partial unique indexes of V12 are the race-proof backstop for the pair
  * invariants; the service queries below only produce readable 409s before
  * inserting. The conditional UPDATE is the single mutation of 012 (research.md D5).
@@ -34,6 +34,24 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
     /** Inbox of the session user: pending requests received, newest first (FR-012). */
     List<FriendshipRequest> findByRecipientIdAndStatusOrderByCreatedAtDescIdDesc(
             Long recipientId, FriendshipRequestStatus status);
+
+    /**
+     * Friends of {@code userId} (feature 013, research.md D3/D4): the OTHER account
+     * of every ACCEPTED request the user takes part in, in either direction, with
+     * the acceptance date. One query, projected straight to the DTO so private
+     * account data is never loaded; same ordering as the user search of 008.
+     */
+    @Query("""
+            select new com.amano.backend.friendship.FriendResponse(
+                u.id, u.firstName, u.lastName, u.email, r.respondedAt)
+            from FriendshipRequest r
+            join User u on u.id = case when r.senderId = :userId
+                                       then r.recipientId else r.senderId end
+            where r.status = ACCEPTED
+              and (r.senderId = :userId or r.recipientId = :userId)
+            order by lower(u.firstName), lower(u.lastName) nulls last, u.id
+            """)
+    List<FriendResponse> findFriendsOf(@Param("userId") Long userId);
 
     /**
      * Atomic transition of a pending request owned by {@code recipientId} to a
