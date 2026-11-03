@@ -150,6 +150,37 @@ describe('groupsClient', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/groups/3/activity?page=2&size=10&eventType=MEMBER_LEFT')
   })
 
+  it('getActivity manda eventTypes separados por coma y credenciales (014)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ content: [], totalPages: 0 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getActivity(3, { eventTypes: ['MEMBER_REMOVED', 'MEMBER_LEFT'] })
+    await getActivity(3, { eventTypes: [] })
+
+    expect(result).toEqual({ ok: true, content: [], totalPages: 0 })
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      '/api/groups/3/activity?page=1&size=20&eventType=MEMBER_REMOVED%2CMEMBER_LEFT',
+    )
+    expect(fetchMock.mock.calls[0][1]).toEqual({ method: 'GET', credentials: 'include' })
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/groups/3/activity?page=1&size=20')
+  })
+
+  it('getActivity distingue 4xx, 5xx y fallas de red (014)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ detail: 'No sos miembro' }, 404)))
+    expect(await getActivity(3)).toEqual({ ok: false, status: 404, detail: 'No sos miembro' })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 400, json: () => Promise.reject(new Error('sin cuerpo')),
+    }))
+    expect(await getActivity(3)).toEqual({ ok: false, status: 400, detail: undefined })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, 503)))
+    expect(await getActivity(3)).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await getActivity(3)).toEqual({ ok: false, network: true })
+  })
+
   it('removeMember y removeSimulatedProfile hacen DELETE con la URL correcta', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ removed: true }))
     vi.stubGlobal('fetch', fetchMock)

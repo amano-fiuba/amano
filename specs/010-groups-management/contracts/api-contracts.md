@@ -308,6 +308,8 @@ This module defines the API contracts for the groups-management feature. All end
 
 ## Contract: Group Activity History
 
+> **Actualizado por 014** (`specs/014-group-activity-history/contracts/activity-api.md`): `details` es un objeto JSON, `eventType` acepta varios tipos separados por coma (400 si alguno no existe) y `size` se limita a 100.
+
 **Method**: `GET`
 **Endpoint**: `/api/groups/{id}/activity`
 

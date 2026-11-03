@@ -100,7 +100,7 @@ public class GroupMemberService {
             groupMemberRepository.save(new GroupMember(friend.getId(), groupId, GroupMember.ROLE_MEMBER));
         }
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_ADDED,
-                callerId, "{\"type\":\"REGISTERED\",\"email\":\"" + friend.getEmail() + "\"}");
+                callerId, ActivityEventService.registeredMemberDetails(friend));
 
         return memberResponse(callerMembership.getRole(),
                 new AddMemberResponse.MemberInfo(friend.getId(), "REGISTERED",
@@ -152,7 +152,7 @@ public class GroupMemberService {
         SimulatedProfile saved = simulatedProfileRepository.save(profile);
 
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_ADDED,
-                callerId, "{\"type\":\"SIMULATED\",\"name\":\"" + name + "\",\"email\":\"" + email + "\"}");
+                callerId, ActivityEventService.simulatedMemberDetails(saved));
 
         return memberResponse(callerMembership.getRole(),
                 new AddMemberResponse.MemberInfo(saved.getId(), "SIMULATED", name, email,
@@ -233,8 +233,19 @@ public class GroupMemberService {
 
         target.setLeftAt(OffsetDateTime.now());
         groupMemberRepository.save(target);
+        // copy of the removed member's name and email at the time of the baja (014 D4)
+        User removed = userRepository.findById(targetUserId).orElse(null);
+        Map<String, Object> details;
+        if (removed == null) {
+            details = new LinkedHashMap<>();
+            details.put("type", "REGISTERED");
+            details.put("userId", targetUserId);
+        }
+        else {
+            details = ActivityEventService.registeredMemberDetails(removed);
+        }
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_REMOVED,
-                callerId, "{\"userId\":" + targetUserId + "}");
+                callerId, details);
         return new RemovalResponse(true,
                 "Miembro eliminado del grupo. Sus gastos previos se conservan.");
     }
@@ -265,8 +276,7 @@ public class GroupMemberService {
 
         simulatedProfileRepository.delete(profile); // physical DELETE (T006 model)
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_REMOVED,
-                callerId, "{\"simulatedProfileId\":" + profileId + ",\"name\":\""
-                        + profile.getName() + "\",\"email\":\"" + profile.getEmail() + "\"}");
+                callerId, ActivityEventService.simulatedMemberDetails(profile));
         return new RemovalResponse(true, "Perfil simulado eliminado del grupo.");
     }
 

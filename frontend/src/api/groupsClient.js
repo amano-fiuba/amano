@@ -166,19 +166,24 @@ export async function addMember(groupId, payload) {
 
 /**
  * GET /api/groups/{id}/activity: paginated descending history (todos los
- * miembros). Gastos y pagos son puntos de enganche que aparecerán cuando
- * exista la integración de gastos.
+ * miembros activos). `eventTypes` (arreglo) se envía como `eventType=A,B`
+ * (specs/014-group-activity-history, contracts/activity-api.md); `eventType`
+ * (un solo tipo) se mantiene por compatibilidad con 010.
  */
-export async function getActivity(groupId, { page = 1, size = 20, eventType } = {}) {
+export async function getActivity(groupId, { page = 1, size = 20, eventType, eventTypes } = {}) {
   try {
     const params = new URLSearchParams({ page: String(page), size: String(size) })
-    if (eventType) {
-      params.set('eventType', eventType)
+    const types = Array.isArray(eventTypes) && eventTypes.length ? eventTypes.join(',') : eventType
+    if (types) {
+      params.set('eventType', types)
     }
     const response = await fetch(`/api/groups/${groupId}/activity?${params.toString()}`, {
       method: 'GET',
       credentials: 'include',
     })
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
     if (!response.ok) {
       const body = await response.json().catch(() => null)
       return { ok: false, status: response.status, detail: body?.detail }

@@ -105,18 +105,27 @@ public class GroupService {
 
         groupMemberRepository.save(new GroupMember(creatorId, savedGroup.getId(), GroupMember.ROLE_ADMIN));
 
+        Map<String, Object> initialMemberDetails;
         if (friend == null) {
             SimulatedProfile profile = new SimulatedProfile();
             profile.setGroupId(savedGroup.getId());
             profile.setName(memberInput.getName().trim());
             profile.setEmail(memberInput.getIdentifier().trim());
-            simulatedProfileRepository.save(profile);
+            SimulatedProfile savedProfile = simulatedProfileRepository.save(profile);
+            initialMemberDetails = ActivityEventService.simulatedMemberDetails(
+                    savedProfile == null ? profile : savedProfile);
         }
         else {
             groupMemberRepository.save(new GroupMember(friend.getId(), savedGroup.getId(), GroupMember.ROLE_MEMBER));
+            initialMemberDetails = ActivityEventService.registeredMemberDetails(friend);
         }
 
         groupPermissionsRepository.save(defaultPermissions(savedGroup.getId()));
+
+        // alta of the initial member, in the same transaction (014 FR-002)
+        initialMemberDetails.put("atCreation", true);
+        activityEventService.record(savedGroup.getId(), GroupActivity.GroupActivityType.MEMBER_ADDED,
+                creatorId, initialMemberDetails);
 
         User creator = userRepository.findById(creatorId).orElseThrow();
         return buildResponse(savedGroup, creator, 2);
@@ -260,7 +269,7 @@ public class GroupService {
         if (permissionsChanged) {
             groupPermissionsRepository.save(permissions);
             activityEventService.record(groupId, GroupActivity.GroupActivityType.PERMISSION_CHANGED,
-                    userId, "{\"fields\":[\"permissions\"]}");
+                    userId, Map.of("fields", List.of("permissions")));
         }
 
         return toDetail(userId, group, membership);
@@ -350,7 +359,7 @@ public class GroupService {
         group.setPhoto(url);
         groupRepository.save(group);
         activityEventService.record(groupId, GroupActivity.GroupActivityType.PHOTO_CHANGED,
-                userId, "{}");
+                userId, Map.of());
         return new com.amano.backend.groups.dto.GroupPhotoResponse(url, saved.getUpdatedAt());
     }
 
@@ -399,7 +408,7 @@ public class GroupService {
         membership.setLeftAt(java.time.OffsetDateTime.now());
         groupMemberRepository.save(membership);
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_LEFT,
-                userId, "{}");
+                userId, Map.of());
         return new LeaveGroupResponse("Se abandonó el grupo. Tus gastos previos se conservan.",
                 true);
     }

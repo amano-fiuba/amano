@@ -4,9 +4,12 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import tools.jackson.databind.JsonNode;
+
 /**
- * Response of {@code GET /api/groups/{id}/activity} (contracts
- * /api-contracts.md). Entries are standalone history rows: actor info is
+ * Response of {@code GET /api/groups/{id}/activity} (010 contracts
+ * /api-contracts.md; 014 contracts/activity-api.md). {@code details} is a JSON
+ * object (014 D9), {@code null} when the stored text is missing or invalid. Entries are standalone history rows: actor info is
  * resolved at read time, but the row itself persists even when the related
  * member/expense/payment is later modified or deleted. Actor info of the write
  * side (who performed the action) is snapshot-free here: the actorUserId
@@ -26,10 +29,10 @@ public class ActivityHistoryResponse {
         private Long id;
         private String eventType;
         private Actor actor;
-        private String details;
+        private JsonNode details;
         private OffsetDateTime createdAt;
 
-        public Entry(Long id, String eventType, Actor actor, String details, OffsetDateTime createdAt) {
+        public Entry(Long id, String eventType, Actor actor, JsonNode details, OffsetDateTime createdAt) {
             this.id = id;
             this.eventType = eventType;
             this.actor = actor;
@@ -49,7 +52,7 @@ public class ActivityHistoryResponse {
             return actor;
         }
 
-        public String getDetails() {
+        public JsonNode getDetails() {
             return details;
         }
 

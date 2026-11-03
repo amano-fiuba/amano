@@ -1,28 +1,142 @@
 package com.amano.backend.groups;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.amano.backend.user.User;
+
+import tools.jackson.databind.ObjectMapper;
+
 /**
- * Records {@link GroupActivity} rows (US history, tasks.md T021). Rows are
- * standalone (preservation pattern): only groupId is referenced, so they
- * survive later member/expense/payment changes. REQUIRES_NEW so an event is
- * preserved even when the surrounding transaction later rolls back? No —
- * callers record after their success path; default propagation keeps the event
- * atomic with the business change that produced it (D: atómico, tasks US1).
+ * Records {@link GroupActivity} rows (010 US9; 014). Rows are standalone
+ * (preservation pattern): only groupId is referenced and the affected member's
+ * name is copied into the details, so they survive later member, expense or
+ * payment changes. {@code Propagation.MANDATORY}: every event is written inside
+ * the transaction of the business change that produced it.
+ *
+ * <p>The details are serialized with Jackson (014 research.md D3), never by
+ * string concatenation, so names with quotes still produce valid JSON. Keys
+ * with a {@code null} value are omitted.
  */
 @Service
 public class ActivityEventService {
 
     private final GroupActivityRepository repository;
+    private final ObjectMapper objectMapper;
 
-    public ActivityEventService(GroupActivityRepository repository) {
+    public ActivityEventService(GroupActivityRepository repository, ObjectMapper objectMapper) {
         this.repository = repository;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public GroupActivity record(Long groupId, GroupActivity.GroupActivityType type, Long actorUserId, String detailsJson) {
-        return repository.save(new GroupActivity(groupId, type, actorUserId, detailsJson));
+    public GroupActivity record(Long groupId, GroupActivity.GroupActivityType type, Long actorUserId,
+            Map<String, ?> details) {
+        return repository.save(new GroupActivity(groupId, type, actorUserId, toJson(details)));
+    }
+
+    /**
+     * Hook for the future group-expenses module (014 US2, FR-006/FR-008):
+     * records {@code EXPENSE_CREATED} with the data-model format.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordExpenseCreated(Long groupId, Long actorUserId, ExpenseActivityDetails details) {
+        if (details == null) {
+            throw new IllegalArgumentException("Faltan los datos del gasto");
+        }
+        String currency = validatedCurrency(details.amount(), details.currency());
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("expenseId", details.expenseId());
+        map.put("amount", details.amount().toPlainString());
+        map.put("currency", currency);
+        map.put("description", blankToNull(details.description()));
+        return record(groupId, GroupActivity.GroupActivityType.EXPENSE_CREATED, actorUserId, map);
+    }
+
+    /**
+     * Hook for the future group-payments module (014 US2, FR-007/FR-008):
+     * records {@code PAYMENT_MADE} with the data-model format.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordPaymentMade(Long groupId, Long actorUserId, PaymentActivityDetails details) {
+        if (details == null) {
+            throw new IllegalArgumentException("Faltan los datos del pago");
+        }
+        String currency = validatedCurrency(details.amount(), details.currency());
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("paymentId", details.paymentId());
+        map.put("amount", details.amount().toPlainString());
+        map.put("currency", currency);
+        map.put("fromName", blankToNull(details.fromName()));
+        map.put("toName", blankToNull(details.toName()));
+        return record(groupId, GroupActivity.GroupActivityType.PAYMENT_MADE, actorUserId, map);
+    }
+
+    /** Visible name of a registered user, without "null" or extra spaces (014 D4). */
+    public static String displayName(User user) {
+        if (user == null) {
+            return null;
+        }
+        String first = user.getFirstName() == null ? "" : user.getFirstName().trim();
+        String last = user.getLastName() == null ? "" : user.getLastName().trim();
+        String full = (first + " " + last).trim();
+        return full.isEmpty() ? null : full;
+    }
+
+    /** Details of an alta/baja of a registered member (014 data-model.md). */
+    public static Map<String, Object> registeredMemberDetails(User user) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("type", "REGISTERED");
+        details.put("userId", user.getId());
+        details.put("name", displayName(user));
+        details.put("email", user.getEmail());
+        return details;
+    }
+
+    /** Details of an alta/baja of a simulated profile (014 data-model.md). */
+    public static Map<String, Object> simulatedMemberDetails(SimulatedProfile profile) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("type", "SIMULATED");
+        details.put("simulatedProfileId", profile.getId());
+        details.put("name", profile.getName());
+        details.put("email", profile.getEmail());
+        return details;
+    }
+
+    private String toJson(Map<String, ?> details) {
+        Map<String, Object> clean = new LinkedHashMap<>();
+        if (details != null) {
+            details.forEach((key, value) -> {
+                if (value != null) {
+                    clean.put(key, value);
+                }
+            });
+        }
+        return objectMapper.writeValueAsString(clean);
+    }
+
+    private static String validatedCurrency(BigDecimal amount, String currency) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException("El monto debe ser mayor a cero");
+        }
+        String normalized = currency == null ? "" : currency.trim().toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("La moneda es obligatoria");
+        }
+        return normalized;
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

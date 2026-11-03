@@ -2,6 +2,7 @@ package com.amano.backend.groups;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -183,7 +184,7 @@ class GroupSettingsServiceTest {
                 null, true, null, null, null, null));
 
         verify(activityEventService).record(eq(GROUP_ID),
-                eq(GroupActivity.GroupActivityType.PERMISSION_CHANGED), eq(ADMIN_ID), anyString());
+                eq(GroupActivity.GroupActivityType.PERMISSION_CHANGED), eq(ADMIN_ID), anyMap());
     }
 
     @Test
