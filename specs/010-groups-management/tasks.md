@@ -328,6 +328,17 @@ description: "Task list for groups-management feature implementation"
 - [X] T096 `./mvnw -B verify` en verde con JaCoCo ≥ 85 %
 - [ ] T097 Validación manual: enviar y aceptar una solicitud entre dos cuentas y agregar a la otra cuenta a un grupo (quickstart.md escenario 2/3)
 
+## Fix 2026-11-04 (b) — Perfiles simulados en la lista y actualización automática
+
+**Problema**: no se podían eliminar perfiles simulados y les aparecía "Hacer admin" (la UI leía `profileId` en vez de `simulatedProfileId`); después de agregar o eliminar había que recargar la página (spec §Clarifications 2026-11-04 (b), FR-012a/FR-012b).
+
+- [X] T098 `MemberListView.jsx`: identificar perfiles simulados por `simulatedProfileId`; sin acciones de rol en esas filas; baja con `simulatedProfileId` — FR-012b
+- [X] T099 `RemoveMemberDialog.jsx`: al eliminar con éxito cierra el diálogo y llama a `onRemoved`; `MemberListView` vuelve a consultar y avisa con `onChanged` (también tras cambiar un rol) — FR-012a
+- [X] T100 `AddMemberView.jsx` (`onAdded`) y `GroupInfoView.jsx` (`reloadKey` de la lista + `getGroup` para el contador); quitar el botón "Actualizar lista" — FR-012a
+- [X] T101 [P] Pruebas: `MemberListView.test.jsx` (forma real de la API, sin acciones de rol en simulados, baja de simulado y de registrado con recarga, `onChanged`, `reloadKey`, respuestas viejas), `RemoveMemberDialog.test.jsx` (`onRemoved`), `AddMemberView.test.jsx` (`onAdded`), `GroupInfoView.test.jsx` (alta actualiza lista y contador)
+- [X] T102 `npm run lint && npm run test:coverage && npm run build` en verde
+- [ ] T103 Validación manual: eliminar un perfil simulado, verificar que no tiene "Hacer admin" y que agregar/eliminar se refleja sin recargar
+
 ---
 
 ## Dependencies & Execution Order

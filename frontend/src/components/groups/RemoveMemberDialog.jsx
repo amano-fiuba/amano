@@ -9,8 +9,9 @@ const ADMIN_TARGET_MESSAGE =
  * admin ("revoke the role first"), pending-debts and simulated-profile cases.
  * The dialog is rendered by the group views with either a registered member
  * (`member` prop) or a `simulatedProfile` — both share the confirm step.
+ * On success it closes and calls `onRemoved` so the list updates by itself.
  */
-export default function RemoveMemberDialog({ groupId, member, simulatedProfile }) {
+export default function RemoveMemberDialog({ groupId, member, simulatedProfile, onRemoved }) {
   const [open, setOpen] = useState(false)
   const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState('')
@@ -34,6 +35,9 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile }
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else if (result.ok) {
       setConfirmation(simulatedProfile ? 'Perfil simulado eliminado' : 'Miembro eliminado del grupo')
+      setOpen(false)
+      // the parent list re-fetches itself: no manual refresh (fix 2026-11-04)
+      onRemoved?.()
     } else {
       setError(result.detail || 'No se pudo eliminar')
     }

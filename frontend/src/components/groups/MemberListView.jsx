@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getMembers,
   grantAdminRole,
@@ -15,13 +15,28 @@ const LAST_ADMIN = 'Sos el último administrador: asigná otro administrador ant
  * simulated profiles — with name, avatar (NULL → gray default) and role.
  * When the caller is ADMIN (US4/US10), each row also carries the role
  * actions (assign/revoke, blocked for the last admin) and the removal
- * dialog with its confirmation. Changing a role re-fetches the list so it
- * always reflects reality.
+ * dialog with its confirmation. Changing a role or removing someone re-fetches
+ * the list and notifies `onChanged`, so the screen updates without a manual
+ * refresh (fix 2026-11-04); changing `reloadKey` (e.g. after an alta) also
+ * re-fetches. The backend identifies simulated profiles with
+ * `simulatedProfileId` (GroupMemberView): they never get role actions.
  */
-export default function MemberListView({ groupId, currentUserId = null, isAdmin = false }) {
+function simulatedIdOf(member) {
+  return member?.simulatedProfileId ?? member?.profileId ?? null
+}
+
+export default function MemberListView({
+  groupId,
+  currentUserId = null,
+  isAdmin = false,
+  reloadKey = 0,
+  onChanged,
+}) {
   const [members, setMembers] = useState(null)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
+  // Only the latest request may update the list (no stale responses).
+  const requestId = useRef(0)
 
   const apply = (result) => {
     if (result.ok) {
@@ -34,22 +49,26 @@ export default function MemberListView({ groupId, currentUserId = null, isAdmin 
     }
   }
 
-  // Consulta inicial (y re-consulta cuando cambia el grupo).
+  // Consulta inicial y re-consulta cuando cambia el grupo o el reloadKey.
   useEffect(() => {
-    let cancelled = false
+    const current = ++requestId.current
     getMembers(groupId).then((result) => {
-      if (cancelled) return
+      if (current !== requestId.current) return
       apply(result)
     })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId])
+  }, [groupId, reloadKey])
 
-  /** Re-sync after a role change (and manual refreshes). */
+  /** Re-sync after a role change or a removal. */
   async function reload() {
-    apply(await getMembers(groupId))
+    const current = ++requestId.current
+    const result = await getMembers(groupId)
+    if (current === requestId.current) apply(result)
+  }
+
+  async function handleRemoved(name) {
+    setStatus(`${name} ya no forma parte del grupo`)
+    await reload()
+    onChanged?.()
   }
 
   async function changeRole(member, action) {
@@ -72,6 +91,7 @@ export default function MemberListView({ groupId, currentUserId = null, isAdmin 
         : `${member.name} volvió a ser miembro del grupo`,
     )
     await reload() // the list refreshes role changes (per-group scope)
+    onChanged?.()
   }
 
   function roleLabel(role) {
@@ -99,11 +119,12 @@ export default function MemberListView({ groupId, currentUserId = null, isAdmin 
       {members === null && <p aria-busy="true">Cargando…</p>}
       <ul>
         {members?.map((member) => {
-          const isSimulated = member.profileId != null
-          const key = isSimulated ? `sim-${member.profileId}` : `user-${member.userId}`
+          const simulatedId = simulatedIdOf(member)
+          const isSimulated = simulatedId != null
+          const key = isSimulated ? `sim-${simulatedId}` : `user-${member.userId}`
           const isCurrentUser = !isSimulated && member.userId === currentUserId
           const isAdminTarget = member.role === 'ADMIN'
-          const revokeable = isAdminTarget && adminIds.size > 1
+          const revokeable = !isSimulated && isAdminTarget && adminIds.size > 1
           return (
             <li key={key} data-testid={isCurrentUser ? 'member-current' : `member-row-${key}`}>
               <img
@@ -138,12 +159,14 @@ export default function MemberListView({ groupId, currentUserId = null, isAdmin 
                 <RemoveMemberDialog
                   groupId={groupId}
                   member={{ userId: member.userId, name: member.name, role: member.role }}
+                  onRemoved={() => handleRemoved(member.name)}
                 />
               )}
               {isAdmin && isSimulated && (
                 <RemoveMemberDialog
                   groupId={groupId}
-                  simulatedProfile={{ profileId: member.profileId, name: member.name }}
+                  simulatedProfile={{ profileId: simulatedId, name: member.name }}
+                  onRemoved={() => handleRemoved(member.name)}
                 />
               )}
             </li>

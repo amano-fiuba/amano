@@ -16,6 +16,8 @@ export default function GroupInfoView() {
   const [error, setError] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [showPermissions, setShowPermissions] = useState(false)
+  // Bumped after an alta so MemberListView re-fetches (fix 2026-11-04).
+  const [membersVersion, setMembersVersion] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -34,10 +36,16 @@ export default function GroupInfoView() {
     }
   }, [id])
 
+  // Re-reads the group (member count, role) after any change in the members.
   function refreshGroup() {
     getGroup(id).then((result) => {
       if (result.ok) setGroup(result.group)
     })
+  }
+
+  function handleMemberAdded() {
+    setMembersVersion((version) => version + 1)
+    refreshGroup()
   }
 
   function roleLabel(role) {
@@ -80,12 +88,14 @@ export default function GroupInfoView() {
             <GroupDescriptionPanel description={group.description ?? null} />
           </header>
 
-          {/* Miembros activos: altas/bajas se ven al refrescar la vista */}
+          {/* Miembros activos: altas, bajas y cambios de rol se ven al instante */}
           <section className="group-card" aria-label="Miembros del grupo">
             <MemberListView
               groupId={Number(id)}
               currentUserId={user?.id ?? null}
               isAdmin={isAdmin}
+              reloadKey={membersVersion}
+              onChanged={refreshGroup}
             />
           </section>
 
@@ -122,14 +132,11 @@ export default function GroupInfoView() {
               </div>
               {showAddMember && (
                 <div className="group-admin-panel" data-testid="add-member-panel">
-                  <AddMemberView group={group} permissions={group.permissions ?? {}} />
-                  <button
-                    type="button"
-                    data-testid="refresh-after-add"
-                    onClick={refreshGroup}
-                  >
-                    Actualizar lista
-                  </button>
+                  <AddMemberView
+                    group={group}
+                    permissions={group.permissions ?? {}}
+                    onAdded={handleMemberAdded}
+                  />
                 </div>
               )}
               {showPermissions && (

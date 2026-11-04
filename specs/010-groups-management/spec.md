@@ -122,6 +122,8 @@
 - **FR-010**: No se permite eliminar un miembro si tiene deudas pendientes con otros miembros del grupo.
 - **FR-011**: Los gastos previos del miembro eliminado se conservan en el historial del grupo.
 - **FR-012**: La eliminación de miembro se registra en el historial del grupo.
+- **FR-012a** *(fix 2026-11-04)*: Tras un alta, una baja o un cambio de rol exitoso, la lista de miembros y el contador del grupo MUST actualizarse solos, sin recargar la página.
+- **FR-012b** *(fix 2026-11-04)*: Las filas de perfiles simulados MUST NOT mostrar acciones de rol de administrador; su eliminación MUST usar el endpoint de perfiles simulados.
 - **FR-013**: Un usuario puede abandonar el grupo con confirmación, salvo que tenga saldo pendiente con otros miembros.
 - **FR-014**: Si el usuario tiene saldo pendiente, se le informa el motivo y no se permite abandonar.
 - **FR-015**: Al abandonar, el grupo deja de figurar como activo para ese usuario, sus gastos previos se conservan y la acción queda registrada en el historial.
@@ -201,6 +203,12 @@
 
 - Q: ¿De dónde salen los "amigos del usuario" de FR-006/FR-007 ahora que existen 011–013? → A: De las amistades reales: una solicitud `ACCEPTED` de `friendship_requests` (V12), en cualquier dirección, igual que "Mis amigos" (013). Las solicitudes `PENDING` y `REJECTED` no cuentan. El stub `NoOpFriendshipPort` (lista fija `groups.friendship.stub-friend-emails`) se elimina: hacía fallar "Agregar amigo" y "Crear grupo con un amigo" para cualquier amistad real, mientras los perfiles simulados funcionaban.
 - Q: ¿Cambia algún contrato REST? → A: No. Mismos endpoints, mismas respuestas (404 "La persona que querés agregar no está entre tus amigos" cuando no hay amistad aceptada). Sin migraciones.
+
+**Session 2026-11-04 (fix: perfiles simulados en la lista y actualización automática)**
+
+- Q: ¿Por qué no se podía eliminar un perfil simulado y le aparecía "Hacer admin"? → A: La lista de miembros leía `profileId`, pero la API devuelve `simulatedProfileId` (contrato "List Members"). La interfaz trataba al perfil simulado como registrado: le ofrecía acciones de rol y lo intentaba borrar con `DELETE /members/null`. Se corrige en el frontend; la API no cambia.
+- Q: ¿Un perfil simulado puede ser administrador? → A: No (ya lo decía "Simulated profile permissions": siempre es MEMBER). La interfaz MUST NOT mostrar "Hacer admin" ni "Quitarle admin" en sus filas; solo "Eliminar perfil simulado" (ADMIN, o MEMBER con la casilla activa).
+- Q: ¿Hay que recargar la página después de agregar, eliminar o cambiar un rol? → A: No. Tras cualquier alta, baja o cambio de rol exitoso, la pantalla del grupo MUST volver a consultar la lista de miembros y el contador sin acción manual; se elimina el botón "Actualizar lista".
 
 ---
 
