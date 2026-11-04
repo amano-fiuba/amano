@@ -40,12 +40,14 @@ import tools.jackson.databind.ObjectMapper;
  * photo is conserved, and every successful upload records PHOTO_CHANGED.
  */
 @SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c",
-        "groups.friendship.stub-friend-emails=friend@example.com"
+        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
 })
 @AutoConfigureMockMvc
 @Testcontainers
 class GroupPhotoControllerIT {
+
+    /** Real friendships replacing the old stub property (see {@link FriendshipFixtures}). */
+    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com");
 
     public static final byte[] PNG_BYTES = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
@@ -76,6 +78,7 @@ class GroupPhotoControllerIT {
                 .andExpect(r -> assertThat(r.getResponse().getStatus()).isIn(201, 409));
         jdbcTemplate.update(
                 "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", rawEmail);
+        FriendshipFixtures.link(jdbcTemplate, rawEmail, FRIEND_FIXTURES);
         return new Cookie("amano_auth", jwtService.issueToken(userIdOf(rawEmail)));
     }
 

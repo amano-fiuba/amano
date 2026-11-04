@@ -6,15 +6,20 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
   ...await importOriginal(),
   getGroup: vi.fn(),
   leaveGroup: vi.fn(),
+  getMembers: vi.fn(),
+  addMember: vi.fn(),
 }))
 
-import { getGroup, leaveGroup } from '../../api/groupsClient'
+import { addMember, getGroup, getMembers, leaveGroup } from '../../api/groupsClient'
 import GroupInfoView from './GroupInfoView'
 import { AuthProvider } from '../../auth/AuthContext'
 
 beforeEach(() => {
   getGroup.mockReset()
   leaveGroup.mockReset()
+  getMembers.mockReset()
+  addMember.mockReset()
+  getMembers.mockResolvedValue({ ok: true, members: [] })
 })
 
 const GROUP = {
@@ -108,9 +113,34 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Configuración del grupo/i }))
 
     expect(screen.getByTestId('admin-controls')).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /Actualizar lista/i }),
-    ).toBeInTheDocument()
+    // fix 2026-11-04: no manual refresh button anymore
+    expect(screen.queryByRole('button', { name: /Actualizar lista/i })).not.toBeInTheDocument()
+  })
+
+  it('tras agregar un miembro actualiza la lista y el contador sin recargar (fix 2026-11-04)', async () => {
+    getGroup
+      .mockResolvedValueOnce({ ok: true, group: GROUP })
+      .mockResolvedValueOnce({ ok: true, group: { ...GROUP, memberCount: 5 } })
+    getMembers
+      .mockResolvedValueOnce({ ok: true, members: [] })
+      .mockResolvedValueOnce({
+        ok: true,
+        members: [{ userId: null, simulatedProfileId: 9, name: 'Abuela', avatar: null, role: 'MEMBER' }],
+      })
+    addMember.mockResolvedValue({ ok: true, member: { id: 9 } })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Agregar miembro$/i }))
+    fireEvent.click(screen.getByRole('radio', { name: /Perfil simulado/i }))
+    fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
+    fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
+
+    expect(await screen.findByText('Abuela')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('group-role')).toHaveTextContent('5 miembros'))
+    expect(getMembers).toHaveBeenCalledTimes(2)
+    expect(getGroup).toHaveBeenCalledTimes(2)
   })
 
   it('siendo miembro no ve los controles de administración del grupo', async () => {

@@ -202,4 +202,12 @@ The following questions were resolved during the clarification phase (3 question
 | Permission configuration | GroupPermissions entity | Clean separation from member roles; extensible for future needs |
 | Activity history design | GroupActivity entity with standalone rows | Preserves entries even when related elements are modified/deleted, as spec requires |
 | Role assignment | ENUM in group-members join table | Supports "rol por grupo" (different roles in different groups) as spec requires |
-| Friend lookup | `FriendshipPort` (port) + stub configurable hasta que exista el módulo de amistades | FR-006 exige "amigos del usuario"; `searchVerified()` busca en toda la base y no distingue amistades |
+| Friend lookup | `FriendshipPort` (port). ~~Stub configurable hasta que exista el módulo de amistades~~ → desde 2026-11-04, `AcceptedFriendshipPort` sobre las amistades `ACCEPTED` de 011–013 (ver "Fix 2026-11-04") | FR-006 exige "amigos del usuario"; `searchVerified()` busca en toda la base y no distingue amistades |
+
+## Fix 2026-11-04 — `FriendshipPort` sobre las amistades reales
+
+- **Problema**: con 011–013 ya mergeadas, "Agregar miembros" y "Crear grupo" con un amigo registrado fallaban siempre (404 "no está entre tus amigos") porque `NoOpFriendshipPort` devolvía una lista fija de correos de prueba (`groups.friendship.stub-friend-emails`, por defecto `test@example.com`) e ignoraba `friendship_requests`. Los perfiles simulados no consultan amistades, por eso sí funcionaban.
+- **Decisión**: se elimina `NoOpFriendshipPort` y se agrega `groups/port/AcceptedFriendshipPort`, que implementa `friendEmailsOf` con `FriendshipRequestRepository.findFriendsOf(userId)` (la consulta de "Mis amigos", 013 research.md D3) e `isFriend` comparando correos sin espacios ni mayúsculas.
+- **Rationale**: una sola definición de amistad en todo el sistema (solicitud `ACCEPTED` en cualquier dirección). El puerto sigue aislando a `groups` del módulo de amistades (principio I); no cambian contratos ni esquema.
+- **Alternativas consideradas**: mantener el stub activable por propiedad (deja una trampa en producción: el bug fue justamente ese); consulta nueva en el repositorio solo con correos (duplica la de 013 sin beneficio con el volumen del proyecto).
+- **Pruebas**: `AcceptedFriendshipPortTest` (unitario) y `GroupRealFriendshipIT` (flujo real 011 → 012 → agregar/crear grupo; pendiente y rechazada no cuentan; ambas direcciones). Los 9 ITs de grupos que usaban la propiedad del stub ahora crean amistades `ACCEPTED` reales con el helper de pruebas `FriendshipFixtures`.

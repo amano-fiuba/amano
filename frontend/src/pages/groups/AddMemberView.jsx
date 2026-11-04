@@ -3,7 +3,9 @@ import { addMember, searchCandidates, GROUPS_NETWORK_ERROR_MESSAGE } from '../..
 
 const CANNOT_INVITE_MESSAGE = 'No podés invitar gente a este grupo'
 
-export default function AddMemberView({ group, permissions }) {
+// `onAdded` lets the group screen re-fetch the members and the count right
+// after a successful alta, without a manual refresh (fix 2026-11-04).
+export default function AddMemberView({ group, permissions, onAdded }) {
   const [mode, setMode] = useState('REGISTERED')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -49,6 +51,7 @@ export default function AddMemberView({ group, permissions }) {
       setConfirmation(`Miembro agregado: ${candidate.email}`)
       setResults([])
       setSearched(false)
+      onAdded?.()
     } else {
       setError(result.detail || 'No se pudo agregar al miembro')
     }
@@ -76,6 +79,7 @@ export default function AddMemberView({ group, permissions }) {
       setProfileName('')
       setProfileEmail('')
       setFormError('')
+      onAdded?.()
     } else {
       setError(result.detail || 'No se pudo agregar al miembro')
     }

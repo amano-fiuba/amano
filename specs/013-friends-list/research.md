@@ -45,7 +45,7 @@
 
 ## D8 — Grupos fuera de alcance
 
-- **Decisión**: `NoOpFriendshipPort` (010) no se reemplaza en 013.
+- **Decisión**: `NoOpFriendshipPort` (010) no se reemplaza en 013. **Actualización 2026-11-04**: se reemplazó después, en el fix de 010 (`AcceptedFriendshipPort`, ver `specs/010-groups-management/research.md` §Fix 2026-11-04), reutilizando `findFriendsOf`.
 - **Rationale**: las pruebas de grupos (más de 15 clases) usan el stub configurable `groups.friendship.stub-friend-emails`; reemplazarlo cambia el comportamiento de crear grupo y agregar miembros de otra feature. Queda como historia propia, que podrá reutilizar `findFriendsOf`.
 
 ## D9 — Estrategia de pruebas
