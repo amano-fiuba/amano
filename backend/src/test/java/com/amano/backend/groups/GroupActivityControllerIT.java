@@ -1,6 +1,7 @@
 package com.amano.backend.groups;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -36,12 +37,14 @@ import tools.jackson.databind.ObjectMapper;
  * is removed.
  */
 @SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c",
-        "groups.friendship.stub-friend-emails=friend@example.com"
+        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
 })
 @AutoConfigureMockMvc
 @Testcontainers
 class GroupActivityControllerIT {
+
+    /** Real friendships replacing the old stub property (see {@link FriendshipFixtures}). */
+    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com");
 
     @Container
     @ServiceConnection
@@ -70,6 +73,7 @@ class GroupActivityControllerIT {
                 .andExpect(r -> assertThat(r.getResponse().getStatus()).isIn(201, 409));
         jdbcTemplate.update(
                 "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", rawEmail);
+        FriendshipFixtures.link(jdbcTemplate, rawEmail, FRIEND_FIXTURES);
         return new Cookie("amano_auth", jwtService.issueToken(userIdOf(rawEmail)));
     }
 
@@ -91,9 +95,8 @@ class GroupActivityControllerIT {
         JsonNode body = objectMapper.readTree(created);
         long groupId = body.get("id").asLong();
 
-        // recorded events (write side of the history): US3 addition and US2
-        // permission change. US1 creation does not record MEMBER_ADDED by
-        // design (events begin with the stories that use them).
+        // recorded events (write side of the history): the initial member at
+        // creation (014 FR-002), US3 addition and US2 permission change.
         mockMvc.perform(post("/api/groups/" + groupId + "/members").cookie(admin)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"memberType\": \"SIMULATED\", \"identifier\": \"simulado@example.com\","
@@ -113,11 +116,12 @@ class GroupActivityControllerIT {
 
         mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.totalPages").value(1))
                 // newest first
                 .andExpect(jsonPath("$.content[0].eventType").value("PERMISSION_CHANGED"))
                 .andExpect(jsonPath("$.content[1].eventType").value("MEMBER_ADDED"))
+                .andExpect(jsonPath("$.content[2].eventType").value("MEMBER_ADDED"))
                 .andExpect(jsonPath("$.content[0].actor.id").isNumber())
                 .andExpect(jsonPath("$.content[0].createdAt").isNotEmpty());
     }
@@ -141,8 +145,8 @@ class GroupActivityControllerIT {
         mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin)
                 .param("page", "1").param("size", "1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2))
-                .andExpect(jsonPath("$.totalPages").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3))
                 .andExpect(jsonPath("$.size").value(1))
                 .andExpect(jsonPath("$.page").value(1));
     }
@@ -157,7 +161,171 @@ class GroupActivityControllerIT {
         Cookie admin = verifiedSessionOf("history-admin@example.com");
         mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(2));
+                .andExpect(jsonPath("$.totalElements").value(3))
+                // 014 D4: the alta keeps the copy of the name after the row is gone
+                .andExpect(jsonPath("$.content[1].details.name").value("Simulado"));
+    }
+
+    // ---- 014: altas y bajas con quién y a quién (US1) ----
+
+    @Test
+    void initialMemberAltaIsRecordedAtCreationWithItsName() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[2].eventType").value("MEMBER_ADDED"))
+                .andExpect(jsonPath("$.content[2].actor.id").value(userIdOf("history-admin@example.com")))
+                .andExpect(jsonPath("$.content[2].details.type").value("REGISTERED"))
+                .andExpect(jsonPath("$.content[2].details.userId").value(userIdOf("friend@example.com")))
+                .andExpect(jsonPath("$.content[2].details.name").value("Ana"))
+                .andExpect(jsonPath("$.content[2].details.email").value("friend@example.com"))
+                .andExpect(jsonPath("$.content[2].details.atCreation").value(true))
+                .andExpect(jsonPath("$.content[1].details.type").value("SIMULATED"))
+                .andExpect(jsonPath("$.content[1].details.atCreation").doesNotExist())
+                .andExpect(jsonPath("$.content[0].details.fields[0]").value("permissions"));
+    }
+
+    @Test
+    void namesWithQuotesAreStoredAsValidJsonAndBajasKeepTheCopy() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+        String tricky = "Abuela \"Tita\" \\ Ñandú";
+
+        mockMvc.perform(post("/api/groups/" + groupId + "/members").cookie(admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of(
+                        "memberType", "SIMULATED", "identifier", "tita@example.com", "name", tricky))))
+                .andExpect(status().isCreated());
+        long profileId = jdbcTemplate.queryForObject(
+                "SELECT id FROM simulated_profiles WHERE group_id = ? AND email = ?", Long.class,
+                groupId, "tita@example.com");
+        mockMvc.perform(delete("/api/groups/" + groupId + "/simulated-profiles/" + profileId).cookie(admin))
+                .andExpect(status().isOk());
+
+        // the stored text is valid JSON (SC-002)
+        String stored = jdbcTemplate.queryForObject(
+                "SELECT details_json FROM group_activity WHERE group_id = ? AND event_type = 'MEMBER_REMOVED'",
+                String.class, groupId);
+        assertThat(objectMapper.readTree(stored).get("name").asString()).isEqualTo(tricky);
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].eventType").value("MEMBER_REMOVED"))
+                .andExpect(jsonPath("$.content[0].details.type").value("SIMULATED"))
+                .andExpect(jsonPath("$.content[0].details.simulatedProfileId").value(profileId))
+                .andExpect(jsonPath("$.content[0].details.name").value(tricky))
+                .andExpect(jsonPath("$.content[1].eventType").value("MEMBER_ADDED"))
+                .andExpect(jsonPath("$.content[1].details.name").value(tricky));
+    }
+
+    @Test
+    void registeredBajaKeepsTheNameAndLegacyInvalidDetailsDegradeToNull() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+        long friendId = userIdOf("friend@example.com");
+
+        mockMvc.perform(delete("/api/groups/" + groupId + "/members/" + friendId).cookie(admin))
+                .andExpect(status().isOk());
+        // a row written before 014 with concatenated (invalid) JSON
+        jdbcTemplate.update("INSERT INTO group_activity (group_id, event_type, actor_user_id, details_json,"
+                + " created_at) VALUES (?, 'MEMBER_ADDED', NULL, ?, NOW() - INTERVAL '1 day')",
+                groupId, "{\"name\":\"Juan \"el tano\"\"}");
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(5))
+                .andExpect(jsonPath("$.content[0].eventType").value("MEMBER_REMOVED"))
+                .andExpect(jsonPath("$.content[0].details.userId").value(friendId))
+                .andExpect(jsonPath("$.content[0].details.name").value("Ana"))
+                .andExpect(jsonPath("$.content[0].details.email").value("friend@example.com"))
+                // oldest: the legacy row, without actor nor valid details
+                .andExpect(jsonPath("$.content[4].actor").isEmpty())
+                .andExpect(jsonPath("$.content[4].details").isEmpty());
+    }
+
+    // ---- 014: gastos y pagos con el enganche (US2) ----
+
+    @Autowired
+    private ActivityEventService activityEventService;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @Test
+    void expenseAndPaymentHooksAppearInTheHistory() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+        long adminId = userIdOf("history-admin@example.com");
+
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> activityEventService.recordExpenseCreated(groupId, adminId,
+                new ExpenseActivityDetails(10L, new java.math.BigDecimal("1500.00"), "ars", "Súper")));
+        transaction.executeWithoutResult(status -> activityEventService.recordPaymentMade(groupId, adminId,
+                new PaymentActivityDetails(3L, new java.math.BigDecimal("500"), "ARS", "Juan", "Ana")));
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin)
+                .param("eventType", "EXPENSE_CREATED,PAYMENT_MADE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].eventType").value("PAYMENT_MADE"))
+                .andExpect(jsonPath("$.content[0].actor.id").value(adminId))
+                .andExpect(jsonPath("$.content[0].details.paymentId").value(3))
+                .andExpect(jsonPath("$.content[0].details.amount").value("500"))
+                .andExpect(jsonPath("$.content[0].details.fromName").value("Juan"))
+                .andExpect(jsonPath("$.content[0].details.toName").value("Ana"))
+                .andExpect(jsonPath("$.content[1].eventType").value("EXPENSE_CREATED"))
+                .andExpect(jsonPath("$.content[1].details.expenseId").value(10))
+                .andExpect(jsonPath("$.content[1].details.amount").value("1500.00"))
+                .andExpect(jsonPath("$.content[1].details.currency").value("ARS"))
+                .andExpect(jsonPath("$.content[1].details.description").value("Súper"));
+    }
+
+    @Test
+    void hooksRequireAnEnclosingTransaction() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> activityEventService.recordExpenseCreated(1L, 1L,
+                new ExpenseActivityDetails(1L, java.math.BigDecimal.ONE, "ARS", null)))
+                .isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
+    }
+
+    // ---- 014: filtro y paginación (US3) ----
+
+    @Test
+    void severalTypesCanBeFilteredTogether() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+        mockMvc.perform(delete("/api/groups/" + groupId + "/members/" + userIdOf("friend@example.com"))
+                .cookie(admin))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin)
+                .param("eventType", "member_removed,MEMBER_LEFT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].eventType").value("MEMBER_REMOVED"));
+    }
+
+    @Test
+    void unknownEventTypeIsABadRequest() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin)
+                .param("eventType", "MEMBER_ADDED,NOPE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.eventType").value("El tipo de evento no es válido"));
+    }
+
+    @Test
+    void pageSizeIsCappedAtOneHundred() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin).param("size", "500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.size").value(100))
+                .andExpect(jsonPath("$.content.length()").value(3));
     }
 
     @Test

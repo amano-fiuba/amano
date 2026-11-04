@@ -14,7 +14,7 @@
 - **Reutiliza 012 (Aceptar y rechazar solicitudes)**: la aceptación es la única forma de crear una amistad. 012 dejó explícitamente "la lista de amigos visualizada para la historia posterior": esta es esa historia.
 - **Extiende la pantalla "Amigos" de 011/012**: se agrega la sección "Mis amigos" en `/friends`, encima de la sección "Solicitudes", que no cambia de comportamiento salvo que, al aceptar una solicitud, la lista de amigos se actualiza.
 - **Reutiliza 001/003/004**: la sesión (`amano_auth`) identifica a la persona y la regla de cuenta verificada se hereda al exponer el endpoint bajo `/api/users/**`.
-- **No modifica 010 (Gestión de grupos)**: el puerto `FriendshipPort` de grupos sigue resuelto por `NoOpFriendshipPort`. Conectarlo con las amistades reales cambia el comportamiento de "Agregar miembros" y todas las pruebas de grupos, por lo que queda como historia aparte.
+- **No modifica 010 (Gestión de grupos)**: el puerto `FriendshipPort` de grupos sigue resuelto por `NoOpFriendshipPort`. **(Actualización 2026-11-04: resuelto en el fix de 010, `AcceptedFriendshipPort` reutiliza `findFriendsOf` de esta feature.)** Conectarlo con las amistades reales cambia el comportamiento de "Agregar miembros" y todas las pruebas de grupos, por lo que queda como historia aparte.
 
 Los identificadores FR-### y SC-### de esta especificación son propios de 013.
 

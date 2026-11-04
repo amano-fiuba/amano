@@ -124,8 +124,18 @@ class GroupMemberServiceTest {
         assertThat(saved.getValue().getId().getUserId()).isEqualTo(15L);
         assertThat(saved.getValue().getRole()).isEqualTo(GroupMember.ROLE_MEMBER);
 
-        verify(activityEventService).record(eq(GROUP_ID),
-                eq(GroupActivity.GroupActivityType.MEMBER_ADDED), eq(ADMIN_ID), anyString());
+        // 014 FR-001: the alta keeps who was added (type, id, name and email)
+        assertThat(recordedDetails(GroupActivity.GroupActivityType.MEMBER_ADDED)).containsExactly(
+                java.util.Map.entry("type", "REGISTERED"), java.util.Map.entry("userId", 15L),
+                java.util.Map.entry("name", "Beto Pérez"), java.util.Map.entry("email", "friend@example.com"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> recordedDetails(GroupActivity.GroupActivityType type) {
+        org.mockito.ArgumentCaptor<java.util.Map<String, Object>> details =
+                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        verify(activityEventService).record(eq(GROUP_ID), eq(type), eq(ADMIN_ID), details.capture());
+        return details.getValue();
     }
 
     @Test
@@ -190,8 +200,11 @@ class GroupMemberServiceTest {
                 org.mockito.ArgumentCaptor.forClass(GroupMember.class);
         Mockito.verify(groupMemberRepository, Mockito.never()).save(members.capture());
 
-        verify(activityEventService).record(eq(GROUP_ID),
-                eq(GroupActivity.GroupActivityType.MEMBER_ADDED), eq(ADMIN_ID), anyString());
+        assertThat(recordedDetails(GroupActivity.GroupActivityType.MEMBER_ADDED))
+                .containsEntry("type", "SIMULATED")
+                .containsEntry("name", "Juan Simulado")
+                .containsEntry("email", "invitado@example.com")
+                .containsKey("simulatedProfileId");
     }
 
     @Test

@@ -317,6 +317,30 @@ description: "Task list for groups-management feature implementation"
 
 ---
 
+## Fix 2026-11-04 — Amigos reales al agregar miembros (rama `fix/agregar-amigos-al-grupo`)
+
+**Problema**: "Agregar amigo" y "Crear grupo con un amigo" fallaban con amistades reales; el stub `NoOpFriendshipPort` ignoraba `friendship_requests` (research.md §Fix 2026-11-04).
+
+- [X] T092 Crear `groups/port/AcceptedFriendshipPort.java` sobre `FriendshipRequestRepository.findFriendsOf` y eliminar `NoOpFriendshipPort.java` — FR-006/FR-007
+- [X] T093 [P] `AcceptedFriendshipPortTest`: correos de amistades aceptadas, comparación sin mayúsculas/espacios, entradas nulas
+- [X] T094 [P] `GroupRealFriendshipIT`: sin amistad → 404; pendiente → 404 y sin candidatos; aceptada → candidatos y alta 201; ambas direcciones; crear grupo con amigo; rechazada → 404
+- [X] T095 Reemplazar la propiedad `groups.friendship.stub-friend-emails` en los 9 ITs de grupos por amistades `ACCEPTED` reales (`FriendshipFixtures`)
+- [X] T096 `./mvnw -B verify` en verde con JaCoCo ≥ 85 %
+- [ ] T097 Validación manual: enviar y aceptar una solicitud entre dos cuentas y agregar a la otra cuenta a un grupo (quickstart.md escenario 2/3)
+
+## Fix 2026-11-04 (b) — Perfiles simulados en la lista y actualización automática
+
+**Problema**: no se podían eliminar perfiles simulados y les aparecía "Hacer admin" (la UI leía `profileId` en vez de `simulatedProfileId`); después de agregar o eliminar había que recargar la página (spec §Clarifications 2026-11-04 (b), FR-012a/FR-012b).
+
+- [X] T098 `MemberListView.jsx`: identificar perfiles simulados por `simulatedProfileId`; sin acciones de rol en esas filas; baja con `simulatedProfileId` — FR-012b
+- [X] T099 `RemoveMemberDialog.jsx`: al eliminar con éxito cierra el diálogo y llama a `onRemoved`; `MemberListView` vuelve a consultar y avisa con `onChanged` (también tras cambiar un rol) — FR-012a
+- [X] T100 `AddMemberView.jsx` (`onAdded`) y `GroupInfoView.jsx` (`reloadKey` de la lista + `getGroup` para el contador); quitar el botón "Actualizar lista" — FR-012a
+- [X] T101 [P] Pruebas: `MemberListView.test.jsx` (forma real de la API, sin acciones de rol en simulados, baja de simulado y de registrado con recarga, `onChanged`, `reloadKey`, respuestas viejas), `RemoveMemberDialog.test.jsx` (`onRemoved`), `AddMemberView.test.jsx` (`onAdded`), `GroupInfoView.test.jsx` (alta actualiza lista y contador)
+- [X] T102 `npm run lint && npm run test:coverage && npm run build` en verde
+- [ ] T103 Validación manual: eliminar un perfil simulado, verificar que no tiene "Hacer admin" y que agregar/eliminar se refleja sin recargar
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

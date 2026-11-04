@@ -72,4 +72,30 @@ describe('RemoveMemberDialog (T062/T057)', () => {
     await waitFor(() => expect(removeSimulatedProfile).toHaveBeenCalledWith(42, 33))
     expect(await screen.findByRole('status')).toHaveTextContent(/Perfil simulado eliminado/i)
   })
+
+  it('al eliminar con éxito cierra el diálogo y avisa con onRemoved (fix 2026-11-04)', async () => {
+    const onRemoved = vi.fn()
+    removeSimulatedProfile.mockResolvedValue({ ok: true, removed: true })
+
+    render(<RemoveMemberDialog groupId={42} simulatedProfile={SIMULATED} onRemoved={onRemoved} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar perfil simulado/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('si el servidor rechaza no llama a onRemoved', async () => {
+    const onRemoved = vi.fn()
+    removeMember.mockResolvedValue({ ok: false, status: 403, detail: 'No sos admin de este grupo' })
+
+    render(<RemoveMemberDialog groupId={42} member={MEMBER} onRemoved={onRemoved} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Eliminar miembro/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+
+    expect(await screen.findByTestId('remove-member-error')).toHaveTextContent('No sos admin de este grupo')
+    expect(onRemoved).not.toHaveBeenCalled()
+  })
 })

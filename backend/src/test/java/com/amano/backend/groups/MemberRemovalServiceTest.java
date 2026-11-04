@@ -106,8 +106,37 @@ class MemberRemovalServiceTest {
         assertThat(saved.getValue().getRole()).isEqualTo(GroupMember.ROLE_MEMBER);
         assertThat(saved.getValue().getId().getUserId()).isEqualTo(TARGET_ID);
 
+        // 014 FR-003 / D4: without the user row, the baja still keeps type and id
+        assertThat(recordedRemovalDetails()).containsExactly(
+                java.util.Map.entry("type", "REGISTERED"), java.util.Map.entry("userId", TARGET_ID));
+    }
+
+    @Test
+    void removalKeepsACopyOfTheRemovedMembersNameAndEmail() {
+        givenActiveMembership(ADMIN_ID, GroupMember.ROLE_ADMIN);
+        givenActiveMembership(TARGET_ID, GroupMember.ROLE_MEMBER);
+        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(false);
+        com.amano.backend.user.User target = new com.amano.backend.user.User();
+        org.springframework.test.util.ReflectionTestUtils.setField(target, "id", TARGET_ID);
+        target.setFirstName("Juan");
+        target.setLastName(null);
+        target.setEmail("juan@example.com");
+        when(userRepository.findById(TARGET_ID)).thenReturn(Optional.of(target));
+
+        service.removeMember(ADMIN_ID, GROUP_ID, TARGET_ID);
+
+        assertThat(recordedRemovalDetails()).containsExactly(
+                java.util.Map.entry("type", "REGISTERED"), java.util.Map.entry("userId", TARGET_ID),
+                java.util.Map.entry("name", "Juan"), java.util.Map.entry("email", "juan@example.com"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> recordedRemovalDetails() {
+        org.mockito.ArgumentCaptor<java.util.Map<String, Object>> details =
+                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
         verify(activityEventService).record(eq(GROUP_ID),
-                eq(GroupActivity.GroupActivityType.MEMBER_REMOVED), eq(ADMIN_ID), anyString());
+                eq(GroupActivity.GroupActivityType.MEMBER_REMOVED), eq(ADMIN_ID), details.capture());
+        return details.getValue();
     }
 
     @Test
@@ -174,8 +203,9 @@ class MemberRemovalServiceTest {
         service.removeSimulatedProfile(ADMIN_ID, GROUP_ID, TARGET_ID);
 
         verify(simulatedProfileRepository).delete(simulated); // physical DELETE (T006 model)
-        verify(activityEventService).record(eq(GROUP_ID),
-                eq(GroupActivity.GroupActivityType.MEMBER_REMOVED), eq(ADMIN_ID), anyString());
+        assertThat(recordedRemovalDetails()).containsExactly(
+                java.util.Map.entry("type", "SIMULATED"), java.util.Map.entry("simulatedProfileId", TARGET_ID),
+                java.util.Map.entry("name", "Juan Simulado"), java.util.Map.entry("email", "simulado@amano.dev"));
     }
 
     @Test

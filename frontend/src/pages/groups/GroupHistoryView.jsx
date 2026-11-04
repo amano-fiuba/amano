@@ -1,100 +1,167 @@
 import { useEffect, useState } from 'react'
-import { getActivity, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { Link } from 'react-router'
+import { getActivity } from '../../api/groupsClient'
+import { useAuth } from '../../auth/AuthContext'
+import {
+  ACTIVITY_FILTERS,
+  describeActivity,
+  formatTime,
+  groupByDay,
+} from './activityDescriptions'
 
-const EVENT_LABELS = {
-  MEMBER_ADDED: 'Agregó un miembro',
-  MEMBER_REMOVED: 'Quitó un miembro',
-  MEMBER_LEFT: 'Abandonó el grupo',
-  PERMISSION_CHANGED: 'Cambió los permisos del grupo',
-  PHOTO_CHANGED: 'Cambió la foto del grupo',
-  EXPENSE_CREATED: 'Registró un gasto',
-  PAYMENT_MADE: 'Registró un pago',
-}
+// Mensajes fijos de la pantalla (specs/014-group-activity-history,
+// contracts/activity-api.md), exportados para las pruebas.
+export const PAGE_SIZE = 20
+export const NO_ACTIVITY_MESSAGE = 'Todavía no hay actividad en este grupo'
+export const NO_FILTERED_ACTIVITY_MESSAGE = 'No hay actividad de este tipo en el grupo'
+export const HISTORY_ERROR_MESSAGE = 'No se pudo cargar el historial. Intentá nuevamente'
+export const NOT_A_MEMBER_MESSAGE = 'No existe el grupo solicitado o no sos miembro'
 
-function formatDate(value) {
-  try {
-    return new Intl.DateTimeFormat('es-AR', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value))
-  } catch {
-    return value
-  }
-}
-
+// Historial de actividad del grupo (010 US9; 014 US1–US3): frases completas
+// agrupadas por día, filtro "Mostrar", paginación y estados de carga, vacío y
+// error. Una respuesta vieja nunca pisa a la consulta más reciente.
 export default function GroupHistoryView({ groupId }) {
-  const [entries, setEntries] = useState(null)
-  const [warning, setWarning] = useState('')
-  const [error, setError] = useState('')
+  const auth = useAuth()
+  const setUser = auth?.setUser
+  const [filter, setFilter] = useState('ALL')
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [retryToken, setRetryToken] = useState(0)
+  const [state, setState] = useState({ status: 'loading', entries: [], totalPages: 0, error: '' })
 
   useEffect(() => {
     let cancelled = false
-    getActivity(groupId, { page, size: 20 }).then((result) => {
+    const { eventTypes } = ACTIVITY_FILTERS.find((option) => option.value === filter)
+
+    getActivity(groupId, { page, size: PAGE_SIZE, eventTypes }).then((result) => {
       if (cancelled) return
       if (result.ok) {
-        setEntries(result.content)
-        setTotalPages(Math.max(result.totalPages, 1))
-        if (!result.content?.length) {
-          setWarning('Todavía no hay actividad en este grupo')
-        } else {
-          setWarning('')
-        }
-      } else if (result.network) {
-        setError(GROUPS_NETWORK_ERROR_MESSAGE)
-      } else {
-        setError(result.detail || 'No existe el grupo solicitado o no sos miembro')
+        setState({
+          status: 'ready',
+          entries: Array.isArray(result.content) ? result.content : [],
+          totalPages: result.totalPages ?? 0,
+          error: '',
+        })
+        return
       }
+      if (result.status === 401) {
+        setUser?.(null)
+        return
+      }
+      const error = result.network
+        ? HISTORY_ERROR_MESSAGE
+        : result.detail || NOT_A_MEMBER_MESSAGE
+      setState({ status: 'error', entries: [], totalPages: 0, error, retryable: Boolean(result.network) })
     })
+
     return () => {
       cancelled = true
     }
-  }, [groupId, page])
+  }, [groupId, filter, page, retryToken, setUser])
 
-  function eventLabel(entry) {
-    if (EVENT_LABELS[entry.eventType]) {
-      return EVENT_LABELS[entry.eventType]
-    }
-    return 'Evento del grupo'
+  function reload(changes) {
+    setState((previous) => ({ ...previous, status: 'loading', error: '' }))
+    changes()
   }
 
+  function changeFilter(event) {
+    const value = event.target.value
+    reload(() => {
+      setFilter(value)
+      setPage(1)
+    })
+  }
+
+  const { status, entries, totalPages, error, retryable } = state
+  const days = groupByDay(entries)
+  const lastPage = Math.max(totalPages, 1)
+
   return (
-    <main className="page">
-      <h1>Historial de actividad</h1>
-      {warning && <p role="status">{warning}</p>}
-      {error && (
-        <p role="alert" data-testid="history-error">
-          {error}
+    <main className="page group-page group-history">
+      <nav className="group-page__back">
+        <Link to={`/groups/${groupId}`}>Volver al grupo</Link>
+      </nav>
+
+      <header className="group-history__header">
+        <h1>Historial de actividad</h1>
+        <label className="group-history__filter">
+          <span>Mostrar</span>
+          <select value={filter} onChange={changeFilter} aria-label="Mostrar">
+            {ACTIVITY_FILTERS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </header>
+
+      {status === 'loading' && (
+        <div className="group-history__loading" role="status">
+          <span className="button-spinner" aria-hidden="true" />
+          <p>Cargando historial…</p>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="group-history__error" role="alert" data-testid="history-error">
+          <p>{error}</p>
+          {retryable && (
+            <button type="button" onClick={() => reload(() => setRetryToken((token) => token + 1))}>
+              Reintentar
+            </button>
+          )}
+        </div>
+      )}
+
+      {status === 'ready' && entries.length === 0 && (
+        <p className="group-history__empty" role="status">
+          {filter === 'ALL' ? NO_ACTIVITY_MESSAGE : NO_FILTERED_ACTIVITY_MESSAGE}
         </p>
       )}
-      {entries && (
-        <section data-testid="history-list">
-          {entries.map((entry) => (
-            <article key={entry.id} data-testid="activity-entry">
-              <p>
-                <strong>{entry.actor ? `${entry.actor.firstName} ${entry.actor.lastName}` : 'Sistema'}</strong>{' '}
-                {eventLabel(entry)}
-              </p>
-              <p>
-                <time dateTime={entry.createdAt}>{formatDate(entry.createdAt)}</time>
-              </p>
-            </article>
+
+      {status === 'ready' && entries.length > 0 && (
+        <div data-testid="history-list">
+          {days.map((day) => (
+            <section key={day.key} className="group-card group-history__day" aria-label={day.label}>
+              <h2 className="group-history__day-title">{day.label}</h2>
+              <ol className="group-history__entries">
+                {day.entries.map((entry) => {
+                  const { actor, text } = describeActivity(entry)
+                  return (
+                    <li
+                      key={entry.id}
+                      className={`group-history__entry group-history__entry--${String(entry.eventType).toLowerCase()}`}
+                      data-testid="activity-entry"
+                    >
+                      <p>
+                        <strong>{actor}</strong> {text}
+                      </p>
+                      <time dateTime={entry.createdAt}>{formatTime(entry.createdAt)}</time>
+                    </li>
+                  )
+                })}
+              </ol>
+            </section>
           ))}
-        </section>
+        </div>
       )}
-      <p data-testid="history-hook-note">
-        Los gastos y pagos se registrarán cuando exista la integración de gastos por grupo.
-      </p>
-      {page > 1 && (
-        <button type="button" onClick={() => setPage(page - 1)}>
-          Anterior
-        </button>
-      )}
-      {page < totalPages && totalPages > 1 && (
-        <button type="button" onClick={() => setPage(page + 1)}>
-          Siguiente
-        </button>
+
+      {status === 'ready' && totalPages > 1 && (
+        <nav className="group-history__pagination" aria-label="Paginación del historial">
+          {page > 1 && (
+            <button type="button" onClick={() => reload(() => setPage(page - 1))}>
+              Anterior
+            </button>
+          )}
+          <span>
+            Página {page} de {lastPage}
+          </span>
+          {page < lastPage && (
+            <button type="button" onClick={() => reload(() => setPage(page + 1))}>
+              Siguiente
+            </button>
+          )}
+        </nav>
       )}
     </main>
   )

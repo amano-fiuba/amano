@@ -186,6 +186,24 @@ This module defines the API contracts for the groups-management feature. All end
 
 **Notes**: los miembros se agregan SOLO entre los amigos del usuario (via `FriendshipPort`; o perfiles simulados con nombre+email); rol asignado automáticamente: MEMBER.
 
+## Contract: List Members
+
+**Method**: `GET`
+**Endpoint**: `/api/groups/{id}/members`
+
+**Response (200 OK)**: arreglo de miembros activos (registrados y perfiles simulados). En cada fila hay **exactamente uno** de `userId` / `simulatedProfileId`:
+
+```json
+[
+  { "userId": 7, "simulatedProfileId": null, "name": "Ana López", "avatar": "/api/users/7/avatar", "role": "ADMIN" },
+  { "userId": null, "simulatedProfileId": 33, "name": "Abuela", "avatar": null, "role": "MEMBER" }
+]
+```
+
+**Notas para el frontend (fix 2026-11-04)**: una fila es un perfil simulado si y solo si `simulatedProfileId` no es `null`. A esas filas la interfaz **no** les ofrece "Hacer admin" ni "Quitarle admin" (un perfil simulado no tiene cuenta y siempre es MEMBER) y su baja usa `DELETE /api/groups/{id}/simulated-profiles/{simulatedProfileId}`, nunca `DELETE /members/{userId}`.
+
+**Errors**: 404 grupo inexistente o no miembro; 401 sin sesión.
+
 ## Contract: Remove Member
 
 **Method**: `DELETE`
@@ -308,6 +326,8 @@ This module defines the API contracts for the groups-management feature. All end
 
 ## Contract: Group Activity History
 
+> **Actualizado por 014** (`specs/014-group-activity-history/contracts/activity-api.md`): `details` es un objeto JSON, `eventType` acepta varios tipos separados por coma (400 si alguno no existe) y `size` se limita a 100.
+
 **Method**: `GET`
 **Endpoint**: `/api/groups/{id}/activity`
 
@@ -371,7 +391,7 @@ This module defines the API contracts for the groups-management feature. All end
 - 404: Group not found
 - 401: Unauthenticated
 
-**Nota de implementación**: mientras no exista el módulo de amistades, `FriendshipPort` es un stub (lista de amigos de prueba para dev/tests). `UserRepository.searchVerified()` NO se usa para este flujo (busca en toda la base).
+**Nota de implementación**: `FriendshipPort` se resuelve con `AcceptedFriendshipPort`: amigos = solicitudes `ACCEPTED` de `friendship_requests` (011–013), en cualquier dirección (fix 2026-11-04; antes era un stub con una lista fija de correos de prueba). `UserRepository.searchVerified()` NO se usa para este flujo (busca en toda la base).
 
 ## Summary of API Contracts
 

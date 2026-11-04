@@ -38,11 +38,13 @@ class GroupServiceTest {
     private GroupPermissionsRepository groupPermissionsRepository;
     private com.amano.backend.groups.port.FriendshipPort friendshipPort;
     private com.amano.backend.user.UserRepository userRepository;
+    private ActivityEventService activityEventService;
     private GroupService service;
 
     @BeforeEach
     void setUp() {
         groupRepository = Mockito.mock(GroupRepository.class);
+        activityEventService = Mockito.mock(ActivityEventService.class);
         groupMemberRepository = Mockito.mock(GroupMemberRepository.class);
         simulatedProfileRepository = Mockito.mock(SimulatedProfileRepository.class);
         groupPermissionsRepository = Mockito.mock(GroupPermissionsRepository.class);
@@ -64,7 +66,7 @@ class GroupServiceTest {
 
         service = new GroupService(groupRepository, groupMemberRepository, simulatedProfileRepository,
                 groupPermissionsRepository, friendshipPort, userRepository,
-                Mockito.mock(GroupPermissionChecker.class), Mockito.mock(ActivityEventService.class),
+                Mockito.mock(GroupPermissionChecker.class), activityEventService,
                 Mockito.mock(com.amano.backend.groups.port.DebtPort.class),
                 Mockito.mock(com.amano.backend.user.UserAvatarRepository.class),
                 Mockito.mock(GroupPhotoRepository.class),
@@ -132,6 +134,23 @@ class GroupServiceTest {
         assertThat(permissions.getValue().isMembersCanManageSimulatedProfiles()).isFalse();
         assertThat(permissions.getValue().isMembersCanGenerateExpensesForOthers()).isFalse();
         assertThat(permissions.getValue().isPaymentsRequireValidation()).isFalse();
+
+        // 014 FR-002: the alta of the initial member is recorded, marked atCreation
+        assertThat(initialMemberDetails()).containsEntry("type", "REGISTERED")
+                .containsEntry("userId", 9L)
+                .containsEntry("name", "Ana López")
+                .containsEntry("email", "friend@example.com")
+                .containsEntry("atCreation", true);
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> initialMemberDetails() {
+        org.mockito.ArgumentCaptor<java.util.Map<String, Object>> details =
+                org.mockito.ArgumentCaptor.forClass(java.util.Map.class);
+        verify(activityEventService).record(org.mockito.ArgumentMatchers.eq(42L),
+                org.mockito.ArgumentMatchers.eq(GroupActivity.GroupActivityType.MEMBER_ADDED),
+                org.mockito.ArgumentMatchers.eq(CREATOR_ID), details.capture());
+        return details.getValue();
     }
 
     private List<GroupMember> captorMembers() {
@@ -160,6 +179,11 @@ class GroupServiceTest {
         assertThat(profile.getValue().getGroupId()).isEqualTo(42L);
         assertThat(profile.getValue().getName()).isEqualTo("Invitado de prueba");
         assertThat(profile.getValue().getEmail()).isEqualTo("invitado@example.com");
+
+        assertThat(initialMemberDetails()).containsEntry("type", "SIMULATED")
+                .containsEntry("name", "Invitado de prueba")
+                .containsEntry("email", "invitado@example.com")
+                .containsEntry("atCreation", true);
     }
 
     @Test
@@ -172,6 +196,7 @@ class GroupServiceTest {
         verify(groupRepository, never()).save(any(Group.class));
         verify(groupMemberRepository, never()).save(any(GroupMember.class));
         verify(simulatedProfileRepository, never()).save(any(SimulatedProfile.class));
+        Mockito.verifyNoInteractions(activityEventService);
     }
 
     @Test

@@ -22,7 +22,7 @@ This quickstart guide provides runnable validation scenarios to prove the groups
 
 **Steps**:
 1. Authenticate as a registered user (use existing login or `POST /api/auth/login`)
-2. `POST /api/groups` with body (con el stub activo, el amigo viene de `FriendshipPort` con datos de prueba):
+2. `POST /api/groups` with body (el amigo tiene que tener una amistad aceptada con quien crea el grupo: enviala desde "Buscar usuarios" y aceptala desde "Amigos"; ver 011/012):
    ```json
    {"name": "Amigos para viajar", "member": {"memberType": "REGISTERED", "identifier": "test@example.com"}}
    ```
@@ -39,7 +39,7 @@ This quickstart guide provides runnable validation scenarios to prove the groups
 **Prerequisite**: Group created in Scenario 1 (que ya trae al menos un miembro semilla de la creación) — aquí se agregan miembros adicionales
 
 **Steps**:
-1. `GET /api/groups/{groupId}/candidates?q=test` (búsqueda **solo entre amigos del caller**, vía `FriendshipPort`; con el stub activo se usan los amigos de prueba configurados para dev/tests)
+1. `GET /api/groups/{groupId}/candidates?q=test` (búsqueda **solo entre amigos del caller**, vía `FriendshipPort`; solo aparecen las cuentas con amistad aceptada)
 2. `POST /api/groups/{groupId}/members` with body:
    ```json
    {"memberType": "REGISTERED", "identifier": "test@example.com"}
@@ -236,4 +236,6 @@ Sesiones: cookies `amano_auth` HttpOnly (`ana/beto/carla/dana@amano.dev`, `Passw
 | 11 | Group photo | ✅ PASS | `POST /api/groups/2/photo` PNG (magic bytes reales): 200 `{photo:"/api/groups/2/photo?v=...",updatedAt}`, `GET photo` → 200 `image/png`. GIF (magic `GIF`) → 400 `"El archivo debe ser una imagen JPG o PNG válida"` con `fields`. MEMBER activo → 403 `"Solo un administrador puede cambiar la foto del grupo"`; ex-miembro → 404 neutral. |
 | 12 | Activity history persistence | ✅ PASS | `GET /api/groups/2/activity`: 7 entradas en orden descendente (`MEMBER_REMOVED`, `PHOTO_CHANGED`, `MEMBER_LEFT`, `PERMISSION_CHANGED`, 3× `MEMBER_ADDED`); tras remover a carla las entradas previas se preservan. `eventType` filter + paginación via unit/IT. |
 
-**Sin verificar end-to-end por stubs**: escenarios 9 y parte del 6 (deudas, vía `NoOpDebtPort`) y el flujo real de amistades (vía `NoOpFriendshipPort` con la lista de emails de `GROUPS_FRIENDSHIP_STUBFRIENDEMAILS`). Ambos quedan cubiertos por tests unitarios que mockean los ports.
+**Fix 2026-11-04 (b)** — validación manual: (1) en un grupo con un perfil simulado, su fila no muestra "Hacer admin"/"Quitarle admin" y "Eliminar perfil simulado" → "Confirmar" lo quita de la lista al instante; (2) agregar un amigo o un perfil simulado desde "Agregar miembro" lo muestra en la lista y actualiza el contador sin recargar; (3) eliminar a un miembro registrado lo quita al instante.
+
+**Sin verificar end-to-end por stubs**: escenarios 9 y parte del 6 (deudas, vía `NoOpDebtPort`), cubiertos por tests unitarios que mockean el port. El flujo real de amistades ya no es un stub desde el fix del 2026-11-04 (`AcceptedFriendshipPort`): lo cubre `GroupRealFriendshipIT` de punta a punta.

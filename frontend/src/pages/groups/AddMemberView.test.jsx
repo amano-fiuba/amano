@@ -104,4 +104,34 @@ describe('AddMemberView (T049/T043)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/ya es miembro del grupo/i)
   })
+
+  it('avisa con onAdded tras un alta exitosa, registrada o simulada (fix 2026-11-04)', async () => {
+    const onAdded = vi.fn()
+    searchCandidates.mockResolvedValue({
+      ok: true,
+      content: [{ id: 15, firstName: 'Beto', lastName: 'Pérez', email: 'beto@example.com' }],
+    })
+    addMember.mockResolvedValue({ ok: true, member: { id: 15 } })
+
+    render(<AddMemberView group={GROUP} permissions={{}} onAdded={onAdded} />)
+
+    fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: 'bet' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Agregar a beto@example\.com/i }))
+    await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('radio', { name: /Perfil simulado/i }))
+    fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
+    fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
+    await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(2))
+
+    // a rejected alta does not notify
+    addMember.mockResolvedValueOnce({ ok: false, status: 400, detail: 'Esa persona ya es miembro del grupo' })
+    fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
+    fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
+    expect(await screen.findByTestId('add-member-error')).toBeInTheDocument()
+    expect(onAdded).toHaveBeenCalledTimes(2)
+  })
 })

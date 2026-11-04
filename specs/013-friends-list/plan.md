@@ -97,4 +97,4 @@ frontend/src/
 |----------|---------|------------------------|
 | `join ... on` sin relación JPA | La entidad `FriendshipRequest` no tiene relaciones a `User` (decisión de 011) | Una consulta con proyección evita N+1 y datos privados (research.md D3) |
 | Recarga en vez de inserción local | Aceptar vuelve a pedir la lista | Mantiene orden y fecha del servidor con una línea de código (research.md D7) |
-| Grupos sin integrar | `NoOpFriendshipPort` sigue activo | Cambiarlo afecta 010 y sus pruebas; historia aparte (research.md D8) |
+| Grupos sin integrar | `NoOpFriendshipPort` sigue activo (reemplazado el 2026-11-04 por `AcceptedFriendshipPort`, fix de 010) | Cambiarlo afecta 010 y sus pruebas; historia aparte (research.md D8) |

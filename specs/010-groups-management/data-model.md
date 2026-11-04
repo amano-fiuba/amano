@@ -31,7 +31,7 @@
 
 ### UserRepository (com.amano.backend.user.UserRepository)
 - **Source**: Feature 008 (existing search)
-- **Relationship**: Nuevo puerto `FriendshipPort` (sub-package `groups/port`, incl. stub) usado para encontrar los **amigos** del usuario al agregar miembros — DECISION (2026-10-27): `searchVerified()` ya NO se usa para esto, porque busca en toda la base de usuarios y el spec exige solo amigos (FR-006)
+- **Relationship**: Nuevo puerto `FriendshipPort` (sub-package `groups/port`; implementación `AcceptedFriendshipPort` sobre las amistades `ACCEPTED` de `friendship_requests` desde el fix del 2026-11-04 — antes, stub) usado para encontrar los **amigos** del usuario al agregar miembros — DECISION (2026-10-27): `searchVerified()` ya NO se usa para esto, porque busca en toda la base de usuarios y el spec exige solo amigos (FR-006)
 - **Reuse reason**: Leverages existing user search infrastructure for "agregar miembros" functionality
 
 ## New Entities (groups-management)
@@ -171,7 +171,7 @@ User (1)─(N) GroupMember (N)─(1) Group
      │                       │
      │                       (N) SimulatedProfile (via group_id)
      │
-    (search) FriendshipPort (stub)
+    (search) FriendshipPort → AcceptedFriendshipPort (friendship_requests ACCEPTED, 011–013)
 
 Group (1)─(1) GroupPermissions
      │
