@@ -197,6 +197,11 @@
 - Q: Un perfil simulado puede abandonar o ser eliminado con deudas? ¿Puede el admin eliminar a otro admin directamente? → A: Un perfil simulado no puede abandonar por sí mismo (no tiene cuenta). Lo elimina un admin, o un miembro si la casilla "Miembros pueden administrar perfiles simulados" está activa. Aplica la misma regla de deudas pendientes que a usuarios registrados, con confirmación y registro en el historial. Un admin no puede eliminar directamente a otro admin: primero debe quitarle el rol.
 - Q: ¿Qué valores por defecto tienen las casillas de permisos al crear un grupo? → A: `spec.md` (FR-005) no las define; decisión acordada (2026-10-27): **todas las casillas en false** (CANNOT/REQUIRE desactivadas), es decir, sin restricciones activas al crear el grupo; el Administrador las activa explícitamente desde la configuración de permisos.
 
+**Session 2026-11-04 (fix: amigos reales al agregar miembros)**
+
+- Q: ¿De dónde salen los "amigos del usuario" de FR-006/FR-007 ahora que existen 011–013? → A: De las amistades reales: una solicitud `ACCEPTED` de `friendship_requests` (V12), en cualquier dirección, igual que "Mis amigos" (013). Las solicitudes `PENDING` y `REJECTED` no cuentan. El stub `NoOpFriendshipPort` (lista fija `groups.friendship.stub-friend-emails`) se elimina: hacía fallar "Agregar amigo" y "Crear grupo con un amigo" para cualquier amistad real, mientras los perfiles simulados funcionaban.
+- Q: ¿Cambia algún contrato REST? → A: No. Mismos endpoints, mismas respuestas (404 "La persona que querés agregar no está entre tus amigos" cuando no hay amistad aceptada). Sin migraciones.
+
 ---
 
 ## Alcance y limitaciones

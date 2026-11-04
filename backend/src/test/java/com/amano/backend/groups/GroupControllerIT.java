@@ -34,12 +34,14 @@ import tools.jackson.databind.node.JsonNodeFactory;
  * (404), the groups list of the caller and the group detail.
  */
 @SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c",
-        "groups.friendship.stub-friend-emails=friend@example.com,listfriend@example.com"
+        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
 })
 @AutoConfigureMockMvc
 @Testcontainers
 class GroupControllerIT {
+
+    /** Real friendships replacing the old stub property (see {@link FriendshipFixtures}). */
+    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com", "listfriend@example.com");
 
     @Container
     @ServiceConnection
@@ -73,6 +75,7 @@ class GroupControllerIT {
                 .andExpect(status().isCreated());
         jdbcTemplate.update(
                 "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", rawEmail);
+        FriendshipFixtures.link(jdbcTemplate, rawEmail, FRIEND_FIXTURES);
         return new Cookie("amano_auth", jwtService.issueToken(userIdOf(rawEmail)));
     }
 
@@ -96,6 +99,7 @@ class GroupControllerIT {
         Cookie friend = verifiedSessionOf("friend@example.com");
         jdbcTemplate.update("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?",
                 "friend@example.com");
+        FriendshipFixtures.link(jdbcTemplate, "friend@example.com", FRIEND_FIXTURES);
 
         mockMvc.perform(post("/api/groups")
                 .cookie(session)

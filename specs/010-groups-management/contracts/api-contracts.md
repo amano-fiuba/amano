@@ -373,7 +373,7 @@ This module defines the API contracts for the groups-management feature. All end
 - 404: Group not found
 - 401: Unauthenticated
 
-**Nota de implementación**: mientras no exista el módulo de amistades, `FriendshipPort` es un stub (lista de amigos de prueba para dev/tests). `UserRepository.searchVerified()` NO se usa para este flujo (busca en toda la base).
+**Nota de implementación**: `FriendshipPort` se resuelve con `AcceptedFriendshipPort`: amigos = solicitudes `ACCEPTED` de `friendship_requests` (011–013), en cualquier dirección (fix 2026-11-04; antes era un stub con una lista fija de correos de prueba). `UserRepository.searchVerified()` NO se usa para este flujo (busca en toda la base).
 
 ## Summary of API Contracts
 

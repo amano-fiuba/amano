@@ -79,7 +79,7 @@ backend/
 │   ├── GroupController.java
 │   ├── port/
 │   │   ├── DebtPort.java + NoOpDebtPort.java       # stub: "sin deudas"
-│   │   └── FriendshipPort.java + NoOpFriendshipPort.java  # stub configurable (datos de prueba)
+│   │   └── FriendshipPort.java + AcceptedFriendshipPort.java  # amistades ACCEPTED reales (fix 2026-11-04; antes NoOpFriendshipPort, stub)
 │   └── dto/                                        # CreateGroupRequest, GroupResponse, etc.
 ├── src/main/resources/db/migration/                # V6__create_groups … V10__create_group_activity, V11__create_group_photos (nuevas)
 └── src/test/java/com/amano/backend/groups/         # *Test (rápidos) + *IT (Testcontainers)
@@ -98,5 +98,5 @@ specs/, compose.yaml, Caddyfile, .specify/   # según repo existente (sin cambio
 
 | Violation (justified) | Why needed | Simpler alternative rejected because |
 |---|---|---|
-| Puertos `DebtPort` / `FriendshipPort` con stubs (patrón de puerto/adapter en el sub-package `port/`, inédito en el repo) | El spec (FR-010/FR-013 y FR-006) requiere reglas de deudas y de amistad cuyos módulos **todavía no existen** en el repo; el principio I prohíbe duplicar infraestructura o inventar entidades ajenas al scope | Acceso directo a un módulo inexistente rompería la construcción; duplicar lógica de amistad/deudas internamente crearía soluciones paralelas para un mismo problema (principio I) — el puerto concentra el acople futuro en un punto |
+| Puertos `DebtPort` / `FriendshipPort` con stubs (`FriendshipPort` ya usa amistades reales desde el fix del 2026-11-04; `DebtPort` sigue siendo stub) (patrón de puerto/adapter en el sub-package `port/`, inédito en el repo) | El spec (FR-010/FR-013 y FR-006) requiere reglas de deudas y de amistad cuyos módulos **todavía no existen** en el repo; el principio I prohíbe duplicar infraestructura o inventar entidades ajenas al scope | Acceso directo a un módulo inexistente rompería la construcción; duplicar lógica de amistad/deudas internamente crearía soluciones paralelas para un mismo problema (principio I) — el puerto concentra el acople futuro en un punto |
 | Sin unicidad de nombre de grupo (contrato previo decía unique 2-50) | Decisión explícita del usuario (2026-10-27): el spec solo exige obligatorio/no vacío; asumir unicidad/longitud inventa un requisito | Constraint DB unique habría impuesto un error (409/400) ante nombres repetidos sin justificación funcional en el spec |

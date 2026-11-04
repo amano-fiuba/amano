@@ -317,6 +317,19 @@ description: "Task list for groups-management feature implementation"
 
 ---
 
+## Fix 2026-11-04 — Amigos reales al agregar miembros (rama `fix/agregar-amigos-al-grupo`)
+
+**Problema**: "Agregar amigo" y "Crear grupo con un amigo" fallaban con amistades reales; el stub `NoOpFriendshipPort` ignoraba `friendship_requests` (research.md §Fix 2026-11-04).
+
+- [X] T092 Crear `groups/port/AcceptedFriendshipPort.java` sobre `FriendshipRequestRepository.findFriendsOf` y eliminar `NoOpFriendshipPort.java` — FR-006/FR-007
+- [X] T093 [P] `AcceptedFriendshipPortTest`: correos de amistades aceptadas, comparación sin mayúsculas/espacios, entradas nulas
+- [X] T094 [P] `GroupRealFriendshipIT`: sin amistad → 404; pendiente → 404 y sin candidatos; aceptada → candidatos y alta 201; ambas direcciones; crear grupo con amigo; rechazada → 404
+- [X] T095 Reemplazar la propiedad `groups.friendship.stub-friend-emails` en los 9 ITs de grupos por amistades `ACCEPTED` reales (`FriendshipFixtures`)
+- [X] T096 `./mvnw -B verify` en verde con JaCoCo ≥ 85 %
+- [ ] T097 Validación manual: enviar y aceptar una solicitud entre dos cuentas y agregar a la otra cuenta a un grupo (quickstart.md escenario 2/3)
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
