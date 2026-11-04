@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { AuthProvider } from './auth/AuthContext'
 import ProtectedRoute from './auth/ProtectedRoute'
 import HomePage from './pages/HomePage'
@@ -9,21 +9,31 @@ import VerifyEmailPage from './pages/VerifyEmailPage'
 import ExpiredLinkPage from './pages/ExpiredLinkPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
-import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import ProfileEditPage from './pages/ProfileEditPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import UsersSearchPage from './pages/UsersSearchPage'
+import FriendsPage from './pages/FriendsPage'
 import NewExpensePage from './pages/NewExpensePage'
 import RecurringExpensesPage from './pages/RecurringExpensesPage'
+import GroupListView from './pages/groups/GroupListView'
+import CreateGroupView from './pages/groups/CreateGroupView'
+import GroupInfoView from './pages/groups/GroupInfoView'
+import GroupHistoryView from './pages/groups/GroupHistoryView'
+import { useParams } from 'react-router'
 import SiteNav from './components/SiteNav'
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
 // '/login' (specs/004-user-login), '/check-email' (pantalla "Revisa tu correo"),
 // '/verify-email' (canje del enlace), '/verify-email/expired' (enlace vencido),
 // '/forgot-password' y '/reset-password' (specs/006-password-recovery), todas
-// públicas por diseño; '/dashboard', '/profile' y sus rutas de edición y de
+// públicas por diseño; '/profile' y sus rutas de edición y de
 // cambio de contraseña (specs/005-edit-user-profile) quedan protegidas.
+function GroupHistoryPage() {
+  const { id } = useParams()
+  return <GroupHistoryView groupId={id} />
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -35,14 +45,9 @@ export function AppRoutes() {
       <Route path="/verify-email/expired" element={<ExpiredLinkPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
+      {/* El dashboard se retiró (el punto de entrada con sesión es /groups);
+          la ruta vieja redirige para no romper URLs guardadas. */}
+      <Route path="/dashboard" element={<Navigate to="/groups" replace />} />
       {/* Ruta protegida del perfil (T005; FR-001, FR-008): sin sesión redirige. */}
       {/* Registro de gasto (specs/007-register-expense, FR-001/FR-002). */}
       <Route
@@ -68,6 +73,49 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <UsersSearchPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Amigos y solicitudes pendientes (specs/011-send-friend-request, FR-010). */}
+      <Route
+        path="/friends"
+        element={
+          <ProtectedRoute>
+            <FriendsPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Grupos (specs/010-groups-management, US1): listado, creación y detalle. */}
+      <Route
+        path="/groups"
+        element={
+          <ProtectedRoute>
+            <GroupListView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/new"
+        element={
+          <ProtectedRoute>
+            <CreateGroupView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/:id"
+        element={
+          <ProtectedRoute>
+            <GroupInfoView />
+          </ProtectedRoute>
+        }
+      />
+      {/* Grupos (specs/010-groups-management, US9): historial de actividad. */}
+      <Route
+        path="/groups/:id/history"
+        element={
+          <ProtectedRoute>
+            <GroupHistoryPage />
           </ProtectedRoute>
         }
       />

@@ -2,11 +2,13 @@ import { useRef, useState } from 'react'
 import SubmitButton from '../components/SubmitButton'
 import TextField from '../components/TextField'
 import { SEARCH_NETWORK_ERROR_MESSAGE, searchUsers } from '../api/usersClient'
+import { SEND_NETWORK_ERROR_MESSAGE, sendFriendshipRequest } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
 
-// Exact messages of the spec (FR-009, FR-017), exported for the tests.
+// Exact messages of the spec (FR-009, FR-016, FR-017), exported for the tests.
 export const TOO_SHORT_MESSAGE = 'Ingresá al menos 2 caracteres para buscar'
 export const NO_RESULTS_MESSAGE = 'No se encontraron usuarios'
+export const FRIENDSHIP_REQUEST_SENT_MESSAGE = 'Solicitud de amistad enviada'
 
 const MIN_LENGTH = 2
 const DEFAULT_AVATAR = '/avatar-default.png'
@@ -96,10 +98,48 @@ export default function UsersSearchPage() {
   const [results, setResults] = useState([])
   const [notice, setNotice] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [sendingId, setSendingId] = useState(null)
+  const [sentIds, setSentIds] = useState([])
+  const [sendFeedback, setSendFeedback] = useState(null)
   const latestRequest = useRef(0)
 
   const showError = (text, title) => {
     setNotice({ kind: 'error', text, title })
+  }
+
+  // Sends a friendship request (feature 011, US1/US2/US4). The row keeps its own
+  // sent state during this screen session; after a reload the search does not
+  // include relationship status, so a retry relies on the backend's 409.
+  const handleAdd = async (user) => {
+    if (sendingId !== null || sentIds.includes(user.id)) {
+      return
+    }
+    setSendingId(user.id)
+    setSendFeedback(null)
+
+    let result
+    try {
+      result = await sendFriendshipRequest(user.id)
+    } catch {
+      result = { ok: false, network: true }
+    }
+
+    setSendingId(null)
+
+    if (result.ok) {
+      setSentIds((ids) => (ids.includes(user.id) ? ids : [...ids, user.id]))
+      setSendFeedback({ kind: 'success', text: FRIENDSHIP_REQUEST_SENT_MESSAGE })
+      return
+    }
+
+    if (result.status === 401) {
+      setUser(null)
+      return
+    }
+
+    const text =
+      result.fields?.recipientId || result.detail || SEND_NETWORK_ERROR_MESSAGE
+    setSendFeedback({ kind: 'error', text })
   }
 
   const handleSubmit = async (event) => {
@@ -119,6 +159,7 @@ export default function UsersSearchPage() {
     }
 
     setNotice(null)
+    setSendFeedback(null)
     setResults([])
     setIsSearching(true)
 
@@ -245,9 +286,20 @@ export default function UsersSearchPage() {
               {resultsLabel(results.length)}
             </span>
           </div>
+          {sendFeedback && (
+            <p
+              className={`users-search__send-feedback users-search__send-feedback--${sendFeedback.kind}`}
+              role={sendFeedback.kind === 'error' ? 'alert' : 'status'}
+              data-testid="friendship-feedback"
+            >
+              {sendFeedback.text}
+            </p>
+          )}
           <ul className="user-results" aria-label="Resultados de la búsqueda">
             {results.map((user) => {
               const name = fullName(user)
+              const isSending = sendingId === user.id
+              const wasSent = sentIds.includes(user.id)
               return (
                 <li key={user.id} className="user-card" data-testid={`user-card-${user.id}`}>
                   <img
@@ -261,25 +313,26 @@ export default function UsersSearchPage() {
                     <strong>{name}</strong>
                     <span>{user.email}</span>
                   </div>
-                  {/* Friend requests are out of scope (FR-013) and have no API. */}
                   <button
                     type="button"
                     className="user-card__action"
-                    disabled
-                    title="Las solicitudes de amistad estarán disponibles próximamente"
-                    aria-label={`Agregar a ${name} (próximamente)`}
-                    aria-describedby="users-search-friendship-note"
+                    onClick={() => handleAdd(user)}
+                    disabled={isSending || wasSent}
+                    aria-label={
+                      wasSent
+                        ? `Solicitud enviada a ${name}`
+                        : isSending
+                          ? `Enviando solicitud a ${name}`
+                          : `Agregar a ${name}`
+                    }
                   >
                     <UserPlusIcon />
-                    Agregar
+                    {isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
                   </button>
                 </li>
               )
             })}
           </ul>
-          <p className="users-search__friendship-note" id="users-search-friendship-note">
-            Las solicitudes de amistad estarán disponibles próximamente.
-          </p>
         </section>
       )}
     </main>

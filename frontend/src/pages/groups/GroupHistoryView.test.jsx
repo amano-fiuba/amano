@@ -1,0 +1,242 @@
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../api/groupsClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  getActivity: vi.fn(),
+}))
+
+const setUser = vi.fn()
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ setUser }),
+}))
+
+import { getActivity } from '../../api/groupsClient'
+import GroupHistoryView, {
+  HISTORY_ERROR_MESSAGE,
+  NO_ACTIVITY_MESSAGE,
+  NO_FILTERED_ACTIVITY_MESSAGE,
+  NOT_A_MEMBER_MESSAGE,
+} from './GroupHistoryView'
+
+const ANA = { id: 7, firstName: 'Ana', lastName: 'López' }
+
+function page(content, { totalPages = 1, page: number = 1 } = {}) {
+  return { ok: true, content, totalElements: content.length, totalPages, page: number, size: 20 }
+}
+
+function renderView() {
+  return render(
+    <MemoryRouter initialEntries={['/groups/42/history']}>
+      <Routes>
+        <Route path="/groups/:id/history" element={<GroupHistoryView groupId="42" />} />
+        <Route path="/groups/:id" element={<p>Pantalla del grupo</p>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
+beforeEach(() => {
+  getActivity.mockReset()
+  setUser.mockReset()
+})
+
+describe('GroupHistoryView (014)', () => {
+  it('muestra frases completas agrupadas por día con la hora (US1)', async () => {
+    getActivity.mockResolvedValue(page([
+      {
+        id: 3,
+        eventType: 'MEMBER_REMOVED',
+        actor: ANA,
+        details: { type: 'REGISTERED', userId: 15, name: 'Juan Pérez' },
+        createdAt: '2026-11-03T15:20:00Z',
+      },
+      {
+        id: 2,
+        eventType: 'MEMBER_ADDED',
+        actor: ANA,
+        details: { type: 'SIMULATED', name: 'Abuela' },
+        createdAt: '2026-11-03T12:00:00Z',
+      },
+      {
+        id: 1,
+        eventType: 'MEMBER_ADDED',
+        actor: null,
+        details: { type: 'REGISTERED', name: 'Juan Pérez', atCreation: true },
+        createdAt: '2026-10-20T13:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries).toHaveLength(3)
+    expect(entries[0]).toHaveTextContent('Ana López quitó a Juan Pérez del grupo')
+    expect(entries[0]).toHaveTextContent('12:20')
+    expect(entries[1]).toHaveTextContent('Ana López agregó el perfil simulado Abuela')
+    expect(entries[2]).toHaveTextContent('Alguien agregó a Juan Pérez al crear el grupo')
+
+    const days = screen.getAllByRole('heading', { level: 2 })
+    expect(days).toHaveLength(2)
+    expect(days[0]).toHaveTextContent(/3 de noviembre de 2026/)
+    expect(days[1]).toHaveTextContent(/20 de octubre de 2026/)
+    expect(within(screen.getByRole('region', { name: /3 de noviembre/ })).getAllByTestId('activity-entry'))
+      .toHaveLength(2)
+
+    expect(getActivity).toHaveBeenCalledWith('42', { page: 1, size: 20, eventTypes: [] })
+    expect(screen.queryByText(/se registrarán cuando exista la integración/i)).not.toBeInTheDocument()
+  })
+
+  it('muestra gastos y pagos (US2)', async () => {
+    getActivity.mockResolvedValue(page([
+      {
+        id: 2,
+        eventType: 'PAYMENT_MADE',
+        actor: ANA,
+        details: { amount: '500', currency: 'ARS', fromName: 'Juan', toName: 'Ana' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+      {
+        id: 1,
+        eventType: 'EXPENSE_CREATED',
+        actor: ANA,
+        details: { amount: '1500.00', currency: 'ARS', description: 'Súper' },
+        createdAt: '2026-11-03T14:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries[0].textContent).toMatch(/Ana López registró un pago de \$\s?500,00 de Juan a Ana/)
+    expect(entries[1].textContent).toMatch(/Ana López registró un gasto de \$\s?1\.500,00 «Súper»/)
+  })
+
+  it('avisa cuando todavía no hay actividad (US3)', async () => {
+    getActivity.mockResolvedValue({ ok: true, totalPages: 0 })
+
+    renderView()
+
+    expect(await screen.findByText(NO_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: /Paginación/ })).not.toBeInTheDocument()
+  })
+
+  it('filtra por tipo, vuelve a la página 1 y avisa si el filtro no tiene resultados (US3)', async () => {
+    const user = userEvent.setup()
+    const many = Array.from({ length: 20 }, (_, index) => ({
+      id: 100 - index,
+      eventType: 'MEMBER_LEFT',
+      actor: ANA,
+      details: {},
+      createdAt: '2026-11-03T15:00:00Z',
+    }))
+    getActivity
+      .mockResolvedValueOnce(page(many, { totalPages: 3 }))
+      .mockResolvedValueOnce(page(many, { totalPages: 3, page: 2 }))
+      .mockResolvedValueOnce(page([], { totalPages: 0 }))
+
+    renderView()
+    expect(await screen.findByText('Página 1 de 3')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Anterior' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByText('Página 2 de 3')).toBeInTheDocument()
+    expect(getActivity).toHaveBeenLastCalledWith('42', { page: 2, size: 20, eventTypes: [] })
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Mostrar' }), 'Bajas')
+
+    expect(await screen.findByText(NO_FILTERED_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    expect(getActivity).toHaveBeenLastCalledWith('42', {
+      page: 1, size: 20, eventTypes: ['MEMBER_REMOVED', 'MEMBER_LEFT'],
+    })
+  })
+
+  it('pagina hacia atrás', async () => {
+    const user = userEvent.setup()
+    const entry = { id: 1, eventType: 'MEMBER_LEFT', actor: ANA, details: {}, createdAt: '2026-11-03T15:00:00Z' }
+    getActivity
+      .mockResolvedValueOnce(page([entry], { totalPages: 2 }))
+      .mockResolvedValueOnce(page([entry], { totalPages: 2, page: 2 }))
+      .mockResolvedValueOnce(page([entry], { totalPages: 2 }))
+
+    renderView()
+    await user.click(await screen.findByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByText('Página 2 de 2')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Siguiente' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Anterior' }))
+    expect(await screen.findByText('Página 1 de 2')).toBeInTheDocument()
+    expect(getActivity).toHaveBeenLastCalledWith('42', { page: 1, size: 20, eventTypes: [] })
+  })
+
+  it('ante un error de red muestra el mensaje con reintento y sin entradas viejas (US3)', async () => {
+    const user = userEvent.setup()
+    getActivity
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValueOnce(page([
+        { id: 1, eventType: 'MEMBER_LEFT', actor: ANA, details: {}, createdAt: '2026-11-03T15:00:00Z' },
+      ]))
+
+    renderView()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(HISTORY_ERROR_MESSAGE)
+    expect(screen.queryByTestId('activity-entry')).not.toBeInTheDocument()
+
+    await user.click(within(alert).getByRole('button', { name: 'Reintentar' }))
+
+    expect(await screen.findByTestId('activity-entry')).toHaveTextContent('Ana López abandonó el grupo')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('ante 404 informa que no existe el grupo o no sos miembro, sin reintento', async () => {
+    getActivity.mockResolvedValue({ ok: false, status: 404 })
+
+    renderView()
+
+    const alert = await screen.findByTestId('history-error')
+    expect(alert).toHaveTextContent(NOT_A_MEMBER_MESSAGE)
+    expect(within(alert).queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('ante 401 cierra la sesión local', async () => {
+    getActivity.mockResolvedValue({ ok: false, status: 401 })
+
+    renderView()
+
+    await waitFor(() => expect(setUser).toHaveBeenCalledWith(null))
+  })
+
+  it('una respuesta vieja no pisa a la más reciente', async () => {
+    const user = userEvent.setup()
+    let resolveFirst
+    getActivity
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve }))
+      .mockResolvedValueOnce(page([
+        { id: 2, eventType: 'PHOTO_CHANGED', actor: ANA, details: {}, createdAt: '2026-11-03T15:00:00Z' },
+      ]))
+
+    renderView()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Mostrar' }), 'Cambios del grupo')
+    expect(await screen.findByTestId('activity-entry')).toHaveTextContent('cambió la foto del grupo')
+
+    resolveFirst(page([
+      { id: 1, eventType: 'MEMBER_LEFT', actor: ANA, details: {}, createdAt: '2026-11-03T15:00:00Z' },
+    ]))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(screen.getAllByTestId('activity-entry')).toHaveLength(1)
+    expect(screen.queryByText(/abandonó el grupo/)).not.toBeInTheDocument()
+  })
+
+  it('"Volver al grupo" lleva a la pantalla del grupo', async () => {
+    const user = userEvent.setup()
+    getActivity.mockResolvedValue(page([]))
+
+    renderView()
+    await user.click(screen.getByRole('link', { name: 'Volver al grupo' }))
+
+    expect(await screen.findByText('Pantalla del grupo')).toBeInTheDocument()
+  })
+})

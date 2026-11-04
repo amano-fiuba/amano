@@ -20,6 +20,11 @@ import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.IdempotencyConflictException;
+import com.amano.backend.friendship.AlreadyFriendsException;
+import com.amano.backend.friendship.FriendshipRecipientNotFoundException;
+import com.amano.backend.friendship.FriendshipRequestAlreadyRespondedException;
+import com.amano.backend.friendship.FriendshipRequestNotFoundException;
+import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
 
@@ -207,6 +212,54 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Unknown or unverified recipient (feature 011, FR-007): neutral 404. */
+    @ExceptionHandler(FriendshipRecipientNotFoundException.class)
+    public ProblemDetail handleFriendshipRecipientNotFound(
+            FriendshipRecipientNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /** Both accounts are already friends (feature 011, FR-006): 409. */
+    @ExceptionHandler(AlreadyFriendsException.class)
+    public ProblemDetail handleAlreadyFriends(AlreadyFriendsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Conflicto");
+        return problem;
+    }
+
+    /** Pending request already exists between the pair (feature 011, FR-005): 409. */
+    @ExceptionHandler(PendingFriendshipRequestExistsException.class)
+    public ProblemDetail handlePendingFriendshipRequestExists(
+            PendingFriendshipRequestExistsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Conflicto");
+        return problem;
+    }
+
+    /** Unknown request or not directed to the session user (feature 012, FR-007/FR-009): neutral 404. */
+    @ExceptionHandler(FriendshipRequestNotFoundException.class)
+    public ProblemDetail handleFriendshipRequestNotFound(FriendshipRequestNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /** Already answered request, outcome not revealed (feature 012, FR-008): 409. */
+    @ExceptionHandler(FriendshipRequestAlreadyRespondedException.class)
+    public ProblemDetail handleFriendshipRequestAlreadyResponded(
+            FriendshipRequestAlreadyRespondedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("Conflicto");
+        return problem;
+    }
+
     /** Service-level validations after normalization (Q3/Q4): same 400 shape (FR-018). */
     @ExceptionHandler(FieldValidationException.class)
     public ProblemDetail handleFieldValidation(FieldValidationException exception) {
@@ -229,6 +282,75 @@ public class ProblemDetailExceptionHandler {
         problem.setTitle("Validación fallida");
         problem.setProperty("properties",
                 Map.of(FIELDS_PROPERTY, Map.of("currentPassword", exception.getMessage())));
+        return problem;
+    }
+
+    /** Spec motive 2 — deudas pendientes (FR-010, US4): 403, member remains. */
+    @ExceptionHandler(com.amano.backend.groups.PendingDebtsException.class)
+    public ProblemDetail handlePendingDebts(com.amano.backend.groups.PendingDebtsException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada por deudas pendientes");
+        problem.setProperty("properties", Map.of("code", "PENDING_DEBTS"));
+        return problem;
+    }
+
+    /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
+    @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
+    public ProblemDetail handleAdminRemovalBlocked(
+            com.amano.backend.groups.AdminRemovalBlockedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada");
+        problem.setProperty("properties", Map.of("code", "REVOKE_ROLE_FIRST"));
+        return problem;
+    }
+
+    /** Spec motive 4 — último admin (US5/US10): 403, operation blocked. */
+    @ExceptionHandler(com.amano.backend.groups.LastAdminException.class)
+    public ProblemDetail handleLastAdmin(com.amano.backend.groups.LastAdminException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada");
+        problem.setProperty("properties", Map.of("code", "LAST_ADMIN"));
+        return problem;
+    }
+
+    /** Spec motive 1 — ya es miembro (FR-007, US3): 400 with the exact reason. */
+    @ExceptionHandler(com.amano.backend.groups.AlreadyMemberException.class)
+    public ProblemDetail handleAlreadyMember(com.amano.backend.groups.AlreadyMemberException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, com.amano.backend.groups.AlreadyMemberException.MESSAGE);
+        problem.setTitle("Validación fallida");
+        problem.setProperty("properties", Map.of(FIELDS_PROPERTY, exception.getFields()));
+        return problem;
+    }
+
+    /** Service-level authorization rejection (US2/US3): 403 with the reason. */
+    @ExceptionHandler(com.amano.backend.groups.GroupPermissionDeniedException.class)
+    public ProblemDetail handleGroupPermissionDenied(
+            com.amano.backend.groups.GroupPermissionDeniedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación no permitida");
+        return problem;
+    }
+
+    /** Adding a registered member outside the friendship relation (US1/US3): one neutral 404. */
+    @ExceptionHandler(com.amano.backend.groups.NotFriendException.class)
+    public ProblemDetail handleNotFriend(com.amano.backend.groups.NotFriendException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("No encontrado");
+        return problem;
+    }
+
+    /** The group does not exist or the caller is not a member (US1 detail): one neutral 404. */
+    @ExceptionHandler(com.amano.backend.groups.GroupNotFoundException.class)
+    public ProblemDetail handleGroupNotFound(com.amano.backend.groups.GroupNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Grupo no encontrado");
         return problem;
     }
 

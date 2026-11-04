@@ -1,0 +1,127 @@
+import { describe, expect, it } from 'vitest'
+import {
+  ACTIVITY_FILTERS,
+  actorName,
+  dayKey,
+  describeActivity,
+  formatDay,
+  formatMoney,
+  formatTime,
+  groupByDay,
+} from './activityDescriptions'
+
+const ANA = { id: 7, firstName: 'Ana', lastName: 'López' }
+
+function phrase(eventType, details, actor = ANA) {
+  const { actor: name, text } = describeActivity({ eventType, details, actor })
+  return `${name} ${text}`
+}
+
+describe('describeActivity: altas y bajas (014 US1)', () => {
+  it('describe altas de registrados y simulados, con y sin creación del grupo', () => {
+    expect(phrase('MEMBER_ADDED', { type: 'REGISTERED', name: 'Juan Pérez' }))
+      .toBe('Ana López agregó a Juan Pérez')
+    expect(phrase('MEMBER_ADDED', { type: 'REGISTERED', name: 'Juan Pérez', atCreation: true }))
+      .toBe('Ana López agregó a Juan Pérez al crear el grupo')
+    expect(phrase('MEMBER_ADDED', { type: 'SIMULATED', name: 'Abuela "Tita"' }))
+      .toBe('Ana López agregó el perfil simulado Abuela "Tita"')
+    expect(phrase('MEMBER_ADDED', { type: 'SIMULATED', name: 'Abuela', atCreation: true }))
+      .toBe('Ana López agregó el perfil simulado Abuela al crear el grupo')
+  })
+
+  it('usa el correo o una frase genérica en las altas anteriores a 014', () => {
+    expect(phrase('MEMBER_ADDED', { type: 'REGISTERED', email: 'juan@example.com' }))
+      .toBe('Ana López agregó a juan@example.com')
+    expect(phrase('MEMBER_ADDED', null)).toBe('Ana López agregó a un miembro')
+    expect(phrase('MEMBER_ADDED', { atCreation: true, name: '  ' }))
+      .toBe('Ana López agregó a un miembro al crear el grupo')
+  })
+
+  it('describe bajas de registrados y simulados, incluidas las viejas', () => {
+    expect(phrase('MEMBER_REMOVED', { type: 'REGISTERED', userId: 15, name: 'Juan Pérez' }))
+      .toBe('Ana López quitó a Juan Pérez del grupo')
+    expect(phrase('MEMBER_REMOVED', { type: 'SIMULATED', name: 'Abuela' }))
+      .toBe('Ana López quitó el perfil simulado Abuela')
+    // formato viejo de 010: simulado sin "type" pero con simulatedProfileId
+    expect(phrase('MEMBER_REMOVED', { simulatedProfileId: 4, name: 'Abuela' }))
+      .toBe('Ana López quitó el perfil simulado Abuela')
+    // formato viejo de 010: registrado con solo el id
+    expect(phrase('MEMBER_REMOVED', { userId: 15 })).toBe('Ana López quitó a un miembro del grupo')
+  })
+
+  it('describe salidas, permisos, foto y tipos desconocidos', () => {
+    expect(phrase('MEMBER_LEFT', {})).toBe('Ana López abandonó el grupo')
+    expect(phrase('PERMISSION_CHANGED', { fields: ['permissions'] }))
+      .toBe('Ana López cambió los permisos del grupo')
+    expect(phrase('PHOTO_CHANGED', {})).toBe('Ana López cambió la foto del grupo')
+    expect(phrase('GROUP_ARCHIVED', {})).toBe('Ana López realizó una acción en el grupo')
+    expect(describeActivity(undefined)).toEqual({ actor: 'Alguien', text: 'realizó una acción en el grupo' })
+  })
+
+  it('arma el nombre del actor sin "null" ni espacios sobrantes', () => {
+    expect(actorName(null)).toBe('Alguien')
+    expect(actorName({ firstName: 'Juan', lastName: null })).toBe('Juan')
+    expect(actorName({ firstName: ' Juan ', lastName: '  ' })).toBe('Juan')
+    expect(actorName({ firstName: '', lastName: '' })).toBe('Alguien')
+  })
+})
+
+describe('describeActivity: gastos y pagos (014 US2)', () => {
+  it('describe gastos con monto en pesos y descripción opcional', () => {
+    const withDescription = phrase('EXPENSE_CREATED', { amount: '1500.00', currency: 'ARS', description: 'Súper' })
+    expect(withDescription).toMatch(/^Ana López registró un gasto de \$\s?1\.500,00 «Súper»$/)
+    expect(phrase('EXPENSE_CREATED', { amount: '1500.00', currency: 'ARS' }))
+      .toMatch(/^Ana López registró un gasto de \$\s?1\.500,00$/)
+    expect(phrase('EXPENSE_CREATED', {})).toBe('Ana López registró un gasto')
+  })
+
+  it('describe pagos con quién paga y quién recibe', () => {
+    expect(phrase('PAYMENT_MADE', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez', toName: 'Ana López' }))
+      .toMatch(/^Ana López registró un pago de \$\s?500,00 de Juan Pérez a Ana López$/)
+    expect(phrase('PAYMENT_MADE', { amount: '500', currency: 'ARS', toName: 'Ana' }))
+      .toMatch(/registró un pago de \$\s?500,00 a Ana$/)
+    expect(phrase('PAYMENT_MADE', { fromName: 'Juan' })).toBe('Ana López registró un pago de Juan')
+  })
+
+  it('formatea montos y tolera monedas desconocidas o datos faltantes', () => {
+    expect(formatMoney('10', 'USD')).toMatch(/US\$\s?10,00/)
+    expect(formatMoney('10', 'NOPE1')).toBe('NOPE1 10')
+    expect(formatMoney('10', '')).toBe('10')
+    expect(formatMoney('abc', 'ARS')).toBeNull()
+    expect(formatMoney(null, 'ARS')).toBeNull()
+    expect(formatMoney('', 'ARS')).toBeNull()
+  })
+})
+
+describe('agrupación por día (014 FR-015)', () => {
+  it('agrupa por día de Argentina y muestra la hora', () => {
+    const entries = [
+      { id: 3, createdAt: '2026-11-03T15:20:00Z' },
+      { id: 2, createdAt: '2026-11-03T12:00:00Z' },
+      // 02:30 UTC del 3 = 23:30 del 2 en Argentina
+      { id: 1, createdAt: '2026-11-03T02:30:00Z' },
+    ]
+
+    const groups = groupByDay(entries)
+
+    expect(groups.map((group) => group.key)).toEqual(['2026-11-03', '2026-11-02'])
+    expect(groups[0].entries.map((entry) => entry.id)).toEqual([3, 2])
+    expect(groups[0].label).toMatch(/^Martes,? 3 de noviembre de 2026$/)
+    expect(formatTime('2026-11-03T15:20:00Z')).toMatch(/12:20/)
+    expect(dayKey('2026-11-03T02:30:00Z')).toBe('2026-11-02')
+  })
+
+  it('tolera fechas inválidas', () => {
+    expect(dayKey('no es fecha')).toBe('sin-fecha')
+    expect(formatDay('no es fecha')).toBe('Sin fecha')
+    expect(formatTime(undefined)).toBe('')
+  })
+
+  it('expone los filtros del contrato', () => {
+    expect(ACTIVITY_FILTERS.map((option) => option.label)).toEqual([
+      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Cambios del grupo',
+    ])
+    expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMOVED').eventTypes)
+      .toEqual(['MEMBER_REMOVED', 'MEMBER_LEFT'])
+  })
+})
