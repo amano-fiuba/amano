@@ -1,9 +1,12 @@
 package com.amano.backend.groups;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -39,6 +42,17 @@ public class ActivityEventService {
     public GroupActivity record(Long groupId, GroupActivity.GroupActivityType type, Long actorUserId,
             Map<String, ?> details) {
         return repository.save(new GroupActivity(groupId, type, actorUserId, toJson(details)));
+    }
+
+    /** 015 FR-007: latest event per group; groups without events are absent. */
+    @Transactional(readOnly = true)
+    public Map<Long, OffsetDateTime> lastActivityByGroup(Collection<Long> groupIds) {
+        if (groupIds.isEmpty()) {
+            return Map.of();
+        }
+        return repository.findLastActivityByGroupIds(groupIds).stream()
+                .collect(Collectors.toMap(GroupActivityRepository.LastActivity::getGroupId,
+                        GroupActivityRepository.LastActivity::getLastActivityAt));
     }
 
     /**

@@ -13,6 +13,7 @@ public class GroupSummaryResponse {
     private String description;
     private String photo;
     private OffsetDateTime createdAt;
+    private OffsetDateTime lastActivityAt;
     private long memberCount;
     private String currentUserRole;
 
@@ -54,6 +55,15 @@ public class GroupSummaryResponse {
 
     public void setCreatedAt(OffsetDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    /** 015 FR-007: latest history event, or {@code createdAt} without events. */
+    public OffsetDateTime getLastActivityAt() {
+        return lastActivityAt;
+    }
+
+    public void setLastActivityAt(OffsetDateTime lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
     }
 
     public long getMemberCount() {
