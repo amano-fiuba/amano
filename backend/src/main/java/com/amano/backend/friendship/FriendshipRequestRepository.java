@@ -54,6 +54,21 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
     List<FriendResponse> findFriendsOf(@Param("userId") Long userId);
 
     /**
+     * Deletes the ACCEPTED row between the two accounts in either direction
+     * (feature 016, FR-007/FR-009). Returns the affected row count so the service
+     * can distinguish a real deletion (1) from a missing or concurrent one (0).
+     * Pending and rejected rows are never touched.
+     */
+    @Modifying
+    @Query("""
+            delete from FriendshipRequest r
+            where r.status = ACCEPTED
+              and ((r.senderId = :a and r.recipientId = :b)
+                or (r.senderId = :b and r.recipientId = :a))
+            """)
+    int deleteAcceptedBetween(@Param("a") Long a, @Param("b") Long b);
+
+    /**
      * Atomic transition of a pending request owned by {@code recipientId} to a
      * final status (feature 012, FR-011): id, ownership and PENDING preconditions
      * live in the same statement so exactly one concurrent response wins and the
