@@ -21,9 +21,11 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.friendship.AlreadyFriendsException;
+import com.amano.backend.friendship.FriendNotFoundException;
 import com.amano.backend.friendship.FriendshipRecipientNotFoundException;
 import com.amano.backend.friendship.FriendshipRequestAlreadyRespondedException;
 import com.amano.backend.friendship.FriendshipRequestNotFoundException;
+import com.amano.backend.friendship.PendingDirectDebtException;
 import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
@@ -257,6 +259,25 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT, exception.getMessage());
         problem.setTitle("Conflicto");
+        return problem;
+    }
+
+    /** Not friends or friendship already deleted (feature 016, FR-025): neutral 404. */
+    @ExceptionHandler(FriendNotFoundException.class)
+    public ProblemDetail handleFriendNotFound(FriendNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /** Pending direct debt (feature 016, FR-011..FR-013): 403, friendship unchanged. */
+    @ExceptionHandler(PendingDirectDebtException.class)
+    public ProblemDetail handlePendingDirectDebt(PendingDirectDebtException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada por deuda pendiente");
+        problem.setProperty("properties", Map.of("code", PendingDirectDebtException.CODE));
         return problem;
     }
 
