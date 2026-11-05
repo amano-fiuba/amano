@@ -106,7 +106,7 @@ backend/src/main/java/com/amano/backend/groups/
 └── GroupMemberService.java            # M: removeMember / removeSimulatedProfile
 
 backend/src/test/java/com/amano/backend/
-├── groupexpense/EqualSplitTest.java, DebtTest.java, GroupExpenseServiceTest.java        # A
+├── groupexpense/EqualSplitTest.java, DebtTest.java, GroupExpenseServiceTest.java, GroupExpenseControllerTest.java  # A
 ├── groupexpense/GroupExpenseMigrationIT.java, GroupExpenseControllerIT.java             # A
 ├── groups/port/LedgerDebtPortIT.java, groups/GroupDebtBlockingIT.java                 # A
 └── groups/(GroupPermissionCheckerTest, GroupMemberServiceTest, MemberRemovalServiceTest, GroupLeaveServiceTest, GroupServiceTest)  # M/A
@@ -114,14 +114,15 @@ backend/src/test/java/com/amano/backend/
 frontend/src/
 ├── api/groupExpensesClient.js (+ .test.js)                          # A
 ├── pages/groups/splitEqually.js (+ .test.js)                        # A: regla D4 en centavos
-├── pages/groups/debtStatusLabels.js (+ .test.js)                    # A: etiquetas en español
-├── pages/groups/expensePermissions.js (+ .test.js)                  # A: rol + casillas → qué permite la UI
+├── pages/groups/debtStatusLabels.js (+ .test.js)                    # A: etiquetas; el test cubre también permisos y claves
+├── pages/groups/expensePermissions.js                               # A: rol + casillas → qué permite la UI
+├── pages/groups/participantKeys.js                                  # A: claves u:/s: (pruebas en debtStatusLabels.test.js)
 ├── pages/groups/GroupExpenseFormView.jsx (+ .test.jsx)              # A: /groups/:id/expenses/new
 ├── pages/groups/GroupExpenseDetailView.jsx (+ .test.jsx)            # A: /groups/:id/expenses/:expenseId
-├── components/groups/DebtStatusBadge.jsx (+ .test.jsx)              # A
-├── components/groups/ExpenseSharePreview.jsx (+ .test.jsx)          # A
-├── components/groups/ExpenseDebtList.jsx (+ .test.jsx)              # A
-├── components/groups/GroupExpensesCard.jsx (+ .test.jsx)            # A: tarjeta "Gastos" del grupo
+├── components/groups/DebtStatusBadge.jsx                            # A
+├── components/groups/ExpenseSharePreview.jsx                        # A
+├── components/groups/ExpenseDebtList.jsx (+ .test.jsx)              # A: el test cubre los cuatro componentes
+├── components/groups/GroupExpensesCard.jsx                          # A: tarjeta "Gastos" del grupo
 ├── pages/groups/GroupInfoView.jsx (+ .test.jsx)                     # M: monta GroupExpensesCard
 ├── pages/groups/GroupHistoryView.jsx (+ .test.jsx)                  # M: "Ver gasto" y ?filter=
 ├── App.jsx (+ App.test.jsx)                                         # M: dos rutas protegidas
@@ -137,14 +138,14 @@ frontend/src/
 `GroupExpenseController.create` toma el usuario de la sesión (`currentUserId()`, patrón de 010) y la cabecera `Idempotency-Key`, y delega en `GroupExpenseService.create`, que es `@Transactional` y sigue este orden:
 
 1. **Membresía**: `GroupMemberRepository` confirma que quien registra es miembro activo. Si no, `GroupNotFoundException` (404 neutral de 010).
-2. **Idempotencia**: busca `(created_by_user_id, idempotency_key)`. Si existe y el cuerpo es igual, devuelve ese gasto con 200. Si el cuerpo es distinto, `IdempotencyConflictException` (422, de 007).
-3. **Permisos**: `GroupPermissionChecker.canCreateExpenses(group, member)` y, si `payerUserId` ≠ quien registra, `canExpenseForOthers(group, member)`. Si alguno falla, 403 con los mensajes del contrato. El ADMIN siempre pasa.
-4. **Entrada**: `ExpenseAmountNormalizer`, `ExpenseDateValidator` (con `deviceTimeZone`) y `ExpenseDescriptionNormalizer` de 007, más la moneda. Todos los errores se juntan en una `FieldValidationException` (400 con `fields`).
-5. **Pagador y participantes**: el pagador tiene que ser miembro registrado activo. Cada participante tiene que ser miembro activo o perfil simulado de **este** grupo, sin repetidos, y tiene que haber al menos uno distinto del pagador. Los nombres visibles se resuelven en este paso.
-6. **División**: `EqualSplit.split(totalCents, n, payerIndex)` devuelve las partes en centavos (D4). Si `base = 0`, 400 en `amount`. Se comprueba que la suma de las partes sea el total.
+2. **Permisos**: `GroupPermissionChecker.canCreateExpenses(role, permissions)` y, si `payerUserId` ≠ quien registra, `canExpenseForOthers(role, permissions)`. Si alguno falla, 403 con los mensajes del contrato. El ADMIN siempre pasa.
+3. **Entrada**: `ExpenseAmountNormalizer`, `ExpenseDateValidator` (con `deviceTimeZone`) y `ExpenseDescriptionNormalizer` de 007, más la moneda. Todos los errores se juntan en una `FieldValidationException` (400 con `fields`).
+4. **Pagador y participantes**: el pagador tiene que ser miembro registrado activo. Cada participante tiene que ser miembro activo o perfil simulado de **este** grupo, sin repetidos, y tiene que haber al menos uno distinto del pagador. Los nombres visibles se resuelven en este paso.
+5. **Idempotencia**: busca `(created_by_user_id, idempotency_key)`. Si existe y el cuerpo normalizado es igual, devuelve ese gasto con 200. Si es distinto, `IdempotencyConflictException` (422, de 007). Va después de validar porque la comparación necesita el cuerpo normalizado (ajuste de la implementación, 2026-11-05).
+6. **División**: `EqualSplit.split(total, n, payerIndex)` devuelve las partes en centavos (D4). Si `base = 0`, 400 en `amount` (se detecta en el paso 3 con `EqualSplit.fits`). La suma de las partes es siempre el total.
 7. **Persistencia**: guarda `GroupExpense`, una `GroupExpenseShare` por participante (con `position` y nombre copiado) y una `Debt` `PENDING` por cada parte que no es del pagador (`creditor = payer`).
 8. **Historial**: `ActivityEventService.recordExpenseCreated(groupId, actorUserId, ExpenseActivityDetails)` (con `expenseId`, `amount`, `currency` y `description`). Es `MANDATORY`, así que corre en la misma transacción. Si falla, se revierte todo (FR-013).
-9. **Carrera de idempotencia**: si dos envíos con la misma clave llegan juntos, el `UNIQUE` de `group_expenses` hace fallar al segundo. Igual que en `ExpenseService`, se captura `DataIntegrityViolationException` y se relee el existente.
+9. **Carrera de idempotencia**: si dos envíos con la misma clave llegan juntos, el `UNIQUE` de `group_expenses` hace fallar al segundo. `GroupExpenseController` captura `DataIntegrityViolationException` y llama a `resolveConcurrentRegistration`, que relee el ganador, igual que en 007.
 
 La respuesta (`GroupExpenseResponse`) arma `shares` y `debts` ordenados por `position`, con `outstanding = amount − paidAmount`.
 
@@ -209,8 +210,9 @@ GroupExpenseDetailView           useParams(id, expenseId) · useAuth()
 | Módulo | Firma | Comportamiento |
 |--------|-------|----------------|
 | `splitEqually.js` | `splitEqually(amountCanonical, participantKeys, payerKey) → [{ key, cents, amount }] \| null` | Pasa a centavos enteros y aplica D4 igual que `EqualSplit`. Devuelve `null` si el monto no es válido o `base = 0`, y la vista previa no se muestra |
-| `debtStatusLabels.js` | `debtStatusLabel(status, outstanding, currency) → string` | `PENDING` → "Pendiente"; `PARTIALLY_PAID` → "Pago parcial · faltan $ X" (con `formatAmount` de 007); `PAID` → "Pagada"; desconocido → "Estado desconocido" |
-| `expensePermissions.js` | `expensePermissions(group, currentUserId) → { canCreateExpenses, canExpenseForOthers }` | ADMIN: los dos en `true`. MEMBER: `!permissions.membersCannotMakeExpenses` y `permissions.membersCanGenerateExpensesForOthers`. Es solo para la UI: el backend decide igual (FR-007, D8) |
+| `debtStatusLabels.js` | `debtStatusLabel(status, outstanding) → string` y `debtStatusModifier(status)` | `PENDING` → "Pendiente"; `PARTIALLY_PAID` → "Pago parcial · faltan $ X" (con `formatAmount` de 007); `PAID` → "Pagada"; desconocido → "Estado desconocido" |
+| `expensePermissions.js` | `expensePermissions(group) → { canCreateExpenses, canExpenseForOthers }` | ADMIN: los dos en `true`. MEMBER: `!permissions.membersCannotMakeExpenses` y `permissions.membersCanGenerateExpensesForOthers`. Es solo para la UI: el backend decide igual (FR-007, D8) |
+| `participantKeys.js` | `participantKey(member)`, `toParticipant(key)`, `userIdOf(key)` | Claves `u:{userId}` / `s:{profileId}` (D7) y su traducción al cuerpo del `POST` |
 | `groupExpensesClient.js` | `createGroupExpense(groupId, payload, idempotencyKey)` y `getGroupExpense(groupId, expenseId)` | Convención de `expenseClient`: nunca lanza. Devuelve `{ ok: true, expense, created }` (`created` = 201), o `{ ok: false, status, detail, fields }`, o `{ ok: false, network: true }` para 5xx y fallos de red. Exporta `GROUP_EXPENSE_NETWORK_ERROR_MESSAGE` y `GROUP_EXPENSE_LOAD_ERROR_MESSAGE` |
 
 ### Componentes

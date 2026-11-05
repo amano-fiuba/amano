@@ -8,6 +8,7 @@ import MemberListView from '../../components/groups/MemberListView'
 import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
 import AddMemberView from './AddMemberView'
+import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
 
 export default function GroupInfoView() {
   const { id } = useParams()
@@ -98,6 +99,9 @@ export default function GroupInfoView() {
               onChanged={refreshGroup}
             />
           </section>
+
+          {/* Gastos del grupo (specs/017-debt-states, FR-021) */}
+          <GroupExpensesCard groupId={id} group={group} />
 
           {/* Acciones del usuario en el grupo */}
           <section className="group-card" aria-label="Acciones del grupo">

@@ -31,9 +31,9 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * US5 contract tests (T064): {@code POST /api/groups/{id}/leave} leaves the
  * group (left_at set + MEMBER_LEFT), the group persists for the others, and
- * the last admin is blocked. Pending balances cannot happen end-to-end with
- * the NoOp DebtPort stub (always zero debts) — that case is covered by unit
- * tests mocking the port (T063).
+ * the last admin is blocked. Groups here have no expenses, so nobody has
+ * debts; the end-to-end blocking by pending debts (017 US2) lives in
+ * {@link GroupDebtBlockingIT}.
  */
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"

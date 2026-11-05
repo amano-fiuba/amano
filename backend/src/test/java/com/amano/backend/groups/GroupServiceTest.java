@@ -224,4 +224,18 @@ class GroupServiceTest {
         verify(userRepository, never()).findByEmail(any());
         verify(groupRepository, never()).save(any(Group.class));
     }
+
+    /** 017 T016 (FR-027): the group detail reports the real number of group expenses. */
+    @Test
+    void theGroupDetailReportsTheRealNumberOfExpenses() {
+        Group group = new Group();
+        org.springframework.test.util.ReflectionTestUtils.setField(group, "id", 42L);
+        group.setName("Depto");
+        when(groupRepository.findById(42L)).thenReturn(Optional.of(group));
+        when(groupMemberRepository.findByIdGroupIdAndIdUserId(42L, CREATOR_ID))
+                .thenReturn(Optional.of(new GroupMember(CREATOR_ID, 42L, GroupMember.ROLE_ADMIN)));
+        when(groupRepository.countGroupExpenses(42L)).thenReturn(5L);
+
+        assertThat(service.getGroup(CREATOR_ID, 42L).getExpensesCount()).isEqualTo(5L);
+    }
 }

@@ -83,6 +83,29 @@ public class GroupPermissionChecker {
                 || GroupMember.ROLE_MEMBER.equals(callerRole);
     }
 
+    /**
+     * 017 (research.md D8, FR-007): registering a group expense. ADMIN always;
+     * MEMBER only when members_cannot_make_expenses = false.
+     */
+    public boolean canCreateExpenses(String callerRole, GroupPermissions permissions) {
+        return allowedUnless(callerRole, permissions != null && permissions.isMembersCannotMakeExpenses());
+    }
+
+    /**
+     * 017 (research.md D8, FR-007): registering a group expense whose payer is
+     * someone else ("generar gastos en nombre de otras personas"). ADMIN always;
+     * MEMBER only when members_can_generate_expenses_for_others = true (positive
+     * casilla, false by default).
+     */
+    public boolean canExpenseForOthers(String callerRole, GroupPermissions permissions) {
+        if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
+            return true;
+        }
+        return GroupMember.ROLE_MEMBER.equals(callerRole)
+                && permissions != null
+                && permissions.isMembersCanGenerateExpensesForOthers();
+    }
+
     private boolean allowedUnless(String callerRole, boolean denied) {
         if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
             return true;

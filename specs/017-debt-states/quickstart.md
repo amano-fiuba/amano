@@ -58,6 +58,8 @@ Los estados "Pago parcial" y "Pagada" no se pueden generar desde la interfaz has
 
 ## Resultado de la validación
 
-- **Línea base (T003)**: pendiente.
-- **Automatizada (T051/T052)**: pendiente (no hay código todavía).
+- **Línea base (T003, 05/11, `feat-crear-estadoss-deudas` con el merge de 016)**: backend 276 unitarias + 186 de integración, JaCoCo 93,0 % de líneas; frontend 603 pruebas. Todo en verde.
+- **Automatizada (T051/T052, 05/11)**:
+  - Backend `./mvnw -B clean verify`: 335 unitarias + 230 de integración, 0 fallos, BUILD SUCCESS. JaCoCo 94,8 % de líneas en total, `groupexpense` 99,3 %, `groups.port` 100 %. La clase nueva o modificada con menor cobertura es `GroupMemberService`, con 91,9 %.
+  - Frontend `npm run lint && npm run test:coverage && npm run build`: 0 errores de lint (2 warnings previos en `ChangePasswordPage`), 672 pruebas en verde, V8 93,9 % de líneas y 93,2 % de sentencias. Todos los archivos nuevos superan el 96 % de líneas y build OK.
 - **Manual**: pendiente.

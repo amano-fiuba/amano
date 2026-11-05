@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 
@@ -151,5 +151,15 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     await waitFor(() => expect(screen.getByTestId('members-list')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /Configuración del grupo/i }))
       .not.toBeInTheDocument()
+  })
+
+  it('muestra la tarjeta "Gastos" con la cantidad y "Nuevo gasto" (017 FR-021)', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: { ...GROUP, expensesCount: 2, permissions: {} } })
+
+    renderView()
+
+    const card = await screen.findByRole('region', { name: 'Gastos del grupo' })
+    expect(within(card).getByTestId('group-expenses-count')).toHaveTextContent('2 gastos registrados')
+    expect(within(card).getByRole('link', { name: 'Nuevo gasto' })).toBeInTheDocument()
   })
 })

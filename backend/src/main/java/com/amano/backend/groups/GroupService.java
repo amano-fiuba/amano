@@ -397,7 +397,7 @@ public class GroupService {
                 .orElseThrow(() -> new GroupNotFoundException(
                         "No existe el grupo solicitado o no sos miembro"));
         GroupMember membership = activeMembership(userId, groupId);
-        if (debtPort.hasPendingDebts(groupId, userId)) {
+        if (debtPort.hasPendingDebtsForUser(groupId, userId)) {
             throw new PendingDebtsException(
                     "No podés abandonar el grupo: tenés saldos pendientes con otros miembros");
         }
@@ -490,7 +490,7 @@ public class GroupService {
         detail.setCurrentUserRole(membership.getRole());
         detail.setPermissions(groupPermissionsRepository.findByGroupId(group.getId()).orElse(null));
         detail.setLastActivity(null); // history events come with later stories (T021 hook points)
-        detail.setExpensesCount(0);
+        detail.setExpensesCount(groupRepository.countGroupExpenses(group.getId())); // 017 FR-027
         return detail;
     }
 

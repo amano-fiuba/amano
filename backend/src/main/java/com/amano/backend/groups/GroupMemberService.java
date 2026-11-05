@@ -227,7 +227,7 @@ public class GroupMemberService {
         if (GroupMember.ROLE_ADMIN.equals(target.getRole())) {
             throw new AdminRemovalBlockedException();
         }
-        if (debtPort.hasPendingDebts(groupId, targetUserId)) {
+        if (debtPort.hasPendingDebtsForUser(groupId, targetUserId)) {
             throw new PendingDebtsException();
         }
 
@@ -270,7 +270,7 @@ public class GroupMemberService {
                 .filter(simulated -> simulated.getGroupId().equals(groupId))
                 .orElseThrow(() -> new GroupNotFoundException(
                         "No existe el perfil simulado en este grupo"));
-        if (debtPort.hasPendingDebts(groupId, profileId)) {
+        if (debtPort.hasPendingDebtsForSimulatedProfile(groupId, profileId)) {
             throw new PendingDebtsException();
         }
 
