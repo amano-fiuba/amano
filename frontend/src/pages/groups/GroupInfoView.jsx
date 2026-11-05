@@ -7,7 +7,14 @@ import GroupDescriptionPanel from '../../components/groups/GroupDescriptionPanel
 import MemberListView from '../../components/groups/MemberListView'
 import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
+import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
+import { memberCountLabel } from './groupDisplay'
+import './groups.scss'
+
+function roleLabel(role) {
+  return role === 'ADMIN' ? 'Administrador' : 'Miembro'
+}
 
 export default function GroupInfoView() {
   const { id } = useParams()
@@ -48,48 +55,94 @@ export default function GroupInfoView() {
     refreshGroup()
   }
 
-  function roleLabel(role) {
-    return role === 'ADMIN' ? 'Administrador' : 'Miembro'
-  }
-
   // UI anticipation only: the server always rules the last-admin motive.
   const isLastAdmin = group?.currentUserRole === 'ADMIN' && group?.memberCount === 1
   const isAdmin = group?.currentUserRole === 'ADMIN'
 
   return (
-    <main className="page group-page">
+    <main className="page group-page group-detail">
       <nav className="group-page__back">
-        <Link to="/groups">Volver a mis grupos</Link>
+        <Link to="/groups">
+          <span aria-hidden="true">←</span> Mis grupos
+        </Link>
       </nav>
       {error && (
         <p role="alert" data-testid="group-error">
           {error}
         </p>
       )}
+      {!group && !error && <GroupRowsSkeleton rows={2} />}
       {group && (
         <>
-          {/* Encabezado: foto + nombre + rol del usuario en el grupo */}
-          <header className="group-page__header" data-testid="group-detail">
-            <div className="group-page__identity">
+          <header className="group-hero" data-testid="group-detail">
+            <div className="group-hero__identity">
               <GroupPhotoPanel
                 groupId={Number(id)}
                 currentPhoto={group.photo ?? null}
                 isAdmin={isAdmin}
-                compact
               />
-              <div>
-                <h2>{group.name}</h2>
-                <p data-testid="group-role">
-                  Tu rol: {roleLabel(group.currentUserRole)} · {group.memberCount}{' '}
-                  {group.memberCount === 1 ? 'miembro' : 'miembros'}
+              <div className="group-hero__text">
+                <h1>{group.name}</h1>
+                <GroupDescriptionPanel description={group.description ?? null} />
+                <p className="group-hero__meta" data-testid="group-role">
+                  {memberCountLabel(group.memberCount)}
+                  <span aria-hidden="true">·</span>
+                  <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
+                    <span className="visually-hidden">Tu rol: </span>
+                    {roleLabel(group.currentUserRole)}
+                  </span>
                 </p>
               </div>
             </div>
-            <GroupDescriptionPanel description={group.description ?? null} />
+            <div className="group-hero__actions">
+              <Link
+                className="group-action"
+                to={`/groups/${id}/history`}
+                data-testid="group-history-link"
+              >
+                Historial de actividad
+              </Link>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="group-action"
+                  aria-expanded={showPermissions}
+                  onClick={() => { setShowPermissions(!showPermissions) }}
+                >
+                  {showPermissions ? 'Cerrar ajustes' : 'Configuración del grupo'}
+                </button>
+              )}
+            </div>
+            {showPermissions && (
+              <div className="group-admin-panel" data-testid="permissions-panel">
+                <GroupPermissionsPanel group={group} permissions={group.permissions ?? {}} />
+              </div>
+            )}
           </header>
 
-          {/* Miembros activos: altas, bajas y cambios de rol se ven al instante */}
-          <section className="group-card" aria-label="Miembros del grupo">
+          <section className="group-detail__section" aria-labelledby="group-members-title">
+            <div className="group-detail__section-header">
+              <h2 id="group-members-title">Miembros ({group.memberCount})</h2>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="group-action"
+                  aria-expanded={showAddMember}
+                  onClick={() => { setShowAddMember(!showAddMember) }}
+                >
+                  {showAddMember ? 'Cerrar' : 'Agregar miembro'}
+                </button>
+              )}
+            </div>
+            {showAddMember && (
+              <div className="group-admin-panel" data-testid="add-member-panel">
+                <AddMemberView
+                  group={group}
+                  permissions={group.permissions ?? {}}
+                  onAdded={handleMemberAdded}
+                />
+              </div>
+            )}
             <MemberListView
               groupId={Number(id)}
               currentUserId={user?.id ?? null}
@@ -99,53 +152,9 @@ export default function GroupInfoView() {
             />
           </section>
 
-          {/* Acciones del usuario en el grupo */}
-          <section className="group-card" aria-label="Acciones del grupo">
-            <div className="group-actions-row">
-              <Link
-                to={`/groups/${id}/history`}
-                data-testid="group-history-link"
-              >
-                Ver historial de actividad
-              </Link>
-              <LeaveGroupPanel groupId={Number(id)} isLastAdmin={isLastAdmin} />
-            </div>
-          </section>
-
-          {/* Controles exclusivos del administrador */}
-          {isAdmin && (
-            <section className="group-card" data-testid="admin-controls" aria-label="Administración">
-              <h3>Administración</h3>
-              <div className="group-admin-controls">
-                <button
-                  type="button"
-                  onClick={() => { setShowAddMember(!showAddMember) }}
-                >
-                  {showAddMember ? 'Cerrar' : 'Agregar miembro'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowPermissions(!showPermissions) }}
-                >
-                  {showPermissions ? 'Cerrar ajustes' : 'Configuración del grupo'}
-                </button>
-              </div>
-              {showAddMember && (
-                <div className="group-admin-panel" data-testid="add-member-panel">
-                  <AddMemberView
-                    group={group}
-                    permissions={group.permissions ?? {}}
-                    onAdded={handleMemberAdded}
-                  />
-                </div>
-              )}
-              {showPermissions && (
-                <div className="group-admin-panel" data-testid="permissions-panel">
-                  <GroupPermissionsPanel group={group} permissions={group.permissions ?? {}} />
-                </div>
-              )}
-            </section>
-          )}
+          <footer className="group-detail__footer">
+            <LeaveGroupPanel groupId={Number(id)} isLastAdmin={isLastAdmin} />
+          </footer>
         </>
       )}
     </main>

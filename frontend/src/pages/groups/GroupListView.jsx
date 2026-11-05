@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { listGroups, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
 import { byLatestActivity, formatActivityDate, memberCountLabel } from './groupDisplay'
-import './GroupListView.scss'
-
-const SKELETON_ROWS = [0, 1, 2]
+import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
+import './groups.scss'
 
 function groupCountLabel(count) {
   return count === 1 ? '1 grupo' : `${count} grupos`
@@ -68,22 +67,7 @@ export default function GroupListView() {
           {error}
         </p>
       )}
-      {groups === null && !error && (
-        <div aria-busy="true">
-          <span className="visually-hidden">Cargando…</span>
-          <ul className="group-rows" aria-hidden="true">
-            {SKELETON_ROWS.map((row) => (
-              <li key={row} className="group-row group-row--skeleton">
-                <span className="group-row__mark" />
-                <span className="group-row__body">
-                  <span className="group-row__line" />
-                  <span className="group-row__line group-row__line--short" />
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {groups === null && !error && <GroupRowsSkeleton />}
       {isEmpty && (
         <div className="groups-page__empty" data-testid="groups-empty">
           <p>Todavía no sos miembro de ningún grupo</p>
@@ -112,7 +96,7 @@ export default function GroupListView() {
                   <span className="group-row__title">
                     <strong>{group.name}</strong>
                     <span
-                      className={`group-row__role group-row__role--${group.currentUserRole.toLowerCase()}`}
+                      className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}
                       data-testid={`group-role-${group.id}`}
                     >
                       {roleLabel(group.currentUserRole)}

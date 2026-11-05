@@ -47,7 +47,11 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile, 
 
   return (
     <section data-testid="remove-member">
-      <button type="button" onClick={openDialog}>
+      <button
+        type="button"
+        className="member-menu__item member-menu__item--danger"
+        onClick={openDialog}
+      >
         {simulatedProfile ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
       </button>
       {error && (
@@ -58,6 +62,7 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile, 
       {open && (
         <div
           role="dialog"
+          className="group-confirm"
           aria-label={`Eliminar a ${targetName}`}
           data-testid="remove-member-dialog"
         >
@@ -70,11 +75,16 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile, 
             </p>
           )}
           {!isAdminTarget && (
-            <button type="button" onClick={confirmRemove} disabled={busy}>
+            <button
+              type="button"
+              className="group-confirm__danger"
+              onClick={confirmRemove}
+              disabled={busy}
+            >
               Confirmar
             </button>
           )}
-          <button type="button" onClick={() => setOpen(false)}>
+          <button type="button" className="group-action" onClick={() => setOpen(false)}>
             Cancelar
           </button>
         </div>

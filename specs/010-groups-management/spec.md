@@ -71,7 +71,7 @@
 ### User Story 7 - Ver descripción del grupo
 **Priority**: P3
 
-**Describe this user journey in plain language**: Se muestra la descripción del grupo si existe, junto con la información principal del grupo. Si el grupo no tiene descripción, se indica que no tiene descripción.
+**Describe this user journey in plain language**: Se muestra la descripción del grupo si existe, junto con la información principal del grupo. Si el grupo no tiene descripción, ese espacio no se muestra.
 
 **Why this priority**: The group description provides context about the group's purpose.
 
@@ -130,7 +130,7 @@
 - **FR-016**: El listado de miembros activos muestra nombre y avatar (si lo tiene), y el usuario actual se distingue visualmente del resto.
 - **FR-017**: El listado de miembros se actualiza con altas y bajas.
 - **FR-018**: La información del grupo es accesible desde la vista de información del grupo.
-- **FR-019**: Se muestra la descripción del grupo si existe; si no, se indica que no tiene descripción.
+- **FR-019**: Se muestra la descripción del grupo si existe; si no, no se muestra nada en su lugar.
 - **FR-020**: La foto del grupo admite solo JPG, JPEG y PNG. Sin foto, se muestra un avatar gris por defecto.
 - **FR-021**: Si falla la carga o el archivo es inválido, se informa y se conserva la foto anterior.
 - **FR-022**: El historial de actividad muestra todas las entradas (altas, bajas, gastos, pagos) en orden cronológico descendente.

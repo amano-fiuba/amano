@@ -11,20 +11,12 @@ describe('GroupDescriptionPanel (T081/T080, US7)', () => {
     expect(panel).toHaveTextContent('Gastos compartidos del depto')
   })
 
-  it('muestra que el grupo no tiene descripción cuando es NULL', () => {
-    render(<GroupDescriptionPanel description={null} />)
+  it('no muestra nada cuando es NULL o vacía', () => {
+    const { container, rerender } = render(<GroupDescriptionPanel description={null} />)
+    expect(container).toBeEmptyDOMElement()
 
-    expect(screen.getByTestId('group-description')).toHaveTextContent(
-      /Este grupo no tiene descripción/,
-    )
-  })
-
-  it('trata la cadena vacía como "sin descripción" (normalización de la UI)', () => {
-    render(<GroupDescriptionPanel description="" />)
-
-    expect(screen.getByTestId('group-description')).toHaveTextContent(
-      /Este grupo no tiene descripción/,
-    )
+    rerender(<GroupDescriptionPanel description="   " />)
+    expect(container).toBeEmptyDOMElement()
   })
 
   it('soporta valores multilinea sin perder el contenido', () => {
