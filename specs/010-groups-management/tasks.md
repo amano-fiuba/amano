@@ -260,7 +260,7 @@ description: "Task list for groups-management feature implementation"
 ### Implementation for User Story 6
 
 - [X] T078 [US6] Implement `GET /api/groups/{id}/members` endpoint in `GroupController.java` returning active members (registered + simulated) with `name`, `avatar`, `role` (read from `GroupMemberRepository` + `UserRepository` / `SimulatedProfileRepository`)
-- [X] T079 [US6] Create `frontend/src/components/groups/MemberListView.jsx`: name + avatar (gray default avatar when the member has none, same mechanism as user avatars — existente), current user visually distinguished ("Vos"), list refreshes on info changes; accessible from `GroupInfoView`; responsive
+- [X] T079 [US6] Create `frontend/src/components/groups/MemberListView.jsx`: name + avatar (gray default avatar when the member has none, same mechanism as user avatars — existente), current user visually distinguished ("Yo"), list refreshes on info changes; accessible from `GroupInfoView`; responsive
 
 **Checkpoint**: Story 6 is independently testable — the member list reflects reality and is refreshed with member changes.
 

@@ -233,7 +233,7 @@ export default function FriendsList({ reloadKey = 0 }) {
               >
                 <img
                   className="friend-request-card__avatar"
-                  src={DEFAULT_AVATAR}
+                  src={friend.avatarUrl || DEFAULT_AVATAR}
                   alt=""
                   width={44}
                   height={44}

@@ -21,17 +21,21 @@ Arreglo ordenado por nombre y apellido (sin distinguir mayúsculas, apellido vac
     "firstName": "Ana",
     "lastName": "Pérez",
     "email": "ana@example.com",
-    "friendsSince": "2026-10-31T14:05:00Z"
+    "friendsSince": "2026-10-31T14:05:00Z",
+    "avatarUrl": "/api/users/12/avatar"
   },
   {
     "id": 8,
     "firstName": "Bruno",
     "lastName": null,
     "email": "bruno@example.com",
-    "friendsSince": "2026-10-30T09:00:00Z"
+    "friendsSince": "2026-10-30T09:00:00Z",
+    "avatarUrl": null
   }
 ]
 ```
+
+`avatarUrl` es `null` si el amigo no tiene avatar propio: la pantalla usa el avatar por defecto.
 
 Nunca incluye `cbu`, `cbuCvu`, `currencies`, `passwordHash` ni otros datos de la cuenta (FR-004).
 

@@ -112,7 +112,8 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^Agregar miembro$/i }))
     fireEvent.click(screen.getByRole('button', { name: /Configuración del grupo/i }))
 
-    expect(screen.getByTestId('admin-controls')).toBeInTheDocument()
+    expect(screen.getByTestId('add-member-panel')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cerrar ajustes' })).toBeInTheDocument()
     // fix 2026-11-04: no manual refresh button anymore
     expect(screen.queryByRole('button', { name: /Actualizar lista/i })).not.toBeInTheDocument()
   })
@@ -151,6 +152,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     await waitFor(() => expect(screen.getByTestId('members-list')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: /Configuración del grupo/i }))
       .not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Agregar miembro$/i })).not.toBeInTheDocument()
   })
 
   it('muestra la tarjeta "Gastos" con la cantidad y "Nuevo gasto" (017 FR-021)', async () => {

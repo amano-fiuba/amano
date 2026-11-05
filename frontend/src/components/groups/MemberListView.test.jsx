@@ -25,6 +25,10 @@ const MEMBERS = [
   { userId: null, simulatedProfileId: 33, name: 'Juan Simulado', avatar: null, role: 'MEMBER' },
 ]
 
+async function openActions(key) {
+  fireEvent.click(await screen.findByTestId(`member-actions-${key}`))
+}
+
 describe('MemberListView (T079/T077, US6)', () => {
   it('renderiza a todos los miembros activos con perfil simulado incluido', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
@@ -36,13 +40,13 @@ describe('MemberListView (T079/T077, US6)', () => {
     expect(screen.getByText('Juan Simulado')).toBeInTheDocument()
   })
 
-  it('distingue al usuario actual con "Vos"', async () => {
+  it('distingue al usuario actual con "Yo"', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 
     render(<MemberListView groupId={3} currentUserId={7} />)
 
     await waitFor(() => expect(screen.getByTestId('member-current')).toHaveTextContent(/Ana López/))
-    expect(screen.getByText(/Vos/)).toBeInTheDocument()
+    expect(screen.getByText('Yo')).toBeInTheDocument()
     expect(screen.queryByTestId('member-current')).not.toHaveTextContent('Carla Gómez')
   })
 
@@ -73,8 +77,45 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin={false} />)
 
     await waitFor(() => expect(screen.getByText('Juan Simulado')).toBeInTheDocument())
-    expect(screen.queryByTestId('grant-admin-user-15')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('revoke-admin-user-7')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('member-actions-user-15')).not.toBeInTheDocument()
+  })
+
+  it('muestra primero al usuario actual', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={15} />)
+
+    const rows = await screen.findAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('Carla Gómez')
+    expect(rows[1]).toHaveTextContent('Ana López')
+  })
+
+  it('el admin no tiene menú de acciones sobre sí mismo', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await screen.findByTestId('member-actions-user-15')
+    expect(screen.queryByTestId('member-actions-user-7')).not.toBeInTheDocument()
+  })
+
+  it('el menú abre y cierra con Escape devolviendo el foco', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await openActions('user-15')
+    const trigger = screen.getByRole('button', { name: 'Acciones de Carla Gómez' })
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+
+    const item = screen.getByTestId('grant-admin-user-15')
+    item.focus()
+    fireEvent.keyDown(item, { key: 'Escape' })
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('grant-admin-user-15')).not.toBeInTheDocument(),
+    )
+    expect(trigger).toHaveFocus()
   })
 
   it('siendo admin muestra "Hacer admin" en miembros y elimina perfiles simulados', async () => {
@@ -82,9 +123,11 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
 
-    expect(await screen.findByTestId('grant-admin-user-15')).toHaveTextContent(/Hacer admin/)
+    await openActions('user-15')
+    expect(screen.getByTestId('grant-admin-user-15')).toHaveTextContent(/Hacer admin/)
+    await openActions('sim-33')
     expect(screen.queryByTestId('grant-admin-sim-33')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Eliminar/i }).length).toBeLessThan(10)
+    expect(screen.getByRole('button', { name: 'Eliminar perfil simulado' })).toBeInTheDocument()
   })
 
   it('muestra el error de conexión cuando getMembers falla', async () => {
@@ -105,6 +148,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
 
     const row = await screen.findByTestId('member-row-sim-33')
+    await openActions('sim-33')
     expect(row).toHaveTextContent('Juan Simulado')
     expect(row.querySelector('[data-testid^="grant-admin"]')).toBeNull()
     expect(row.querySelector('[data-testid^="revoke-admin"]')).toBeNull()
@@ -122,6 +166,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin onChanged={onChanged} />)
 
     const row = await screen.findByTestId('member-row-sim-33')
+    await openActions('sim-33')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar perfil simulado' }))
     fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
 
@@ -142,6 +187,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
 
     const row = await screen.findByTestId('member-row-user-15')
+    await openActions('user-15')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar miembro' }))
     fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
 
@@ -156,7 +202,8 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     render(<MemberListView groupId={3} currentUserId={7} isAdmin onChanged={onChanged} />)
 
-    fireEvent.click(await screen.findByTestId('grant-admin-user-15'))
+    await openActions('user-15')
+    fireEvent.click(screen.getByTestId('grant-admin-user-15'))
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
     expect(grantAdminRole).toHaveBeenCalledWith(3, 15)

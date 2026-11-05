@@ -181,6 +181,81 @@ class FriendListIT {
                 .andExpect(jsonPath("$", hasSize(0)));
     }
 
+    // ---- Avatares ajenos ----
+
+    private void avatar(long userId) {
+        jdbcTemplate.update("INSERT INTO user_avatars (user_id, content_type, data) VALUES (?, 'image/png', ?)",
+                userId, new byte[] {1, 2, 3});
+    }
+
+    private long groupWith(long... members) {
+        long group = jdbcTemplate.queryForObject(
+                "INSERT INTO groups (name) VALUES ('Viaje') RETURNING id", Long.class);
+        for (long member : members) {
+            jdbcTemplate.update("INSERT INTO group_members (user_id, group_id, role) VALUES (?, ?, 'MEMBER')",
+                    member, group);
+        }
+        return group;
+    }
+
+    private ResultActions avatarAs(long viewer, long owner) throws Exception {
+        return mockMvc.perform(get("/api/users/" + owner + "/avatar")
+                .cookie(new Cookie("amano_auth", jwtService.issueToken(viewer))));
+    }
+
+    @Test
+    void listsTheAvatarUrlOnlyOfFriendsWithACustomAvatar() throws Exception {
+        long me = verified("ConFotos", "Siete");
+        long withPhoto = verified("Aconfoto", "Siete");
+        long withoutPhoto = verified("Bsinfoto", "Siete");
+        friends(me, withPhoto);
+        friends(withoutPhoto, me);
+        avatar(withPhoto);
+
+        listAs(me)
+                .andExpect(jsonPath("$[0].avatarUrl").value("/api/users/" + withPhoto + "/avatar"))
+                .andExpect(jsonPath("$[1].avatarUrl").doesNotExist());
+    }
+
+    @Test
+    void friendsInEitherDirectionCanSeeTheAvatar() throws Exception {
+        long me = verified("Vista", "Ocho");
+        long friend = verified("Amiga", "Ocho");
+        friends(me, friend);
+        avatar(friend);
+        avatar(me);
+
+        avatarAs(me, friend).andExpect(status().isOk());
+        avatarAs(friend, me).andExpect(status().isOk());
+    }
+
+    @Test
+    void activeGroupMatesCanSeeTheAvatarUntilOneLeaves() throws Exception {
+        long me = verified("Grupo", "Nueve");
+        long mate = verified("Companera", "Nueve");
+        long group = groupWith(me, mate);
+        avatar(mate);
+
+        avatarAs(me, mate).andExpect(status().isOk());
+
+        jdbcTemplate.update("UPDATE group_members SET left_at = now() WHERE group_id = ? AND user_id = ?",
+                group, mate);
+        avatarAs(me, mate).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void unrelatedAccountsAndPendingRequestsCannotSeeTheAvatar() throws Exception {
+        long me = verified("Ajena", "Diez");
+        long stranger = verified("Extrana", "Diez");
+        long pending = verified("Pendiente", "Diez");
+        request(pending, me, "PENDING", null);
+        avatar(stranger);
+        avatar(pending);
+
+        avatarAs(me, stranger).andExpect(status().isNotFound());
+        avatarAs(me, pending).andExpect(status().isNotFound());
+    }
+
     // ---- US3 ----
 
     @Test

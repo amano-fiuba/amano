@@ -42,7 +42,7 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
 
   return (
     <section data-testid="leave-group">
-      <button type="button" onClick={openDialog}>
+      <button type="button" className="group-danger" onClick={openDialog}>
         Abandonar grupo
       </button>
       {error && (
@@ -51,7 +51,12 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
         </p>
       )}
       {open && (
-        <div role="dialog" aria-label="Abandonar el grupo" data-testid="leave-group-dialog">
+        <div
+          role="dialog"
+          className="group-confirm"
+          aria-label="Abandonar el grupo"
+          data-testid="leave-group-dialog"
+        >
           {isLastAdmin ? (
             <p role="alert" data-testid="leave-group-last-admin-hint">
               {LAST_ADMIN_MESSAGE}
@@ -59,12 +64,17 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
           ) : (
             <>
               <p>¿Seguro que querés abandonar el grupo? Vas a dejar de ver sus gastos.</p>
-              <button type="button" onClick={confirmLeave} disabled={busy}>
+              <button
+                type="button"
+                className="group-confirm__danger"
+                onClick={confirmLeave}
+                disabled={busy}
+              >
                 Confirmar
               </button>
             </>
           )}
-          <button type="button" onClick={() => setOpen(false)}>
+          <button type="button" className="group-action" onClick={() => setOpen(false)}>
             Cancelar
           </button>
         </div>

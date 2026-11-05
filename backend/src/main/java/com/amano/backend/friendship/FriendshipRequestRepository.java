@@ -43,10 +43,12 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
      */
     @Query("""
             select new com.amano.backend.friendship.FriendResponse(
-                u.id, u.firstName, u.lastName, u.email, r.respondedAt)
+                u.id, u.firstName, u.lastName, u.email, r.respondedAt,
+                case when a.id is not null then true else false end)
             from FriendshipRequest r
             join User u on u.id = case when r.senderId = :userId
                                        then r.recipientId else r.senderId end
+            left join UserAvatar a on a.id = u.id
             where r.status = ACCEPTED
               and (r.senderId = :userId or r.recipientId = :userId)
             order by lower(u.firstName), lower(u.lastName) nulls last, u.id

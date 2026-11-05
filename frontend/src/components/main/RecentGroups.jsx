@@ -1,22 +1,13 @@
 import { Link } from 'react-router'
 import { GROUPS_NETWORK_ERROR_MESSAGE, listGroups } from '../../api/groupsClient'
 import { useSessionData } from '../../hooks/useSessionData'
+import {
+  byLatestActivity,
+  formatActivityDate,
+  memberCountLabel,
+} from '../../pages/groups/groupDisplay'
 
 const VISIBLE_GROUPS = 5
-
-function latestFirst(groups) {
-  return [...groups]
-    .sort((a, b) => Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt))
-    .slice(0, VISIBLE_GROUPS)
-}
-
-function formatDate(isoDateTime) {
-  return new Date(isoDateTime).toLocaleDateString('es-AR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
-}
 
 // Los grupos con actividad más reciente (specs/015-main-screen, FR-007).
 export default function RecentGroups() {
@@ -36,7 +27,7 @@ export default function RecentGroups() {
       )}
       {items.length > 0 && (
         <ul className="main-list">
-          {latestFirst(items).map((group) => (
+          {byLatestActivity(items).slice(0, VISIBLE_GROUPS).map((group) => (
             <li key={group.id}>
               <Link to={`/groups/${group.id}`} className="main-group">
                 {group.photo ? (
@@ -49,8 +40,8 @@ export default function RecentGroups() {
                 <span className="main-group__body">
                   <strong>{group.name}</strong>
                   <small>
-                    {group.memberCount === 1 ? '1 miembro' : `${group.memberCount} miembros`}
-                    {' · '}Actividad: {formatDate(group.lastActivityAt)}
+                    {memberCountLabel(group.memberCount)}
+                    {' · '}Actividad: {formatActivityDate(group.lastActivityAt)}
                   </small>
                 </span>
               </Link>
