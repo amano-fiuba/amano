@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { AppRoutes } from './App'
@@ -310,5 +310,40 @@ describe('App ruta del buscador (specs/008-user-search)', () => {
     expect(
       await screen.findByRole('heading', { name: 'Buscar usuarios' }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('rutas de gastos de grupo (017)', () => {
+  const PERFIL = { id: 7, email: 'ana@example.com', firstName: 'Ana', lastName: 'López', currencies: [] }
+
+  it.each(['/groups/3/expenses/new', '/groups/3/expenses/12'])('%s sin sesión redirige al login', async (path) => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument()
+  })
+
+  it('/groups/:id/history con sesión pasa el id del grupo al historial', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(PERFIL) }),
+    )
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/groups/3/history?filter=EXPENSES']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Historial de actividad' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/groups/3/activity'), expect.anything()),
+    )
   })
 })

@@ -367,6 +367,28 @@
   }
 }
 
+// Sección "Gastos" del detalle (specs/017-debt-states, FR-021).
+.group-expenses__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
+
+  p {
+    margin: 0;
+    color: var(--color-texto-suave);
+    font-size: 0.9rem;
+  }
+}
+
+.group-expenses__history {
+  color: var(--color-acento-oscuro);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
 .group-admin-panel {
   margin-top: 1rem;
   margin-bottom: 1rem;

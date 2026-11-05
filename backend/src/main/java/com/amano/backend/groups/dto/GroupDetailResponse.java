@@ -7,9 +7,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.amano.backend.groups.GroupPermissions;
 
 /**
- * {@code GET /api/groups/{id}} detail (contracts/api-contracts.md). Expenses
- * are out of this module's scope in this phase, so {@code expensesCount} is
- * reported as 0 — a later story may join the expenses module.
+ * {@code GET /api/groups/{id}} detail (contracts/api-contracts.md). Since 017
+ * (FR-027), {@code expensesCount} is the real number of group expenses of the
+ * group ({@code group_expenses}); the shape of the contract is unchanged.
  */
 public class GroupDetailResponse {
 

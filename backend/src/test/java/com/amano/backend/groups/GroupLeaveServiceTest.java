@@ -70,7 +70,7 @@ class GroupLeaveServiceTest {
     void userWithoutBalancesLeavesTheGroupAndTheRowIsSoftDeleted() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
 
         com.amano.backend.groups.dto.LeaveGroupResponse response = service.leaveGroup(USER_ID, GROUP_ID);
 
@@ -84,7 +84,7 @@ class GroupLeaveServiceTest {
     void leavingIsBlockedByPendingBalances() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(true);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(true);
 
         var exception = catchThrowableOfType(() -> service.leaveGroup(USER_ID, GROUP_ID),
                 PendingDebtsException.class);
@@ -99,7 +99,7 @@ class GroupLeaveServiceTest {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_ADMIN)));
         when(groupMemberRepository.countActiveAdminsByGroupId(GROUP_ID)).thenReturn(1L);
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
 
         var exception = catchThrowableOfType(() -> service.leaveGroup(USER_ID, GROUP_ID),
                 LastAdminException.class);
@@ -113,7 +113,7 @@ class GroupLeaveServiceTest {
     void theGroupPersistsForTheRemainingMembers() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
         when(simulatedProfileRepository.countByGroupId(GROUP_ID)).thenReturn(2L);
         when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(3L);
 

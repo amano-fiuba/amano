@@ -96,7 +96,7 @@ class MemberRemovalServiceTest {
     void adminRemovesAnActiveMemberWithSoftBajaAndTheEventIsRecorded() {
         givenActiveMembership(ADMIN_ID, GroupMember.ROLE_ADMIN);
         givenActiveMembership(TARGET_ID, GroupMember.ROLE_MEMBER);
-        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, TARGET_ID)).thenReturn(false);
 
         service.removeMember(ADMIN_ID, GROUP_ID, TARGET_ID);
 
@@ -115,7 +115,7 @@ class MemberRemovalServiceTest {
     void removalKeepsACopyOfTheRemovedMembersNameAndEmail() {
         givenActiveMembership(ADMIN_ID, GroupMember.ROLE_ADMIN);
         givenActiveMembership(TARGET_ID, GroupMember.ROLE_MEMBER);
-        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, TARGET_ID)).thenReturn(false);
         com.amano.backend.user.User target = new com.amano.backend.user.User();
         org.springframework.test.util.ReflectionTestUtils.setField(target, "id", TARGET_ID);
         target.setFirstName("Juan");
@@ -170,7 +170,7 @@ class MemberRemovalServiceTest {
     void removalIsBlockedWhenTheTargetHasPendingDebts() {
         givenActiveMembership(ADMIN_ID, GroupMember.ROLE_ADMIN);
         givenActiveMembership(TARGET_ID, GroupMember.ROLE_MEMBER);
-        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(true);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, TARGET_ID)).thenReturn(true);
 
         var exception = catchThrowableOfType(() -> service.removeMember(ADMIN_ID, GROUP_ID, TARGET_ID),
                 PendingDebtsException.class);
@@ -198,7 +198,7 @@ class MemberRemovalServiceTest {
         when(permissionChecker.canRemoveSimulatedProfiles(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
         SimulatedProfile simulated = profile(TARGET_ID, "Juan Simulado", "simulado@amano.dev");
         when(simulatedProfileRepository.findById(TARGET_ID)).thenReturn(Optional.of(simulated));
-        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForSimulatedProfile(GROUP_ID, TARGET_ID)).thenReturn(false);
 
         service.removeSimulatedProfile(ADMIN_ID, GROUP_ID, TARGET_ID);
 
@@ -214,7 +214,7 @@ class MemberRemovalServiceTest {
         when(permissionChecker.canRemoveSimulatedProfiles(eq(GroupMember.ROLE_MEMBER), any())).thenReturn(true);
         SimulatedProfile simulated = profile(TARGET_ID, "Juan Simulado", "simulado@amano.dev");
         when(simulatedProfileRepository.findById(TARGET_ID)).thenReturn(Optional.of(simulated));
-        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForSimulatedProfile(GROUP_ID, TARGET_ID)).thenReturn(false);
 
         service.removeSimulatedProfile(MEMBER_ID, GROUP_ID, TARGET_ID);
 
@@ -242,7 +242,7 @@ class MemberRemovalServiceTest {
         when(permissionChecker.canRemoveSimulatedProfiles(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
         when(simulatedProfileRepository.findById(TARGET_ID)).thenReturn(
                 Optional.of(profile(TARGET_ID, "Juan Simulado", "simulado@amano.dev")));
-        when(debtPort.hasPendingDebts(GROUP_ID, TARGET_ID)).thenReturn(true);
+        when(debtPort.hasPendingDebtsForSimulatedProfile(GROUP_ID, TARGET_ID)).thenReturn(true);
 
         var exception = catchThrowableOfType(
                 () -> service.removeSimulatedProfile(ADMIN_ID, GROUP_ID, TARGET_ID),
@@ -250,5 +250,36 @@ class MemberRemovalServiceTest {
 
         assertThat(exception).isNotNull();
         Mockito.verifyNoInteractions(activityEventService);
+    }
+
+    /**
+     * 017 research.md D7: the simulated-profile removal asks the port about the
+     * PROFILE, never about a user that happens to share the same numeric id.
+     */
+    @Test
+    void simulatedRemovalAsksAboutTheProfileNotAUserWithTheSameId() {
+        givenActiveMembership(ADMIN_ID, GroupMember.ROLE_ADMIN);
+        when(permissionChecker.canRemoveSimulatedProfiles(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
+        SimulatedProfile simulated = profile(TARGET_ID, "Juan Simulado", "simulado@amano.dev");
+        when(simulatedProfileRepository.findById(TARGET_ID)).thenReturn(Optional.of(simulated));
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, TARGET_ID)).thenReturn(true);
+        when(debtPort.hasPendingDebtsForSimulatedProfile(GROUP_ID, TARGET_ID)).thenReturn(false);
+
+        service.removeSimulatedProfile(ADMIN_ID, GROUP_ID, TARGET_ID);
+
+        verify(simulatedProfileRepository).delete(simulated);
+        verify(debtPort, Mockito.never()).hasPendingDebtsForUser(any(), any());
+    }
+
+    /** 017 research.md D7: a registered removal asks about the user, never about a profile. */
+    @Test
+    void memberRemovalAsksAboutTheUserNotAProfile() {
+        givenActiveMembership(ADMIN_ID, GroupMember.ROLE_ADMIN);
+        givenActiveMembership(TARGET_ID, GroupMember.ROLE_MEMBER);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, TARGET_ID)).thenReturn(false);
+
+        service.removeMember(ADMIN_ID, GROUP_ID, TARGET_ID);
+
+        verify(debtPort, Mockito.never()).hasPendingDebtsForSimulatedProfile(any(), any());
     }
 }

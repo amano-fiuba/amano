@@ -239,4 +239,66 @@ describe('GroupHistoryView (014)', () => {
 
     expect(await screen.findByText('Pantalla del grupo')).toBeInTheDocument()
   })
+
+  it('"Ver gasto" enlaza al detalle solo cuando la entrada trae expenseId (017 FR-024)', async () => {
+    getActivity.mockResolvedValue(page([
+      {
+        id: 2,
+        eventType: 'EXPENSE_CREATED',
+        actor: ANA,
+        details: { expenseId: 12, amount: '1500.00', currency: 'ARS', description: 'Súper' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+      {
+        id: 1,
+        eventType: 'EXPENSE_CREATED',
+        actor: ANA,
+        details: { amount: '10.00', currency: 'ARS' },
+        createdAt: '2026-11-03T14:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(within(entries[0]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/12')
+    expect(within(entries[1]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
+  })
+
+  it('?filter=EXPENSES abre el historial filtrado y un valor desconocido muestra todo (017 FR-024)', async () => {
+    getActivity.mockResolvedValue(page([]))
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/groups/42/history?filter=EXPENSES']}>
+        <Routes>
+          <Route path="/groups/:id/history" element={<GroupHistoryView groupId="42" />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(NO_FILTERED_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mostrar' })).toHaveValue('EXPENSES')
+    expect(getActivity).toHaveBeenLastCalledWith('42', { page: 1, size: 20, eventTypes: ['EXPENSE_CREATED'] })
+    unmount()
+
+    render(
+      <MemoryRouter initialEntries={['/groups/42/history?filter=CUALQUIERA']}>
+        <Routes>
+          <Route path="/groups/:id/history" element={<GroupHistoryView groupId="42" />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(NO_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mostrar' })).toHaveValue('ALL')
+  })
+
+  it('cambiar el filtro actualiza el parámetro y volver a "Toda la actividad" lo quita (017)', async () => {
+    const user = userEvent.setup()
+    getActivity.mockResolvedValue(page([]))
+    renderView()
+    await screen.findByText(NO_ACTIVITY_MESSAGE)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Mostrar' }), 'Gastos')
+    expect(await screen.findByText(NO_FILTERED_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Mostrar' }), 'Toda la actividad')
+    expect(await screen.findByText(NO_ACTIVITY_MESSAGE)).toBeInTheDocument()
+  })
 })

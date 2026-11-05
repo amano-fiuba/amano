@@ -520,3 +520,115 @@ describe('respondFriendshipRequest: aviso de cambios (015, FR-004)', () => {
 
   })
 })
+
+describe('checkFriendDeletion(endpoint: GET /api/users/me/friends/{id}/deletion-eligibility) — feature 016', () => {
+  it('200 devuelve canDelete y reason con la cookie de sesión', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ canDelete: false, reason: 'Tenés una deuda pendiente' }),
+      }),
+    )
+
+    expect(await checkFriendDeletion(12)).toEqual({
+      ok: true,
+      canDelete: false,
+      reason: 'Tenés una deuda pendiente',
+    })
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/users/me/friends/12/deletion-eligibility',
+      { credentials: 'include' },
+    )
+  })
+
+  it('200 sin reason devuelve null', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ canDelete: true }),
+      }),
+    )
+
+    expect(await checkFriendDeletion(12)).toEqual({
+      ok: true,
+      canDelete: true,
+      reason: null,
+    })
+  })
+
+  it('404 devuelve el detalle del ProblemDetail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ detail: 'No sos amigo de ese usuario' }),
+      }),
+    )
+
+    expect(await checkFriendDeletion(12)).toEqual({
+      ok: false,
+      status: 404,
+      detail: 'No sos amigo de ese usuario',
+    })
+  })
+
+  it('5xx y errores de red se tratan como red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+    expect(await checkFriendDeletion(12)).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await checkFriendDeletion(12)).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('deleteFriend(endpoint: DELETE /api/users/me/friends/{id}) — feature 016', () => {
+  it('204 devuelve ok con método DELETE y cookie de sesión', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 204 }))
+
+    expect(await deleteFriend(12)).toEqual({ ok: true })
+    expect(fetch).toHaveBeenCalledWith('/api/users/me/friends/12', {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+  })
+
+  it('403 devuelve el detalle de la deuda pendiente', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: () =>
+          Promise.resolve({
+            detail: 'No podés eliminar a este amigo: tenés una deuda pendiente. Saldá la deuda e intentá nuevamente.',
+          }),
+      }),
+    )
+
+    expect(await deleteFriend(12)).toEqual({
+      ok: false,
+      status: 403,
+      detail:
+        'No podés eliminar a este amigo: tenés una deuda pendiente. Saldá la deuda e intentá nuevamente.',
+    })
+  })
+
+  it('5xx y errores de red se tratan como red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }))
+    expect(await deleteFriend(12)).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await deleteFriend(12)).toEqual({ ok: false, network: true })
+  })
+
+  it('expone el mensaje fijo de error al eliminar', () => {
+    expect(DELETE_FRIEND_NETWORK_ERROR_MESSAGE).toBe(
+      'No se pudo eliminar al amigo. Intentá nuevamente',
+    )
+  })
+})

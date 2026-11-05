@@ -9,6 +9,7 @@ import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
+import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
 import { memberCountLabel } from './groupDisplay'
 import './groups.scss'
 
@@ -119,6 +120,9 @@ export default function GroupInfoView() {
               </div>
             )}
           </header>
+
+          {/* Gastos del grupo (specs/017-debt-states, FR-021) */}
+          <GroupExpensesCard groupId={id} group={group} />
 
           <section className="group-detail__section" aria-labelledby="group-members-title">
             <div className="group-detail__section-header">

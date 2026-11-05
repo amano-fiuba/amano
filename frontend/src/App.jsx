@@ -23,6 +23,8 @@ import GroupListView from './pages/groups/GroupListView'
 import CreateGroupView from './pages/groups/CreateGroupView'
 import GroupInfoView from './pages/groups/GroupInfoView'
 import GroupHistoryView from './pages/groups/GroupHistoryView'
+import GroupExpenseFormView from './pages/groups/GroupExpenseFormView'
+import GroupExpenseDetailView from './pages/groups/GroupExpenseDetailView'
 import { useParams } from 'react-router'
 import SiteNav from './components/SiteNav'
 import QuickActionsButton from './components/QuickActionsButton'
@@ -131,6 +133,23 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <GroupHistoryPage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Gastos de grupo y deudas (specs/017-debt-states, US3). */}
+      <Route
+        path="/groups/:id/expenses/new"
+        element={
+          <ProtectedRoute>
+            <GroupExpenseFormView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/:id/expenses/:expenseId"
+        element={
+          <ProtectedRoute>
+            <GroupExpenseDetailView />
           </ProtectedRoute>
         }
       />
