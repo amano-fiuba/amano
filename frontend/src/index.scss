@@ -29,6 +29,7 @@
   // referencia circular entre variables y las invalidaría a todas.
   --color-acento-tono: #4b80c5;
   --color-error-tono: #b42336;
+  --color-barra: #28548c;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -41,6 +42,7 @@
   --color-acento: color-mix(in srgb, var(--color-acento-tono) 78%, white);
   --color-acento-oscuro: var(--color-acento);
   --color-error: color-mix(in srgb, var(--color-error-tono) 72%, white);
+  --color-barra: #1b2b40;
 }
 * {
   box-sizing: border-box;
@@ -1455,5 +1457,17 @@ li:has(> [data-testid="member-you"]) {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
+  }
+}
+
+// Ajustes (specs/015-main-screen, FR-009)
+.settings-page {
+  h2 {
+    margin: 1.5rem 0 0.6rem;
+    font-size: 1.1rem;
+  }
+
+  .theme-toggle {
+    position: static;
   }
 }

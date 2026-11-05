@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   RECEIVED_NETWORK_ERROR_MESSAGE,
   FRIENDS_NETWORK_ERROR_MESSAGE,
+  FRIEND_REQUESTS_CHANGED_EVENT,
   RESPOND_NETWORK_ERROR_MESSAGE,
   SEND_NETWORK_ERROR_MESSAGE,
   listFriends,
@@ -377,5 +378,28 @@ describe('listFriends(endpoint: GET /api/users/me/friends) — feature 013', () 
     expect(FRIENDS_NETWORK_ERROR_MESSAGE).toBe(
       'No se pudo cargar tu lista de amigos. Intentá nuevamente',
     )
+  })
+})
+
+describe('respondFriendshipRequest: aviso de cambios (015, FR-004)', () => {
+  it('emite el evento solo cuando la respuesta fue exitosa', async () => {
+    const listener = vi.fn()
+    window.addEventListener(FRIEND_REQUESTS_CHANGED_EVENT, listener)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({}) }),
+    )
+    await respondFriendshipRequest(1, 'ACCEPT')
+    expect(listener).not.toHaveBeenCalled()
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ id: 1 }) }),
+    )
+    await respondFriendshipRequest(1, 'ACCEPT')
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    window.removeEventListener(FRIEND_REQUESTS_CHANGED_EVENT, listener)
   })
 })
