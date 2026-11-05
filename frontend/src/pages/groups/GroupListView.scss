@@ -1,0 +1,207 @@
+// "Mis grupos": mismo lenguaje visual que las filas de grupo de la pantalla
+// principal, a la escala de una página.
+
+.groups-page {
+  max-width: 760px;
+}
+
+.groups-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+
+  h1 {
+    margin-bottom: 0;
+  }
+}
+
+.groups-page__count {
+  margin: 0.15rem 0 0;
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+}
+
+.groups-page__empty {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding: 2.5rem 1rem;
+  border: 1px dashed var(--color-borde);
+  border-radius: 0.75rem;
+  text-align: center;
+
+  p {
+    margin: 0;
+    color: var(--color-texto-suave);
+  }
+}
+
+.group-rows {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.75rem;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-weight: 400;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
+
+  &:hover {
+    border-color: var(--color-acento);
+    background: var(--color-superficie-fuerte);
+    color: var(--color-texto);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+
+  &:hover .group-row__chevron {
+    transform: translateX(2px);
+  }
+}
+
+.group-row__mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.65rem;
+  background: var(--color-superficie-fuerte);
+  color: var(--color-acento-oscuro);
+  font-size: 1.15rem;
+  font-weight: 700;
+  object-fit: cover;
+}
+
+.group-row:hover span.group-row__mark {
+  background: var(--color-superficie);
+}
+
+.group-row__body {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 0.15rem;
+  min-width: 0;
+
+  small {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+}
+
+.group-row__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 0.6rem;
+
+  strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.group-row__role {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  background: var(--color-superficie-fuerte);
+  color: var(--color-texto-suave);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.group-row:hover .group-row__role--member {
+  background: var(--color-superficie);
+}
+
+.group-row__role--admin {
+  background: color-mix(in srgb, var(--color-acento) 18%, transparent);
+  color: var(--color-acento-oscuro);
+}
+
+.group-row__description {
+  overflow: hidden;
+  color: var(--color-texto-suave);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-row__chevron {
+  flex: 0 0 auto;
+  color: var(--color-texto-suave);
+  font-size: 1.4rem;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+
+.group-row--skeleton {
+  animation: group-row-pulse 1.4s ease-in-out infinite;
+}
+
+.group-row__line {
+  display: block;
+  width: 55%;
+  height: 0.8rem;
+  border-radius: 0.25rem;
+  background: var(--color-superficie-fuerte);
+
+  &--short {
+    width: 35%;
+  }
+}
+
+@keyframes group-row-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (max-width: 480px) {
+  .group-row {
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  .group-row__title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .group-row__chevron {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-row,
+  .group-row__chevron {
+    transition: none;
+  }
+
+  .group-row--skeleton {
+    animation: none;
+  }
+}
