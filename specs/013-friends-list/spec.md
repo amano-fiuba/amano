@@ -105,7 +105,7 @@ Al aceptar una solicitud desde la sección "Solicitudes", la nueva amistad apare
 - **FR-001**: El sistema MUST ofrecer, dentro de la pantalla protegida "Amigos", una sección "Mis amigos" con todas las amistades de la persona autenticada.
 - **FR-002**: Una amistad MUST ser una solicitud en estado `ACCEPTED` en la que la persona autenticada sea emisora o destinataria; la lista MUST mostrar siempre la otra cuenta.
 - **FR-003**: La lista MUST excluir solicitudes `PENDING` y `REJECTED` y amistades en las que la persona autenticada no participe.
-- **FR-004**: Por cada amigo, la respuesta y la pantalla MUST incluir únicamente id, nombre, apellido, correo y fecha desde la que son amigos (fecha de aceptación); MUST NOT incluir CBU/CVU, monedas, contraseña ni otros datos privados. La pantalla muestra el avatar por defecto.
+- **FR-004**: Por cada amigo, la respuesta y la pantalla MUST incluir únicamente id, nombre, apellido, correo, fecha desde la que son amigos (fecha de aceptación) y la URL del avatar si tiene uno propio; MUST NOT incluir CBU/CVU, monedas, contraseña ni otros datos privados. La pantalla muestra la foto del amigo o, si no tiene, el avatar por defecto.
 - **FR-005**: La lista MUST ordenarse por nombre y luego apellido sin distinguir mayúsculas, con apellido vacío al final y el id como desempate.
 - **FR-006**: La pantalla MUST mostrar el total de amigos ("1 amigo" / "N amigos").
 - **FR-007**: Sin amistades, la sección MUST mostrar exactamente "Todavía no tenés amigos" y un enlace a "Buscar usuarios" (`/users/search`).
