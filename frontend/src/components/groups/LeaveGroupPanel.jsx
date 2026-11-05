@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import { leaveGroup, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { useSnackbar } from '../Snackbar'
 
 const LAST_ADMIN_MESSAGE = 'Sos el último administrador: asigná otro administrador antes de salir'
 
@@ -7,16 +9,17 @@ const LAST_ADMIN_MESSAGE = 'Sos el último administrador: asigná otro administr
  * Leave group (US5): confirmation gate before POST /api/groups/{id}/leave.
  * The last-admin motive can be anticipated client-side (suggestion to assign
  * another admin first), but the server decision always rules: rejection
- * motives come back as ProblemDetail and are rendered as-is.
+ * motives come back as ProblemDetail and are rendered as-is. On success the
+ * user goes to the groups list (FR-015).
  */
 export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
+  const navigate = useNavigate()
+  const showSnackbar = useSnackbar()
   const [open, setOpen] = useState(false)
-  const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   function openDialog() {
-    setStatus('')
     setError('')
     setOpen(true)
   }
@@ -28,8 +31,9 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
     if (!result || result.network) {
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else if (result.ok) {
-      setOpen(false)
-      setStatus('Se abandonó el grupo')
+      showSnackbar('Se abandonó el grupo')
+      // replace: "atrás" no debe volver a un grupo del que ya no se es miembro.
+      navigate('/groups', { replace: true })
     } else {
       setError(result.detail || 'No se pudo abandonar el grupo')
     }
@@ -41,7 +45,6 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
       <button type="button" onClick={openDialog}>
         Abandonar grupo
       </button>
-      {status && <p role="status">{status}</p>}
       {error && (
         <p role="alert" data-testid="leave-group-error">
           {error}

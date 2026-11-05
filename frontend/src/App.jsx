@@ -26,6 +26,7 @@ import GroupHistoryView from './pages/groups/GroupHistoryView'
 import { useParams } from 'react-router'
 import SiteNav from './components/SiteNav'
 import QuickActionsButton from './components/QuickActionsButton'
+import { SnackbarProvider } from './components/Snackbar'
 
 // Rutas base del shell de la SPA (T015 + US1 + US2): '/', '/register',
 // '/login' (specs/004-user-login), '/check-email' (pantalla "Revisa tu correo"),
@@ -184,9 +185,11 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <SiteNav />
-        <AppRoutes />
-        <QuickActionsButton />
+        <SnackbarProvider>
+          <SiteNav />
+          <AppRoutes />
+          <QuickActionsButton />
+        </SnackbarProvider>
       </BrowserRouter>
     </AuthProvider>
   )

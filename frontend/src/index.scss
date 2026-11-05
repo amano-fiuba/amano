@@ -784,12 +784,6 @@ fieldset {
   font-size: 0.85rem;
   font-weight: 600;
 
-  &--success {
-    border: 1px solid color-mix(in srgb, var(--color-oliva) 45%, var(--color-borde));
-    color: var(--color-texto);
-    background: color-mix(in srgb, var(--color-oliva) 14%, var(--color-superficie));
-  }
-
   &--error {
     border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
     color: var(--color-error);
@@ -1149,19 +1143,13 @@ fieldset {
   }
 }
 
-// Notice of the outcome of a response (feature 012, FR-013..FR-016): success,
-// conflict (409/404) and network error keep the row visible when it applies.
+// Notice of a failed response (feature 012, FR-014..FR-016): conflict (409/404)
+// and network error keep the row visible when it applies.
 .friends-requests__notice {
   margin: 0;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
   font-size: 0.9rem;
-
-  &--success {
-    border: 1px solid color-mix(in srgb, var(--color-oliva) 35%, var(--color-borde));
-    background: color-mix(in srgb, var(--color-oliva) 12%, var(--color-superficie));
-    color: var(--color-texto);
-  }
 
   &--conflict,
   &--error {

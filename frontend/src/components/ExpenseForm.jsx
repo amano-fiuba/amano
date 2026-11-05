@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import TextField from './TextField'
 import SelectField from './SelectField'
+import { useSnackbar } from './Snackbar'
 import {
   EXPENSE_NETWORK_ERROR_MESSAGE,
   createExpense,
@@ -27,7 +28,6 @@ export const EXPENSE_REUSED_KEY_MESSAGE =
   'La operación ya fue registrada con datos distintos. Reintentá el guardado.'
 export const EXPENSE_SESSION_EXPIRED_MESSAGE =
   'Tu sesión expiró. Iniciá sesión nuevamente.'
-export const SUCCESS_VISIBLE_MS = 5000
 
 const REQUIRED_SELECT_MESSAGES = {
   currency: 'La moneda es obligatoria',
@@ -85,8 +85,8 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
   const selectedType = useWatch({ control, name: 'type' })
   const isRecurring = selectedType === 'RECURRING'
 
+  const showSnackbar = useSnackbar()
   const [idempotencyKey, setIdempotencyKey] = useState(null)
-  const [success, setSuccess] = useState('')
   const [formError, setFormError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
 
@@ -103,15 +103,6 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
       setValue('currency', initialCurrency, { shouldDirty: false })
     }
   }, [initialCurrency, dirtyFields.currency, setValue])
-
-  // FR-031: the success notification closes by itself after 5 s.
-  useEffect(() => {
-    if (!success) {
-      return undefined
-    }
-    const timer = setTimeout(() => setSuccess(''), SUCCESS_VISIBLE_MS)
-    return () => clearTimeout(timer)
-  }, [success])
 
   const resetForm = () => {
     reset({
@@ -144,7 +135,6 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     clearErrors()
     setFormError('')
     setSessionExpired(false)
-    setSuccess('')
 
     const amount = parseArgentineAmount(values.amount)
     const date = parseArgentineDate(values.date)
@@ -175,7 +165,8 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     if (result.ok) {
       setIdempotencyKey(null)
       resetForm()
-      setSuccess(EXPENSE_SUCCESS_MESSAGE)
+      // FR-031: the snackbar closes by itself after 5 s.
+      showSnackbar(EXPENSE_SUCCESS_MESSAGE)
       return
     }
     if (result.network) {
@@ -207,19 +198,6 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
 
   return (
     <form className="expense-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-      {success && (
-        <div role="status" data-testid="expense-success" className="form-success">
-          <span>{success}</span>
-          <button
-            type="button"
-            className="text-button"
-            aria-label="Cerrar notificación"
-            onClick={() => setSuccess('')}
-          >
-            Cerrar
-          </button>
-        </div>
-      )}
       {formError && (
         <p role="alert" data-testid="expense-error">
           {formError}

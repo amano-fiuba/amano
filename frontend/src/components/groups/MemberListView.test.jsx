@@ -130,7 +130,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     expect(removeMember).not.toHaveBeenCalled()
     expect(getMembers).toHaveBeenCalledTimes(2)
     expect(onChanged).toHaveBeenCalledTimes(1)
-    expect(screen.getByTestId('members-status')).toHaveTextContent('Juan Simulado ya no forma parte del grupo')
+    expect(screen.getByTestId('snackbar')).toHaveTextContent('Juan Simulado ya no forma parte del grupo')
   })
 
   it('al eliminar a un miembro registrado la lista se actualiza sola', async () => {

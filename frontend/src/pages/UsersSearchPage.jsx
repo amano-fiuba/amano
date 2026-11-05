@@ -5,6 +5,7 @@ import TextField from '../components/TextField'
 import { SEARCH_NETWORK_ERROR_MESSAGE, searchUsers } from '../api/usersClient'
 import { SEND_NETWORK_ERROR_MESSAGE, sendFriendshipRequest } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
+import { useSnackbar } from '../components/Snackbar'
 
 // Exact messages of the spec (FR-009, FR-016, FR-017), exported for the tests.
 export const TOO_SHORT_MESSAGE = 'Ingresá al menos 2 caracteres para buscar'
@@ -95,13 +96,14 @@ function UserPlusIcon() {
 // the latest request's answer is shown (out-of-order answers are ignored).
 function UsersSearch({ initialTerm }) {
   const { setUser } = useAuth()
+  const showSnackbar = useSnackbar()
   const [term, setTerm] = useState(initialTerm)
   const [results, setResults] = useState([])
   const [notice, setNotice] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
   const [sendingId, setSendingId] = useState(null)
   const [sentIds, setSentIds] = useState([])
-  const [sendFeedback, setSendFeedback] = useState(null)
+  const [sendError, setSendError] = useState('')
   const latestRequest = useRef(0)
 
   const showError = (text, title) => {
@@ -116,7 +118,7 @@ function UsersSearch({ initialTerm }) {
       return
     }
     setSendingId(user.id)
-    setSendFeedback(null)
+    setSendError('')
 
     let result
     try {
@@ -129,7 +131,7 @@ function UsersSearch({ initialTerm }) {
 
     if (result.ok) {
       setSentIds((ids) => (ids.includes(user.id) ? ids : [...ids, user.id]))
-      setSendFeedback({ kind: 'success', text: FRIENDSHIP_REQUEST_SENT_MESSAGE })
+      showSnackbar(FRIENDSHIP_REQUEST_SENT_MESSAGE)
       return
     }
 
@@ -138,9 +140,7 @@ function UsersSearch({ initialTerm }) {
       return
     }
 
-    const text =
-      result.fields?.recipientId || result.detail || SEND_NETWORK_ERROR_MESSAGE
-    setSendFeedback({ kind: 'error', text })
+    setSendError(result.fields?.recipientId || result.detail || SEND_NETWORK_ERROR_MESSAGE)
   }
 
   const runSearch = async (rawTerm) => {
@@ -159,7 +159,7 @@ function UsersSearch({ initialTerm }) {
     }
 
     setNotice(null)
-    setSendFeedback(null)
+    setSendError('')
     setResults([])
     setIsSearching(true)
 
@@ -304,13 +304,13 @@ function UsersSearch({ initialTerm }) {
               {resultsLabel(results.length)}
             </span>
           </div>
-          {sendFeedback && (
+          {sendError && (
             <p
-              className={`users-search__send-feedback users-search__send-feedback--${sendFeedback.kind}`}
-              role={sendFeedback.kind === 'error' ? 'alert' : 'status'}
+              className="users-search__send-feedback users-search__send-feedback--error"
+              role="alert"
               data-testid="friendship-feedback"
             >
-              {sendFeedback.text}
+              {sendError}
             </p>
           )}
           <ul className="user-results" aria-label="Resultados de la búsqueda">

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router'
 
 vi.mock('../../api/groupsClient', async (importOriginal) => ({
   ...await importOriginal(),
@@ -9,13 +10,24 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
 import { leaveGroup } from '../../api/groupsClient'
 import LeaveGroupPanel from './LeaveGroupPanel'
 
+function renderPanel(props) {
+  return render(
+    <MemoryRouter initialEntries={['/groups/42']}>
+      <Routes>
+        <Route path="/groups/42" element={<LeaveGroupPanel groupId={42} {...props} />} />
+        <Route path="/groups" element={<p>Mis grupos</p>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+}
+
 beforeEach(() => {
   leaveGroup.mockReset()
 })
 
 describe('LeaveGroupPanel (T068/T065)', () => {
   it('muestra la confirmación cuando el usuario no es el último admin', () => {
-    render(<LeaveGroupPanel groupId={42} isLastAdmin={false} />)
+    renderPanel({ isLastAdmin: false })
 
     fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
 
@@ -25,7 +37,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
   })
 
   it('si el usuario es último admin muestra la guía de asignar otro admin y no sale', async () => {
-    render(<LeaveGroupPanel groupId={42} isLastAdmin />)
+    renderPanel({ isLastAdmin: true })
 
     fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
 
@@ -35,18 +47,17 @@ describe('LeaveGroupPanel (T068/T065)', () => {
     expect(leaveGroup).not.toHaveBeenCalled()
   })
 
-  it('abandona el grupo tras confirmar y muestra el éxito', async () => {
+  it('abandona el grupo tras confirmar, avisa y vuelve al listado', async () => {
     leaveGroup.mockResolvedValue({ ok: true, groupLeft: true })
 
-    render(<LeaveGroupPanel groupId={42} isLastAdmin={false} />)
+    renderPanel({ isLastAdmin: false })
 
     fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     await waitFor(() => expect(leaveGroup).toHaveBeenCalledWith(42))
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /Se abandonó el grupo/i,
-    )
+    expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Se abandonó el grupo/i)
   })
 
   it('renderiza el motivo del rechazo server-side', async () => {
@@ -56,7 +67,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
       detail: 'No podés abandonar el grupo: tenés saldos pendientes con otros miembros',
     })
 
-    render(<LeaveGroupPanel groupId={42} isLastAdmin={false} />)
+    renderPanel({ isLastAdmin: false })
 
     fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))

@@ -271,7 +271,7 @@ describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
       resolveSend({ ok: true, request: { id: 9 } })
     })
 
-    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FRIENDSHIP_REQUEST_SENT_MESSAGE,
     )
     expect(
@@ -358,7 +358,7 @@ describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Agregar a Ana Pérez' }))
 
-    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FRIENDSHIP_REQUEST_SENT_MESSAGE,
     )
     expect(friendsClient.sendFriendshipRequest).toHaveBeenCalledTimes(2)

@@ -8,6 +8,8 @@ import {
 } from '../../api/friendsClient'
 import { useAuth } from '../../auth/AuthContext'
 import { useSessionData } from '../../hooks/useSessionData'
+import { ACCEPTED_MESSAGE, REJECTED_MESSAGE } from '../../pages/FriendsPage'
+import { useSnackbar } from '../Snackbar'
 
 const VISIBLE_REQUESTS = 3
 
@@ -19,6 +21,7 @@ function fullName({ firstName, lastName }) {
 // se conserva ante un fallo de red.
 export default function PendingRequestsPanel() {
   const { setUser } = useAuth()
+  const showSnackbar = useSnackbar()
   const [{ status, items }, setState] = useSessionData(
     listReceivedFriendshipRequests,
     'requests',
@@ -41,7 +44,9 @@ export default function PendingRequestsPanel() {
         items: previous.items.filter((item) => item.id !== request.id),
       }))
     }
-    if (!result.ok) {
+    if (result.ok) {
+      showSnackbar(action === 'ACCEPT' ? ACCEPTED_MESSAGE : REJECTED_MESSAGE)
+    } else {
       setError(result.detail || RESPOND_NETWORK_ERROR_MESSAGE)
     }
   }

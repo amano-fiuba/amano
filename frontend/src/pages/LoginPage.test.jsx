@@ -105,19 +105,6 @@ describe('LoginPage (feature 004)', () => {
     expect(button).toBeEnabled()
   })
 
-  it('muestra el aviso recibido en state.notice (feature 006: contraseña actualizada)', async () => {
-    renderLogin([
-      {
-        pathname: '/login',
-        state: { notice: 'Tu contraseña fue actualizada. Ya puedes iniciar sesión' },
-      },
-    ])
-
-    expect(await screen.findByTestId('login-notice')).toHaveTextContent(
-      'Tu contraseña fue actualizada. Ya puedes iniciar sesión',
-    )
-  })
-
   it('campos vacíos: muestra los obligatorios y no llama al backend', async () => {
     const user = userEvent.setup()
     renderLogin()

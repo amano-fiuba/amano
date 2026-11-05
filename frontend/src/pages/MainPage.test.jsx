@@ -168,6 +168,7 @@ describe('MainPage (015, US1)', () => {
 
     expect(respond).toHaveBeenCalledWith(1, 'ACCEPT')
     expect(await screen.findByText('No tenés solicitudes pendientes')).toBeInTheDocument()
+    expect(screen.getByTestId('snackbar')).toHaveTextContent('Solicitud de amistad aceptada')
   })
 
   it('ante un fallo de red conserva la solicitud y avisa', async () => {

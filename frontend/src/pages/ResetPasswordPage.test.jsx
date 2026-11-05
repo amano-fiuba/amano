@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import ResetPasswordPage, {
   EXPIRED_RESET_LINK_MESSAGE,
   INVALID_RESET_LINK_MESSAGE,
@@ -23,10 +23,8 @@ beforeEach(() => {
   authClient.resetPassword.mockReset()
 })
 
-/** Shows the notice the reset page hands to the login. */
 function LoginProbe() {
-  const location = useLocation()
-  return <div>LOGIN {location.state?.notice}</div>
+  return <div>LOGIN</div>
 }
 
 function renderPage(url = '/reset-password?token=token-del-correo') {
@@ -134,7 +132,8 @@ describe('ResetPasswordPage (feature 006, US2)', () => {
 
     await fillAndSubmit(user, NEW_PASSWORD, NEW_PASSWORD)
 
-    expect(await screen.findByText(`LOGIN ${RESET_SUCCESS_MESSAGE}`)).toBeInTheDocument()
+    expect(await screen.findByText('LOGIN')).toBeInTheDocument()
+    expect(screen.getByTestId('snackbar')).toHaveTextContent(RESET_SUCCESS_MESSAGE)
     expect(authClient.resetPassword).toHaveBeenCalledWith(
       'token-del-correo',
       NEW_PASSWORD,

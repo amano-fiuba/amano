@@ -36,7 +36,7 @@ Suites clave de esta feature:
 | `pages/ForgotPasswordPage.test.jsx` | Formulario, validación de correo, estado "Enviando…", éxito "Revisa tu bandeja de entrada", fallo de red |
 | `pages/ResetPasswordPage.test.jsx` | Sin token, validación de política y coincidencia, estado "Guardando…", redirección a `/login` con aviso, 410, 400 con y sin campos, fallo de red |
 | `api/authClient.test.js` | Forma de `forgotPassword()` y `resetPassword()`, mensajes fijos de red |
-| `pages/LoginPage.test.jsx` | Enlace "¿Olvidaste tu contraseña?" y aviso `state.notice` |
+| `pages/LoginPage.test.jsx` | Enlace "¿Olvidaste tu contraseña?" |
 
 ## 2. Levantar el entorno
 

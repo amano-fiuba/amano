@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { updateGroup, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { useSnackbar } from '../Snackbar'
 
 const CHECKBOXES = [
   { key: 'membersCannotMakeExpenses', label: 'No podrán hacer gastos' },
@@ -11,9 +12,9 @@ const CHECKBOXES = [
 ]
 
 export default function GroupPermissionsPanel({ group, permissions }) {
+  const showSnackbar = useSnackbar()
   const [values, setValues] = useState({ ...permissions })
   const [saving, setSaving] = useState(false)
-  const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState('')
 
   function toggle(key) {
@@ -22,12 +23,11 @@ export default function GroupPermissionsPanel({ group, permissions }) {
 
   async function handleSubmit() {
     setSaving(true)
-    setConfirmation('')
     setError('')
     const result = await updateGroup(group.id, { permissions: values })
     if (result.ok) {
       setValues({ ...values, ...(result.group?.permissions ?? {}) })
-      setConfirmation('Permisos actualizados')
+      showSnackbar('Permisos actualizados')
     } else if (result.network) {
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else {
@@ -54,7 +54,6 @@ export default function GroupPermissionsPanel({ group, permissions }) {
       <button type="button" onClick={handleSubmit} disabled={saving}>
         Guardar permisos
       </button>
-      {confirmation && <p role="status">{confirmation}</p>}
       {error && (
         <p role="alert" data-testid="permissions-error">
           {error}
