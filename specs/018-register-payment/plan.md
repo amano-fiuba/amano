@@ -86,7 +86,7 @@ No quedaron `NEEDS CLARIFICATION`. Las decisiones de producto están en las Clar
 
 ### D5 — Concurrencia con bloqueo pesimista
 
-- **Decisión**: `DebtRepository.findByIdForUpdate(id)` con `@Lock(LockModeType.PESSIMISTIC_WRITE)`. El servicio la usa después de validar la entrada y antes de mirar la idempotencia y el saldo.
+- **Decisión**: `DebtRepository.findByIdForUpdate(id)` con `@Lock(LockModeType.PESSIMISTIC_WRITE)`. El servicio la usa en la **primera** lectura de la deuda, antes de la membresía, la idempotencia y el saldo (ajuste de la implementación: ver §Flujo, paso 1).
 - **Rationale**: la carrera real (deudor y acreedor registrando el mismo pago a la vez) sumaría de más. `SELECT … FOR UPDATE` serializa solo los pagos de **esa** deuda, no requiere cambios de esquema y deja el CHECK `ck_debts_paid_range` como última barrera.
 - **Alternativas consideradas**: `@Version` en `Debt` (necesita `ALTER TABLE debts ADD COLUMN version` y reintentos); `UPDATE … WHERE paid_amount + :x <= amount` a mano (saltea `applyPayment` y la regla de 017 de que el dominio mueve el estado).
 
@@ -277,11 +277,11 @@ Cada elemento de `debts` suma `canRegisterPayment` (boolean, FR-016): `status �
 
 `PaymentController.register` toma el usuario de la sesión (`currentUserId()`, patrón de 010/017) y la cabecera `Idempotency-Key`, y delega en `PaymentService.register`, que es `@Transactional` y sigue este orden:
 
-1. **Deuda**: `DebtRepository.findById(debtId)` sin bloqueo. Si no existe, `DebtNotFoundException` (404 neutral). Si falta `debtId`, 400 en `debtId`.
+1. **Deuda (con bloqueo)**: `DebtRepository.findByIdForUpdate(debtId)` (`SELECT … FOR UPDATE`, D5). Si no existe, `DebtNotFoundException` (404 neutral). Si falta `debtId`, 400 en `debtId`. Desde acá la deuda está fija hasta el `COMMIT`. *Ajuste de la implementación (2026-11-05)*: el diseño original leía la deuda sin bloqueo y la bloqueaba en el paso 5, pero Hibernate devuelve la instancia ya cargada en el contexto de persistencia sin refrescarla, así que el saldo podía quedar viejo. Por eso la primera lectura toma el bloqueo.
 2. **Membresía**: `GroupMemberRepository` confirma que quien registra es miembro activo de `debt.groupId`. Si no, el **mismo** `DebtNotFoundException` (no se distingue "no existe" de "no sos miembro").
 3. **Permiso**: `GroupPermissionChecker.canRegisterPayment(role, caller, debt.debtorUserId, debt.creditorUserId)` (D2). Si es `false`, `GroupPermissionDeniedException` (403 de 010).
 4. **Entrada**: `ExpenseAmountNormalizer` y `ExpenseDateValidator` (con `deviceTimeZone`) de 007, más la fecha mínima del gasto (`GroupExpenseRepository.findById(debt.expenseId).expenseDate`). Todos los errores se juntan en una `FieldValidationException` (400 con `fields`).
-5. **Bloqueo**: `DebtRepository.findByIdForUpdate(debtId)` (`SELECT … FOR UPDATE`, D5). Desde acá la deuda está fija hasta el `COMMIT`.
+5. *(Paso integrado al 1: ver el ajuste de arriba.)*
 6. **Idempotencia**: busca `(registered_by_user_id, idempotency_key)`. Si existe y `(debtId, amount, date)` coinciden, devuelve ese pago con 200 y la deuda actual. Si no coinciden, `IdempotencyConflictException` (422, de 007). Va después del bloqueo para que dos envíos iguales queden serializados.
 7. **Estado**: si `debt.status = PAID`, `DebtAlreadyPaidException` (409). Si `amount > debt.outstanding`, 400 en `amount` (D4).
 8. **Aplicación**: `debt.applyPayment(amount)` (017). La entidad queda modificada en el contexto de persistencia; Hibernate emite el `UPDATE debts SET paid_amount, status, updated_at` al hacer *flush*.
@@ -293,9 +293,9 @@ Cada elemento de `debts` suma `canRegisterPayment` (boolean, FR-016): `status �
 ```text
 POST /api/payments ──▶ PaymentController ──▶ PaymentService.register  (@Transactional)
                                                 │
-          1 findById ── 2 membresía ── 3 canRegisterPayment ── 4 validar (007)
+          1 findByIdForUpdate ── 2 membresía ── 3 canRegisterPayment ── 4 validar (007)
                                                 │
-          5 findByIdForUpdate ── 6 idempotencia ── 7 PAID? / saldo
+          6 idempotencia ── 7 PAID? / saldo
                                                 │
           8 Debt.applyPayment ── 9 save(Payment) ── 10 recordPaymentMade (MANDATORY)
                                                 │
@@ -459,6 +459,10 @@ Con la cuenta **A** (Ana, ADMIN), la cuenta **B** (Juan, MEMBER), la cuenta **C*
 
 ## Resultado
 
-- **Línea base (T003)**: pendiente.
-- **Automatizada (T057/T058)**: pendiente.
+- **Línea base (T003, 05/11, `feat/registrar-pagos` con 017)**: backend 335 unitarias + 234 de integración, JaCoCo 94,8 % de líneas; frontend 685 pruebas, V8 93,9 % de líneas y 93,2 % de sentencias. Sin `V14` en `db/migration` (T001).
+- **Automatizada (T057/T058, 05/11)**:
+  - Backend `./mvnw -B clean verify`: **375 unitarias + 257 de integración**, 0 fallos, BUILD SUCCESS, "All coverage checks have been met". **JaCoCo 95,1 %** de líneas en total; paquete `payment` 100 %. Clases modificadas: `GroupExpenseService`, `GroupExpenseResponse`, `GroupPermissionChecker`, `PaymentActivityDetails`, `ActivityEventService` y `SecurityConfig` al 100 %; `ProblemDetailExceptionHandler` 89,8 %.
+  - Frontend `npm run lint && npx vitest run --coverage && npm run build`: 0 errores de lint (2 warnings previos de `RegisterForm` y `ChangePasswordPage`), **730 pruebas** en 68 archivos, **V8 94,2 % de líneas y 93,5 % de sentencias**, build OK. Archivos nuevos y modificados de US3 al 100 % de líneas.
+  - Migración (T060): la búsqueda de `UPDATE|DELETE|INSERT|DROP|TRUNCATE|ALTER` en `V14__create_payments.sql` solo encuentra `ON DELETE SET NULL`.
+- **Desvíos respecto del diseño (T066)**: el bloqueo pesimista se toma en la primera lectura de la deuda (§Flujo, paso 1); `PaymentActivityDetails` conserva un constructor con el formato de 014; `GroupExpenseResponse.DebtView.of` centraliza la vista de la deuda para el detalle y el pago.
 - **Manual (T064/T065)**: pendiente.

@@ -316,7 +316,7 @@ describe('App ruta del buscador (specs/008-user-search)', () => {
 describe('rutas de gastos de grupo (017)', () => {
   const PERFIL = { id: 7, email: 'ana@example.com', firstName: 'Ana', lastName: 'López', currencies: [] }
 
-  it.each(['/groups/3/expenses/new', '/groups/3/expenses/12'])('%s sin sesión redirige al login', async (path) => {
+  it.each(['/groups/3/expenses/new', '/groups/3/expenses/12', '/groups/3/expenses/12/debts/31/payment'])('%s sin sesión redirige al login', async (path) => {
     render(
       <AuthProvider>
         <MemoryRouter initialEntries={[path]}>

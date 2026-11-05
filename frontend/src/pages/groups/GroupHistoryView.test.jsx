@@ -240,6 +240,32 @@ describe('GroupHistoryView (014)', () => {
     expect(await screen.findByText('Pantalla del grupo')).toBeInTheDocument()
   })
 
+  it('"Ver gasto" también aparece en los pagos que traen expenseId (018 FR-022)', async () => {
+    getActivity.mockResolvedValue(page([
+      {
+        id: 3,
+        eventType: 'PAYMENT_MADE',
+        actor: ANA,
+        details: { paymentId: 54, amount: '1000.00', currency: 'ARS', fromName: 'Juan', toName: 'Ana', expenseId: 12, debtId: 31 },
+        createdAt: '2026-11-03T16:00:00Z',
+      },
+      {
+        id: 2,
+        eventType: 'PAYMENT_MADE',
+        actor: ANA,
+        details: { paymentId: 3, amount: '500.00', currency: 'ARS', fromName: 'Juan', toName: 'Ana' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries[0]).toHaveTextContent('registró un pago de')
+    expect(within(entries[0]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/12')
+    expect(within(entries[1]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
+  })
+
   it('"Ver gasto" enlaza al detalle solo cuando la entrada trae expenseId (017 FR-024)', async () => {
     getActivity.mockResolvedValue(page([
       {

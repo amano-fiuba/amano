@@ -25,6 +25,7 @@ import GroupInfoView from './pages/groups/GroupInfoView'
 import GroupHistoryView from './pages/groups/GroupHistoryView'
 import GroupExpenseFormView from './pages/groups/GroupExpenseFormView'
 import GroupExpenseDetailView from './pages/groups/GroupExpenseDetailView'
+import RegisterPaymentView from './pages/groups/RegisterPaymentView'
 import { useParams } from 'react-router'
 import SiteNav from './components/SiteNav'
 import QuickActionsButton from './components/QuickActionsButton'
@@ -150,6 +151,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <GroupExpenseDetailView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/:id/expenses/:expenseId/debts/:debtId/payment"
+        element={
+          <ProtectedRoute>
+            <RegisterPaymentView />
           </ProtectedRoute>
         }
       />

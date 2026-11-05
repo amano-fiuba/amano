@@ -77,6 +77,38 @@ describe('ExpenseDebtList (017)', () => {
   })
 })
 
+describe('ExpenseDebtList con "Registrar pago" (018)', () => {
+  function renderList(props) {
+    return render(
+      <MemoryRouter>
+        <ExpenseDebtList {...props} />
+      </MemoryRouter>,
+    )
+  }
+
+  it('ofrece "Registrar pago" en cada deuda que la persona puede pagar', () => {
+    renderList({
+      groupId: '3',
+      expenseId: '12',
+      debts: [
+        { ...debt(31, 'Juan Pérez', 'PENDING'), canRegisterPayment: true },
+        { ...debt(32, 'Abuela', 'PENDING'), canRegisterPayment: false },
+        { ...debt(33, 'Tío', 'PAID', '0.00'), canRegisterPayment: false },
+      ],
+    })
+    const rows = screen.getAllByTestId('debt-row')
+    expect(within(rows[0]).getByRole('link', { name: 'Registrar pago' }))
+      .toHaveAttribute('href', '/groups/3/expenses/12/debts/31/payment')
+    expect(within(rows[1]).queryByRole('link', { name: 'Registrar pago' })).not.toBeInTheDocument()
+    expect(within(rows[2]).queryByRole('link', { name: 'Registrar pago' })).not.toBeInTheDocument()
+  })
+
+  it('sin groupId ni expenseId la lista sigue siendo de solo lectura', () => {
+    renderList({ debts: [{ ...debt(31, 'Juan Pérez', 'PENDING'), canRegisterPayment: true }] })
+    expect(screen.queryByRole('link', { name: 'Registrar pago' })).not.toBeInTheDocument()
+  })
+})
+
 describe('ExpenseSharePreview (017)', () => {
   const names = { 'u:7': 'Ana López', 'u:15': 'Juan Pérez', 's:4': 'Abuela' }
 

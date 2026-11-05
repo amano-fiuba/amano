@@ -106,7 +106,7 @@ export default function GroupExpenseDetailView() {
 
           <section className="group-card" aria-label="Deudas">
             <h3>Deudas</h3>
-            <ExpenseDebtList debts={expense.debts} />
+            <ExpenseDebtList debts={expense.debts} groupId={id} expenseId={expenseId} />
           </section>
         </>
       )}

@@ -528,4 +528,34 @@ class GroupExpenseServiceTest {
                 .isNotNull();
         verify(expenseRepository, never()).findByIdAndGroupId(any(), any());
     }
+
+    // 018 T034 (FR-016): canRegisterPayment per debt for the session user.
+    @Test
+    void theDetailTellsWhoCanRegisterAPaymentOfEachDebt() {
+        GroupExpense existing = existingThreeWay();
+        when(expenseRepository.findByIdAndGroupId(12L, GROUP_ID)).thenReturn(Optional.of(existing));
+        long carla = 30L;
+        when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, carla))
+                .thenReturn(Optional.of(new GroupMember(carla, GROUP_ID, GroupMember.ROLE_MEMBER)));
+
+        assertThat(service.get(JUAN, GROUP_ID, 12L).debts())
+                .extracting(GroupExpenseResponse.DebtView::canRegisterPayment).containsExactly(true, false);
+        assertThat(service.get(ANA, GROUP_ID, 12L).debts())
+                .extracting(GroupExpenseResponse.DebtView::canRegisterPayment).containsExactly(true, true);
+        assertThat(service.get(carla, GROUP_ID, 12L).debts())
+                .extracting(GroupExpenseResponse.DebtView::canRegisterPayment).containsExactly(false, false);
+    }
+
+    @Test
+    void aPaidDebtCannotReceiveMorePayments() {
+        GroupExpense existing = existingThreeWay();
+        when(expenseRepository.findByIdAndGroupId(12L, GROUP_ID)).thenReturn(Optional.of(existing));
+        List<Debt> debts = debtRepository.findByExpenseId(12L);
+        debts.get(0).applyPayment(new BigDecimal("3333.33"));
+
+        GroupExpenseResponse.DebtView paid = service.get(ANA, GROUP_ID, 12L).debts().get(0);
+
+        assertThat(paid.status()).isEqualTo("PAID");
+        assertThat(paid.canRegisterPayment()).isFalse();
+    }
 }

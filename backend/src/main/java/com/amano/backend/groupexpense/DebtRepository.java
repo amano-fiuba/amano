@@ -1,10 +1,14 @@
 package com.amano.backend.groupexpense;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Persistence of {@link Debt} (017). The two {@code existsOpen…} queries back
@@ -15,6 +19,15 @@ import org.springframework.data.repository.query.Param;
 public interface DebtRepository extends JpaRepository<Debt, Long> {
 
     List<Debt> findByExpenseId(Long expenseId);
+
+    /**
+     * 018 (data-model.md §Concurrencia, plan.md D5): the debt with a pessimistic
+     * write lock ({@code SELECT … FOR UPDATE}), so concurrent payments of the
+     * same debt are serialized and never pay more than its amount.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT d FROM Debt d WHERE d.id = :id")
+    Optional<Debt> findByIdForUpdate(@Param("id") Long id);
 
     /** True when the user has an unsettled debt of the group as debtor OR creditor (FR-017). */
     @Query("""

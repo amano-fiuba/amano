@@ -89,6 +89,13 @@ public class ActivityEventService {
         map.put("currency", currency);
         map.put("fromName", blankToNull(details.fromName()));
         map.put("toName", blankToNull(details.toName()));
+        // 018 (plan.md D6): additive keys, only when present, so 014 entries keep their shape.
+        if (details.expenseId() != null) {
+            map.put("expenseId", details.expenseId());
+        }
+        if (details.debtId() != null) {
+            map.put("debtId", details.debtId());
+        }
         return record(groupId, GroupActivity.GroupActivityType.PAYMENT_MADE, actorUserId, map);
     }
 
