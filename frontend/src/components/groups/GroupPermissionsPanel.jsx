@@ -37,8 +37,8 @@ export default function GroupPermissionsPanel({ group, permissions }) {
   }
 
   return (
-    <section data-testid="permissions-panel">
-      <h2>Permisos de los miembros</h2>
+    <section className="group-permissions" data-testid="permissions-panel">
+      <h3>Permisos de los miembros</h3>
       {CHECKBOXES.map(({ key, label }) => (
         <div key={key}>
           <label>

@@ -85,8 +85,8 @@ export default function AddMemberView({ group, permissions, onAdded }) {
   }
 
   return (
-    <main className="page">
-      <h1>Agregar miembros</h1>
+    <div className="add-member">
+      <h3>Agregar miembros</h3>
       {!canInvite && <p role="alert">{CANNOT_INVITE_MESSAGE}</p>}
       {error && (
         <p role="alert" data-testid="add-member-error">
@@ -99,7 +99,7 @@ export default function AddMemberView({ group, permissions, onAdded }) {
         </p>
       )}
 
-      <div role="radiogroup" aria-label="Tipo de miembro">
+      <div className="add-member__types" role="radiogroup" aria-label="Tipo de miembro">
         <label>
           <input
             type="radio"
@@ -121,7 +121,7 @@ export default function AddMemberView({ group, permissions, onAdded }) {
       </div>
 
       {mode === 'REGISTERED' && (
-        <section data-testid="friend-search">
+        <section className="add-member__search" data-testid="friend-search">
           <label htmlFor="friend-query">Buscar entre tus amigos</label>
           <input
             id="friend-query"
@@ -134,7 +134,7 @@ export default function AddMemberView({ group, permissions, onAdded }) {
           </button>
           {searched && results.length === 0 && <p>No encontraste amigos con esa búsqueda</p>}
           {results.map((candidate) => (
-            <div key={candidate.id}>
+            <div key={candidate.id} className="add-member__result">
               <span>
                 {candidate.firstName} {candidate.lastName} · {candidate.email}
               </span>
@@ -147,7 +147,7 @@ export default function AddMemberView({ group, permissions, onAdded }) {
       )}
 
       {mode === 'SIMULATED' && (
-        <section data-testid="simulated-form">
+        <section className="add-member__simulated" data-testid="simulated-form">
           <label htmlFor="simulated-name">Nombre del perfil simulado</label>
           <input
             id="simulated-name"
@@ -167,6 +167,6 @@ export default function AddMemberView({ group, permissions, onAdded }) {
           </button>
         </section>
       )}
-    </main>
+    </div>
   )
 }

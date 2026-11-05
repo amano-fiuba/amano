@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { uploadGroupPhoto, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { CameraIcon } from '../NavIcons'
 import { useSnackbar } from '../Snackbar'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
@@ -11,7 +12,7 @@ const FORMAT_MESSAGE = 'El archivo debe ser una imagen JPG o PNG válida'
  * message for immediate feedback and keeps the current photo rendered on any
  * failure (FR-021); success swaps the URL for the freshly returned one.
  */
-export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin = false, compact = false }) {
+export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin = false }) {
   const showSnackbar = useSnackbar()
   const [photo, setPhoto] = useState(currentPhoto)
   const [error, setError] = useState('')
@@ -51,42 +52,45 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
   }
 
   return (
-    <section
-      data-testid="group-photo"
-      aria-label="Foto del grupo"
-      className={compact ? 'group-photo group-photo--compact' : 'group-photo'}
-    >
-      <img
-        src={photo || DEFAULT_AVATAR}
-        alt=""
-        width={compact ? 56 : 96}
-        height={compact ? 56 : 96}
-        data-testid="group-photo-image"
-      />
+    <section data-testid="group-photo" aria-label="Foto del grupo" className="group-photo">
+      <div className="group-photo__frame">
+        <img
+          src={photo || DEFAULT_AVATAR}
+          alt=""
+          width={96}
+          height={96}
+          data-testid="group-photo-image"
+        />
+        {isAdmin && (
+          <>
+            <label className="visually-hidden" htmlFor="group-photo-input">Cambiar foto del grupo</label>
+            <input
+              id="group-photo-input"
+              ref={inputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              disabled={busy}
+              onChange={handleChange}
+              data-testid="group-photo-input"
+              hidden
+            />
+            <button
+              type="button"
+              className="group-photo__change"
+              aria-label="Cambiar foto"
+              disabled={busy}
+              onClick={() => inputRef.current?.click()}
+            >
+              <CameraIcon />
+            </button>
+          </>
+        )}
+      </div>
       {error && (
-        <p role="alert" data-testid="group-photo-error">
+        <p role="alert" className="group-photo__error" data-testid="group-photo-error">
           {error}
         </p>
       )}
-      {!isAdmin && (
-        <p role="alert" data-testid="group-photo-admin-hint">
-          Solo un administrador puede cambiar la foto del grupo
-        </p>
-      )}
-      <label className="visually-hidden" htmlFor="group-photo-input">Cambiar foto del grupo</label>
-      <input
-        id="group-photo-input"
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png"
-        disabled={busy || !isAdmin}
-        onChange={handleChange}
-        data-testid="group-photo-input"
-        hidden
-      />
-      <button type="button" disabled={!isAdmin} onClick={() => inputRef.current?.click()}>
-        {compact ? 'Cambiar' : 'Cambiar foto'}
-      </button>
     </section>
   )
 }

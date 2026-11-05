@@ -91,12 +91,12 @@ describe('GroupPhotoPanel (T086/T083, US8)', () => {
     expect(screen.getByAltText('')).toHaveAttribute('src', '/api/groups/3/photo?v=old') // conservada
   })
 
-  it('deshabilita la carga para quien no es admin con la explicación', () => {
+  it('quien no es admin solo ve la foto, sin controles ni avisos', () => {
     render(<GroupPhotoPanel groupId={3} currentPhoto={null} isAdmin={false} />)
 
-    expect(screen.getByRole('button', { name: /Cambiar foto/i })).toBeDisabled()
-    expect(
-      screen.getByText(/Solo un administrador puede cambiar la foto del grupo/),
-    ).toBeInTheDocument()
+    expect(screen.getByAltText('')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cambiar foto/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/Cambiar foto del grupo/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

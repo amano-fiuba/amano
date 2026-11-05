@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 
@@ -20,6 +20,19 @@ function renderView(entry = '/groups') {
       <GroupListView />
     </MemoryRouter>,
   )
+}
+
+function group(id, overrides = {}) {
+  return {
+    id,
+    name: `Grupo ${id}`,
+    description: null,
+    photo: null,
+    memberCount: 2,
+    lastActivityAt: '2026-11-01T12:00:00Z',
+    currentUserRole: 'MEMBER',
+    ...overrides,
+  }
 }
 
 describe('GroupListView (T029/T031 read view)', () => {
@@ -56,8 +69,8 @@ describe('GroupListView (T029/T031 read view)', () => {
     listGroups.mockResolvedValue({
       ok: true,
       groups: [
-        { id: 3, name: 'Departamento 2026', photo: 'p3.jpg', currentUserRole: 'ADMIN' },
-        { id: 5, name: 'Viaje a Mendoza', photo: null, currentUserRole: 'MEMBER' },
+        group(3, { name: 'Departamento 2026', photo: 'p3.jpg', currentUserRole: 'ADMIN' }),
+        group(5, { name: 'Viaje a Mendoza' }),
       ],
     })
 
@@ -66,12 +79,45 @@ describe('GroupListView (T029/T031 read view)', () => {
     expect(await screen.findByText('Departamento 2026')).toBeInTheDocument()
     expect(screen.getByText('Viaje a Mendoza')).toBeInTheDocument()
     expect(document.querySelector('img')).toHaveAttribute('src', 'p3.jpg')
-    expect(screen.getByTestId('group-avatar-default')).toBeInTheDocument()
+    expect(screen.getByTestId('group-avatar-default')).toHaveTextContent('V')
     expect(screen.getByTestId('group-role-3')).toHaveTextContent(/Administrador/)
     expect(screen.getByTestId('group-role-5')).toHaveTextContent(/Miembro/)
   })
 
-  it('muestra el estado vacío cuando el usuario no tiene grupos', async () => {
+  it('ordena por actividad más reciente y la fila entera lleva al grupo', async () => {
+    listGroups.mockResolvedValue({
+      ok: true,
+      groups: [
+        group(1, { lastActivityAt: '2026-10-01T12:00:00Z' }),
+        group(2, { lastActivityAt: '2026-11-01T12:00:00Z' }),
+      ],
+    })
+
+    renderView()
+
+    const links = within(await screen.findByTestId('groups-list')).getAllByRole('link')
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/groups/2', '/groups/1'])
+    expect(within(links[0]).getByTestId('group-role-2')).toBeInTheDocument()
+  })
+
+  it('muestra contador, miembros, última actividad y descripción', async () => {
+    listGroups.mockResolvedValue({
+      ok: true,
+      groups: [
+        group(1, { memberCount: 1, description: 'Regalo para Ana' }),
+        group(2, { memberCount: 4 }),
+      ],
+    })
+
+    renderView()
+
+    expect(await screen.findByTestId('groups-count')).toHaveTextContent('2 grupos')
+    expect(screen.getByText('Regalo para Ana')).toBeInTheDocument()
+    expect(screen.getByText(/^1 miembro · Actividad: 01\/11\/2026$/)).toBeInTheDocument()
+    expect(screen.getByText(/^4 miembros · Actividad: 01\/11\/2026$/)).toBeInTheDocument()
+  })
+
+  it('muestra el estado vacío con un único botón para crear el primer grupo', async () => {
     listGroups.mockResolvedValue({ ok: true, groups: [] })
 
     renderView()
@@ -79,6 +125,12 @@ describe('GroupListView (T029/T031 read view)', () => {
     expect(await screen.findByTestId('groups-empty')).toHaveTextContent(
       /Todavía no sos miembro de ningún grupo/,
     )
+    expect(screen.getByRole('link', { name: 'Crear mi primer grupo' })).toHaveAttribute(
+      'href',
+      '/groups/new',
+    )
+    expect(screen.queryByRole('link', { name: 'Crear nuevo grupo' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('groups-count')).not.toBeInTheDocument()
   })
 
   it('muestra el estado de carga y luego el error de red', async () => {
@@ -90,7 +142,7 @@ describe('GroupListView (T029/T031 read view)', () => {
     expect(await screen.findByTestId('groups-error')).toHaveTextContent(
       /No se pudo conectar con el servidor/,
     )
-    expect(screen.getByTestId('groups-empty')).toBeInTheDocument()
+    expect(screen.queryByTestId('groups-empty')).not.toBeInTheDocument()
   })
 
   it('el error 401 también se muestra como error de conexión con el texto del client', async () => {
@@ -106,7 +158,7 @@ describe('GroupListView (T029/T031 read view)', () => {
   })
 
   it('mantiene el enlace para crear un nuevo grupo', async () => {
-    listGroups.mockResolvedValue({ ok: true, groups: [] })
+    listGroups.mockResolvedValue({ ok: true, groups: [group(1)] })
 
     renderView()
 
