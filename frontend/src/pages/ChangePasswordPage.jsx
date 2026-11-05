@@ -11,6 +11,7 @@ import {
   UPDATE_NETWORK_ERROR_MESSAGE,
   updatePassword,
 } from '../api/authClient'
+import { useSnackbar } from '../components/Snackbar'
 import TextField from '../components/TextField'
 import {
   validateConfirmPassword,
@@ -28,7 +29,7 @@ export default function ChangePasswordPage() {
   } = useForm({ mode: 'onBlur' })
 
   const [formError, setFormError] = useState('')
-  const [success, setSuccess] = useState('')
+  const showSnackbar = useSnackbar()
   const password = watch('newPassword') ?? ''
   const confirmation = watch('confirmPassword') ?? ''
 
@@ -41,7 +42,6 @@ export default function ChangePasswordPage() {
 
   const onSubmit = async (values) => {
     setFormError('')
-    setSuccess('')
     const result = await updatePassword({
       currentPassword: values.currentPassword,
       newPassword: values.newPassword,
@@ -50,7 +50,7 @@ export default function ChangePasswordPage() {
 
     if (result.ok) {
       // El cambio no rota la sesión: el usuario queda en la misma pantalla.
-      setSuccess('La contraseña se cambió correctamente')
+      showSnackbar('La contraseña se cambió correctamente')
       reset({ currentPassword: '', newPassword: '', confirmPassword: '' })
       return
     }
@@ -77,11 +77,6 @@ export default function ChangePasswordPage() {
   return (
     <main className="page">
       <h1>Cambiar contraseña</h1>
-      {success && (
-        <p role="status" data-testid="form-success">
-          {success}
-        </p>
-      )}
       {formError && (
         <p role="alert" data-testid="form-error">
           {formError}

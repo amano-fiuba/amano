@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { removeMember, removeSimulatedProfile, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { useSnackbar } from '../Snackbar'
 
 const ADMIN_TARGET_MESSAGE =
   'No podés eliminar directamente a otro administrador: primero quitale el rol'
@@ -12,15 +13,15 @@ const ADMIN_TARGET_MESSAGE =
  * On success it closes and calls `onRemoved` so the list updates by itself.
  */
 export default function RemoveMemberDialog({ groupId, member, simulatedProfile, onRemoved }) {
+  const showSnackbar = useSnackbar()
   const [open, setOpen] = useState(false)
-  const [confirmation, setConfirmation] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const isAdminTarget = member?.role === 'ADMIN'
+  const targetName = simulatedProfile?.name ?? member?.name ?? ''
 
   function openDialog() {
-    setConfirmation('')
     setError('')
     setOpen(true)
   }
@@ -34,7 +35,7 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile, 
     if (!result || result.network) {
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else if (result.ok) {
-      setConfirmation(simulatedProfile ? 'Perfil simulado eliminado' : 'Miembro eliminado del grupo')
+      showSnackbar(`${targetName} ya no forma parte del grupo`)
       setOpen(false)
       // the parent list re-fetches itself: no manual refresh (fix 2026-11-04)
       onRemoved?.()
@@ -44,14 +45,11 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile, 
     setBusy(false)
   }
 
-  const targetName = simulatedProfile?.name ?? member?.name ?? ''
-
   return (
     <section data-testid="remove-member">
       <button type="button" onClick={openDialog}>
         {simulatedProfile ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
       </button>
-      {confirmation && <p role="status">{confirmation}</p>}
       {error && (
         <p role="alert" data-testid="remove-member-error">
           {error}

@@ -7,6 +7,7 @@ import {
 } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
 import FriendsList from '../components/FriendsList'
+import { useSnackbar } from '../components/Snackbar'
 
 // Exact messages of the spec (FR-013), exported for the tests.
 export const NO_PENDING_REQUESTS_MESSAGE = 'No tenés solicitudes de amistad pendientes'
@@ -24,13 +25,13 @@ function fullName(sender) {
 // "Amigos" screen (features 011 US3 and 012 US1/US2/US3). The "Solicitudes"
 // section lists the pending requests received by the session user and lets the
 // recipient accept ("ACCEPT") or reject ("REJECT") each one. The row leaves the
-// list on 200/409/404 (it is no longer pending), the exact confirmation stays
-// visible until another action or navigation (research.md D8), network failures
-// keep the row reactive and 401 closes the session. The "Mis amigos" section
+// list on 200/409/404 (it is no longer pending), the exact confirmation is shown
+// in the snackbar, network failures keep the row reactive and 401 closes the session. The "Mis amigos" section
 // (feature 013) is rendered first and queried again after an accepted request
 // (FR-009 of 013).
 export default function FriendsPage() {
   const { setUser } = useAuth()
+  const showSnackbar = useSnackbar()
   const [requests, setRequests] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -86,11 +87,7 @@ export default function FriendsPage() {
         // The new friendship must show up in "Mis amigos" (013, FR-009).
         setFriendsReloadKey((key) => key + 1)
       }
-      setNotice({
-        kind: 'success',
-        message:
-          action === 'ACCEPT' ? ACCEPTED_MESSAGE : REJECTED_MESSAGE,
-      })
+      showSnackbar(action === 'ACCEPT' ? ACCEPTED_MESSAGE : REJECTED_MESSAGE)
       return
     }
     if (result.network) {

@@ -126,7 +126,7 @@
 - **FR-012b** *(fix 2026-11-04)*: Las filas de perfiles simulados MUST NOT mostrar acciones de rol de administrador; su eliminación MUST usar el endpoint de perfiles simulados.
 - **FR-013**: Un usuario puede abandonar el grupo con confirmación, salvo que tenga saldo pendiente con otros miembros.
 - **FR-014**: Si el usuario tiene saldo pendiente, se le informa el motivo y no se permite abandonar.
-- **FR-015**: Al abandonar, el grupo deja de figurar como activo para ese usuario, sus gastos previos se conservan y la acción queda registrada en el historial.
+- **FR-015**: Al abandonar, el grupo deja de figurar como activo para ese usuario, sus gastos previos se conservan y la acción queda registrada en el historial. La interfaz confirma la salida y lleva al usuario al listado de grupos, sin dejar la pantalla del grupo en el historial de navegación.
 - **FR-016**: El listado de miembros activos muestra nombre y avatar (si lo tiene), y el usuario actual se distingue visualmente del resto.
 - **FR-017**: El listado de miembros se actualiza con altas y bajas.
 - **FR-018**: La información del grupo es accesible desde la vista de información del grupo.

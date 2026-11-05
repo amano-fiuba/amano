@@ -30,7 +30,7 @@ describe('RemoveMemberDialog (T062/T057)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
     await waitFor(() => expect(removeMember).toHaveBeenCalledWith(42, 15))
-    expect(await screen.findByRole('status')).toHaveTextContent(/Miembro eliminado/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Carla Pérez ya no forma parte del grupo/i)
   })
 
   it('muestra la pista de revocar el rol primero para otro admin', async () => {
@@ -70,7 +70,7 @@ describe('RemoveMemberDialog (T062/T057)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     await waitFor(() => expect(removeSimulatedProfile).toHaveBeenCalledWith(42, 33))
-    expect(await screen.findByRole('status')).toHaveTextContent(/Perfil simulado eliminado/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Juan Simulado ya no forma parte del grupo/i)
   })
 
   it('al eliminar con éxito cierra el diálogo y avisa con onRemoved (fix 2026-11-04)', async () => {

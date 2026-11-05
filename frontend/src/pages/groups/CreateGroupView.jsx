@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createGroup } from '../../api/groupsClient'
 
+import { useSnackbar } from '../../components/Snackbar'
 import SubmitButton from '../../components/SubmitButton'
 import TextField from '../../components/TextField'
 
@@ -23,7 +24,7 @@ function firstNameOf(group) {
  */
 export default function CreateGroupView() {
   const [memberTab, setMemberTab] = useState(MEMBER_TYPES.REGISTERED)
-  const [status, setStatus] = useState(null)
+  const showSnackbar = useSnackbar()
   const [saving, setSaving] = useState(false)
 
   const [fields, setFields] = useState({ name: '', description: '' })
@@ -59,7 +60,6 @@ export default function CreateGroupView() {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    setStatus(null)
     const nextErrors = findTabError()
     setErrors(nextErrors)
     if (!fields.name.trim() || Object.keys(nextErrors).length > 0) {
@@ -79,10 +79,9 @@ export default function CreateGroupView() {
     })
     setSaving(false)
     if (result.ok) {
-      setStatus({ kind: 'success', text: `Grupo creado: ${firstNameOf(result.group)}` })
+      showSnackbar(`Grupo creado: ${firstNameOf(result.group)}`)
       setErrors({})
     } else {
-      setStatus(null)
       setErrors(result.fields || findTabError())
     }
   }
@@ -165,11 +164,6 @@ export default function CreateGroupView() {
         <SubmitButton loading={saving}>Crear grupo</SubmitButton>
         <p>{MEMBER_REQUIRED_MESSAGE}</p>
       </form>
-      {status?.kind === 'success' && (
-        <p role="status" data-testid="group-created">
-          {status.text}
-        </p>
-      )}
     </main>
   )
 }

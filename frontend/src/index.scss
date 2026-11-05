@@ -29,6 +29,7 @@
   // referencia circular entre variables y las invalidaría a todas.
   --color-acento-tono: #4b80c5;
   --color-error-tono: #b42336;
+  --color-barra: #28548c;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -41,6 +42,7 @@
   --color-acento: color-mix(in srgb, var(--color-acento-tono) 78%, white);
   --color-acento-oscuro: var(--color-acento);
   --color-error: color-mix(in srgb, var(--color-error-tono) 72%, white);
+  --color-barra: #1b2b40;
 }
 * {
   box-sizing: border-box;
@@ -782,12 +784,6 @@ fieldset {
   font-size: 0.85rem;
   font-weight: 600;
 
-  &--success {
-    border: 1px solid color-mix(in srgb, var(--color-oliva) 45%, var(--color-borde));
-    color: var(--color-texto);
-    background: color-mix(in srgb, var(--color-oliva) 14%, var(--color-superficie));
-  }
-
   &--error {
     border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
     color: var(--color-error);
@@ -1147,19 +1143,13 @@ fieldset {
   }
 }
 
-// Notice of the outcome of a response (feature 012, FR-013..FR-016): success,
-// conflict (409/404) and network error keep the row visible when it applies.
+// Notice of a failed response (feature 012, FR-014..FR-016): conflict (409/404)
+// and network error keep the row visible when it applies.
 .friends-requests__notice {
   margin: 0;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
   font-size: 0.9rem;
-
-  &--success {
-    border: 1px solid color-mix(in srgb, var(--color-oliva) 35%, var(--color-borde));
-    background: color-mix(in srgb, var(--color-oliva) 12%, var(--color-superficie));
-    color: var(--color-texto);
-  }
 
   &--conflict,
   &--error {
@@ -1455,5 +1445,17 @@ li:has(> [data-testid="member-you"]) {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.25rem;
+  }
+}
+
+// Ajustes (specs/015-main-screen, FR-009)
+.settings-page {
+  h2 {
+    margin: 1.5rem 0 0.6rem;
+    font-size: 1.1rem;
+  }
+
+  .theme-toggle {
+    position: static;
   }
 }

@@ -190,7 +190,7 @@ El correo se envía normalizado (`normalizeEmail`).
 | URL sin `token` | "El enlace para restablecer la contraseña no es válido" + "Solicitar un nuevo enlace" (`/forgot-password`); sin formulario ni llamada |
 | Campos inválidos en el cliente | Errores de campo con los mensajes de 001 ("Debes confirmar la contraseña" si falta la confirmación); sin llamada |
 | Envío en curso | Botón deshabilitado con "Guardando…" |
-| 200 | `{ ok: true, message }` → `navigate('/login', { replace: true, state: { notice: message } })`; `LoginPage` muestra el aviso (`data-testid="login-notice"`) |
+| 200 | `{ ok: true, message }` → snackbar con `message` y `navigate('/login', { replace: true })` |
 | 410 | `{ ok: false, status: 410, ... }` → "…ha expirado" + "Solicitar un nuevo enlace"; sin formulario |
 | 400 con `fields` | `setError` por campo; formulario conservado |
 | 400 sin `fields` (u otro 4xx) | "…no es válido" + "Solicitar un nuevo enlace"; sin formulario |
@@ -201,4 +201,3 @@ El correo se envía normalizado (`normalizeEmail`).
 | Situación | Comportamiento |
 |-----------|----------------|
 | Siempre | Enlace "¿Olvidaste tu contraseña?" a `/forgot-password` |
-| `location.state.notice` presente | Se muestra en `role="status"` sobre el formulario |

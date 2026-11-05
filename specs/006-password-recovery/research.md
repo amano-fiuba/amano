@@ -60,7 +60,7 @@
 
 ## D10 — Sin sesión automática; aviso en `/login`
 
-- **Decisión**: el 200 del canje solo trae `{"message": ...}`, sin `Set-Cookie`. El frontend navega a `/login` con `state.notice` y `LoginPage` lo muestra en un `role="status"`.
+- **Decisión**: el 200 del canje solo trae `{"message": ...}`, sin `Set-Cookie`. El frontend muestra el mensaje en el snackbar global y navega a `/login`.
 - **Rationale**: confirmar la nueva contraseña escribiéndola una vez más es la práctica habitual y no requiere que el canje conozca el mecanismo de sesión de 001. El paso por estado del router replica el patrón de `state.from` (D6 de 004) y `verifiedWelcome` (003).
 - **Alternativas consideradas**: iniciar sesión directamente como el canje de verificación de 003 (acopla el canje a `AuthCookie`/`JwtService` y abre sesión en el dispositivo donde se abrió el correo, que puede no ser el de la persona); pantalla de éxito propia con temporizador de redirección (más estado y tests con temporizadores, sin beneficio).
 

@@ -233,7 +233,7 @@ describe('FriendsPage (feature 012, responder solicitudes)', () => {
     await user.click(screen.getByRole('button', { name: 'Rechazar' }))
 
     expect(friendsClient.respondFriendshipRequest).toHaveBeenCalledWith(5, 'REJECT')
-    expect(await screen.findByText(REJECTED_MESSAGE)).toHaveAttribute('role', 'status')
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(REJECTED_MESSAGE)
     expect(screen.queryByTestId('friend-request-5')).not.toBeInTheDocument()
   })
 
@@ -303,7 +303,7 @@ describe('FriendsPage (feature 012, responder solicitudes)', () => {
     expect(screen.queryByText(ACCEPTED_MESSAGE)).not.toBeInTheDocument()
   })
 
-  it('US3: la confirmación de la última solicitud permanece con la lista vacía', async () => {
+  it('US3: al responder la última solicitud confirma y muestra la lista vacía', async () => {
     friendsClient.listReceivedFriendshipRequests.mockResolvedValue({
       ok: true,
       requests: [ANA],
@@ -319,9 +319,7 @@ describe('FriendsPage (feature 012, responder solicitudes)', () => {
     await user.click(screen.getByRole('button', { name: 'Aceptar' }))
 
     expect(await screen.findByText(ACCEPTED_MESSAGE)).toBeInTheDocument()
-    expect(
-      screen.queryByText(NO_PENDING_REQUESTS_MESSAGE),
-    ).not.toBeInTheDocument()
+    expect(await screen.findByText(NO_PENDING_REQUESTS_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Solicitudes pendientes' })).not.toBeInTheDocument()
   })
 
