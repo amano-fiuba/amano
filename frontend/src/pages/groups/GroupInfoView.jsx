@@ -10,6 +10,12 @@ import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
 import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
+import { memberCountLabel } from './groupDisplay'
+import './groups.scss'
+
+function roleLabel(role) {
+  return role === 'ADMIN' ? 'Administrador' : 'Miembro'
+}
 
 export default function GroupInfoView() {
   const { id } = useParams()
@@ -89,26 +95,7 @@ export default function GroupInfoView() {
                 </p>
               </div>
             </div>
-            <GroupDescriptionPanel description={group.description ?? null} />
-          </header>
-
-          {/* Miembros activos: altas, bajas y cambios de rol se ven al instante */}
-          <section className="group-card" aria-label="Miembros del grupo">
-            <MemberListView
-              groupId={Number(id)}
-              currentUserId={user?.id ?? null}
-              isAdmin={isAdmin}
-              reloadKey={membersVersion}
-              onChanged={refreshGroup}
-            />
-          </section>
-
-          {/* Gastos del grupo (specs/017-debt-states, FR-021) */}
-          <GroupExpensesCard groupId={id} group={group} />
-
-          {/* Acciones del usuario en el grupo */}
-          <section className="group-card" aria-label="Acciones del grupo">
-            <div className="group-actions-row">
+            <div className="group-hero__actions">
               <Link
                 className="group-action"
                 to={`/groups/${id}/history`}
@@ -133,6 +120,9 @@ export default function GroupInfoView() {
               </div>
             )}
           </header>
+
+          {/* Gastos del grupo (specs/017-debt-states, FR-021) */}
+          <GroupExpensesCard groupId={id} group={group} />
 
           <section className="group-detail__section" aria-labelledby="group-members-title">
             <div className="group-detail__section-header">
