@@ -939,6 +939,108 @@ fieldset {
   font-weight: 600;
 }
 
+// Delete action of each friend (feature 016): outlined danger button that
+// leaves the card visible while the deletion is in progress.
+.friend-card__actions {
+  flex: 0 0 auto;
+}
+
+.friend-card__delete {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-error) 55%, var(--color-borde));
+  border-radius: 0.5rem;
+  color: var(--color-error);
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  &:hover:enabled {
+    color: var(--color-superficie);
+    background: var(--color-error);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+// Confirmation dialog for deleting a friend (feature 016, FR-004..FR-006).
+.delete-friend-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--color-texto) 45%, transparent);
+}
+
+.delete-friend-dialog {
+  width: min(24rem, 100%);
+  padding: 1.25rem;
+  border: 1px solid var(--color-borde);
+  border-radius: 0.9rem;
+  background: var(--color-superficie);
+  box-shadow: 0 18px 45px color-mix(in srgb, var(--color-texto) 25%, transparent);
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+.delete-friend-dialog__error {
+  margin-top: 0.75rem !important;
+  color: var(--color-error);
+}
+
+.delete-friend-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+
+  button {
+    padding: 0.5rem 0.9rem;
+    border-radius: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+.delete-friend-dialog__cancel {
+  border: 1px solid var(--color-borde);
+  color: var(--color-texto);
+  background: transparent;
+
+  &:hover:enabled {
+    background: var(--color-fondo);
+  }
+}
+
+.delete-friend-dialog__confirm {
+  border: 1px solid var(--color-error);
+  color: var(--color-superficie);
+  background: var(--color-error);
+
+  &:hover:enabled {
+    border-color: color-mix(in srgb, var(--color-error) 80%, black);
+    background: color-mix(in srgb, var(--color-error) 80%, black);
+  }
+}
+
 @media (max-width: 480px) {
   .friend-card {
     flex-wrap: wrap;

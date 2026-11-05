@@ -4,11 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from '../auth/AuthContext'
 import ProtectedRoute from '../auth/ProtectedRoute'
-import FriendsList, { NO_FRIENDS_MESSAGE } from './FriendsList'
+import FriendsList, {
+  DELETE_SUCCESS_MESSAGE,
+  NOT_FRIEND_MESSAGE,
+  NO_FRIENDS_MESSAGE,
+} from './FriendsList'
 
 vi.mock('../api/friendsClient', () => ({
   FRIENDS_NETWORK_ERROR_MESSAGE: 'No se pudo cargar tu lista de amigos. Intentá nuevamente',
+  DELETE_FRIEND_NETWORK_ERROR_MESSAGE: 'No se pudo eliminar al amigo. Intentá nuevamente',
   listFriends: vi.fn(),
+  checkFriendDeletion: vi.fn(),
+  deleteFriend: vi.fn(),
 }))
 
 const friendsClient = await import('../api/friendsClient')
@@ -38,6 +45,8 @@ beforeEach(() => {
     vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(ME) }),
   )
   friendsClient.listFriends.mockReset()
+  friendsClient.checkFriendDeletion.mockReset()
+  friendsClient.deleteFriend.mockReset()
 })
 
 afterEach(() => {
@@ -233,5 +242,148 @@ describe('FriendsList (feature 013)', () => {
 
     expect(screen.getByText('Bruno')).toBeInTheDocument()
     expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
+  })
+
+  it('US1 (016): eliminar un amigo pide confirmación y actualiza la lista', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: true, canDelete: true })
+    friendsClient.deleteFriend.mockResolvedValue({ ok: true })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+
+    expect(friendsClient.checkFriendDeletion).toHaveBeenCalledWith(12)
+    expect(screen.getByRole('dialog', { name: 'Eliminar amigo' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+    expect(await screen.findByText(DELETE_SUCCESS_MESSAGE)).toBeInTheDocument()
+    expect(friendsClient.deleteFriend).toHaveBeenCalledWith(12)
+    expect(screen.queryByTestId('friend-12')).not.toBeInTheDocument()
+    expect(screen.getByText(NO_FRIENDS_MESSAGE)).toBeInTheDocument()
+  })
+
+  it('US1 (016): cancelar el diálogo no elimina ni llama al backend', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: true, canDelete: true })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(friendsClient.deleteFriend).not.toHaveBeenCalled()
+    expect(screen.getByTestId('friend-12')).toBeInTheDocument()
+  })
+
+  it('US2 (016): la deuda directa muestra el aviso y no abre el diálogo', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({
+      ok: true,
+      canDelete: false,
+      reason: 'No podés eliminar a este amigo: tenés una deuda pendiente.',
+    })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+
+    expect(await screen.findByText(/tenés una deuda pendiente/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(friendsClient.deleteFriend).not.toHaveBeenCalled()
+  })
+
+  it('US2 (016): un 403 al confirmar conserva la tarjeta y muestra el motivo', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: true, canDelete: true })
+    friendsClient.deleteFriend.mockResolvedValue({
+      ok: false,
+      status: 403,
+      detail: 'No podés eliminar a este amigo: tenés una deuda pendiente.',
+    })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+    expect(await screen.findByText(/tenés una deuda pendiente/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('friend-12')).toBeInTheDocument()
+    expect(screen.queryByText(DELETE_SUCCESS_MESSAGE)).not.toBeInTheDocument()
+  })
+
+  it('US3 (016): un 404 retira la tarjeta obsoleta y muestra el mensaje neutro', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: true, canDelete: true })
+    friendsClient.deleteFriend.mockResolvedValue({
+      ok: false,
+      status: 404,
+      detail: NOT_FRIEND_MESSAGE,
+    })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+    expect(await screen.findByText(NOT_FRIEND_MESSAGE)).toBeInTheDocument()
+    expect(screen.queryByTestId('friend-12')).not.toBeInTheDocument()
+    expect(screen.queryByText(DELETE_SUCCESS_MESSAGE)).not.toBeInTheDocument()
+  })
+
+  it('US3 (016): un error de red mantiene la tarjeta y no confirma el éxito', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: true, canDelete: true })
+    friendsClient.deleteFriend.mockResolvedValue({ ok: false, network: true })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+    expect(
+      await screen.findByText('No se pudo eliminar al amigo. Intentá nuevamente'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByTestId('friend-12')).toBeInTheDocument()
+    expect(screen.queryByText(DELETE_SUCCESS_MESSAGE)).not.toBeInTheDocument()
+  })
+
+  it('US3 (016): un 401 durante la elegibilidad cierra la sesión', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: false, status: 401 })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+
+    expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('US3 (016): un error al consultar la elegibilidad no abre el diálogo', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
+    friendsClient.checkFriendDeletion.mockResolvedValue({ ok: false, network: true })
+    const user = userEvent.setup()
+    render(ui())
+
+    const card = await screen.findByTestId('friend-12')
+    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+
+    expect(
+      await screen.findByText('No se pudo eliminar al amigo. Intentá nuevamente'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(friendsClient.deleteFriend).not.toHaveBeenCalled()
   })
 })

@@ -12,6 +12,8 @@ export const RESPOND_NETWORK_ERROR_MESSAGE =
   'No se pudo responder la solicitud. Intentá nuevamente'
 export const FRIENDS_NETWORK_ERROR_MESSAGE =
   'No se pudo cargar tu lista de amigos. Intentá nuevamente'
+export const DELETE_FRIEND_NETWORK_ERROR_MESSAGE =
+  'No se pudo eliminar al amigo. Intentá nuevamente'
 
 // Emitted after answering a request, so the bell of the top bar stays current
 // no matter which screen answered it (specs/015-main-screen).
@@ -120,6 +122,60 @@ export async function listFriends() {
     })
     if (response.ok) {
       return { ok: true, friends: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await parseProblem(response)
+    return { ok: false, status: response.status, detail: problem.detail }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * Checks whether the session user can delete a friendship (feature 016).
+ * Returns { ok: true, canDelete, reason } on 2xx; 4xx as
+ * { ok: false, status, detail }; network failures and 5xx as
+ * { ok: false, network: true }.
+ */
+export async function checkFriendDeletion(friendId) {
+  try {
+    const response = await fetch(
+      `/api/users/me/friends/${friendId}/deletion-eligibility`,
+      { credentials: 'include' },
+    )
+    if (response.ok) {
+      const eligibility = await response.json()
+      return {
+        ok: true,
+        canDelete: eligibility.canDelete,
+        reason: eligibility.reason ?? null,
+      }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await parseProblem(response)
+    return { ok: false, status: response.status, detail: problem.detail }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * Deletes the friendship with the given account (feature 016). Returns
+ * { ok: true } on 2xx (204); 4xx as { ok: false, status, detail }; network
+ * failures and 5xx as { ok: false, network: true }.
+ */
+export async function deleteFriend(friendId) {
+  try {
+    const response = await fetch(`/api/users/me/friends/${friendId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (response.ok) {
+      return { ok: true }
     }
     if (response.status >= 500) {
       return { ok: false, network: true }
