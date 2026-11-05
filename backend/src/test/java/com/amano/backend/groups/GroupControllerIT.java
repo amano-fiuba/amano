@@ -1,5 +1,7 @@
 package com.amano.backend.groups;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -207,5 +209,30 @@ class GroupControllerIT {
 
         mockMvc.perform(get("/api/groups/999999").cookie(session))
                 .andExpect(status().isNotFound());
+    }
+    /** 015 FR-007: the latest history event, or the creation date without events. */
+    @Test
+    void groupsListInformsTheLastActivity() throws Exception {
+        Cookie session = verifiedSessionOf("activitylister@example.com");
+        String created = postGroup(session, "Actividad", Map.of(
+                "memberType", "SIMULATED",
+                "identifier", "actividad@example.com",
+                "name", "Invitado"));
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        jdbcTemplate.update("DELETE FROM group_activity WHERE group_id = ?", groupId);
+        String listed = mockMvc.perform(get("/api/groups").cookie(session))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var summary = objectMapper.readTree(listed).get(0);
+        assertThat(summary.get("lastActivityAt").asString()).isEqualTo(summary.get("createdAt").asString());
+
+        String insertEvent = "INSERT INTO group_activity (group_id, event_type, created_at) "
+                + "VALUES (?, 'MEMBER_ADDED', ?::timestamptz)";
+        jdbcTemplate.update(insertEvent, groupId, "2029-06-15 12:00:00+00");
+        jdbcTemplate.update(insertEvent, groupId, "2030-06-15 12:00:00+00");
+        mockMvc.perform(get("/api/groups").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].lastActivityAt").value(startsWith("2030-06-15")));
     }
 }

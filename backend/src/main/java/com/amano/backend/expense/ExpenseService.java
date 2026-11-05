@@ -73,6 +73,14 @@ public class ExpenseService {
             String description, RecurrenceFrequency frequency, LocalDate today) {
     }
 
+    /** Latest expenses of the user, newest registration first (015 FR-008). */
+    @Transactional(readOnly = true)
+    public List<ExpenseResponse> listRecent(Long userId) {
+        return expenseRepository.findTop5ByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
+                .map(ExpenseResponse::from)
+                .toList();
+    }
+
     /**
      * Validates and normalizes the whole payload, replays an existing operation of
      * the same user/key or persists a new expense linked to {@code userId}.

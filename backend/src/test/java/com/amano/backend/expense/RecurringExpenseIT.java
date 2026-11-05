@@ -341,6 +341,35 @@ class RecurringExpenseIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ----- Feature 015: GET /api/expenses/recent -------------------------------
+
+    @Test
+    void recentExpensesReturnsTheLastFiveOfTheCallerNewestFirst() throws Exception {
+        Cookie owner = verifiedSession("recent-owner@example.com");
+        Cookie stranger = verifiedSession("recent-stranger@example.com");
+        createId(stranger, payload("ONE_TIME", null, today()));
+        long[] ids = new long[6];
+        for (int index = 0; index < ids.length; index++) {
+            ids[index] = createId(owner, payload("ONE_TIME", null, today()));
+        }
+
+        mockMvc.perform(get("/api/expenses/recent").cookie(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[0].id").value(ids[5]))
+                .andExpect(jsonPath("$[4].id").value(ids[1]));
+    }
+
+    @Test
+    void recentExpensesIsEmptyWithoutExpensesAndRequiresASession() throws Exception {
+        Cookie session = verifiedSession("recent-empty@example.com");
+
+        mockMvc.perform(get("/api/expenses/recent").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mockMvc.perform(get("/api/expenses/recent")).andExpect(status().isUnauthorized());
+    }
+
     // ----- FR-015 and V5 constraints -----------------------------------------
 
     @Test

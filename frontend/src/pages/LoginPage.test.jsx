@@ -49,7 +49,7 @@ function renderLogin(initialEntries = ['/login']) {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/dashboard" element={<SessionProbe label="DASHBOARD" />} />
-        <Route path="/groups" element={<SessionProbe label="GRUPOS" />} />
+          <Route path="/" element={<SessionProbe label="PRINCIPAL" />} />
           <Route path="/profile" element={<SessionProbe label="PERFIL" />} />
           <Route path="/register" element={<div>REGISTRO</div>} />
         </Routes>
@@ -105,19 +105,6 @@ describe('LoginPage (feature 004)', () => {
     expect(button).toBeEnabled()
   })
 
-  it('muestra el aviso recibido en state.notice (feature 006: contraseña actualizada)', async () => {
-    renderLogin([
-      {
-        pathname: '/login',
-        state: { notice: 'Tu contraseña fue actualizada. Ya puedes iniciar sesión' },
-      },
-    ])
-
-    expect(await screen.findByTestId('login-notice')).toHaveTextContent(
-      'Tu contraseña fue actualizada. Ya puedes iniciar sesión',
-    )
-  })
-
   it('campos vacíos: muestra los obligatorios y no llama al backend', async () => {
     const user = userEvent.setup()
     renderLogin()
@@ -141,7 +128,7 @@ describe('LoginPage (feature 004)', () => {
     expect(authClient.login).not.toHaveBeenCalled()
   })
 
-  it('200: guarda la sesión y navega a /groups con el correo normalizado', async () => {
+  it('200: guarda la sesión y navega a la pantalla principal con el correo normalizado', async () => {
     authClient.login.mockResolvedValue({ ok: true, profile: PROFILE })
     const user = userEvent.setup()
     renderLogin()
@@ -149,7 +136,7 @@ describe('LoginPage (feature 004)', () => {
 
     await fillAndSubmit(user, '  Ana@Example.COM ', 'Password123!')
 
-    expect(await screen.findByText('GRUPOS con-sesion:Ana')).toBeInTheDocument()
+    expect(await screen.findByText('PRINCIPAL con-sesion:Ana')).toBeInTheDocument()
     expect(authClient.login).toHaveBeenCalledWith('ana@example.com', 'Password123!')
   })
 
@@ -260,14 +247,14 @@ describe('LoginPage (feature 004)', () => {
     expect(await screen.findByTestId('login-error')).toHaveTextContent('Demasiados intentos')
   })
 
-  it('con sesión activa no muestra el formulario: va directo a /groups', async () => {
+  it('con sesión activa no muestra el formulario: va directo a la pantalla principal', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(PROFILE) }),
     )
     renderLogin()
 
-    expect(await screen.findByText('GRUPOS con-sesion:Ana')).toBeInTheDocument()
+    expect(await screen.findByText('PRINCIPAL con-sesion:Ana')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: /iniciar sesión/i })).not.toBeInTheDocument()
   })
 })

@@ -142,8 +142,7 @@ Quita el avatar propio y devuelve la cuenta al estado "sin avatar propio".
   avatar pendiente, primero `DELETE /api/users/me/avatar` (si se marcó eliminación) y luego
   `PUT /api/users/me/avatar` con el archivo retenido, en ese orden; todo éxito ⇒ navegación
   a la visualización del perfil de `002`, que muestra los datos frescos junto al mensaje
-  "Los cambios se guardaron correctamente" una única vez (aviso one-shot por sessionStorage,
-  FR-009 enmendado). El botón queda deshabilitado (gris) mientras no haya cambios pendientes
+  "Los cambios se guardaron correctamente" una única vez en un snackbar (FR-009 enmendado). El botón queda deshabilitado (gris) mientras no haya cambios pendientes
   (FR-011 enmendada).
   `400` ⇒ mensajes por campo de `properties.fields` sin limpiar el formulario (FR-010),
   sin navegación;

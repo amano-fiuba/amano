@@ -44,6 +44,12 @@ class ActivityEventServiceTest {
         service = new ActivityEventService(repository, objectMapper);
     }
 
+    @Test
+    void lastActivityOfNoGroupsDoesNotQueryTheDatabase() {
+        assertThat(service.lastActivityByGroup(List.of())).isEmpty();
+        verify(repository, never()).findLastActivityByGroupIds(any());
+    }
+
     private GroupActivity saved() {
         ArgumentCaptor<GroupActivity> captor = ArgumentCaptor.forClass(GroupActivity.class);
         verify(repository).save(captor.capture());

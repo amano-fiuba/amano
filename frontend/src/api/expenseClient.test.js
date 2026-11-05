@@ -4,6 +4,7 @@ import {
   RECURRING_LOAD_ERROR_MESSAGE,
   RECURRING_UPDATE_ERROR_MESSAGE,
   createExpense,
+  listRecentExpenses,
   listRecurringExpenses,
   updateRecurringExpenseStatus,
 } from './expenseClient'
@@ -258,5 +259,29 @@ describe('updateRecurringExpenseStatus (009, FR-009/FR-010)', () => {
     expect(RECURRING_UPDATE_ERROR_MESSAGE).toBe(
       'No se pudo actualizar el gasto recurrente. Intentá nuevamente',
     )
+  })
+})
+
+describe('listRecentExpenses (015, FR-008)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it.each([
+    [response({ ok: true, body: [{ id: 1 }] }), { ok: true, expenses: [{ id: 1 }] }],
+    [response({ ok: true, body: null }), { ok: true, expenses: [] }],
+    [response({ status: 401 }), { ok: false, status: 401 }],
+    [response({ status: 500 }), { ok: false, network: true }],
+  ])('traduce la respuesta %#', async (answer, expected) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(answer))
+
+    await expect(listRecentExpenses()).resolves.toEqual(expected)
+    expect(fetch).toHaveBeenCalledWith('/api/expenses/recent', { credentials: 'include' })
+  })
+
+  it('un fallo de red se informa como network', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+
+    await expect(listRecentExpenses()).resolves.toEqual({ ok: false, network: true })
   })
 })

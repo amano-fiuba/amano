@@ -43,10 +43,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderPage() {
+function renderPage(entry = '/users/search') {
   return render(
     <AuthProvider>
-      <MemoryRouter initialEntries={['/users/search']}>
+      <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route
             path="/users/search"
@@ -73,6 +73,16 @@ async function search(user, text) {
 }
 
 describe('UsersSearchPage (feature 008)', () => {
+  it('ejecuta la búsqueda indicada por ?q= (015, FR-006)', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    renderPage('/users/search?q=ana%20p')
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(usersClient.searchUsers).toHaveBeenCalledTimes(1)
+    expect(usersClient.searchUsers).toHaveBeenCalledWith('ana p')
+    expect(screen.getByLabelText('Nombre, apellido o email')).toHaveValue('ana p')
+  })
+
   it('muestra el título, el campo y el botón Buscar dentro de la tarjeta de página', async () => {
     renderPage()
 
@@ -261,7 +271,7 @@ describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
       resolveSend({ ok: true, request: { id: 9 } })
     })
 
-    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FRIENDSHIP_REQUEST_SENT_MESSAGE,
     )
     expect(
@@ -348,7 +358,7 @@ describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Agregar a Ana Pérez' }))
 
-    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FRIENDSHIP_REQUEST_SENT_MESSAGE,
     )
     expect(friendsClient.sendFriendshipRequest).toHaveBeenCalledTimes(2)

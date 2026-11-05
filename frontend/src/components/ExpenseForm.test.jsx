@@ -9,12 +9,12 @@ vi.mock('../api/expenseClient', () => ({
 }))
 
 import { createExpense } from '../api/expenseClient'
+import { SNACKBAR_VISIBLE_MS } from './Snackbar'
 import ExpenseForm, {
   EXPENSE_REUSED_KEY_MESSAGE,
   FREQUENCY_REQUIRED_MESSAGE,
   EXPENSE_SESSION_EXPIRED_MESSAGE,
   EXPENSE_SUCCESS_MESSAGE,
-  SUCCESS_VISIBLE_MS,
 } from './ExpenseForm'
 import {
   AMOUNT_DECIMALS,
@@ -105,7 +105,7 @@ describe('ExpenseForm (T029/T030)', () => {
     expect(screen.getByRole('status')).toHaveTextContent(EXPENSE_SUCCESS_MESSAGE)
 
     act(() => {
-      vi.advanceTimersByTime(SUCCESS_VISIBLE_MS - 1)
+      vi.advanceTimersByTime(SNACKBAR_VISIBLE_MS - 1)
     })
     expect(screen.getByRole('status')).toBeInTheDocument()
 

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { uploadGroupPhoto, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { useSnackbar } from '../Snackbar'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
 const FORMAT_MESSAGE = 'El archivo debe ser una imagen JPG o PNG válida'
@@ -11,8 +12,8 @@ const FORMAT_MESSAGE = 'El archivo debe ser una imagen JPG o PNG válida'
  * failure (FR-021); success swaps the URL for the freshly returned one.
  */
 export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin = false, compact = false }) {
+  const showSnackbar = useSnackbar()
   const [photo, setPhoto] = useState(currentPhoto)
-  const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const inputRef = useRef(null)
@@ -31,7 +32,6 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
     const file = event.target.files?.[0]
     setBusy(true)
     setError('')
-    setStatus('')
     const clientError = pickClientSideError(file)
     if (clientError) {
       setError(clientError)
@@ -43,7 +43,7 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else if (result.ok) {
       setPhoto(result.photo) // replaces the previous photo only on success
-      setStatus('La foto del grupo se actualizó')
+      showSnackbar('La foto del grupo se actualizó')
     } else {
       setError(result.detail || 'No se pudo actualizar la foto del grupo')
     }
@@ -63,7 +63,6 @@ export default function GroupPhotoPanel({ groupId, currentPhoto = null, isAdmin 
         height={compact ? 56 : 96}
         data-testid="group-photo-image"
       />
-      {status && <p role="status">{status}</p>}
       {error && (
         <p role="alert" data-testid="group-photo-error">
           {error}

@@ -6,6 +6,7 @@ import {
   GROUPS_NETWORK_ERROR_MESSAGE,
 } from '../../api/groupsClient'
 import RemoveMemberDialog from './RemoveMemberDialog'
+import { useSnackbar } from '../Snackbar'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
 const LAST_ADMIN = 'Sos el último administrador: asigná otro administrador antes de salir'
@@ -34,7 +35,7 @@ export default function MemberListView({
 }) {
   const [members, setMembers] = useState(null)
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('')
+  const showSnackbar = useSnackbar()
   // Only the latest request may update the list (no stale responses).
   const requestId = useRef(0)
 
@@ -65,14 +66,12 @@ export default function MemberListView({
     if (current === requestId.current) apply(result)
   }
 
-  async function handleRemoved(name) {
-    setStatus(`${name} ya no forma parte del grupo`)
+  async function handleRemoved() {
     await reload()
     onChanged?.()
   }
 
   async function changeRole(member, action) {
-    setStatus('')
     const result = action === 'grant'
       ? await grantAdminRole(groupId, member.userId)
       : await revokeAdminRole(groupId, member.userId)
@@ -85,7 +84,7 @@ export default function MemberListView({
       return
     }
     setError('')
-    setStatus(
+    showSnackbar(
       action === 'grant'
         ? `${member.name} ahora es administrador del grupo`
         : `${member.name} volvió a ser miembro del grupo`,
@@ -110,8 +109,7 @@ export default function MemberListView({
   return (
     <section data-testid="members-list">
       <h3>Miembros del grupo</h3>
-      {status && <p role="status" data-testid="members-status">{status}</p>}
-      {status === '' && isAdmin && isLastAdmin && adminIds.size === 1 && (
+      {isAdmin && isLastAdmin && adminIds.size === 1 && (
         <p role="alert" data-testid="members-last-admin-hint">
           {LAST_ADMIN}
         </p>
@@ -159,14 +157,14 @@ export default function MemberListView({
                 <RemoveMemberDialog
                   groupId={groupId}
                   member={{ userId: member.userId, name: member.name, role: member.role }}
-                  onRemoved={() => handleRemoved(member.name)}
+                  onRemoved={handleRemoved}
                 />
               )}
               {isAdmin && isSimulated && (
                 <RemoveMemberDialog
                   groupId={groupId}
                   simulatedProfile={{ profileId: simulatedId, name: member.name }}
-                  onRemoved={() => handleRemoved(member.name)}
+                  onRemoved={handleRemoved}
                 />
               )}
             </li>

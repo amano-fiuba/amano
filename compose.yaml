@@ -48,5 +48,13 @@ services:
     ports:
       - "127.0.0.1:8081:80"
 
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8082:8080"
+
 volumes:
   db_data:

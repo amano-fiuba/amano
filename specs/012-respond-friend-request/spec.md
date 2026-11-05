@@ -99,7 +99,7 @@ Solo la destinataria de la solicitud puede responderla, y solo mientras está pe
 - **Acción por API manipulada** (valor distinto de aceptar/rechazar, mayúsculas no normalizadas u otro texto): 400 con error de campo; sin contacto con la persistencia.
 - **Identificador no numérico en la ruta**: 400 sin acceso a datos.
 - **Fila respondida por otra vía durante la sesión actual**: la interfaz retira la fila con el mensaje del 409 y refresca su estado local sin recargar la pantalla.
-- **Última solicitud respondida de la bandeja**: la confirmación de éxito permanece visible; el mensaje "No tenés solicitudes de amistad pendientes" corresponde únicamente a una carga inicial sin pendientes.
+- **Última solicitud respondida de la bandeja**: la confirmación de éxito se muestra en el snackbar y debajo aparece el mensaje "No tenés solicitudes de amistad pendientes".
 - **Sesión expirada durante la respuesta**: 401, cierre de sesión local y redirección al acceso.
 - **Error de red durante la respuesta**: la fila permanece con sus botones reactivos; no se conservan estados de carga colgados ni marcas optimistas.
 
@@ -131,7 +131,7 @@ Solo la destinataria de la solicitud puede responderla, y solo mientras está pe
 
 - **FR-012**: Durante una respuesta, los botones de la fila MUST deshabilitarse y mostrar la acción en curso ("Aceptando…" o "Rechazando…"), sin alterar las demás filas.
 - **FR-013**: Con éxito, la fila MUST retirarse de la lista de pendientes y la interfaz MUST mostrar exactamente "Solicitud de amistad aceptada" o "Solicitud de amistad rechazada".
-- **FR-014**: La confirmación de éxito MUST permanecer visible hasta que la persona navegue o accione otra solicitud, incluso si la lista queda sin filas.
+- **FR-014**: La confirmación de éxito MUST mostrarse en un snackbar, que se cierra solo a los 5 segundos o manualmente y sigue visible aunque la persona navegue o la lista quede sin filas. Una confirmación nueva reemplaza a la anterior. Enmienda: reemplaza a la confirmación persistente en la pantalla.
 - **FR-015**: Ante 409, la fila ya no pendiente MUST retirarse de la lista y la interfaz MUST mostrar el motivo informado por el servidor; ante 404 MUST mostrar "No se encontró la solicitud de amistad" y retirar la fila.
 - **FR-016**: Ante un error de red o del servidor, la interfaz MUST mostrar exactamente "No se pudo responder la solicitud. Intentá nuevamente", la fila MUST permanecer con sus acciones reactivas y MUST NOT mostrar ninguna confirmación de éxito.
 - **FR-017**: Ante un 401, la interfaz MUST cerrar la sesión local y redirigir al flujo de acceso, sin dejar datos ni confirmaciones falsas.

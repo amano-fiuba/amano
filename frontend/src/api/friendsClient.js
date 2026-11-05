@@ -15,6 +15,10 @@ export const FRIENDS_NETWORK_ERROR_MESSAGE =
 export const DELETE_FRIEND_NETWORK_ERROR_MESSAGE =
   'No se pudo eliminar al amigo. Intentá nuevamente'
 
+// Emitted after answering a request, so the bell of the top bar stays current
+// no matter which screen answered it (specs/015-main-screen).
+export const FRIEND_REQUESTS_CHANGED_EVENT = 'amano:friend-requests-changed'
+
 async function parseProblem(response) {
   try {
     const problem = await response.json()
@@ -91,7 +95,9 @@ export async function respondFriendshipRequest(id, action) {
       body: JSON.stringify({ action }),
     })
     if (response.ok) {
-      return { ok: true, request: await response.json() }
+      const request = await response.json()
+      window.dispatchEvent(new Event(FRIEND_REQUESTS_CHANGED_EVENT))
+      return { ok: true, request }
     }
     if (response.status >= 500) {
       return { ok: false, network: true }

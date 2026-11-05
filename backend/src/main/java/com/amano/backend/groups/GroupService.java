@@ -1,5 +1,6 @@
 package com.amano.backend.groups;
 
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -435,8 +436,11 @@ public class GroupService {
     /** T029: groups where the caller is an active member, newest first. */
     @Transactional(readOnly = true)
     public List<GroupSummaryResponse> listUserGroups(Long userId) {
-        return groupRepository.findActiveGroupsOfUser(userId).stream()
-                .map(group -> toSummary(userId, group))
+        List<Group> groups = groupRepository.findActiveGroupsOfUser(userId);
+        Map<Long, OffsetDateTime> lastActivity = activityEventService.lastActivityByGroup(
+                groups.stream().map(Group::getId).toList());
+        return groups.stream()
+                .map(group -> toSummary(userId, group, lastActivity))
                 .toList();
     }
 
@@ -458,13 +462,15 @@ public class GroupService {
         return toDetail(userId, group, membershipOpt.get());
     }
 
-    private GroupSummaryResponse toSummary(Long userId, Group group) {
+    private GroupSummaryResponse toSummary(Long userId, Group group,
+            Map<Long, OffsetDateTime> lastActivity) {
         GroupSummaryResponse summary = new GroupSummaryResponse();
         summary.setId(group.getId());
         summary.setName(group.getName());
         summary.setDescription(group.getDescription());
         summary.setPhoto(group.getPhoto());
         summary.setCreatedAt(group.getCreatedAt());
+        summary.setLastActivityAt(lastActivity.getOrDefault(group.getId(), group.getCreatedAt()));
         summary.setMemberCount(activeMemberCount(group.getId()));
         groupMemberRepository.findByIdGroupIdAndIdUserId(group.getId(), userId)
                 .ifPresent(membership -> summary.setCurrentUserRole(membership.getRole()));

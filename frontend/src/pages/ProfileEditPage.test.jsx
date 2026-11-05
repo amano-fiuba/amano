@@ -177,7 +177,9 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     // FR-009 enmendado: el éxito navega a la visualización de 002.
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     // Aviso one-shot para que la visualización muestre el mensaje de éxito.
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe('true')
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
+      /los cambios se guardaron correctamente/i,
+    )
   })
 
   it('error de validación del servidor informa por campo y conserva los datos (FR-010)', async () => {
@@ -231,7 +233,7 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateProfile).not.toHaveBeenCalled()
     // Cancelar nunca marca el aviso de guardado (FR-008).
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
+    expect(screen.queryByTestId('snackbar')).not.toBeInTheDocument()
   })
 
   it('no existe el botón "Volver atrás" (reemplazado por "Cancelar cambios")', async () => {
@@ -347,7 +349,9 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     })
     expect(updateAvatar.mock.calls[0][0]).toBeInstanceOf(File)
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe('true')
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
+      /los cambios se guardaron correctamente/i,
+    )
   })
 
   it('Cancelar con avatar pendiente descarta el pendiente sin ninguna llamada', async () => {
@@ -361,7 +365,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateAvatar).not.toHaveBeenCalled()
     expect(updateProfile).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
+    expect(screen.queryByTestId('snackbar')).not.toBeInTheDocument()
   })
 
   it('Eliminar avatar queda pendiente: preview del default, botón deshabilitado, DELETE solo al Guardar', async () => {
@@ -385,7 +389,9 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
       expect(deleteAvatar).toHaveBeenCalledTimes(1)
     })
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe('true')
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
+      /los cambios se guardaron correctamente/i,
+    )
   })
 
   it('Cancelar con eliminación pendiente: ninguna llamada, pendiente descartado', async () => {
@@ -399,7 +405,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(deleteAvatar).not.toHaveBeenCalled()
     expect(updateProfile).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
+    expect(screen.queryByTestId('snackbar')).not.toBeInTheDocument()
   })
 
   it('subida pendiente reemplaza la marca de eliminación: Guardar solo hace PUT', async () => {

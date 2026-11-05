@@ -22,7 +22,7 @@ cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build
 |-------|-------|
 | `friendship/FriendshipRequestServiceTest` (ampliado) | Acción o id inválido, 404 por inexistencia y por solicitud ajena, 409 por ya respondida (aceptada y rechazada), transiciones válidas con `respondedAt`, relectura que distingue 404 de 409 y escritura exclusivamente por `UPDATE` condicional |
 | `friendship/FriendshipRequestIT` (ampliado) | Flujo HTTP del `PUT`: 200 con estado final, 400/401/404/409, aislamiento entre cuentas, doble respuesta concurrente con una única transición, estado y `responded_at` en la base, invarianza de `POST` y `GET` de 011 |
-| `pages/FriendsPage.test.jsx` (ampliado) | Botones por fila, carga por acción, retiro de fila, confirmaciones exactas, confirmación visible con lista vacía, 409/404, error de red con fila reactiva, 401 |
+| `pages/FriendsPage.test.jsx` (ampliado) | Botones por fila, carga por acción, retiro de fila, confirmaciones exactas, confirmación en el snackbar con lista vacía, 409/404, error de red con fila reactiva, 401 |
 | `api/friendsClient.test.js` (ampliado) | `PUT`, URL con id, cuerpo `{ action }`, `credentials`, parseo de 2xx/4xx/red y mensaje de red fijo |
 | Suites previas de 011 | Regresión: envío, bandeja, buscador, acceso y navegación sin cambios |
 
@@ -91,7 +91,7 @@ cd frontend && npm ci && npm run lint && npm run test:coverage && npm run build
 1. Detener el backend y pulsar "Aceptar" o "Rechazar". **Esperado**: "No se pudo responder la solicitud. Intentá nuevamente"; la fila permanece con sus botones reactivos y sin confirmación de éxito.
 2. Levantar el backend y responder de nuevo la misma fila. **Esperado**: la operación concluye con su confirmación correcta.
 3. Expirar la sesión y pulsar una acción. **Esperado**: redirección al acceso sin datos visibles ni confirmaciones falsas.
-4. En la última pendiente de la bandeja, responderla con éxito. **Esperado**: la confirmación permanece visible aunque la lista quede sin filas; el texto "No tenés solicitudes de amistad pendientes" solo reaparece al recargar la pantalla.
+4. En la última pendiente de la bandeja, responderla con éxito. **Esperado**: la confirmación aparece en el snackbar, se cierra sola a los 5 segundos y debajo se ve "No tenés solicitudes de amistad pendientes".
 
 ## 3. Regresiones a observar
 

@@ -21,9 +21,9 @@ import {
   FORMAT_MESSAGE,
   realContentType,
 } from '../validation/avatarValidation'
+import { useSnackbar } from '../components/Snackbar'
 import TextField from '../components/TextField'
 import { useAuth } from '../auth/AuthContext'
-import { PROFILE_SAVED_KEY } from './ProfilePage'
 import {
   AVATAR_MAX_BYTES,
   normalizeCbu,
@@ -55,7 +55,7 @@ export default function ProfileEditPage() {
 
   const [loadError, setLoadError] = useState(false)
   const [formError, setFormError] = useState('')
-  const [success, setSuccess] = useState('')
+  const showSnackbar = useSnackbar()
   const [currencies, setCurrencies] = useState([])
   const [monedasIniciales, setMonedasIniciales] = useState([])
   const [avatarUrl, setAvatarUrl] = useState('')
@@ -137,7 +137,6 @@ export default function ProfileEditPage() {
   const onSubmit = async (values) => {
     setFormError('')
     setAvatarError('')
-    setSuccess('')
     const result = await updateProfile({
       firstName: trim(values.firstName),
       lastName: trim(values.lastName ?? ''),
@@ -194,8 +193,8 @@ export default function ProfileEditPage() {
     }
 
     // FR-009 enmendado: persistir, aplicar los datos frescos al contexto de
-    // sesión y volver a la visualización de 002; el mensaje de éxito se
-    // muestra UNA sola vez en esa pantalla (clave one-shot de sessionStorage).
+    // sesión y volver a la visualización de 002; el mensaje de éxito es un
+    // snackbar: sobrevive a la navegación y no reaparece al refrescar.
     setUser(perfilFinal)
     aplicarPerfil(perfilFinal)
     if (avatarPendienteUrl) {
@@ -204,7 +203,7 @@ export default function ProfileEditPage() {
     setAvatarPendiente(null)
     setAvatarPendienteUrl('')
     setEliminarPendiente(false)
-    sessionStorage.setItem(PROFILE_SAVED_KEY, 'true')
+    showSnackbar('Los cambios se guardaron correctamente')
     navigate('/profile')
   }
 
@@ -213,7 +212,6 @@ export default function ProfileEditPage() {
     event.target.value = '' // permitir reintentar el mismo archivo
     if (!file) return
     setAvatarError('')
-    setSuccess('')
     // Validación en vivo igual que en el registro (FR-010/FR-013 de 001):
     // tamaño primero, luego magic bytes reales. Se retiene pendiente: no hay
     // llamada al backend hasta "Guardar cambios".
@@ -249,7 +247,6 @@ export default function ProfileEditPage() {
       setAvatarPendienteUrl('')
     }
     setAvatarError('')
-    setSuccess('')
     setEliminarPendiente(true)
   }
 
@@ -277,11 +274,6 @@ export default function ProfileEditPage() {
   return (
     <main className="page">
       <h1>Modificar perfil</h1>
-      {success && (
-        <p role="status" data-testid="form-success">
-          {success}
-        </p>
-      )}
       {formError && (
         <p role="alert" data-testid="form-error">
           {formError}

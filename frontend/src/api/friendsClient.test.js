@@ -4,6 +4,7 @@ import {
   DELETE_FRIEND_NETWORK_ERROR_MESSAGE,
   RECEIVED_NETWORK_ERROR_MESSAGE,
   FRIENDS_NETWORK_ERROR_MESSAGE,
+  FRIEND_REQUESTS_CHANGED_EVENT,
   RESPOND_NETWORK_ERROR_MESSAGE,
   SEND_NETWORK_ERROR_MESSAGE,
   checkFriendDeletion,
@@ -492,5 +493,30 @@ describe('deleteFriend(endpoint: DELETE /api/users/me/friends/{id}) — feature 
     expect(DELETE_FRIEND_NETWORK_ERROR_MESSAGE).toBe(
       'No se pudo eliminar al amigo. Intentá nuevamente',
     )
+  })
+})
+
+
+describe('respondFriendshipRequest: aviso de cambios (015, FR-004)', () => {
+  it('emite el evento solo cuando la respuesta fue exitosa', async () => {
+    const listener = vi.fn()
+    window.addEventListener(FRIEND_REQUESTS_CHANGED_EVENT, listener)
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 409, json: () => Promise.resolve({}) }),
+    )
+    await respondFriendshipRequest(1, 'ACCEPT')
+    expect(listener).not.toHaveBeenCalled()
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ id: 1 }) }),
+    )
+    await respondFriendshipRequest(1, 'ACCEPT')
+    expect(listener).toHaveBeenCalledTimes(1)
+
+    window.removeEventListener(FRIEND_REQUESTS_CHANGED_EVENT, listener)
+
   })
 })

@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import SubmitButton from '../components/SubmitButton'
 import TextField from '../components/TextField'
 import { SEARCH_NETWORK_ERROR_MESSAGE, searchUsers } from '../api/usersClient'
 import { SEND_NETWORK_ERROR_MESSAGE, sendFriendshipRequest } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
+import { useSnackbar } from '../components/Snackbar'
 
 // Exact messages of the spec (FR-009, FR-016, FR-017), exported for the tests.
 export const TOO_SHORT_MESSAGE = 'Ingresá al menos 2 caracteres para buscar'
@@ -92,15 +94,16 @@ function UserPlusIcon() {
 //  - network/5xx → fixed retry message (FR-010)
 // Previous results are always cleared when a search starts or fails, and only
 // the latest request's answer is shown (out-of-order answers are ignored).
-export default function UsersSearchPage() {
+function UsersSearch({ initialTerm }) {
   const { setUser } = useAuth()
-  const [term, setTerm] = useState('')
+  const showSnackbar = useSnackbar()
+  const [term, setTerm] = useState(initialTerm)
   const [results, setResults] = useState([])
   const [notice, setNotice] = useState(null)
   const [isSearching, setIsSearching] = useState(false)
   const [sendingId, setSendingId] = useState(null)
   const [sentIds, setSentIds] = useState([])
-  const [sendFeedback, setSendFeedback] = useState(null)
+  const [sendError, setSendError] = useState('')
   const latestRequest = useRef(0)
 
   const showError = (text, title) => {
@@ -115,7 +118,7 @@ export default function UsersSearchPage() {
       return
     }
     setSendingId(user.id)
-    setSendFeedback(null)
+    setSendError('')
 
     let result
     try {
@@ -128,7 +131,7 @@ export default function UsersSearchPage() {
 
     if (result.ok) {
       setSentIds((ids) => (ids.includes(user.id) ? ids : [...ids, user.id]))
-      setSendFeedback({ kind: 'success', text: FRIENDSHIP_REQUEST_SENT_MESSAGE })
+      showSnackbar(FRIENDSHIP_REQUEST_SENT_MESSAGE)
       return
     }
 
@@ -137,14 +140,11 @@ export default function UsersSearchPage() {
       return
     }
 
-    const text =
-      result.fields?.recipientId || result.detail || SEND_NETWORK_ERROR_MESSAGE
-    setSendFeedback({ kind: 'error', text })
+    setSendError(result.fields?.recipientId || result.detail || SEND_NETWORK_ERROR_MESSAGE)
   }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    const trimmed = term.trim()
+  const runSearch = async (rawTerm) => {
+    const trimmed = rawTerm.trim()
 
     // Every submission invalidates any in-flight request, including an invalid
     // term (otherwise an older answer could overwrite the validation notice).
@@ -159,7 +159,7 @@ export default function UsersSearchPage() {
     }
 
     setNotice(null)
-    setSendFeedback(null)
+    setSendError('')
     setResults([])
     setIsSearching(true)
 
@@ -195,6 +195,24 @@ export default function UsersSearchPage() {
     }
     showError(SEARCH_NETWORK_ERROR_MESSAGE, 'No pudimos completar la búsqueda')
   }
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    runSearch(term)
+  }
+
+  // The global search of the top bar arrives with ?q= (specs/015-main-screen, FR-006).
+  const searchInitialTerm = useEffectEvent(() => {
+    runSearch(initialTerm)
+  })
+
+  useEffect(() => {
+    if (!initialTerm) {
+      return undefined
+    }
+    const timer = setTimeout(searchInitialTerm)
+    return () => clearTimeout(timer)
+  }, [initialTerm])
 
   return (
     <main className="page users-search-page">
@@ -286,13 +304,13 @@ export default function UsersSearchPage() {
               {resultsLabel(results.length)}
             </span>
           </div>
-          {sendFeedback && (
+          {sendError && (
             <p
-              className={`users-search__send-feedback users-search__send-feedback--${sendFeedback.kind}`}
-              role={sendFeedback.kind === 'error' ? 'alert' : 'status'}
+              className="users-search__send-feedback users-search__send-feedback--error"
+              role="alert"
               data-testid="friendship-feedback"
             >
-              {sendFeedback.text}
+              {sendError}
             </p>
           )}
           <ul className="user-results" aria-label="Resultados de la búsqueda">
@@ -337,4 +355,11 @@ export default function UsersSearchPage() {
       )}
     </main>
   )
+}
+
+// Keyed by the term so a new global search restarts the screen.
+export default function UsersSearchPage() {
+  const [searchParams] = useSearchParams()
+  const initialTerm = searchParams.get('q') ?? ''
+  return <UsersSearch key={initialTerm} initialTerm={initialTerm} />
 }
