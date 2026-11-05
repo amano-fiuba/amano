@@ -46,7 +46,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} />)
 
     await waitFor(() => expect(screen.getByTestId('member-current')).toHaveTextContent(/Ana López/))
-    expect(screen.getByText(/Vos/)).toBeInTheDocument()
+    expect(screen.getByText('Yo')).toBeInTheDocument()
     expect(screen.queryByTestId('member-current')).not.toHaveTextContent('Carla Gómez')
   })
 
