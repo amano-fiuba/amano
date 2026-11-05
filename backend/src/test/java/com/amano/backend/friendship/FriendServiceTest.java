@@ -32,9 +32,9 @@ class FriendServiceTest {
     void listsTheFriendsOfTheSessionUserInRepositoryOrder() {
         List<FriendResponse> friends = List.of(
                 new FriendResponse(4L, "Ana", "Paz", "ana@example.com",
-                        OffsetDateTime.parse("2026-10-31T10:00:00Z")),
+                        OffsetDateTime.parse("2026-10-31T10:00:00Z"), null),
                 new FriendResponse(2L, "Bruno", null, "bruno@example.com",
-                        OffsetDateTime.parse("2026-10-30T10:00:00Z")));
+                        OffsetDateTime.parse("2026-10-30T10:00:00Z"), null));
         when(requestRepository.findFriendsOf(9L)).thenReturn(friends);
 
         assertThat(service.listFriends(9L)).containsExactlyElementsOf(friends);
