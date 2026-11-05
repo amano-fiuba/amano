@@ -27,8 +27,9 @@ import com.amano.backend.user.UserAccountResponse;
  *
  * Reads (001/002): GET /api/users/me returns the owner's own profile
  * (FR-009/FR-021: cbuCvu is private to the session owner by design);
- * GET /api/users/{id}/avatar serves the session user's own avatar binaries —
- * any other id is 404.
+ * GET /api/users/{id}/avatar serves the avatar of the session user, of a friend
+ * or of someone sharing an active group ({@link AvatarVisibility}) — any other
+ * id is 404, the same answer as an account without a custom avatar.
  *
  * Search (008): GET /api/users/search?q= returns verified accounts matching the
  * term (minimal DTO, never the caller, at most 20).
@@ -45,13 +46,16 @@ public class UserController {
     private final UserAvatarRepository userAvatarRepository;
     private final UserAccountService userAccountService;
     private final UserSearchService userSearchService;
+    private final AvatarVisibility avatarVisibility;
 
     public UserController(UserMapper userMapper, UserAvatarRepository userAvatarRepository,
-            UserAccountService userAccountService, UserSearchService userSearchService) {
+            UserAccountService userAccountService, UserSearchService userSearchService,
+            AvatarVisibility avatarVisibility) {
         this.userMapper = userMapper;
         this.userAvatarRepository = userAvatarRepository;
         this.userAccountService = userAccountService;
         this.userSearchService = userSearchService;
+        this.avatarVisibility = avatarVisibility;
     }
 
     @GetMapping("/api/users/me")
@@ -82,8 +86,8 @@ public class UserController {
     @GetMapping("/api/users/{id}/avatar")
     public ResponseEntity<?> avatar(@PathVariable("id") Long requestedId) {
         Long sessionUserId = currentUserId();
-        // Only the owner's own avatar exists in this feature (users-api.md).
-        if (sessionUserId == null || requestedId == null || !sessionUserId.equals(requestedId)) {
+        if (sessionUserId == null || requestedId == null
+                || !avatarVisibility.canView(sessionUserId, requestedId)) {
             return notFoundProblem();
         }
         return userAvatarRepository.findById(requestedId)

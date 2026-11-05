@@ -27,6 +27,16 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
     @Query("SELECT COUNT(m) FROM GroupMember m WHERE m.id.groupId = :groupId AND m.leftAt IS NULL")
     long countActiveByGroupId(@Param("groupId") Long groupId);
 
+    /** True when both accounts are active members of at least one common group. */
+    @Query("""
+            SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END
+            FROM GroupMember m, GroupMember other
+            WHERE m.id.groupId = other.id.groupId
+              AND m.id.userId = :a AND m.leftAt IS NULL
+              AND other.id.userId = :b AND other.leftAt IS NULL
+            """)
+    boolean shareActiveGroup(@Param("a") Long a, @Param("b") Long b);
+
     /** Admins still active, for the last-admin guard (US4/US5). */
     @Query("""
             SELECT COUNT(m) FROM GroupMember m

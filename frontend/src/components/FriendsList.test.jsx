@@ -115,6 +115,19 @@ describe('FriendsList (feature 013)', () => {
     expect(screen.queryByText(/null/)).not.toBeInTheDocument()
   })
 
+  it('muestra la foto del amigo cuando tiene una', async () => {
+    friendsClient.listFriends.mockResolvedValue({
+      ok: true,
+      friends: [{ ...ANA, avatarUrl: '/api/users/12/avatar' }, BRUNO],
+    })
+    render(ui())
+
+    const list = await screen.findByRole('list', { name: 'Lista de amigos' })
+    const [ana, bruno] = within(list).getAllByRole('listitem')
+    expect(ana.querySelector('img')).toHaveAttribute('src', '/api/users/12/avatar')
+    expect(bruno.querySelector('img')).toHaveAttribute('src', '/avatar-default.png')
+  })
+
   it('US1: respeta el orden del servidor', async () => {
     friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [BRUNO, ANA] })
     render(ui())
