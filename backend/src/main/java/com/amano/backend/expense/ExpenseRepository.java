@@ -22,6 +22,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     /** Latest expenses registered by a user (015 FR-008). */
     List<Expense> findTop5ByUserIdOrderByCreatedAtDescIdDesc(Long userId);
 
+    List<Expense> findTop200ByUserIdOrderByCreatedAtDescIdDesc(Long userId);
+
     /** Series of a user for the "Gastos recurrentes" screen, newest first (009, FR-012). */
     List<Expense> findByUserIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(Long userId);
 

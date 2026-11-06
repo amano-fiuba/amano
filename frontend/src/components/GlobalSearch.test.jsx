@@ -68,6 +68,40 @@ describe('GlobalSearch (015, US3)', () => {
     expect(searchUsers).toHaveBeenCalledWith('cord')
   })
 
+  it('muestra la foto de la persona y, sin foto, el avatar por defecto', async () => {
+    searchUsers.mockResolvedValue({
+      ok: true,
+      users: [{ ...ANA, avatarUrl: '/api/users/5/avatar' }, { ...ANA, id: 6, avatarUrl: null }],
+    })
+    const user = userEvent.setup()
+    const { container } = renderSearch()
+
+    await user.type(input(), 'an')
+    await screen.findAllByText('Ana Cordero')
+
+    const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))
+    expect(sources).toEqual(['/api/users/5/avatar', '/avatar-default.png'])
+  })
+
+  it('muestra la foto del grupo y, sin foto, su inicial', async () => {
+    listGroups.mockResolvedValue({
+      ok: true,
+      groups: [
+        { id: 1, name: 'Casa nueva', memberCount: 2, photo: '/api/groups/1/photo' },
+        { id: 2, name: 'Casa vieja', memberCount: 2, photo: null },
+      ],
+    })
+    searchUsers.mockResolvedValue({ ok: true, users: [] })
+    const user = userEvent.setup()
+    const { container } = renderSearch()
+
+    await user.type(input(), 'casa')
+    await screen.findByText('Casa nueva')
+
+    expect(container.querySelector('img.global-search__mark')).toHaveAttribute('src', '/api/groups/1/photo')
+    expect(screen.getByTestId('group-avatar-default')).toHaveTextContent('C')
+  })
+
   it('al elegir una persona va al buscador con el término y limpia el campo', async () => {
     const user = userEvent.setup()
     renderSearch()

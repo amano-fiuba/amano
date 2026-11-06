@@ -7,6 +7,7 @@ import {
 } from '../../api/groupsClient'
 import GroupRowsSkeleton from './GroupRowsSkeleton'
 import MemberActionsMenu from './MemberActionsMenu'
+import MemberBalance from './MemberBalance'
 import RemoveMemberDialog from './RemoveMemberDialog'
 import { useSnackbar } from '../Snackbar'
 
@@ -157,6 +158,7 @@ export default function MemberListView({
                     {roleLabel(member.role)}
                   </span>
                 </span>
+                {!isYou && <MemberBalance balances={member.balances} payUrl={member.payUrl} />}
               </span>
               {isAdmin && !isYou && (
                 <MemberActionsMenu memberName={member.name} testId={`member-actions-${key}`}>

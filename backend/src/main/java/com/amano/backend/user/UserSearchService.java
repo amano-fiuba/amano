@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -31,11 +32,14 @@ public class UserSearchService {
 
     private final UserRepository userRepository;
     private final FriendshipRequestRepository friendshipRequestRepository;
+    private final AvatarVisibility avatarVisibility;
 
     public UserSearchService(UserRepository userRepository,
-            FriendshipRequestRepository friendshipRequestRepository) {
+            FriendshipRequestRepository friendshipRequestRepository,
+            AvatarVisibility avatarVisibility) {
         this.userRepository = userRepository;
         this.friendshipRequestRepository = friendshipRequestRepository;
+        this.avatarVisibility = avatarVisibility;
     }
 
     @Transactional(readOnly = true)
@@ -53,9 +57,10 @@ public class UserSearchService {
         if (users.isEmpty()) {
             return List.of();
         }
+        List<Long> userIds = users.stream().map(User::getId).toList();
         Map<Long, String> statusByUser = new HashMap<>();
         for (FriendshipRequest request : friendshipRequestRepository.findActiveBetween(
-                currentUserId, users.stream().map(User::getId).toList())) {
+                currentUserId, userIds)) {
             boolean sentByMe = currentUserId.equals(request.getSenderId());
             Long other = sentByMe ? request.getRecipientId() : request.getSenderId();
             String status = request.getStatus() == FriendshipRequestStatus.ACCEPTED
@@ -63,9 +68,12 @@ public class UserSearchService {
                     : sentByMe ? UserSearchResult.PENDING_SENT : UserSearchResult.PENDING_RECEIVED;
             statusByUser.merge(other, status, (a, b) -> UserSearchResult.FRIENDS.equals(a) ? a : b);
         }
+        Set<Long> withAvatar = userRepository.findIdsWithAvatar(userIds);
+        Set<Long> visible = avatarVisibility.visibleAmong(currentUserId, userIds);
         return users.stream()
                 .map(user -> UserSearchResult.from(user,
-                        statusByUser.getOrDefault(user.getId(), UserSearchResult.NONE)))
+                        statusByUser.getOrDefault(user.getId(), UserSearchResult.NONE),
+                        withAvatar.contains(user.getId()) && visible.contains(user.getId())))
                 .toList();
     }
 }

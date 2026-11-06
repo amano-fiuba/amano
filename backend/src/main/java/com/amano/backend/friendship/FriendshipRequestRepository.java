@@ -46,6 +46,10 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
     List<FriendshipRequest> findActiveBetween(@Param("userId") Long userId,
             @Param("otherIds") java.util.Collection<Long> otherIds);
 
+    /** Directional check: {@code senderId} has a request with this status to {@code recipientId}. */
+    boolean existsBySenderIdAndRecipientIdAndStatus(Long senderId, Long recipientId,
+            FriendshipRequestStatus status);
+
     /** Inbox of the session user: pending requests received, newest first (FR-012). */
     List<FriendshipRequest> findByRecipientIdAndStatusOrderByCreatedAtDescIdDesc(
             Long recipientId, FriendshipRequestStatus status);

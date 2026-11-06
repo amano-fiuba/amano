@@ -129,6 +129,22 @@ describe('UsersSearchPage (feature 008)', () => {
     avatars.forEach((img) => expect(img).toHaveAttribute('src', '/avatar-default.png'))
   })
 
+  it('muestra la foto si la API la envía', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: true,
+      users: [{ ...ANA, avatarUrl: '/api/users/3/avatar' }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    expect((await screen.findByTestId('user-card-3')).querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/users/3/avatar',
+    )
+  })
+
   it('presenta cada resultado como tarjeta con su acción de agregar', async () => {
     usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA, JUAN] })
     const user = userEvent.setup()

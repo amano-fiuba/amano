@@ -54,6 +54,8 @@ describe('SiteNav', () => {
     ).toHaveAttribute('href', '/')
     expect(screen.getByRole('searchbox', { name: 'Buscar personas y grupos' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/profile')
+    expect(screen.getByRole('link', { name: 'Mis grupos' })).toHaveAttribute('href', '/groups')
+    expect(screen.getByRole('link', { name: 'Actividad personal' })).toHaveAttribute('href', '/activity')
     expect(screen.getByRole('link', { name: 'Amigos' })).toHaveAttribute('href', '/friends')
     expect(screen.getByRole('link', { name: 'Preguntas frecuentes' })).toHaveAttribute('href', '/faq')
     expect(screen.getByRole('link', { name: 'Ajustes' })).toHaveAttribute('href', '/settings')

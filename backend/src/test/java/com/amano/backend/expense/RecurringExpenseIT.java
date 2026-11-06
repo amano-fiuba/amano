@@ -341,6 +341,31 @@ class RecurringExpenseIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    // ----- Actividad personal: GET /api/expenses --------------------------------
+
+    @Test
+    void expenseHistoryReturnsEveryExpenseOfTheCallerNewestFirst() throws Exception {
+        Cookie owner = verifiedSession("history-owner@example.com");
+        Cookie stranger = verifiedSession("history-stranger@example.com");
+        createId(stranger, payload("ONE_TIME", null, today()));
+        long[] ids = new long[6];
+        for (int index = 0; index < ids.length; index++) {
+            ids[index] = createId(owner, payload("ONE_TIME", null, today()));
+        }
+
+        mockMvc.perform(get("/api/expenses").cookie(owner))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(6))
+                .andExpect(jsonPath("$[0].id").value(ids[5]))
+                .andExpect(jsonPath("$[5].id").value(ids[0]));
+    }
+
+    @Test
+    void expenseHistoryRequiresASession() throws Exception {
+        mockMvc.perform(get("/api/expenses"))
+                .andExpect(status().isUnauthorized());
+    }
+
     // ----- Feature 015: GET /api/expenses/recent -------------------------------
 
     @Test

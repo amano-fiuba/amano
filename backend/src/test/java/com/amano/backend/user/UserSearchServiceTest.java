@@ -30,13 +30,15 @@ class UserSearchServiceTest {
 
     private UserRepository userRepository;
     private FriendshipRequestRepository friendshipRequestRepository;
+    private AvatarVisibility avatarVisibility;
     private UserSearchService service;
 
     @BeforeEach
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
         friendshipRequestRepository = Mockito.mock(FriendshipRequestRepository.class);
-        service = new UserSearchService(userRepository, friendshipRequestRepository);
+        avatarVisibility = Mockito.mock(AvatarVisibility.class);
+        service = new UserSearchService(userRepository, friendshipRequestRepository, avatarVisibility);
     }
 
     private static User user(long id, String firstName, String lastName, String email) {
@@ -67,7 +69,23 @@ class UserSearchServiceTest {
 
         List<UserSearchResult> results = service.search(7L, "an");
 
-        assertThat(results).containsExactly(new UserSearchResult(3L, "Ana", "Pérez", "ana@example.com", "NONE"));
+        assertThat(results).containsExactly(new UserSearchResult(3L, "Ana", "Pérez", "ana@example.com", "NONE", null));
+    }
+
+    /** 023 FR-032: both conditions are required for the URL to go out. */
+    @Test
+    void theAvatarUrlNeedsAPhotoTheCallerMaySee() {
+        when(userRepository.searchVerified(anyString(), anyLong(), any(Pageable.class))).thenReturn(List.of(
+                user(1L, "Visible", null, "a@example.com"),
+                user(2L, "Oculta", null, "b@example.com"),
+                user(3L, "Sinfoto", null, "c@example.com")));
+        when(userRepository.findIdsWithAvatar(List.of(1L, 2L, 3L))).thenReturn(java.util.Set.of(1L, 2L));
+        when(avatarVisibility.visibleAmong(7L, List.of(1L, 2L, 3L))).thenReturn(java.util.Set.of(1L, 3L));
+
+        List<UserSearchResult> results = service.search(7L, "an");
+
+        assertThat(results).extracting(UserSearchResult::avatarUrl)
+                .containsExactly("/api/users/1/avatar", null, null);
     }
 
     @Test

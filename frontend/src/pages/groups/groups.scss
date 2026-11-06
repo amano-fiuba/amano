@@ -30,7 +30,7 @@
   gap: 1rem;
   padding: 2.5rem 1rem;
   border: 1px dashed var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   text-align: center;
 
   p {
@@ -53,7 +53,7 @@
   gap: 0.9rem;
   padding: 0.85rem 1rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-fondo);
   color: var(--color-texto);
   font-weight: 400;
@@ -85,7 +85,7 @@
   justify-content: center;
   width: 3rem;
   height: 3rem;
-  border-radius: 0.65rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-superficie-fuerte);
   color: var(--color-acento-oscuro);
   font-size: 1.15rem;
@@ -188,8 +188,40 @@
 
 .group-edit-form {
   display: grid;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  flex: 1 1 100%;
+  gap: 0.75rem;
+  max-width: 34rem;
+
+  label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+
+  input:not([type='file']),
+  textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-control);
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    font: inherit;
+    font-weight: 400;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .group-photo .group-action {
+    justify-self: start;
+  }
+}
+
+// Mientras se edita, el formulario ocupa su propia fila del encabezado.
+.group-hero__identity:has(.group-edit-form) {
+  flex: 1 1 100%;
 }
 
 .leave-group-modal {
@@ -221,12 +253,18 @@
 }
 
 // Botones del módulo: la acción secundaria y la destructiva.
+.group-action svg {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+}
+
 .group-action {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   padding: 0.5rem 0.8rem;
   background: transparent;
   color: var(--color-acento-oscuro);
@@ -261,7 +299,7 @@
   margin-top: 0.5rem;
   padding: 0.75rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   background: var(--color-fondo);
   text-align: left;
 
@@ -288,11 +326,106 @@
 
 // Detalle de un grupo.
 .group-detail {
-  max-width: 760px;
+  display: grid;
+  gap: 1rem;
+  width: calc(100% - 2rem);
+  max-width: 76rem;
+  margin: 1.25rem auto 5.5rem;
+}
+
+.group-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+
+  .group-admin-panel {
+    flex: 1 0 100%;
+    margin-block: 0;
+  }
+}
+
+// Miembros, gastos y actividad, con las proporciones de la pantalla principal.
+.group-board {
+  display: grid;
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr) minmax(15rem, 20rem);
+  align-items: start;
+  gap: 1rem;
+
+  .member-row__body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.member-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.15rem;
+  font-size: 0.875rem;
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .group-action {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+.group-feed {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    gap: 0.1rem;
+    padding: 0.6rem 0;
+    overflow-wrap: anywhere;
+    font-size: 0.92rem;
+  }
+
+  li + li {
+    border-top: 1px solid var(--color-borde);
+  }
+
+  small {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+}
+
+.group-feed__note {
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 960px) {
+  .group-detail {
+    width: calc(100% - 1.5rem);
+  }
+
+  .group-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .group-detail .group-page__back {
-  margin-top: 0;
+  margin: 0;
   font-size: 0.9rem;
 }
 
@@ -311,6 +444,7 @@
 }
 
 .group-detail .group-hero__text h1 {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -335,7 +469,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  margin-top: 1.25rem;
 }
 
 // La sección no genera caja: así un error de la foto ocupa todo el ancho del
@@ -355,7 +488,7 @@
     width: 100%;
     height: 100%;
     border: 1px solid var(--color-borde);
-    border-radius: 0.9rem;
+    border-radius: var(--radio-tarjeta);
     background: var(--color-superficie-fuerte);
     object-fit: cover;
   }
@@ -388,12 +521,16 @@
 }
 
 .group-detail__section {
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--color-borde);
+  min-width: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
 }
 
 .group-detail__section-header {
   display: flex;
+  min-height: 2.6rem;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
@@ -413,13 +550,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.4rem;
 
   p {
     margin: 0;
     color: var(--color-texto-suave);
     font-size: 0.9rem;
   }
+}
+
+.group-expenses__more {
+  margin-top: 0.4rem;
 }
 
 .group-expenses__history {
@@ -433,7 +574,7 @@
   margin-bottom: 1rem;
   padding: 1rem;
   border-top: 0;
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-fondo);
 }
 
@@ -447,7 +588,7 @@
     width: 100%;
     min-width: 0;
     border: 1px solid var(--color-borde);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
     padding: 0.6rem 0.75rem;
     background: var(--color-superficie);
     color: var(--color-texto);
@@ -519,9 +660,6 @@
 .group-detail__footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-borde);
 
   section {
     display: flex;
@@ -544,7 +682,7 @@
   gap: 0.8rem;
   padding: 0.65rem 0.9rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-fondo);
 }
 
@@ -610,7 +748,7 @@
   width: min(16rem, calc(100vw - 3rem));
   padding: 0.35rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.65rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
   box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
 }
@@ -695,7 +833,7 @@
   div {
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--color-borde);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
   }
 
   dt {
@@ -733,5 +871,157 @@
 @media (max-width: 600px) {
   .group-payment__figures {
     grid-template-columns: 1fr;
+  }
+}
+
+// Crear grupo: lista de amigos con casillas (spec 023 US5)
+@media (max-width: 720px) {
+  // Deja "Crear grupo" por encima del botón flotante al llegar al final.
+  .page.create-group {
+    margin-bottom: 6rem;
+  }
+}
+
+.create-group__members {
+  display: grid;
+  gap: 0.75rem;
+
+  label {
+    margin-right: 0;
+  }
+
+  .group-action {
+    justify-self: start;
+  }
+}
+
+.friend-picker {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.friend-picker__filter {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+
+  input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-control);
+    background: var(--color-superficie);
+    color: var(--color-texto);
+    font: inherit;
+  }
+}
+
+.friend-picker__list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 15rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.friend-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-naranja);
+  }
+
+  &.is-selected {
+    background: var(--color-superficie-fuerte);
+    border-color: var(--color-acento);
+  }
+
+  input {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    accent-color: var(--color-acento);
+  }
+
+  img {
+    flex: 0 0 auto;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+}
+
+.friend-picker__identity {
+  display: grid;
+  min-width: 0;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: var(--color-texto-suave);
+    font-size: 0.82rem;
+  }
+}
+
+.friend-picker__status {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.create-group__profiles {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-control);
+  }
+}
+
+.create-group__simulated {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.create-group__count {
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.88rem;
+}
+
+.create-group__error {
+  margin: 0;
+  color: var(--color-error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .friend-picker__row {
+    transition: none;
   }
 }

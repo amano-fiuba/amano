@@ -4,7 +4,7 @@
 
 .home-page {
   --home-max: 1160px;
-  --home-radius: 1rem;
+  --home-radius: var(--radio-tarjeta);
   --home-shadow:
     0 24px 70px color-mix(in srgb, var(--color-texto) 11%, transparent),
     0 4px 14px color-mix(in srgb, var(--color-texto) 6%, transparent);
@@ -88,7 +88,7 @@
   min-height: 3rem;
   padding: 0.8rem 1.25rem;
   border: 1px solid var(--color-texto);
-  border-radius: 0.65rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-texto);
   color: var(--color-superficie);
   font-weight: 700;
@@ -226,7 +226,7 @@
   width: 100%;
   padding: 1.35rem;
   border: 1px solid var(--color-borde);
-  border-radius: 1.25rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
   box-shadow: var(--home-shadow);
   transform: rotate(-1.4deg);
@@ -278,7 +278,7 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
   padding: 0.9rem;
-  border-radius: 0.8rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-fondo);
 
   div {
@@ -345,7 +345,7 @@
 .debt-card__result {
   padding: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--color-acento) 30%, var(--color-borde));
-  border-radius: 0.8rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-acento) 7%, var(--color-superficie));
 }
 
@@ -502,7 +502,7 @@
   width: 2.65rem;
   height: 2.65rem;
   place-items: center;
-  border-radius: 0.8rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-acento) 12%, var(--color-superficie));
   color: var(--color-acento-oscuro);
 
@@ -617,7 +617,7 @@
   gap: 2rem;
   padding: clamp(1.5rem, 4vw, 2.8rem);
   border: 1px solid color-mix(in srgb, var(--color-acento) 35%, var(--color-borde));
-  border-radius: 1.25rem;
+  border-radius: var(--radio-tarjeta);
   background:
     radial-gradient(
       circle at 85% 20%,
