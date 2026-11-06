@@ -140,7 +140,7 @@ public class GroupExpenseService {
         Optional<GroupExpense> existing =
                 expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey);
         if (existing.isPresent()) {
-            return replay(existing.get(), groupId, normalized);
+            return replay(existing.get(), groupId, normalized, caller);
         }
 
         GroupExpense expense = new GroupExpense();
@@ -176,7 +176,7 @@ public class GroupExpenseService {
         activityEventService.recordExpenseCreated(groupId, callerId, new ExpenseActivityDetails(
                 saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription()));
 
-        return new Registration(toResponse(saved, shares, savedDebts), true);
+        return new Registration(toResponse(saved, shares, savedDebts, caller), true);
     }
 
     /**
@@ -186,31 +186,32 @@ public class GroupExpenseService {
     @Transactional(readOnly = true)
     public Registration resolveConcurrentRegistration(Long callerId, Long groupId, UUID idempotencyKey,
             CreateGroupExpenseRequest request) {
-        activeMembership(callerId, groupId);
+        GroupMember caller = activeMembership(callerId, groupId);
         NormalizedExpense normalized = validateAndNormalize(groupId, request);
         GroupExpense winner = expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey)
                 .orElseThrow(() -> new IllegalStateException(
                         "Idempotency conflict without a persisted winner"));
-        return replay(winner, groupId, normalized);
+        return replay(winner, groupId, normalized, caller);
     }
 
     /** Detail of an expense of a group the caller belongs to (FR-020). */
     @Transactional(readOnly = true)
     public GroupExpenseResponse get(Long callerId, Long groupId, Long expenseId) {
-        activeMembership(callerId, groupId);
+        GroupMember caller = activeMembership(callerId, groupId);
         GroupExpense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
                 .orElseThrow(() -> new GroupNotFoundException(EXPENSE_NOT_FOUND));
         return toResponse(expense, shareRepository.findByExpenseIdOrderByPositionAsc(expense.getId()),
-                debtRepository.findByExpenseId(expense.getId()));
+                debtRepository.findByExpenseId(expense.getId()), caller);
     }
 
-    private Registration replay(GroupExpense existing, Long groupId, NormalizedExpense normalized) {
+    private Registration replay(GroupExpense existing, Long groupId, NormalizedExpense normalized,
+            GroupMember caller) {
         List<GroupExpenseShare> shares = shareRepository.findByExpenseIdOrderByPositionAsc(existing.getId());
         if (!existing.getGroupId().equals(groupId) || !samePayload(existing, shares, normalized)) {
             throw new IdempotencyConflictException();
         }
-        return new Registration(toResponse(existing, shares, debtRepository.findByExpenseId(existing.getId())),
-                false);
+        return new Registration(toResponse(existing, shares, debtRepository.findByExpenseId(existing.getId()),
+                caller), false);
     }
 
     private static boolean samePayload(GroupExpense existing, List<GroupExpenseShare> shares,
@@ -399,7 +400,7 @@ public class GroupExpenseService {
     }
 
     private GroupExpenseResponse toResponse(GroupExpense expense, List<GroupExpenseShare> shares,
-            List<Debt> debts) {
+            List<Debt> debts, GroupMember caller) {
         Map<Long, String> names = new HashMap<>();
         Set<Long> people = new HashSet<>(List.of(expense.getPayerUserId(), expense.getCreatedByUserId()));
         for (User user : userRepository.findAllById(people)) {
@@ -418,18 +419,21 @@ public class GroupExpenseService {
         List<GroupExpenseResponse.DebtView> debtViews = debts.stream()
                 .sorted((a, b) -> Integer.compare(positionOfShare.getOrDefault(a.getShareId(), 0),
                         positionOfShare.getOrDefault(b.getShareId(), 0)))
-                .map(debt -> new GroupExpenseResponse.DebtView(debt.getId(),
-                        new GroupExpenseResponse.Debtor(debt.getDebtorType().name(), debt.getDebtorUserId(),
-                                debt.getDebtorSimulatedProfileId(), debt.getDebtorName()),
-                        new GroupExpenseResponse.Person(debt.getCreditorUserId(), names.get(debt.getCreditorUserId())),
-                        debt.getAmount().toPlainString(), debt.getPaidAmount().toPlainString(),
-                        debt.getOutstanding().toPlainString(), debt.getCurrency().name(), debt.getStatus().name()))
+                .map(debt -> GroupExpenseResponse.DebtView.of(debt, names.get(debt.getCreditorUserId()),
+                        canRegisterPayment(debt, caller)))
                 .toList();
         return new GroupExpenseResponse(expense.getId(), expense.getGroupId(), expense.getAmount().toPlainString(),
                 expense.getCurrency().name(), expense.getExpenseDate().toString(), expense.getDescription(), payer,
                 new GroupExpenseResponse.Person(expense.getCreatedByUserId(),
                         names.get(expense.getCreatedByUserId())),
                 expense.getCreatedAt(), shareViews, debtViews);
+    }
+
+    /** 018 FR-016: the debt is not PAID and the caller is its debtor, its creditor or an ADMIN. */
+    private boolean canRegisterPayment(Debt debt, GroupMember caller) {
+        return debt.getStatus() != DebtStatus.PAID
+                && permissionChecker.canRegisterPayment(caller.getRole(), caller.getId().getUserId(),
+                        debt.getDebtorUserId(), debt.getCreditorUserId());
     }
 
     private static String nameOf(User user) {

@@ -634,3 +634,71 @@
     animation: none;
   }
 }
+
+// Pantalla "Registrar pago" (specs/018-register-payment, FR-018).
+.group-payment__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.group-payment__summary {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+
+  h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+}
+
+.group-payment__figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0;
+
+  div {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: 0.5rem;
+  }
+
+  dt {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 700;
+  }
+}
+
+.group-payment__preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+}
+
+.group-payment__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+
+  a {
+    color: var(--color-acento-oscuro);
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 600px) {
+  .group-payment__figures {
+    grid-template-columns: 1fr;
+  }
+}

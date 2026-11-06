@@ -24,6 +24,9 @@ function initialFilter(value) {
 // Historial de actividad del grupo (010 US9; 014 US1–US3): frases completas
 // agrupadas por día, filtro "Mostrar", paginación y estados de carga, vacío y
 // error. Una respuesta vieja nunca pisa a la consulta más reciente.
+
+// Entries that open the expense detail: the expense itself (017) and its payments (018 FR-022).
+const LINKS_TO_EXPENSE = ['EXPENSE_CREATED', 'PAYMENT_MADE']
 export default function GroupHistoryView({ groupId }) {
   const auth = useAuth()
   const setUser = auth?.setUser
@@ -144,7 +147,7 @@ export default function GroupHistoryView({ groupId }) {
                       <p>
                         <strong>{actor}</strong> {text}
                       </p>
-                      {entry.eventType === 'EXPENSE_CREATED' && entry.details?.expenseId != null && (
+                      {LINKS_TO_EXPENSE.includes(entry.eventType) && entry.details?.expenseId != null && (
                         <Link
                           to={`/groups/${groupId}/expenses/${entry.details.expenseId}`}
                           className="group-history__expense-link"

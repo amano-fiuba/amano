@@ -106,6 +106,19 @@ public class GroupPermissionChecker {
                 && permissions.isMembersCanGenerateExpensesForOthers();
     }
 
+    /**
+     * 018 (plan.md D2, FR-004): registering a payment of a debt. ADMIN always;
+     * otherwise only the debtor (when registered) or the creditor of the debt.
+     */
+    public boolean canRegisterPayment(String callerRole, Long callerUserId, Long debtorUserId,
+            Long creditorUserId) {
+        if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
+            return true;
+        }
+        return callerUserId != null
+                && (callerUserId.equals(debtorUserId) || callerUserId.equals(creditorUserId));
+    }
+
     private boolean allowedUnless(String callerRole, boolean denied) {
         if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
             return true;

@@ -316,6 +316,23 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** 018 FR-003: debt that does not exist or belongs to a group the caller is not in — neutral 404. */
+    @ExceptionHandler(com.amano.backend.payment.DebtNotFoundException.class)
+    public ProblemDetail handleDebtNotFound(com.amano.backend.payment.DebtNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Deuda no encontrada");
+        return problem;
+    }
+
+    /** 018 FR-006: payment on a PAID debt — 409 with a machine-readable code. */
+    @ExceptionHandler(com.amano.backend.payment.DebtAlreadyPaidException.class)
+    public ProblemDetail handleDebtAlreadyPaid(com.amano.backend.payment.DebtAlreadyPaidException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("La deuda ya está pagada");
+        problem.setProperty("properties", Map.of("code", com.amano.backend.payment.DebtAlreadyPaidException.CODE));
+        return problem;
+    }
+
     /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
     @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
     public ProblemDetail handleAdminRemovalBlocked(

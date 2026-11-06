@@ -52,4 +52,25 @@ class GroupPermissionCheckerTest {
         assertThat(checker.canExpenseForOthers("GUEST", permissions(false, true))).isFalse();
         assertThat(checker.canCreateExpenses(null, null)).isFalse();
     }
+
+    // 018 T013 (plan.md D2, FR-004): who may register a payment of a debt.
+    @Test
+    void adminAlwaysRegistersPayments() {
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_ADMIN, 1L, 15L, 7L)).isTrue();
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_ADMIN, 1L, null, 7L)).isTrue();
+    }
+
+    @Test
+    void theDebtorAndTheCreditorRegisterTheirPayments() {
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_MEMBER, 15L, 15L, 7L)).isTrue();
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_MEMBER, 7L, 15L, 7L)).isTrue();
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_MEMBER, 7L, null, 7L)).isTrue();
+    }
+
+    @Test
+    void aThirdMemberCannotRegisterPayments() {
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_MEMBER, 20L, 15L, 7L)).isFalse();
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_MEMBER, 20L, null, 7L)).isFalse();
+        assertThat(checker.canRegisterPayment(GroupMember.ROLE_MEMBER, null, null, 7L)).isFalse();
+    }
 }

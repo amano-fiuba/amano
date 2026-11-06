@@ -149,6 +149,27 @@ class ActivityEventServiceTest {
         assertThat(json.has("toName")).isFalse();
     }
 
+    // 018 T017 (plan.md D6): additive expense and debt links.
+    @Test
+    void paymentHookAddsTheExpenseAndDebtWhenPresent() {
+        service.recordPaymentMade(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(54L, new BigDecimal("1000.00"), "ARS", "Juan Pérez", "Ana López", 12L, 31L));
+
+        JsonNode json = objectMapper.readTree(saved().getDetailsJson());
+        assertThat(json.get("expenseId").asLong()).isEqualTo(12L);
+        assertThat(json.get("debtId").asLong()).isEqualTo(31L);
+        assertThat(json.get("toName").asString()).isEqualTo("Ana López");
+    }
+
+    @Test
+    void paymentHookWithoutLinksKeepsThe014Format() {
+        service.recordPaymentMade(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(3L, new BigDecimal("500"), "ARS", "Juan", "Ana"));
+
+        assertThat(saved().getDetailsJson()).isEqualTo(
+                "{\"paymentId\":3,\"amount\":\"500\",\"currency\":\"ARS\",\"fromName\":\"Juan\",\"toName\":\"Ana\"}");
+    }
+
     @Test
     void hooksRejectMissingDataWithoutSaving() {
         assertThatThrownBy(() -> service.recordExpenseCreated(GROUP_ID, ACTOR_ID, null))

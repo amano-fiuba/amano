@@ -104,6 +104,21 @@ describe('GroupExpenseDetailView (017)', () => {
     expect(screen.getByRole('link', { name: 'Volver al grupo' })).toHaveAttribute('href', '/groups/3')
   })
 
+  it('cada deuda que la persona puede pagar lleva a "Registrar pago" (018 FR-017)', async () => {
+    getGroupExpense.mockResolvedValue({
+      ok: true,
+      expense: {
+        ...EXPENSE,
+        debts: [{ ...EXPENSE.debts[0], canRegisterPayment: true }, { ...EXPENSE.debts[1], canRegisterPayment: false }],
+      },
+    })
+    renderView()
+    const debts = await screen.findAllByTestId('debt-row')
+    expect(within(debts[0]).getByRole('link', { name: 'Registrar pago' }))
+      .toHaveAttribute('href', '/groups/3/expenses/12/debts/31/payment')
+    expect(within(debts[1]).queryByRole('link', { name: 'Registrar pago' })).not.toBeInTheDocument()
+  })
+
   it('un gasto sin descripción y una deuda pagada', async () => {
     getGroupExpense.mockResolvedValue({
       ok: true,

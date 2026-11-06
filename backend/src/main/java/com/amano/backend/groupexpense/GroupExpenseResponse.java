@@ -37,8 +37,23 @@ public record GroupExpenseResponse(
     public record Debtor(String type, Long userId, Long simulatedProfileId, String name) {
     }
 
-    /** One debt with its state (research.md D5). */
+    /**
+     * One debt with its state (research.md D5). {@code canRegisterPayment}
+     * (018 FR-016) tells whether the session user may pay it now: the debt is
+     * not PAID and the user is its debtor, its creditor or an ADMIN.
+     */
     public record DebtView(Long id, Debtor debtor, Person creditor, String amount, String paidAmount,
-            String outstanding, String currency, String status) {
+            String outstanding, String currency, String status, boolean canRegisterPayment) {
+
+        /** View of {@code debt} with the current creditor name (shared with 018 payments). */
+        public static DebtView of(Debt debt, String creditorName, boolean canRegisterPayment) {
+            return new DebtView(debt.getId(),
+                    new Debtor(debt.getDebtorType().name(), debt.getDebtorUserId(),
+                            debt.getDebtorSimulatedProfileId(), debt.getDebtorName()),
+                    new Person(debt.getCreditorUserId(), creditorName),
+                    debt.getAmount().toPlainString(), debt.getPaidAmount().toPlainString(),
+                    debt.getOutstanding().toPlainString(), debt.getCurrency().name(), debt.getStatus().name(),
+                    canRegisterPayment);
+        }
     }
 }

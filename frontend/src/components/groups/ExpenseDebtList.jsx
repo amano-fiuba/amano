@@ -1,12 +1,16 @@
+import { Link } from 'react-router'
 import DebtStatusBadge from './DebtStatusBadge'
 import { formatAmount } from '../../validation/expenseFormat'
 
 export const NO_DEBTS_MESSAGE = 'Este gasto no generó deudas'
 
 // Debts of one group expense (specs/017-debt-states, FR-023): "{deudor} le debe
-// a {acreedor}", the amount and the state. Read-only: payments belong to 018.
-// The backend already sends them in share order (contract §GET).
-export default function ExpenseDebtList({ debts }) {
+// a {acreedor}", the amount and the state. The backend already sends them in
+// share order (contract §GET). With `groupId` and `expenseId`, each debt the
+// session user may pay (`canRegisterPayment`, 018 FR-016/FR-017) links to the
+// "Registrar pago" screen; without them the list stays read-only.
+export default function ExpenseDebtList({ debts, groupId, expenseId }) {
+  const withActions = groupId != null && expenseId != null
   const list = Array.isArray(debts) ? debts : []
   if (list.length === 0) {
     return <p className="group-expense__empty">{NO_DEBTS_MESSAGE}</p>
@@ -20,6 +24,14 @@ export default function ExpenseDebtList({ debts }) {
           </span>
           <span className="group-expense__debt-amount">$ {formatAmount(debt.amount)}</span>
           <DebtStatusBadge status={debt.status} outstanding={debt.outstanding} />
+          {withActions && debt.canRegisterPayment && (
+            <Link
+              className="group-action"
+              to={`/groups/${groupId}/expenses/${expenseId}/debts/${debt.id}/payment`}
+            >
+              Registrar pago
+            </Link>
+          )}
         </li>
       ))}
     </ul>
