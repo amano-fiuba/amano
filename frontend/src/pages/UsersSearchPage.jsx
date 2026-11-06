@@ -359,7 +359,9 @@ function UsersSearch({ initialTerm }) {
             {results.map((user) => {
               const name = fullName(user)
               const isSending = sendingId === user.id
-              const wasSent = sentIds.includes(user.id)
+              const wasSent = sentIds.includes(user.id) || user.friendshipStatus === 'PENDING_SENT'
+              const isPendingReceived = user.friendshipStatus === 'PENDING_RECEIVED'
+              const isFriend = user.friendshipStatus === 'FRIENDS'
               return (
                 <li key={user.id} className="user-card" data-testid={`user-card-${user.id}`}>
                   <img
@@ -373,38 +375,30 @@ function UsersSearch({ initialTerm }) {
                     <strong>{name}</strong>
                     <span>{user.email}</span>
                   </div>
-                  {user.relationship === 'FRIENDS' || user.relationship === 'PENDING' ? (
-                    <button
-                      type="button"
-                      className="user-card__action"
-                      disabled
-                      aria-label={
-                        user.relationship === 'FRIENDS'
-                          ? `${name} ya es tu amigo`
-                          : `Solicitud pendiente con ${name}`
-                      }
-                    >
-                      {user.relationship === 'FRIENDS' ? <UsersIcon /> : <UserClockIcon />}
-                      {user.relationship === 'FRIENDS' ? 'Amigos' : 'Pendiente'}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="user-card__action"
-                      onClick={() => handleAdd(user)}
-                      disabled={isSending || wasSent}
-                      aria-label={
-                        wasSent
-                          ? `Solicitud enviada a ${name}`
-                          : isSending
-                            ? `Enviando solicitud a ${name}`
-                            : `Agregar a ${name}`
-                      }
-                    >
-                      <UserPlusIcon />
-                      {isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="user-card__action"
+                    onClick={() => handleAdd(user)}
+                    disabled={isSending || wasSent || isPendingReceived || isFriend}
+                    aria-label={
+                      isFriend
+                        ? `${name} ya es tu amigo`
+                        : isPendingReceived
+                          ? `Solicitud pendiente de ${name}`
+                          : wasSent
+                        ? `Solicitud enviada a ${name}`
+                        : isSending
+                          ? `Enviando solicitud a ${name}`
+                          : `Agregar a ${name}`
+                    }
+                  >
+                    {isFriend ? <UsersIcon /> : isPendingReceived ? <UserClockIcon /> : <UserPlusIcon />}
+                    {isFriend
+                      ? 'Amigos'
+                      : isPendingReceived
+                        ? 'Pendiente'
+                        : isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
+                  </button>
                 </li>
               )
             })}

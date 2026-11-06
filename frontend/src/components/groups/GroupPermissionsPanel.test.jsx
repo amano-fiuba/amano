@@ -14,7 +14,7 @@ const GROUP = { id: 42, name: 'Amigos para viajar' }
 const BASE_PERMISSIONS = {
   membersCannotMakeExpenses: false,
   membersCannotInvite: false,
-  membersCannotEditSettings: false,
+  membersCanEditGroupData: false,
   membersCanManageSimulatedProfiles: false,
   membersCanGenerateExpensesForOthers: false,
   paymentsRequireValidation: false,
@@ -35,7 +35,7 @@ describe('GroupPermissionsPanel (T036/T040)', () => {
 
     expect(screen.getByLabelText('No podrán hacer gastos')).not.toBeChecked()
     expect(screen.getByLabelText('No podrán invitar gente')).toBeChecked()
-    expect(screen.getByLabelText('No podrán editar ajustes del grupo')).not.toBeChecked()
+    expect(screen.getByLabelText('Pueden editar datos del grupo')).not.toBeChecked()
     expect(screen.getByLabelText('Pueden administrar perfiles simulados')).not.toBeChecked()
     expect(screen.getByLabelText('Pueden generar gastos en nombre de otras personas')).not.toBeChecked()
     expect(screen.getByLabelText('Los pagos requieren validación')).not.toBeChecked()

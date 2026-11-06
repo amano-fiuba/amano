@@ -74,4 +74,22 @@ describe('LeaveGroupPanel (T068/T065)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/saldos pendientes/i)
   })
+
+  it('si es el último miembro avisa que el grupo se eliminará, confirma y vuelve a Mis grupos', async () => {
+    leaveGroup.mockResolvedValue({ ok: true, groupLeft: true, groupDeleted: true })
+
+    renderPanel({ isLastAdmin: true, isLastMember: true })
+
+    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    expect(
+      screen.getByText('Sos el último miembro: si confirmas, el grupo se eliminará'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/asigná otro administrador/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(leaveGroup).toHaveBeenCalledWith(42))
+    expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Se eliminó el grupo/i)
+  })
 })

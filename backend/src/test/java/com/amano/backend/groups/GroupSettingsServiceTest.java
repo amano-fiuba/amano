@@ -119,7 +119,7 @@ class GroupSettingsServiceTest {
     @Test
     void adminAlwaysEditsSettingsAndEachCasillaIsIndependent() {
         givenGroup(ADMIN_ID, GroupMember.ROLE_ADMIN);
-        when(permissionChecker.canEditSettings(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
+        when(permissionChecker.canManagePermissions(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
 
         service.updateGroupSettings(ADMIN_ID, GROUP_ID, requestWithAllCasillas(
                 true, true, true, true, true, true));
@@ -136,27 +136,39 @@ class GroupSettingsServiceTest {
     }
 
     @Test
-    void memberEditsWhenTheCasillaAllowsIt() {
+    void memberEditsNameAndDescriptionWhenTheCasillaAllowsIt() {
         givenGroup(MEMBER_ID, GroupMember.ROLE_MEMBER);
-        when(permissionChecker.canEditSettings(eq(GroupMember.ROLE_MEMBER), any())).thenReturn(true);
+        when(permissionChecker.canEditGroupData(eq(GroupMember.ROLE_MEMBER), any())).thenReturn(true);
+        UpdateGroupRequest request = new UpdateGroupRequest();
+        request.setName("Nuevo nombre");
+        request.setDescription("Nueva descripción");
 
-        service.updateGroupSettings(MEMBER_ID, GROUP_ID, requestWithAllCasillas(
-                true, null, null, null, null, null));
+        service.updateGroupSettings(MEMBER_ID, GROUP_ID, request);
 
-        org.mockito.ArgumentCaptor<GroupPermissions> saved =
-                org.mockito.ArgumentCaptor.forClass(GroupPermissions.class);
-        verify(groupPermissionsRepository).save(saved.capture());
-        assertThat(saved.getValue().isMembersCannotMakeExpenses()).isTrue();
-        assertThat(saved.getValue().isMembersCannotInvite()).isFalse();
+        verify(groupPermissionsRepository, Mockito.never()).save(any(GroupPermissions.class));
     }
 
     @Test
-    void memberIsDeniedWhenTheCasillaBlocksSettingsEditing() {
+    void memberIsDeniedGroupDataWhenTheCasillaIsOff() {
         givenGroup(MEMBER_ID, GroupMember.ROLE_MEMBER);
-        when(permissionChecker.canEditSettings(eq(GroupMember.ROLE_MEMBER), any())).thenReturn(false);
+        when(permissionChecker.canEditGroupData(eq(GroupMember.ROLE_MEMBER), any())).thenReturn(false);
+        UpdateGroupRequest request = new UpdateGroupRequest();
+        request.setDescription("Nueva descripción");
+
+        var exception = catchThrowableOfType(
+                () -> service.updateGroupSettings(MEMBER_ID, GROUP_ID, request),
+                GroupPermissionDeniedException.class);
+
+        assertThat(exception).isNotNull();
+    }
+
+    @Test
+    void memberIsDeniedWhenChangingPermissions() {
+        givenGroup(MEMBER_ID, GroupMember.ROLE_MEMBER);
+        when(permissionChecker.canManagePermissions(eq(GroupMember.ROLE_MEMBER), any())).thenReturn(false);
 
         var exception = catchThrowableOfType(() -> service.updateGroupSettings(MEMBER_ID, GROUP_ID,
-                requestWithAllCasillas(null, null, null, null, null, null)),
+                requestWithAllCasillas(true, null, null, null, null, null)),
                 GroupPermissionDeniedException.class);
 
         assertThat(exception).isNotNull();
@@ -166,19 +178,19 @@ class GroupSettingsServiceTest {
     @Test
     void authorizationIsAlwaysDelegatedToThePermissionChecker() {
         givenGroup(ADMIN_ID, GroupMember.ROLE_ADMIN);
-        when(permissionChecker.canEditSettings(anyString(), any())).thenReturn(true);
+        when(permissionChecker.canManagePermissions(anyString(), any())).thenReturn(true);
 
         service.updateGroupSettings(ADMIN_ID, GROUP_ID, requestWithAllCasillas(
                 null, null, true, null, null, null));
 
-        verify(permissionChecker).canEditSettings(eq(GroupMember.ROLE_ADMIN),
+        verify(permissionChecker).canManagePermissions(eq(GroupMember.ROLE_ADMIN),
                 Mockito.any(GroupPermissions.class));
     }
 
     @Test
     void editingPermissionsRecordsAPermissionChangedEvent() {
         givenGroup(ADMIN_ID, GroupMember.ROLE_ADMIN);
-        when(permissionChecker.canEditSettings(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
+        when(permissionChecker.canManagePermissions(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
 
         service.updateGroupSettings(ADMIN_ID, GROUP_ID, requestWithAllCasillas(
                 null, true, null, null, null, null));
@@ -202,7 +214,7 @@ class GroupSettingsServiceTest {
     @Test
     void presentNameMustStayNonEmpty() {
         givenGroup(ADMIN_ID, GroupMember.ROLE_ADMIN);
-        when(permissionChecker.canEditSettings(anyString(), any())).thenReturn(true);
+        when(permissionChecker.canEditGroupData(anyString(), any())).thenReturn(true);
 
         UpdateGroupRequest request = new UpdateGroupRequest();
         request.setName("   ");
@@ -217,7 +229,7 @@ class GroupSettingsServiceTest {
     @Test
     void partialUpdateLeavesUnspecifiedCasillasUntouched() {
         givenGroup(ADMIN_ID, GroupMember.ROLE_ADMIN);
-        when(permissionChecker.canEditSettings(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
+        when(permissionChecker.canManagePermissions(eq(GroupMember.ROLE_ADMIN), any())).thenReturn(true);
 
         service.updateGroupSettings(ADMIN_ID, GROUP_ID, requestWithAllCasillas(
                 null, true, Boolean.FALSE, null, null, null));

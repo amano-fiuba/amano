@@ -141,7 +141,7 @@ class GroupSettingsUpdateIT {
 
         mockMvc.perform(put("/api/groups/" + groupId).cookie(admin)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"permissions\": {\"membersCannotEditSettings\": true}}"))
+                .content("{\"permissions\": {\"membersCanEditGroupData\": false}}"))
                 .andExpect(status().isOk());
 
         long memberId = jdbcTemplate
@@ -153,19 +153,29 @@ class GroupSettingsUpdateIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"Intento inválido\"}"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.detail").value("No podés editar los ajustes de este grupo"));
+                .andExpect(jsonPath("$.detail").value("No podés editar los datos de este grupo"));
     }
 
     @Test
-    void memberCanEditWhileTheCasillaIsOff() throws Exception {
+    void memberCanEditGroupDataOnceTheAdminAllowsIt() throws Exception {
         Cookie admin = verifiedSessionOf("member-ok-admin@example.com");
         registeredFriend();
         long groupId = createGroup(admin);
+
+        mockMvc.perform(put("/api/groups/" + groupId).cookie(admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\": {\"membersCanEditGroupData\": true}}"))
+                .andExpect(status().isOk());
 
         long memberId = jdbcTemplate
                 .queryForObject("SELECT user_id FROM group_members WHERE group_id = ? AND role = 'MEMBER'",
                         Long.class, groupId);
         Cookie member = new Cookie("amano_auth", jwtService.issueToken(memberId));
+
+        mockMvc.perform(put("/api/groups/" + groupId).cookie(member)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\": {\"membersCannotInvite\": true}}"))
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(put("/api/groups/" + groupId).cookie(member)
                 .contentType(MediaType.APPLICATION_JSON)

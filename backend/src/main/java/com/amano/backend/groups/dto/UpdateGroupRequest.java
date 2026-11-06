@@ -23,6 +23,15 @@ public class UpdateGroupRequest {
         private Boolean membersCanManageSimulatedProfiles;
         private Boolean membersCanGenerateExpensesForOthers;
         private Boolean paymentsRequireValidation;
+        private Boolean membersCanEditGroupData;
+
+        public Boolean getMembersCanEditGroupData() {
+            return membersCanEditGroupData;
+        }
+
+        public void setMembersCanEditGroupData(Boolean membersCanEditGroupData) {
+            this.membersCanEditGroupData = membersCanEditGroupData;
+        }
 
         public Boolean getMembersCannotMakeExpenses() {
             return membersCannotMakeExpenses;

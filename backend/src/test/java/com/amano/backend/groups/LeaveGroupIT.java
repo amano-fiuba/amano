@@ -116,11 +116,11 @@ class LeaveGroupIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].eventType").value("MEMBER_LEFT"));
 
-        // and the last remaining admin cannot leave (spec motive 4)
+        // and the last remaining member can leave: the group is deleted, since
+        // nobody is left to hand the admin role to
         mockMvc.perform(post("/api/groups/" + groupId + "/leave").cookie(admin))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.detail").value(
-                        "Sos el último administrador: asigná otro administrador antes de salir"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupDeleted").value(true));
     }
 
     @Test

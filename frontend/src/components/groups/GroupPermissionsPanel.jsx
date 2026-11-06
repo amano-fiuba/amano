@@ -5,7 +5,7 @@ import { useSnackbar } from '../Snackbar'
 const CHECKBOXES = [
   { key: 'membersCannotMakeExpenses', label: 'No podrán hacer gastos' },
   { key: 'membersCannotInvite', label: 'No podrán invitar gente' },
-  { key: 'membersCannotEditSettings', label: 'No podrán editar ajustes del grupo' },
+  { key: 'membersCanEditGroupData', label: 'Pueden editar datos del grupo' },
   { key: 'membersCanManageSimulatedProfiles', label: 'Pueden administrar perfiles simulados' },
   { key: 'membersCanGenerateExpensesForOthers', label: 'Pueden generar gastos en nombre de otras personas' },
   { key: 'paymentsRequireValidation', label: 'Los pagos requieren validación' },

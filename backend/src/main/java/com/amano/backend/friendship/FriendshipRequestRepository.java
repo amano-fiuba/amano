@@ -32,17 +32,19 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
             @Param("status") FriendshipRequestStatus status);
 
     /**
-     * ACCEPTED and PENDING rows between {@code me} and any of {@code others}, in
-     * either direction (user search shows "Amigos"/"Pendiente" instead of "Agregar").
+     * PENDING and ACCEPTED requests between {@code userId} and any of {@code otherIds}
+     * (either direction): used to tell the user search which relationship each
+     * result already has with the caller.
      */
     @Query("""
             select r from FriendshipRequest r
-            where r.status in (ACCEPTED, PENDING)
-              and ((r.senderId = :me and r.recipientId in :others)
-                or (r.recipientId = :me and r.senderId in :others))
+            where r.status in (com.amano.backend.friendship.FriendshipRequestStatus.PENDING,
+                               com.amano.backend.friendship.FriendshipRequestStatus.ACCEPTED)
+              and ((r.senderId = :userId and r.recipientId in :otherIds)
+                or (r.recipientId = :userId and r.senderId in :otherIds))
             """)
-    List<FriendshipRequest> findActiveBetween(@Param("me") Long me,
-            @Param("others") java.util.Collection<Long> others);
+    List<FriendshipRequest> findActiveBetween(@Param("userId") Long userId,
+            @Param("otherIds") java.util.Collection<Long> otherIds);
 
     /** Directional check: {@code senderId} has a request with this status to {@code recipientId}. */
     boolean existsBySenderIdAndRecipientIdAndStatus(Long senderId, Long recipientId,

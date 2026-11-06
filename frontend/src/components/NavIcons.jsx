@@ -25,6 +25,15 @@ export function CameraIcon() {
   )
 }
 
+export function PencilIcon() {
+  return (
+    <Icon>
+      <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+      <path d="m14.5 7.5 3 3" />
+    </Icon>
+  )
+}
+
 export function FriendsIcon() {
   return (
     <Icon>

@@ -181,7 +181,56 @@
   color: var(--color-acento-oscuro);
 }
 
+.role-chip--simulated {
+  background: color-mix(in srgb, var(--color-texto-suave) 15%, transparent);
+  font-style: italic;
+}
+
+.group-edit-form {
+  display: grid;
+  flex: 1 1 100%;
+  gap: 0.75rem;
+  max-width: 34rem;
+
+  label {
+    display: grid;
+    gap: 0.25rem;
+    font-weight: 600;
+  }
+
+  input:not([type='file']),
+  textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-control);
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    font: inherit;
+    font-weight: 400;
+  }
+
+  textarea {
+    resize: vertical;
+  }
+
+  .group-photo .group-action {
+    justify-self: start;
+  }
+}
+
+// Mientras se edita, el formulario ocupa su propia fila del encabezado.
+.group-hero__identity:has(.group-edit-form) {
+  flex: 1 1 100%;
+}
+
 // Botones del módulo: la acción secundaria y la destructiva.
+.group-action svg {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+}
+
 .group-action {
   display: inline-flex;
   align-items: center;
