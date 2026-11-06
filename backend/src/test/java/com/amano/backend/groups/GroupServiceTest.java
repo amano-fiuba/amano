@@ -130,7 +130,7 @@ class GroupServiceTest {
         assertThat(permissions.getValue().getGroupId()).isEqualTo(42L);
         assertThat(permissions.getValue().isMembersCannotMakeExpenses()).isFalse();
         assertThat(permissions.getValue().isMembersCannotInvite()).isFalse();
-        assertThat(permissions.getValue().isMembersCannotEditSettings()).isFalse();
+        assertThat(permissions.getValue().isMembersCanEditGroupData()).isFalse();
         assertThat(permissions.getValue().isMembersCanManageSimulatedProfiles()).isFalse();
         assertThat(permissions.getValue().isMembersCanGenerateExpensesForOthers()).isFalse();
         assertThat(permissions.getValue().isPaymentsRequireValidation()).isFalse();

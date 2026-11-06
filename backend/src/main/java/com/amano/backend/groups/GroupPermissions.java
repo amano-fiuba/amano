@@ -31,9 +31,6 @@ public class GroupPermissions {
     @Column(name = "members_cannot_invite", nullable = false)
     private boolean membersCannotInvite;
 
-    @Column(name = "members_cannot_edit_settings", nullable = false)
-    private boolean membersCannotEditSettings;
-
     @Column(name = "members_can_manage_simulated_profiles", nullable = false)
     private boolean membersCanManageSimulatedProfiles;
 
@@ -72,14 +69,6 @@ public class GroupPermissions {
 
     public void setMembersCannotInvite(boolean membersCannotInvite) {
         this.membersCannotInvite = membersCannotInvite;
-    }
-
-    public boolean isMembersCannotEditSettings() {
-        return membersCannotEditSettings;
-    }
-
-    public void setMembersCannotEditSettings(boolean membersCannotEditSettings) {
-        this.membersCannotEditSettings = membersCannotEditSettings;
     }
 
     public boolean isMembersCanManageSimulatedProfiles() {

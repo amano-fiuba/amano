@@ -19,7 +19,6 @@ public class UpdateGroupRequest {
 
         private Boolean membersCannotMakeExpenses;
         private Boolean membersCannotInvite;
-        private Boolean membersCannotEditSettings;
         private Boolean membersCanManageSimulatedProfiles;
         private Boolean membersCanGenerateExpensesForOthers;
         private Boolean paymentsRequireValidation;
@@ -47,14 +46,6 @@ public class UpdateGroupRequest {
 
         public void setMembersCannotInvite(Boolean membersCannotInvite) {
             this.membersCannotInvite = membersCannotInvite;
-        }
-
-        public Boolean getMembersCannotEditSettings() {
-            return membersCannotEditSettings;
-        }
-
-        public void setMembersCannotEditSettings(Boolean membersCannotEditSettings) {
-            this.membersCannotEditSettings = membersCannotEditSettings;
         }
 
         public Boolean getMembersCanManageSimulatedProfiles() {

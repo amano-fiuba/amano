@@ -25,8 +25,8 @@ import com.amano.backend.user.UserRepository;
 /**
  * Unit tests of {@link GroupService#updateGroupSettings} (T034, US2). Every
  * authorization decision goes through {@link GroupPermissionChecker} (role +
- * casillas): ADMIN always; MEMBER only when members_cannot_edit_settings =
- * false. The six casillas change independently and defaults at creation are
+ * casillas): the casillas are ADMIN-only; name and description need
+ * members_can_edit_group_data for a MEMBER. The six casillas change independently and defaults at creation are
  * all false (T007 / decision 11).
  */
 class GroupSettingsServiceTest {
@@ -102,13 +102,13 @@ class GroupSettingsServiceTest {
     }
 
     private static UpdateGroupRequest requestWithAllCasillas(
-            Boolean expenses, Boolean invite, Boolean settings, Boolean simulated,
+            Boolean expenses, Boolean invite, Boolean editGroupData, Boolean simulated,
             Boolean expensesForOthers, Boolean payments) {
         UpdateGroupRequest request = new UpdateGroupRequest();
         UpdateGroupRequest.PermissionsInput permissions = new UpdateGroupRequest.PermissionsInput();
         permissions.setMembersCannotMakeExpenses(expenses);
         permissions.setMembersCannotInvite(invite);
-        permissions.setMembersCannotEditSettings(settings);
+        permissions.setMembersCanEditGroupData(editGroupData);
         permissions.setMembersCanManageSimulatedProfiles(simulated);
         permissions.setMembersCanGenerateExpensesForOthers(expensesForOthers);
         permissions.setPaymentsRequireValidation(payments);
@@ -129,7 +129,7 @@ class GroupSettingsServiceTest {
         verify(groupPermissionsRepository).save(saved.capture());
         assertThat(saved.getValue().isMembersCannotMakeExpenses()).isTrue();
         assertThat(saved.getValue().isMembersCannotInvite()).isTrue();
-        assertThat(saved.getValue().isMembersCannotEditSettings()).isTrue();
+        assertThat(saved.getValue().isMembersCanEditGroupData()).isTrue();
         assertThat(saved.getValue().isMembersCanManageSimulatedProfiles()).isTrue();
         assertThat(saved.getValue().isMembersCanGenerateExpensesForOthers()).isTrue();
         assertThat(saved.getValue().isPaymentsRequireValidation()).isTrue();
@@ -237,7 +237,7 @@ class GroupSettingsServiceTest {
         verify(groupPermissionsRepository).save(Mockito.argThat(saved ->
                 saved.isMembersCannotMakeExpenses() == false
                         && saved.isMembersCannotInvite() == true
-                        && saved.isMembersCannotEditSettings() == false
+                        && saved.isMembersCanEditGroupData() == false
                         && saved.isMembersCanManageSimulatedProfiles() == false));
     }
 
@@ -264,7 +264,7 @@ class GroupSettingsServiceTest {
         verify(groupPermissionsRepository).save(saved.capture());
         assertThat(saved.getValue().isMembersCannotMakeExpenses()).isFalse();
         assertThat(saved.getValue().isMembersCannotInvite()).isFalse();
-        assertThat(saved.getValue().isMembersCannotEditSettings()).isFalse();
+        assertThat(saved.getValue().isMembersCanEditGroupData()).isFalse();
         assertThat(saved.getValue().isMembersCanManageSimulatedProfiles()).isFalse();
         assertThat(saved.getValue().isMembersCanGenerateExpensesForOthers()).isFalse();
         assertThat(saved.getValue().isPaymentsRequireValidation()).isFalse();

@@ -197,8 +197,8 @@ public class GroupService {
     /**
      * T037/T039 (US2): partial update of name, description and the permission
      * casillas. Authorization always goes through {@link GroupPermissionChecker}
-     * (ADMIN always; MEMBER only when members_cannot_edit_settings = false);
-     * server-side enforcement so calling the endpoint directly cannot bypass the
+     * (casillas: ADMIN only; name and description: ADMIN always, MEMBER only when
+     * members_can_edit_group_data = true); server-side enforcement so calling the endpoint directly cannot bypass the
      * casillas. Unspecified casillas keep their stored value.
      */
     @Transactional
@@ -235,11 +235,6 @@ public class GroupService {
             if (input.getMembersCannotInvite() != null
                     && input.getMembersCannotInvite() != permissions.isMembersCannotInvite()) {
                 permissions.setMembersCannotInvite(input.getMembersCannotInvite());
-                permissionsChanged = true;
-            }
-            if (input.getMembersCannotEditSettings() != null
-                    && input.getMembersCannotEditSettings() != permissions.isMembersCannotEditSettings()) {
-                permissions.setMembersCannotEditSettings(input.getMembersCannotEditSettings());
                 permissionsChanged = true;
             }
             if (input.getMembersCanManageSimulatedProfiles() != null

@@ -13,14 +13,6 @@ import org.springframework.stereotype.Component;
 public class GroupPermissionChecker {
 
     /**
-     * Settings editing (PUT /api/groups/{id}): allowed for ADMIN always and
-     * for MEMBER only when members_cannot_edit_settings = false.
-     */
-    public boolean canEditSettings(String callerRole, GroupPermissions permissions) {
-        return allowedUnless(callerRole, permissions != null && permissions.isMembersCannotEditSettings());
-    }
-
-    /**
      * Adding members (POST /api/groups/{id}/members): ADMIN always; MEMBER
      * only when members_cannot_invite = false.
      */
