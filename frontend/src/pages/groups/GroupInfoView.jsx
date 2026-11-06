@@ -10,6 +10,7 @@ import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
 import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
+import GroupFeed from '../../components/groups/GroupFeed'
 import { memberCountLabel } from './groupDisplay'
 import './groups.scss'
 
@@ -61,7 +62,7 @@ export default function GroupInfoView() {
   const isAdmin = group?.currentUserRole === 'ADMIN'
 
   return (
-    <main className="page group-page group-detail">
+    <main className="group-detail">
       <nav className="group-page__back">
         <Link to="/groups">
           <span aria-hidden="true">←</span> Mis grupos
@@ -121,9 +122,8 @@ export default function GroupInfoView() {
             )}
           </header>
 
-          {/* Gastos del grupo (specs/017-debt-states, FR-021) */}
-          <GroupExpensesCard groupId={id} group={group} />
-
+          {/* Miembros, gastos y actividad a la vez, como la pantalla principal. */}
+          <div className="group-board">
           <section className="group-detail__section" aria-labelledby="group-members-title">
             <div className="group-detail__section-header">
               <h2 id="group-members-title">Miembros ({group.memberCount})</h2>
@@ -155,6 +155,23 @@ export default function GroupInfoView() {
               onChanged={refreshGroup}
             />
           </section>
+
+          {/* Gastos del grupo (specs/017-debt-states, FR-021) */}
+          <GroupExpensesCard groupId={id} group={group} reloadKey={membersVersion} />
+
+          <section className="group-detail__section" aria-labelledby="group-activity-title">
+            <div className="group-detail__section-header">
+              <h2 id="group-activity-title">Actividad</h2>
+              <Link to={`/groups/${id}/history`}>Ver todo</Link>
+            </div>
+            <GroupFeed
+              groupId={id}
+              size={8}
+              emptyMessage="Todavía no hay actividad"
+              reloadKey={membersVersion}
+            />
+          </section>
+          </div>
 
           <footer className="group-detail__footer">
             <LeaveGroupPanel groupId={Number(id)} isLastAdmin={isLastAdmin} />

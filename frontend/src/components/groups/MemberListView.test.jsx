@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../api/groupsClient', async (importOriginal) => ({
@@ -57,6 +58,31 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     const avatars = await screen.findAllByAltText('')
     avatars.forEach((img) => expect(img).toHaveAttribute('src', '/avatar-default.png'))
+  })
+
+  it('sin saldos del backend no muestra nada de deudas', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} />, { wrapper: MemoryRouter })
+
+    await screen.findByText('Carla Gómez')
+    expect(screen.queryByText(/Te debe|Le debés/)).not.toBeInTheDocument()
+  })
+
+  it('muestra un saldo por moneda, también de perfiles simulados', async () => {
+    getMembers.mockResolvedValue({
+      ok: true,
+      members: [
+        { ...MEMBERS[1], balances: [{ amount: '500.00', currency: 'ARS' }], payUrl: '/pagar' },
+        { ...MEMBERS[2], balances: [{ amount: '-20.00', currency: 'USD' }, { amount: '0', currency: 'ARS' }] },
+      ],
+    })
+
+    render(<MemberListView groupId={3} currentUserId={7} />, { wrapper: MemoryRouter })
+
+    expect(await screen.findByText(/Te debe/)).toBeInTheDocument()
+    expect(screen.getByText(/Le debés/)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Pagar' })).toHaveLength(1)
   })
 
   it('renderiza el rol de cada miembro', async () => {

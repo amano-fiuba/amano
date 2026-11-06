@@ -249,11 +249,106 @@
 
 // Detalle de un grupo.
 .group-detail {
-  max-width: 760px;
+  display: grid;
+  gap: 1rem;
+  width: calc(100% - 2rem);
+  max-width: 76rem;
+  margin: 1.25rem auto 5.5rem;
+}
+
+.group-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+
+  .group-admin-panel {
+    flex: 1 0 100%;
+    margin-block: 0;
+  }
+}
+
+// Miembros, gastos y actividad, con las proporciones de la pantalla principal.
+.group-board {
+  display: grid;
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr) minmax(15rem, 20rem);
+  align-items: start;
+  gap: 1rem;
+
+  .member-row__body {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.member-balance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+  margin-top: 0.15rem;
+  font-size: 0.875rem;
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .group-action {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+.group-feed {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    gap: 0.1rem;
+    padding: 0.6rem 0;
+    overflow-wrap: anywhere;
+    font-size: 0.92rem;
+  }
+
+  li + li {
+    border-top: 1px solid var(--color-borde);
+  }
+
+  small {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+}
+
+.group-feed__note {
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 960px) {
+  .group-detail {
+    width: calc(100% - 1.5rem);
+  }
+
+  .group-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .group-detail .group-page__back {
-  margin-top: 0;
+  margin: 0;
   font-size: 0.9rem;
 }
 
@@ -272,6 +367,7 @@
 }
 
 .group-detail .group-hero__text h1 {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -296,7 +392,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.6rem;
-  margin-top: 1.25rem;
 }
 
 // La sección no genera caja: así un error de la foto ocupa todo el ancho del
@@ -349,12 +444,16 @@
 }
 
 .group-detail__section {
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--color-borde);
+  min-width: 0;
+  padding: 1.1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
 }
 
 .group-detail__section-header {
   display: flex;
+  min-height: 2.6rem;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
@@ -374,13 +473,17 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem 1rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.4rem;
 
   p {
     margin: 0;
     color: var(--color-texto-suave);
     font-size: 0.9rem;
   }
+}
+
+.group-expenses__more {
+  margin-top: 0.4rem;
 }
 
 .group-expenses__history {
@@ -480,9 +583,6 @@
 .group-detail__footer {
   display: flex;
   justify-content: flex-end;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-borde);
 
   section {
     display: flex;

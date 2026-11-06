@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 
 vi.mock('../../api/groupsClient', async (importOriginal) => ({
   ...await importOriginal(),
@@ -8,9 +8,10 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
   leaveGroup: vi.fn(),
   getMembers: vi.fn(),
   addMember: vi.fn(),
+  getActivity: vi.fn(),
 }))
 
-import { addMember, getGroup, getMembers, leaveGroup } from '../../api/groupsClient'
+import { addMember, getActivity, getGroup, getMembers, leaveGroup } from '../../api/groupsClient'
 import GroupInfoView from './GroupInfoView'
 import { AuthProvider } from '../../auth/AuthContext'
 
@@ -20,6 +21,8 @@ beforeEach(() => {
   getMembers.mockReset()
   addMember.mockReset()
   getMembers.mockResolvedValue({ ok: true, members: [] })
+  getActivity.mockReset()
+  getActivity.mockResolvedValue({ ok: true, content: [] })
 })
 
 const GROUP = {
@@ -34,7 +37,9 @@ function renderView() {
   return render(
     <MemoryRouter initialEntries={['/groups/3']}>
       <AuthProvider>
-        <GroupInfoView />
+        <Routes>
+          <Route path="/groups/:id" element={<GroupInfoView />} />
+        </Routes>
       </AuthProvider>
     </MemoryRouter>,
   )
@@ -49,6 +54,39 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     expect(await screen.findByText('Departamento 2026')).toBeInTheDocument()
     expect(screen.getByText(/Gastos compartidos del depto/)).toBeInTheDocument()
     expect(screen.getByTestId('group-role')).toHaveTextContent(/Administrador/)
+  })
+
+  it('muestra la actividad reciente y los últimos gastos con su enlace', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: { ...GROUP, expensesCount: 1 } })
+    getActivity.mockResolvedValue({
+      ok: true,
+      content: [
+        {
+          id: 9,
+          eventType: 'EXPENSE_CREATED',
+          actor: { id: 7, firstName: 'Ana', lastName: 'Paz' },
+          details: { expenseId: 44, description: 'Pizza', amount: '100.00', currency: 'ARS' },
+          createdAt: '2026-11-05T12:00:00Z',
+        },
+      ],
+    })
+
+    renderView()
+
+    const links = await screen.findAllByRole('link', { name: 'Ver gasto' })
+    expect(links[0]).toHaveAttribute('href', '/groups/3/expenses/44')
+    expect(getActivity).toHaveBeenCalledWith('3', expect.objectContaining({ eventTypes: ['EXPENSE_CREATED'] }))
+    expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/groups/3/history')
+  })
+
+  it('si falla la actividad el resto de la pantalla sigue funcionando', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+    getActivity.mockResolvedValue({ ok: false, network: true })
+
+    renderView()
+
+    expect(await screen.findByText('No se pudo cargar esta información')).toBeInTheDocument()
+    expect(screen.getByTestId('members-list')).toBeInTheDocument()
   })
 
   it('muestra el error de grupo inexistente con el motivo 404', async () => {
