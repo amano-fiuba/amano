@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
+
+import com.amano.backend.friendship.FriendshipRequestRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -27,12 +29,14 @@ import com.amano.backend.common.FieldValidationException;
 class UserSearchServiceTest {
 
     private UserRepository userRepository;
+    private FriendshipRequestRepository friendshipRequestRepository;
     private UserSearchService service;
 
     @BeforeEach
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
-        service = new UserSearchService(userRepository);
+        friendshipRequestRepository = Mockito.mock(FriendshipRequestRepository.class);
+        service = new UserSearchService(userRepository, friendshipRequestRepository);
     }
 
     private static User user(long id, String firstName, String lastName, String email) {
@@ -63,7 +67,7 @@ class UserSearchServiceTest {
 
         List<UserSearchResult> results = service.search(7L, "an");
 
-        assertThat(results).containsExactly(new UserSearchResult(3L, "Ana", "Pérez", "ana@example.com"));
+        assertThat(results).containsExactly(new UserSearchResult(3L, "Ana", "Pérez", "ana@example.com", "NONE"));
     }
 
     @Test

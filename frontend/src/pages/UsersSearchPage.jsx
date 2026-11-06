@@ -85,6 +85,48 @@ function UserPlusIcon() {
   )
 }
 
+function UserClockIcon() {
+  return (
+    <svg
+      className="search-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M14 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="8" cy="7" r="4" />
+      <circle cx="18" cy="14" r="4" />
+      <path d="M18 12.5V14l1 1" />
+    </svg>
+  )
+}
+
+function UsersIcon() {
+  return (
+    <svg
+      className="search-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
 // User search screen (feature 008). Searches only on submit (button or Enter,
 // FR-001b). Outcomes:
 //  - < 2 chars after trimming → notice, no request (FR-004)
@@ -331,22 +373,38 @@ function UsersSearch({ initialTerm }) {
                     <strong>{name}</strong>
                     <span>{user.email}</span>
                   </div>
-                  <button
-                    type="button"
-                    className="user-card__action"
-                    onClick={() => handleAdd(user)}
-                    disabled={isSending || wasSent}
-                    aria-label={
-                      wasSent
-                        ? `Solicitud enviada a ${name}`
-                        : isSending
-                          ? `Enviando solicitud a ${name}`
-                          : `Agregar a ${name}`
-                    }
-                  >
-                    <UserPlusIcon />
-                    {isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
-                  </button>
+                  {user.relationship === 'FRIENDS' || user.relationship === 'PENDING' ? (
+                    <button
+                      type="button"
+                      className="user-card__action"
+                      disabled
+                      aria-label={
+                        user.relationship === 'FRIENDS'
+                          ? `${name} ya es tu amigo`
+                          : `Solicitud pendiente con ${name}`
+                      }
+                    >
+                      {user.relationship === 'FRIENDS' ? <UsersIcon /> : <UserClockIcon />}
+                      {user.relationship === 'FRIENDS' ? 'Amigos' : 'Pendiente'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="user-card__action"
+                      onClick={() => handleAdd(user)}
+                      disabled={isSending || wasSent}
+                      aria-label={
+                        wasSent
+                          ? `Solicitud enviada a ${name}`
+                          : isSending
+                            ? `Enviando solicitud a ${name}`
+                            : `Agregar a ${name}`
+                      }
+                    >
+                      <UserPlusIcon />
+                      {isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
+                    </button>
+                  )}
                 </li>
               )
             })}
