@@ -99,6 +99,7 @@ class GroupLeaveServiceTest {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_ADMIN)));
         when(groupMemberRepository.countActiveAdminsByGroupId(GROUP_ID)).thenReturn(1L);
+        when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(2L);
         when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
 
         var exception = catchThrowableOfType(() -> service.leaveGroup(USER_ID, GROUP_ID),
@@ -110,6 +111,20 @@ class GroupLeaveServiceTest {
     }
 
     @Test
+    void theLastMemberLeavingDeletesTheGroupEvenIfTheyAreTheOnlyAdmin() {
+        when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
+                .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_ADMIN)));
+        when(groupMemberRepository.countActiveAdminsByGroupId(GROUP_ID)).thenReturn(1L);
+        when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(1L);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
+
+        var response = service.leaveGroup(USER_ID, GROUP_ID);
+
+        assertThat(response.isGroupDeleted()).isTrue();
+        verify(groupMemberRepository).save(any(GroupMember.class));
+    }
+
+    @Test
     void theGroupPersistsForTheRemainingMembers() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
@@ -117,8 +132,9 @@ class GroupLeaveServiceTest {
         when(simulatedProfileRepository.countByGroupId(GROUP_ID)).thenReturn(2L);
         when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(3L);
 
-        service.leaveGroup(USER_ID, GROUP_ID);
+        var response = service.leaveGroup(USER_ID, GROUP_ID);
 
+        assertThat(response.isGroupDeleted()).isFalse();
         // no dissolution: the group row is never deleted by leaving
         Mockito.verify(groupRepository, Mockito.never()).deleteById(any());
     }

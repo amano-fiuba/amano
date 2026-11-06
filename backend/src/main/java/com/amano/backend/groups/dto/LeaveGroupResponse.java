@@ -9,10 +9,17 @@ public class LeaveGroupResponse {
 
     private String message;
     private boolean groupLeft;
+    private boolean groupDeleted;
 
-    public LeaveGroupResponse(String message, boolean groupLeft) {
+    public LeaveGroupResponse(String message, boolean groupLeft, boolean groupDeleted) {
         this.message = message;
         this.groupLeft = groupLeft;
+        this.groupDeleted = groupDeleted;
+    }
+
+    /** True when the caller was the last member, so the group was deleted. */
+    public boolean isGroupDeleted() {
+        return groupDeleted;
     }
 
     public String getMessage() {

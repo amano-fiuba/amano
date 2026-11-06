@@ -25,6 +25,17 @@ public class GroupDetailResponse {
     private GroupPermissions permissions;
     private Object lastActivity;
     private long expensesCount;
+    private boolean lastMember;
+
+    /** True when the caller is the only registered member left in the group. */
+    @JsonProperty("isLastMember")
+    public boolean isLastMember() {
+        return lastMember;
+    }
+
+    public void setLastMember(boolean lastMember) {
+        this.lastMember = lastMember;
+    }
 
     public Long getId() {
         return id;

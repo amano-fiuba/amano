@@ -181,6 +181,17 @@
   color: var(--color-acento-oscuro);
 }
 
+.role-chip--simulated {
+  background: color-mix(in srgb, var(--color-texto-suave) 15%, transparent);
+  font-style: italic;
+}
+
+.group-edit-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
 // Botones del módulo: la acción secundaria y la destructiva.
 .group-action {
   display: inline-flex;

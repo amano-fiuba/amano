@@ -317,7 +317,9 @@ function UsersSearch({ initialTerm }) {
             {results.map((user) => {
               const name = fullName(user)
               const isSending = sendingId === user.id
-              const wasSent = sentIds.includes(user.id)
+              const wasSent = sentIds.includes(user.id) || user.friendshipStatus === 'PENDING_SENT'
+              const isPendingReceived = user.friendshipStatus === 'PENDING_RECEIVED'
+              const isFriend = user.friendshipStatus === 'FRIENDS'
               return (
                 <li key={user.id} className="user-card" data-testid={`user-card-${user.id}`}>
                   <img
@@ -335,9 +337,13 @@ function UsersSearch({ initialTerm }) {
                     type="button"
                     className="user-card__action"
                     onClick={() => handleAdd(user)}
-                    disabled={isSending || wasSent}
+                    disabled={isSending || wasSent || isPendingReceived || isFriend}
                     aria-label={
-                      wasSent
+                      isFriend
+                        ? `${name} ya es tu amigo`
+                        : isPendingReceived
+                          ? `Solicitud pendiente de ${name}`
+                          : wasSent
                         ? `Solicitud enviada a ${name}`
                         : isSending
                           ? `Enviando solicitud a ${name}`
@@ -345,7 +351,11 @@ function UsersSearch({ initialTerm }) {
                     }
                   >
                     <UserPlusIcon />
-                    {isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
+                    {isFriend
+                      ? 'Amigos'
+                      : isPendingReceived
+                        ? 'Pendiente'
+                        : isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
                   </button>
                 </li>
               )

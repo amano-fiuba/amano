@@ -6,6 +6,8 @@ import LeaveGroupPanel from '../../components/groups/LeaveGroupPanel'
 import GroupDescriptionPanel from '../../components/groups/GroupDescriptionPanel'
 import MemberListView from '../../components/groups/MemberListView'
 import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
+import GroupEditForm from '../../components/groups/GroupEditForm'
+import { PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
@@ -24,6 +26,7 @@ export default function GroupInfoView() {
   const [error, setError] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [showPermissions, setShowPermissions] = useState(false)
+  const [editing, setEditing] = useState(false)
   // Bumped after an alta so MemberListView re-fetches (fix 2026-11-04).
   const [membersVersion, setMembersVersion] = useState(0)
 
@@ -59,6 +62,7 @@ export default function GroupInfoView() {
   // UI anticipation only: the server always rules the last-admin motive.
   const isLastAdmin = group?.currentUserRole === 'ADMIN' && group?.memberCount === 1
   const isAdmin = group?.currentUserRole === 'ADMIN'
+  const canEditGroupData = isAdmin || Boolean(group?.permissions?.membersCanEditGroupData)
 
   return (
     <main className="page group-page group-detail">
@@ -77,23 +81,32 @@ export default function GroupInfoView() {
         <>
           <header className="group-hero" data-testid="group-detail">
             <div className="group-hero__identity">
-              <GroupPhotoPanel
-                groupId={Number(id)}
-                currentPhoto={group.photo ?? null}
-                isAdmin={isAdmin}
-              />
-              <div className="group-hero__text">
-                <h1>{group.name}</h1>
-                <GroupDescriptionPanel description={group.description ?? null} />
-                <p className="group-hero__meta" data-testid="group-role">
-                  {memberCountLabel(group.memberCount)}
-                  <span aria-hidden="true">·</span>
-                  <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
-                    <span className="visually-hidden">Tu rol: </span>
-                    {roleLabel(group.currentUserRole)}
-                  </span>
-                </p>
-              </div>
+              {editing ? (
+                <GroupEditForm
+                  group={group}
+                  onCancel={() => setEditing(false)}
+                  onSaved={(updated) => {
+                    setGroup(updated)
+                    setEditing(false)
+                  }}
+                />
+              ) : (
+                <>
+                  <GroupPhotoPanel photo={group.photo ?? null} />
+                  <div className="group-hero__text">
+                    <h1>{group.name}</h1>
+                    <GroupDescriptionPanel description={group.description ?? null} />
+                    <p className="group-hero__meta" data-testid="group-role">
+                      {memberCountLabel(group.memberCount)}
+                      <span aria-hidden="true">·</span>
+                      <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
+                        <span className="visually-hidden">Tu rol: </span>
+                        {roleLabel(group.currentUserRole)}
+                      </span>
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
             <div className="group-hero__actions">
               <Link
@@ -103,6 +116,16 @@ export default function GroupInfoView() {
               >
                 Historial de actividad
               </Link>
+              {canEditGroupData && !editing && (
+                <button
+                  type="button"
+                  className="group-action"
+                  data-testid="group-edit-button"
+                  onClick={() => setEditing(true)}
+                >
+                  <PencilIcon /> Editar
+                </button>
+              )}
               {isAdmin && (
                 <button
                   type="button"
@@ -157,7 +180,11 @@ export default function GroupInfoView() {
           </section>
 
           <footer className="group-detail__footer">
-            <LeaveGroupPanel groupId={Number(id)} isLastAdmin={isLastAdmin} />
+            <LeaveGroupPanel
+              groupId={Number(id)}
+              isLastAdmin={isLastAdmin}
+              isLastMember={Boolean(group.isLastMember)}
+            />
           </footer>
         </>
       )}

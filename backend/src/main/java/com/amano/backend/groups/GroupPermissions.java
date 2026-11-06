@@ -40,6 +40,9 @@ public class GroupPermissions {
     @Column(name = "members_can_generate_expenses_for_others", nullable = false)
     private boolean membersCanGenerateExpensesForOthers;
 
+    @Column(name = "members_can_edit_group_data", nullable = false)
+    private boolean membersCanEditGroupData;
+
     @Column(name = "payments_require_validation", nullable = false)
     private boolean paymentsRequireValidation;
 
@@ -101,5 +104,13 @@ public class GroupPermissions {
 
     public void setPaymentsRequireValidation(boolean paymentsRequireValidation) {
         this.paymentsRequireValidation = paymentsRequireValidation;
+    }
+
+    public boolean isMembersCanEditGroupData() {
+        return membersCanEditGroupData;
+    }
+
+    public void setMembersCanEditGroupData(boolean membersCanEditGroupData) {
+        this.membersCanEditGroupData = membersCanEditGroupData;
     }
 }

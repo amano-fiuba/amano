@@ -149,6 +149,14 @@ export default function MemberListView({
                   {isYou && (
                     <span className="role-chip role-chip--you" data-testid="member-you">Yo</span>
                   )}
+                  {isSimulated && (
+                    <span
+                      className="role-chip role-chip--simulated"
+                      data-testid={`member-simulated-${key}`}
+                    >
+                      Simulado
+                    </span>
+                  )}
                   <span
                     className={`role-chip role-chip--${member.role.toLowerCase()}`}
                     data-testid={`member-role-${key}`}

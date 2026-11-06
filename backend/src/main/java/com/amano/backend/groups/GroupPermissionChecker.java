@@ -66,11 +66,29 @@ public class GroupPermissionChecker {
     }
 
     /**
-     * US8 group photo upload/replace: ADMIN-only with no casilla (spec
-     * "Solo ADMIN"; the check concentrates here).
+     * US8 group photo upload/replace/remove: ADMIN always; MEMBER only when
+     * members_can_edit_group_data = true.
      */
     public boolean canManagePhoto(String callerRole, GroupPermissions permissions) {
+        return canEditGroupData(callerRole, permissions);
+    }
+
+    /**
+     * Editing the group data (photo, name, description): ADMIN always; MEMBER
+     * only when members_can_edit_group_data = true (positive casilla).
+     */
+    public boolean canEditGroupData(String callerRole, GroupPermissions permissions) {
+        return positiveCasilla(callerRole, permissions != null && permissions.isMembersCanEditGroupData());
+    }
+
+    /** Changing the casillas: ADMIN-only, no casilla. */
+    public boolean canManagePermissions(String callerRole, GroupPermissions permissions) {
         return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    private boolean positiveCasilla(String callerRole, boolean granted) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole)
+                || (GroupMember.ROLE_MEMBER.equals(callerRole) && granted);
     }
 
     /**

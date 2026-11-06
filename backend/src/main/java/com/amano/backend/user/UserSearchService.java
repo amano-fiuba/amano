@@ -1,5 +1,6 @@
 package com.amano.backend.user;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -9,6 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.friendship.FriendshipRequest;
+import com.amano.backend.friendship.FriendshipRequestRepository;
+import com.amano.backend.friendship.FriendshipRequestStatus;
 
 /**
  * User search (feature 008): validates the term on the server (FR-004/FR-019,
@@ -26,9 +30,12 @@ public class UserSearchService {
     public static final String TOO_LONG_MESSAGE = "La búsqueda no puede superar los 100 caracteres";
 
     private final UserRepository userRepository;
+    private final FriendshipRequestRepository friendshipRequestRepository;
 
-    public UserSearchService(UserRepository userRepository) {
+    public UserSearchService(UserRepository userRepository,
+            FriendshipRequestRepository friendshipRequestRepository) {
         this.userRepository = userRepository;
+        this.friendshipRequestRepository = friendshipRequestRepository;
     }
 
     @Transactional(readOnly = true)
@@ -41,10 +48,24 @@ public class UserSearchService {
             throw new FieldValidationException(Map.of("q", TOO_LONG_MESSAGE));
         }
         String normalized = term.toLowerCase(Locale.ROOT);
-        return userRepository
-                .searchVerified(normalized, currentUserId, PageRequest.of(0, MAX_RESULTS))
-                .stream()
-                .map(UserSearchResult::from)
+        List<User> users = userRepository
+                .searchVerified(normalized, currentUserId, PageRequest.of(0, MAX_RESULTS));
+        if (users.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, String> statusByUser = new HashMap<>();
+        for (FriendshipRequest request : friendshipRequestRepository.findActiveBetween(
+                currentUserId, users.stream().map(User::getId).toList())) {
+            boolean sentByMe = currentUserId.equals(request.getSenderId());
+            Long other = sentByMe ? request.getRecipientId() : request.getSenderId();
+            String status = request.getStatus() == FriendshipRequestStatus.ACCEPTED
+                    ? UserSearchResult.FRIENDS
+                    : sentByMe ? UserSearchResult.PENDING_SENT : UserSearchResult.PENDING_RECEIVED;
+            statusByUser.merge(other, status, (a, b) -> UserSearchResult.FRIENDS.equals(a) ? a : b);
+        }
+        return users.stream()
+                .map(user -> UserSearchResult.from(user,
+                        statusByUser.getOrDefault(user.getId(), UserSearchResult.NONE)))
                 .toList();
     }
 }

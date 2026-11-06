@@ -210,12 +210,18 @@ public class GroupService {
         GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId)
                 .orElseGet(() -> defaultPermissions(groupId));
 
-        if (!permissionChecker.canEditSettings(membership.getRole(), permissions)) {
-            throw new GroupPermissionDeniedException("No podés editar los ajustes de este grupo");
-        }
-
         if (request == null) {
             throw new FieldValidationException(Map.of("name", "El nombre del grupo es obligatorio"));
+        }
+        // Casillas: ADMIN-only. Name/description: ADMIN, or members when the
+        // "Pueden editar datos del grupo" casilla is on.
+        if (request.getPermissions() != null
+                && !permissionChecker.canManagePermissions(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException("Solo un administrador puede editar los permisos del grupo");
+        }
+        if ((request.getName() != null || request.getDescription() != null)
+                && !permissionChecker.canEditGroupData(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException("No podés editar los datos de este grupo");
         }
 
         boolean permissionsChanged = false;
@@ -247,6 +253,11 @@ public class GroupService {
                             .isMembersCanGenerateExpensesForOthers()) {
                 permissions.setMembersCanGenerateExpensesForOthers(
                         input.getMembersCanGenerateExpensesForOthers());
+                permissionsChanged = true;
+            }
+            if (input.getMembersCanEditGroupData() != null
+                    && input.getMembersCanEditGroupData() != permissions.isMembersCanEditGroupData()) {
+                permissions.setMembersCanEditGroupData(input.getMembersCanEditGroupData());
                 permissionsChanged = true;
             }
             if (input.getPaymentsRequireValidation() != null
@@ -337,7 +348,7 @@ public class GroupService {
         GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId).orElse(null);
         if (!permissionChecker.canManagePhoto(membership.getRole(), permissions)) {
             throw new GroupPermissionDeniedException(
-                    "Solo un administrador puede cambiar la foto del grupo");
+                    "No tenés permiso para cambiar la foto del grupo");
         }
         if (photo == null || photo.isEmpty()) {
             throw new com.amano.backend.common.FieldValidationException(java.util.Map.of("photo",
@@ -362,6 +373,27 @@ public class GroupService {
         activityEventService.record(groupId, GroupActivity.GroupActivityType.PHOTO_CHANGED,
                 userId, Map.of());
         return new com.amano.backend.groups.dto.GroupPhotoResponse(url, saved.getUpdatedAt());
+    }
+
+    /** Removes the custom photo: the group goes back to the default one. */
+    @Transactional
+    public void deletePhoto(Long userId, Long groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        GroupMember membership = activeMembership(userId, groupId);
+        GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId).orElse(null);
+        if (!permissionChecker.canManagePhoto(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException(
+                    "No tenés permiso para cambiar la foto del grupo");
+        }
+        if (groupPhotoRepository.existsById(groupId)) {
+            groupPhotoRepository.deleteById(groupId);
+            group.setPhoto(null);
+            groupRepository.save(group);
+            activityEventService.record(groupId, GroupActivity.GroupActivityType.PHOTO_CHANGED,
+                    userId, Map.of());
+        }
     }
 
     /** Served bytes for GET /api/groups/{id}/photo: members only (neutral 404 otherwise). */
@@ -389,7 +421,9 @@ public class GroupService {
      * {@link DebtPort} (spec motive 2, own wording) or by the last-admin guard
      * (spec motive 4). Success completes left_at (soft baja; the row is
      * preserved), records MEMBER_LEFT (NOT MEMBER_REMOVED) and the group is
-     * NEVER dissolved — it persists for the remaining members.
+     * NOT dissolved while others remain. When the caller is the last registered
+     * member, leaving deletes the group (no active member left; the last-admin
+     * guard does not apply).
      */
     @Transactional
     public LeaveGroupResponse leaveGroup(Long userId, Long groupId) {
@@ -401,7 +435,10 @@ public class GroupService {
             throw new PendingDebtsException(
                     "No podés abandonar el grupo: tenés saldos pendientes con otros miembros");
         }
-        if (GroupMember.ROLE_ADMIN.equals(membership.getRole())
+        // The last registered member leaving deletes the group: nobody is left
+        // to hand the admin role to, so the last-admin guard does not apply.
+        boolean lastMember = groupMemberRepository.countActiveByGroupId(groupId) <= 1;
+        if (!lastMember && GroupMember.ROLE_ADMIN.equals(membership.getRole())
                 && groupMemberRepository.countActiveAdminsByGroupId(groupId) <= 1) {
             throw new LastAdminException();
         }
@@ -410,8 +447,13 @@ public class GroupService {
         groupMemberRepository.save(membership);
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_LEFT,
                 userId, Map.of());
+        if (lastMember) {
+            // No active member left: the group no longer shows up for anyone
+            // (listing and detail require an active membership).
+            return new LeaveGroupResponse("Se eliminó el grupo.", true, true);
+        }
         return new LeaveGroupResponse("Se abandonó el grupo. Tus gastos previos se conservan.",
-                true);
+                true, false);
     }
 
     /**
@@ -488,6 +530,7 @@ public class GroupService {
         detail.setActiveForUser(membership.getLeftAt() == null);
         detail.setMemberCount(activeMemberCount(group.getId()));
         detail.setCurrentUserRole(membership.getRole());
+        detail.setLastMember(groupMemberRepository.countActiveByGroupId(group.getId()) <= 1);
         detail.setPermissions(groupPermissionsRepository.findByGroupId(group.getId()).orElse(null));
         detail.setLastActivity(null); // history events come with later stories (T021 hook points)
         detail.setExpensesCount(groupRepository.countGroupExpenses(group.getId())); // 017 FR-027

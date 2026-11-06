@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { leaveGroup, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
 import { useSnackbar } from '../Snackbar'
 
+const LAST_MEMBER_MESSAGE = 'Sos el último miembro: si confirmas, el grupo se eliminará'
 const LAST_ADMIN_MESSAGE = 'Sos el último administrador: asigná otro administrador antes de salir'
 
 /**
@@ -10,9 +11,10 @@ const LAST_ADMIN_MESSAGE = 'Sos el último administrador: asigná otro administr
  * The last-admin motive can be anticipated client-side (suggestion to assign
  * another admin first), but the server decision always rules: rejection
  * motives come back as ProblemDetail and are rendered as-is. On success the
- * user goes to the groups list (FR-015).
+ * user goes to the groups list (FR-015). The last member gets a different
+ * warning: confirming deletes the group.
  */
-export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
+export default function LeaveGroupPanel({ groupId, isLastAdmin = false, isLastMember = false }) {
   const navigate = useNavigate()
   const showSnackbar = useSnackbar()
   const [open, setOpen] = useState(false)
@@ -31,7 +33,7 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
     if (!result || result.network) {
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else if (result.ok) {
-      showSnackbar('Se abandonó el grupo')
+      showSnackbar(isLastMember || result.groupDeleted ? 'Se eliminó el grupo' : 'Se abandonó el grupo')
       // replace: "atrás" no debe volver a un grupo del que ya no se es miembro.
       navigate('/groups', { replace: true })
     } else {
@@ -57,7 +59,21 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false }) {
           aria-label="Abandonar el grupo"
           data-testid="leave-group-dialog"
         >
-          {isLastAdmin ? (
+          {isLastMember ? (
+            <>
+              <p role="alert" data-testid="leave-group-last-member-hint">
+                {LAST_MEMBER_MESSAGE}
+              </p>
+              <button
+                type="button"
+                className="group-confirm__danger"
+                onClick={confirmLeave}
+                disabled={busy}
+              >
+                Confirmar
+              </button>
+            </>
+          ) : isLastAdmin ? (
             <p role="alert" data-testid="leave-group-last-admin-hint">
               {LAST_ADMIN_MESSAGE}
             </p>

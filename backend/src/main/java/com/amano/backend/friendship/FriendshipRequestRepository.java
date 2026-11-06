@@ -31,6 +31,21 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
     boolean existsBetween(@Param("a") Long a, @Param("b") Long b,
             @Param("status") FriendshipRequestStatus status);
 
+    /**
+     * PENDING and ACCEPTED requests between {@code userId} and any of {@code otherIds}
+     * (either direction): used to tell the user search which relationship each
+     * result already has with the caller.
+     */
+    @Query("""
+            select r from FriendshipRequest r
+            where r.status in (com.amano.backend.friendship.FriendshipRequestStatus.PENDING,
+                               com.amano.backend.friendship.FriendshipRequestStatus.ACCEPTED)
+              and ((r.senderId = :userId and r.recipientId in :otherIds)
+                or (r.recipientId = :userId and r.senderId in :otherIds))
+            """)
+    List<FriendshipRequest> findActiveBetween(@Param("userId") Long userId,
+            @Param("otherIds") java.util.Collection<Long> otherIds);
+
     /** Inbox of the session user: pending requests received, newest first (FR-012). */
     List<FriendshipRequest> findByRecipientIdAndStatusOrderByCreatedAtDescIdDesc(
             Long recipientId, FriendshipRequestStatus status);
