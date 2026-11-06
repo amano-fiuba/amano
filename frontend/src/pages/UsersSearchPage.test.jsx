@@ -143,6 +143,30 @@ describe('UsersSearchPage (feature 008)', () => {
     expect(screen.getByRole('button', { name: 'Agregar a Juan' })).toBeEnabled()
   })
 
+  it('muestra Amigos, Pendiente o Agregar según la relación, sin acción en los dos primeros', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: true,
+      users: [
+        { ...ANA, relationship: 'FRIENDS' },
+        { ...JUAN, relationship: 'PENDING' },
+        { id: 5, firstName: 'Lola', lastName: null, email: 'lola@example.com', relationship: 'NONE' },
+      ],
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    const friends = await screen.findByRole('button', { name: 'Ana Pérez ya es tu amigo' })
+    expect(friends).toHaveTextContent('Amigos')
+    expect(friends).toBeDisabled()
+    const pending = screen.getByRole('button', { name: 'Solicitud pendiente con Juan' })
+    expect(pending).toHaveTextContent('Pendiente')
+    expect(pending).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Lola' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Agregar a Ana Pérez' })).not.toBeInTheDocument()
+  })
+
   it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {
     let resolveSearch
     usersClient.searchUsers.mockReturnValue(
