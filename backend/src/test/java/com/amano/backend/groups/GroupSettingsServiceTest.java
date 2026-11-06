@@ -214,7 +214,7 @@ class GroupSettingsServiceTest {
     @Test
     void presentNameMustStayNonEmpty() {
         givenGroup(ADMIN_ID, GroupMember.ROLE_ADMIN);
-        when(permissionChecker.canManagePermissions(anyString(), any())).thenReturn(true);
+        when(permissionChecker.canEditGroupData(anyString(), any())).thenReturn(true);
 
         UpdateGroupRequest request = new UpdateGroupRequest();
         request.setName("   ");

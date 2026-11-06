@@ -26,6 +26,17 @@ public class GroupDetailResponse {
     private Object lastActivity;
     private long expensesCount;
     private boolean lastMember;
+    private boolean lastAdmin;
+
+    /** True when the caller is an ADMIN and the only active admin of the group. */
+    @JsonProperty("isLastAdmin")
+    public boolean isLastAdmin() {
+        return lastAdmin;
+    }
+
+    public void setLastAdmin(boolean lastAdmin) {
+        this.lastAdmin = lastAdmin;
+    }
 
     /** True when the caller is the only registered member left in the group. */
     @JsonProperty("isLastMember")

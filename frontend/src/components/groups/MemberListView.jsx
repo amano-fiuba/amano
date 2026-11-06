@@ -11,7 +11,6 @@ import RemoveMemberDialog from './RemoveMemberDialog'
 import { useSnackbar } from '../Snackbar'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
-const LAST_ADMIN = 'Sos el último administrador: asigná otro administrador antes de salir'
 
 /**
  * Members list (US6, T079): every ACTIVE member — registered users and
@@ -106,7 +105,6 @@ export default function MemberListView({
   const adminIds = new Set(
     (members ?? []).filter((m) => m.role === 'ADMIN').map((m) => m.userId),
   )
-  const isLastAdmin = adminIds.size <= 1
 
   const isCurrentUser = (member) => member.userId != null && member.userId === currentUserId
   const ordered = [...(members ?? [])].sort(
@@ -115,11 +113,6 @@ export default function MemberListView({
 
   return (
     <section data-testid="members-list">
-      {isAdmin && isLastAdmin && adminIds.size === 1 && (
-        <p role="alert" className="member-rows__hint" data-testid="members-last-admin-hint">
-          {LAST_ADMIN}
-        </p>
-      )}
       {members === null && <GroupRowsSkeleton rows={2} />}
       <ul className="member-rows">
         {ordered.map((member) => {

@@ -421,9 +421,10 @@ public class GroupService {
      * {@link DebtPort} (spec motive 2, own wording) or by the last-admin guard
      * (spec motive 4). Success completes left_at (soft baja; the row is
      * preserved), records MEMBER_LEFT (NOT MEMBER_REMOVED) and the group is
-     * NOT dissolved while others remain. When the caller is the last registered
-     * member, leaving deletes the group (no active member left; the last-admin
-     * guard does not apply).
+     * never dissolved. When the caller is the last registered member the same
+     * soft baja applies, without the last-admin guard (spec 020): no group record
+     * is deleted, the group just stops showing up because nobody is active in it.
+     * {@code groupDeleted} reports that outcome, not a deletion.
      */
     @Transactional
     public LeaveGroupResponse leaveGroup(Long userId, Long groupId) {
@@ -435,8 +436,7 @@ public class GroupService {
             throw new PendingDebtsException(
                     "No podés abandonar el grupo: tenés saldos pendientes con otros miembros");
         }
-        // The last registered member leaving deletes the group: nobody is left
-        // to hand the admin role to, so the last-admin guard does not apply.
+        // Nobody is left to hand the admin role to, so the guard does not apply.
         boolean lastMember = groupMemberRepository.countActiveByGroupId(groupId) <= 1;
         if (!lastMember && GroupMember.ROLE_ADMIN.equals(membership.getRole())
                 && groupMemberRepository.countActiveAdminsByGroupId(groupId) <= 1) {
@@ -448,8 +448,8 @@ public class GroupService {
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_LEFT,
                 userId, Map.of());
         if (lastMember) {
-            // No active member left: the group no longer shows up for anyone
-            // (listing and detail require an active membership).
+            // Listing and detail require an active membership: the group no
+            // longer shows up for anyone. Its records stay in the database.
             return new LeaveGroupResponse("Se eliminó el grupo.", true, true);
         }
         return new LeaveGroupResponse("Se abandonó el grupo. Tus gastos previos se conservan.",
@@ -531,6 +531,8 @@ public class GroupService {
         detail.setMemberCount(activeMemberCount(group.getId()));
         detail.setCurrentUserRole(membership.getRole());
         detail.setLastMember(groupMemberRepository.countActiveByGroupId(group.getId()) <= 1);
+        detail.setLastAdmin(GroupMember.ROLE_ADMIN.equals(membership.getRole())
+                && groupMemberRepository.countActiveAdminsByGroupId(group.getId()) <= 1);
         detail.setPermissions(groupPermissionsRepository.findByGroupId(group.getId()).orElse(null));
         detail.setLastActivity(null); // history events come with later stories (T021 hook points)
         detail.setExpensesCount(groupRepository.countGroupExpenses(group.getId())); // 017 FR-027
