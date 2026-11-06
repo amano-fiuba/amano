@@ -366,7 +366,7 @@ function UsersSearch({ initialTerm }) {
                 <li key={user.id} className="user-card" data-testid={`user-card-${user.id}`}>
                   <img
                     className="user-card__avatar"
-                    src={DEFAULT_AVATAR}
+                    src={user.avatarUrl || DEFAULT_AVATAR}
                     alt=""
                     width={44}
                     height={44}

@@ -99,12 +99,14 @@ public class FriendshipRequestService {
                 .collect(Collectors.toSet());
         Map<Long, User> senders = userRepository.findAllById(senderIds).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
+        Set<Long> sendersWithAvatar = userRepository.findIdsWithAvatar(senderIds);
 
         return pending.stream()
                 .map(request -> {
                     User sender = senders.get(request.getSenderId());
                     return sender == null ? null
-                            : ReceivedFriendshipRequestResponse.from(request, sender);
+                            : ReceivedFriendshipRequestResponse.from(request, sender,
+                                    sendersWithAvatar.contains(sender.getId()));
                 })
                 .filter(Objects::nonNull)
                 .toList();

@@ -44,6 +44,26 @@ export function FriendsIcon() {
   )
 }
 
+export function GroupsIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="7.5" r="3.5" />
+      <circle cx="5.5" cy="10" r="2.25" />
+      <circle cx="18.5" cy="10" r="2.25" />
+      <path d="M6 20c.4-3.6 2.6-5.5 6-5.5s5.6 1.9 6 5.5" />
+      <path d="M1.5 18c.2-2.2 1.3-3.6 3-4M22.5 18c-.2-2.2-1.3-3.6-3-4" />
+    </Icon>
+  )
+}
+
+export function ActivityIcon() {
+  return (
+    <Icon>
+      <path d="M5 20v-8M12 20V4M19 20v-5" />
+    </Icon>
+  )
+}
+
 export function BellIcon() {
   return (
     <Icon>

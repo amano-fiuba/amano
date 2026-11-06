@@ -8,8 +8,9 @@ import com.amano.backend.user.User;
 public record ReceivedFriendshipRequestResponse(Long id, FriendshipRequestStatus status,
         OffsetDateTime createdAt, FriendshipUserSummary sender) {
 
-    public static ReceivedFriendshipRequestResponse from(FriendshipRequest request, User sender) {
+    public static ReceivedFriendshipRequestResponse from(FriendshipRequest request, User sender,
+            boolean senderHasAvatar) {
         return new ReceivedFriendshipRequestResponse(request.getId(), request.getStatus(),
-                request.getCreatedAt(), FriendshipUserSummary.from(sender));
+                request.getCreatedAt(), FriendshipUserSummary.from(sender, senderHasAvatar));
     }
 }

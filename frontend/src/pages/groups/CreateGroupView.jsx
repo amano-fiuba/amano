@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { createGroup } from '../../api/groupsClient'
+import { useNavigate } from 'react-router'
+import { GROUPS_NETWORK_ERROR_MESSAGE, createGroup } from '../../api/groupsClient'
 
+import FriendPicker from '../../components/groups/FriendPicker'
 import { useSnackbar } from '../../components/Snackbar'
 import SubmitButton from '../../components/SubmitButton'
 import TextField from '../../components/TextField'
@@ -9,85 +11,109 @@ import TextField from '../../components/TextField'
 export const NAME_REQUIRED_MESSAGE = 'El nombre del grupo es obligatorio'
 export const MEMBER_REQUIRED_MESSAGE =
   'Agregá al menos un miembro adicional (amigo registrado o perfil simulado)'
+const SIMULATED_REQUIRED_MESSAGE = 'Ingresá nombre y correo del perfil simulado'
+const SIMULATED_REPEATED_MESSAGE = 'No podés repetir el correo de un perfil simulado'
 
-const MEMBER_TYPES = { REGISTERED: 'REGISTERED', SIMULATED: 'SIMULATED' }
+const EMPTY_DRAFT = { name: '', email: '' }
 
 function firstNameOf(group) {
   return group?.name || 'Grupo'
 }
 
+function peopleLabel(count) {
+  return count === 1 ? '1 persona elegida' : `${count} personas elegidas`
+}
+
 /**
- * Create-group screen (T031, FR-001): name (required), optional description
- * and the mandatory additional member — a registered friend (email) or a
- * simulated profile (name + email). Errors come inline; success announces the
- * created group. Placeholder: once groups exist, this flows to /groups/:id.
+ * Create-group screen (010 FR-001, 023 US5): name (required), optional
+ * description and at least one additional member, chosen from the friends list
+ * and/or added as simulated profiles. Errors come inline; success opens the
+ * new group.
  */
 export default function CreateGroupView() {
-  const [memberTab, setMemberTab] = useState(MEMBER_TYPES.REGISTERED)
   const showSnackbar = useSnackbar()
+  const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
 
   const [fields, setFields] = useState({ name: '', description: '' })
   const [errors, setErrors] = useState({})
 
-  const [friend, setFriend] = useState({ identifier: '' })
+  const [friends, setFriends] = useState([])
+  const [simulated, setSimulated] = useState([])
+  const [showSimulatedForm, setShowSimulatedForm] = useState(false)
+  const [draft, setDraft] = useState(EMPTY_DRAFT)
 
-  const [simulated, setSimulated] = useState({ name: '', email: '' })
-
-  function findTabError() {
-    if (memberTab === MEMBER_TYPES.SIMULATED) {
-      if (!simulated.name.trim() || !simulated.email.trim()) {
-        return { member: 'Ingresá nombre y correo del perfil simulado' }
-      }
-      return {}
-    }
-    if (!friend.identifier.trim()) {
-      return { member: 'Ingresá el correo del amigo' }
-    }
-    return {}
+  function isRepeated(email, profiles = simulated) {
+    return profiles.some((profile) => profile.email.toLowerCase() === email.toLowerCase())
   }
 
-  function asPayload() {
-    if (memberTab === MEMBER_TYPES.SIMULATED) {
-      return {
-        memberType: 'SIMULATED',
-        identifier: simulated.email.trim(),
-        name: simulated.name.trim(),
-      }
+  // The profile being typed, validated; `null` when the form is empty.
+  function readDraft() {
+    const profile = { name: draft.name.trim(), email: draft.email.trim() }
+    if (!profile.name && !profile.email) return { profile: null }
+    if (!profile.name || !profile.email) return { error: SIMULATED_REQUIRED_MESSAGE }
+    if (isRepeated(profile.email)) return { error: SIMULATED_REPEATED_MESSAGE }
+    return { profile }
+  }
+
+  function addSimulated() {
+    const { profile, error } = readDraft()
+    if (error || !profile) {
+      setErrors((prev) => ({ ...prev, member: error || SIMULATED_REQUIRED_MESSAGE }))
+      return
     }
-    return { memberType: 'REGISTERED', identifier: friend.identifier.trim() }
+    setSimulated((prev) => [...prev, profile])
+    setDraft(EMPTY_DRAFT)
+    setShowSimulatedForm(false)
+    setErrors((prev) => ({ ...prev, member: undefined }))
+  }
+
+  function removeSimulated(email) {
+    setSimulated((prev) => prev.filter((profile) => profile.email !== email))
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
-    const nextErrors = findTabError()
+    const { profile, error } = readDraft()
+    const profiles = profile ? [...simulated, profile] : simulated
+    const memberCount = friends.length + profiles.length
+
+    const nextErrors = {}
+    if (!fields.name.trim()) nextErrors.name = NAME_REQUIRED_MESSAGE
+    if (error) nextErrors.member = error
+    else if (memberCount === 0) nextErrors.member = MEMBER_REQUIRED_MESSAGE
     setErrors(nextErrors)
-    if (!fields.name.trim() || Object.keys(nextErrors).length > 0) {
-      setErrors((prev) => ({
-        ...prev,
-        ...(!fields.name.trim()
-          ? { name: NAME_REQUIRED_MESSAGE, ...nextErrors }
-          : nextErrors),
-      }))
-      return
-    }
+    if (Object.keys(nextErrors).length > 0) return
+
     setSaving(true)
     const result = await createGroup({
       name: fields.name.trim(),
       description: fields.description.trim(),
-      member: asPayload(),
+      members: [
+        ...friends.map((friend) => ({ memberType: 'REGISTERED', identifier: friend.email })),
+        ...profiles.map(({ name, email }) => ({
+          memberType: 'SIMULATED',
+          identifier: email,
+          name,
+        })),
+      ],
     })
     setSaving(false)
     if (result.ok) {
       showSnackbar(`Grupo creado: ${firstNameOf(result.group)}`)
-      setErrors({})
+      navigate(`/groups/${result.group.id}`, { replace: true })
+    } else if (result.network) {
+      setErrors({ member: GROUPS_NETWORK_ERROR_MESSAGE })
     } else {
-      setErrors(result.fields || findTabError())
+      const { name, member, identifier } = result.fields ?? {}
+      setErrors({ name, member: member || identifier })
     }
   }
 
+  const memberCount = friends.length + simulated.length
+
   return (
-    <main className="page">
+    <main className="page create-group">
       <h1>Crear nuevo grupo</h1>
       <form onSubmit={handleSubmit} noValidate>
         <TextField
@@ -105,64 +131,71 @@ export default function CreateGroupView() {
           error={errors.description}
         />
 
-        <fieldset>
-          <legend>Miembro adicional</legend>
-          <label>
-            <input
-              type="radio"
-              name="memberType"
-              checked={memberTab === MEMBER_TYPES.REGISTERED}
-              onChange={() => setMemberTab(MEMBER_TYPES.REGISTERED)}
-            />
-            Amigo registrado
-          </label>
-          {memberTab === MEMBER_TYPES.REGISTERED && (
-            <TextField
-              id="friend-email"
-              label="Correo del amigo"
-              type="email"
-              value={friend.identifier}
-              onChange={(event) => setFriend({ identifier: event.target.value })}
-              error={memberTab === MEMBER_TYPES.REGISTERED ? errors.member : undefined}
-            />
+        <fieldset className="create-group__members">
+          <legend>¿Quiénes participan?</legend>
+          <FriendPicker selected={friends} onChange={setFriends} />
+
+          {simulated.length > 0 && (
+            <ul className="create-group__profiles" aria-label="Perfiles simulados">
+              {simulated.map(({ name, email }) => (
+                <li key={email}>
+                  <span className="friend-picker__identity">
+                    <strong>{name}</strong>
+                    <span>{email}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="group-action"
+                    aria-label={`Quitar a ${name}`}
+                    onClick={() => removeSimulated(email)}
+                  >
+                    Quitar
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
-          <label>
-            <input
-              type="radio"
-              name="memberType"
-              checked={memberTab === MEMBER_TYPES.SIMULATED}
-              onChange={() => setMemberTab(MEMBER_TYPES.SIMULATED)}
-            />
-            Perfil simulado
-          </label>
-          {memberTab === MEMBER_TYPES.SIMULATED && (
-            <>
+
+          {showSimulatedForm ? (
+            <div className="create-group__simulated">
               <TextField
                 id="simulated-name"
                 label="Nombre del perfil simulado"
-                value={simulated.name}
-                onChange={(event) => setSimulated((prev) => ({ ...prev, name: event.target.value }))}
-                error={memberTab === MEMBER_TYPES.SIMULATED ? errors.name : undefined}
+                value={draft.name}
+                onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
               />
               <TextField
                 id="simulated-email"
                 label="Correo del perfil simulado"
                 type="email"
-                value={simulated.email}
-                onChange={(event) => setSimulated((prev) => ({ ...prev, email: event.target.value }))}
-                error={memberTab === MEMBER_TYPES.SIMULATED ? errors.identifier : undefined}
+                value={draft.email}
+                onChange={(event) => setDraft((prev) => ({ ...prev, email: event.target.value }))}
               />
-              {errors.member && (
-                <p role="alert" data-testid="member-error">
-                  {errors.member}
-                </p>
-              )}
-            </>
+              <button type="button" className="group-action" onClick={addSimulated}>
+                Agregar perfil
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="group-action"
+              onClick={() => setShowSimulatedForm(true)}
+            >
+              Sumar perfil simulado
+            </button>
+          )}
+
+          <p className="create-group__count" aria-live="polite" data-testid="member-count">
+            {peopleLabel(memberCount)}
+          </p>
+          {errors.member && (
+            <p role="alert" className="create-group__error" data-testid="member-error">
+              {errors.member}
+            </p>
           )}
         </fieldset>
 
         <SubmitButton loading={saving}>Crear grupo</SubmitButton>
-        <p>{MEMBER_REQUIRED_MESSAGE}</p>
       </form>
     </main>
   )

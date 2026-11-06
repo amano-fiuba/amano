@@ -123,7 +123,7 @@ export default function GlobalSearch() {
                 {people.map((person) => (
                   <li key={person.id}>
                     <Link to={peopleUrl} onClick={reset}>
-                      <img src={DEFAULT_AVATAR} alt="" width={32} height={32} />
+                      <img src={person.avatarUrl || DEFAULT_AVATAR} alt="" width={32} height={32} />
                       <span>
                         <strong>{fullName(person)}</strong>
                         <small>{person.email}</small>
@@ -142,6 +142,17 @@ export default function GlobalSearch() {
                 {matchingGroups.map((group) => (
                   <li key={group.id}>
                     <Link to={`/groups/${group.id}`} onClick={reset}>
+                      {group.photo ? (
+                        <img className="global-search__mark" src={group.photo} alt="" width={32} height={32} />
+                      ) : (
+                        <span
+                          className="global-search__mark"
+                          data-testid="group-avatar-default"
+                          aria-hidden="true"
+                        >
+                          {group.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
                       <span>
                         <strong>{group.name}</strong>
                         <small>

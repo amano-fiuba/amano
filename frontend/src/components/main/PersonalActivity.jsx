@@ -1,3 +1,4 @@
+import { Link } from 'react-router'
 import { RECENT_EXPENSES_ERROR_MESSAGE, listRecentExpenses } from '../../api/expenseClient'
 import { useSessionData } from '../../hooks/useSessionData'
 import { CATEGORY_OPTIONS, labelOf } from '../../validation/expenseCatalog'
@@ -11,6 +12,7 @@ export default function PersonalActivity() {
     <section className="main-card" aria-labelledby="main-activity-title">
       <div className="main-card__header">
         <h2 id="main-activity-title">Actividad personal</h2>
+        <Link to="/activity">Ver todo</Link>
       </div>
 
       {status === 'loading' && <p aria-busy="true">Cargando…</p>}

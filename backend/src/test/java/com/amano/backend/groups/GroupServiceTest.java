@@ -225,6 +225,93 @@ class GroupServiceTest {
         verify(groupRepository, never()).save(any(Group.class));
     }
 
+    private static CreateGroupRequest.MemberInput registered(String email) {
+        CreateGroupRequest.MemberInput member = new CreateGroupRequest.MemberInput();
+        member.setMemberType("REGISTERED");
+        member.setIdentifier(email);
+        return member;
+    }
+
+    private static CreateGroupRequest.MemberInput simulated(String email) {
+        CreateGroupRequest.MemberInput member = new CreateGroupRequest.MemberInput();
+        member.setMemberType("SIMULATED");
+        member.setIdentifier(email);
+        member.setName("Invitado");
+        return member;
+    }
+
+    private static CreateGroupRequest requestWithMembers(CreateGroupRequest.MemberInput... members) {
+        CreateGroupRequest request = new CreateGroupRequest();
+        request.setName("Viaje");
+        request.setMembers(List.of(members));
+        return request;
+    }
+
+    /** 023 FR-029: a repeated friend counts once. */
+    @Test
+    void aRepeatedFriendJoinsOnlyOnce() {
+        when(friendshipPort.isFriend(CREATOR_ID, "friend@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("friend@example.com")).thenReturn(
+                Optional.of(registeredUser(9L, "friend@example.com")));
+
+        GroupResponse response = service.createGroup(CREATOR_ID,
+                requestWithMembers(registered("friend@example.com"), registered("friend@example.com")));
+
+        assertThat(response.getMembersCount()).isEqualTo(2);
+    }
+
+    /** 023 FR-029: an invalid member anywhere in the list creates nothing. */
+    @Test
+    void anInvalidMemberAtTheEndOfTheListCreatesNothing() {
+        when(friendshipPort.isFriend(CREATOR_ID, "friend@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("friend@example.com")).thenReturn(
+                Optional.of(registeredUser(9L, "friend@example.com")));
+        when(friendshipPort.isFriend(CREATOR_ID, "stranger@example.com")).thenReturn(false);
+
+        catchThrowableOfType(
+                () -> service.createGroup(CREATOR_ID, requestWithMembers(
+                        registered("friend@example.com"), registered("stranger@example.com"))),
+                NotFriendException.class);
+
+        verify(groupRepository, never()).save(any(Group.class));
+    }
+
+    /** 023 FR-029: the unique index would otherwise surface as a 500. */
+    @Test
+    void repeatedSimulatedEmailsAreRejected() {
+        FieldValidationException exception = catchThrowableOfType(
+                () -> service.createGroup(CREATOR_ID, requestWithMembers(
+                        simulated("invitado@example.com"), simulated("INVITADO@example.com"))),
+                FieldValidationException.class);
+
+        assertThat(exception.getFields()).containsKey("member");
+        verify(groupRepository, never()).save(any(Group.class));
+    }
+
+    /** 023 FR-028: {@code members} wins when both arrive. */
+    @Test
+    void membersWinsOverTheSingleMember() {
+        when(friendshipPort.isFriend(CREATOR_ID, "friend@example.com")).thenReturn(true);
+        when(userRepository.findByEmail("friend@example.com")).thenReturn(
+                Optional.of(registeredUser(9L, "friend@example.com")));
+        CreateGroupRequest request = requestWithMembers(registered("friend@example.com"));
+        request.setMember(simulated("ignorado@example.com"));
+
+        GroupResponse response = service.createGroup(CREATOR_ID, request);
+
+        assertThat(response.getMembersCount()).isEqualTo(2);
+        verify(simulatedProfileRepository, never()).save(any());
+    }
+
+    @Test
+    void anEmptyMembersListIsRejected() {
+        FieldValidationException exception = catchThrowableOfType(
+                () -> service.createGroup(CREATOR_ID, requestWithMembers()),
+                FieldValidationException.class);
+
+        assertThat(exception.getFields()).containsKey("member");
+    }
+
     /** 017 T016 (FR-027): the group detail reports the real number of group expenses. */
     @Test
     void theGroupDetailReportsTheRealNumberOfExpenses() {

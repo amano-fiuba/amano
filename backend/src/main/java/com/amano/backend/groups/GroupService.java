@@ -1,10 +1,14 @@
 package com.amano.backend.groups;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -79,24 +83,34 @@ public class GroupService {
             throw new FieldValidationException(Map.of("name", "El nombre del grupo es obligatorio"));
         }
 
-        CreateGroupRequest.MemberInput memberInput = request.getMember();
-        if (memberInput == null) {
+        List<CreateGroupRequest.MemberInput> memberInputs = memberInputsOf(request);
+        if (memberInputs.isEmpty()) {
             throw new FieldValidationException(Map.of("member",
                     "Agregá al menos un miembro adicional (amigo registrado o perfil simulado)"));
         }
 
         // Everything is validated/resolved BEFORE any insert: a failure leaves
         // no partial rows even without depending on the rollback (atomicity).
-        String memberType = nullToBlank(memberInput.getMemberType());
-        if (!"SIMULATED".equalsIgnoreCase(memberType) && !"REGISTERED".equalsIgnoreCase(memberType)) {
-            throw new FieldValidationException(Map.of("member", "El tipo de miembro no es válido"));
-        }
-        User friend = null;
-        if ("REGISTERED".equalsIgnoreCase(memberType)) {
-            friend = resolveRegisterdFriend(creatorId, memberInput.getIdentifier());
-        }
-        else {
-            validateSimulatedMember(memberInput);
+        Map<Long, User> friends = new LinkedHashMap<>();
+        List<CreateGroupRequest.MemberInput> simulatedInputs = new ArrayList<>();
+        Set<String> simulatedEmails = new HashSet<>();
+        for (CreateGroupRequest.MemberInput memberInput : memberInputs) {
+            String memberType = memberInput == null ? "" : nullToBlank(memberInput.getMemberType());
+            if ("REGISTERED".equalsIgnoreCase(memberType)) {
+                User friend = resolveRegisterdFriend(creatorId, memberInput.getIdentifier());
+                friends.putIfAbsent(friend.getId(), friend);
+            }
+            else if ("SIMULATED".equalsIgnoreCase(memberType)) {
+                validateSimulatedMember(memberInput);
+                if (!simulatedEmails.add(memberInput.getIdentifier().trim().toLowerCase(Locale.ROOT))) {
+                    throw new FieldValidationException(Map.of("member",
+                            "No podés repetir el correo de un perfil simulado"));
+                }
+                simulatedInputs.add(memberInput);
+            }
+            else {
+                throw new FieldValidationException(Map.of("member", "El tipo de miembro no es válido"));
+            }
         }
 
         Group group = new Group();
@@ -106,30 +120,40 @@ public class GroupService {
 
         groupMemberRepository.save(new GroupMember(creatorId, savedGroup.getId(), GroupMember.ROLE_ADMIN));
 
-        Map<String, Object> initialMemberDetails;
-        if (friend == null) {
+        List<Map<String, Object>> initialMembersDetails = new ArrayList<>();
+        for (User friend : friends.values()) {
+            groupMemberRepository.save(new GroupMember(friend.getId(), savedGroup.getId(), GroupMember.ROLE_MEMBER));
+            initialMembersDetails.add(ActivityEventService.registeredMemberDetails(friend));
+        }
+        for (CreateGroupRequest.MemberInput memberInput : simulatedInputs) {
             SimulatedProfile profile = new SimulatedProfile();
             profile.setGroupId(savedGroup.getId());
             profile.setName(memberInput.getName().trim());
             profile.setEmail(memberInput.getIdentifier().trim());
             SimulatedProfile savedProfile = simulatedProfileRepository.save(profile);
-            initialMemberDetails = ActivityEventService.simulatedMemberDetails(
-                    savedProfile == null ? profile : savedProfile);
-        }
-        else {
-            groupMemberRepository.save(new GroupMember(friend.getId(), savedGroup.getId(), GroupMember.ROLE_MEMBER));
-            initialMemberDetails = ActivityEventService.registeredMemberDetails(friend);
+            initialMembersDetails.add(ActivityEventService.simulatedMemberDetails(
+                    savedProfile == null ? profile : savedProfile));
         }
 
         groupPermissionsRepository.save(defaultPermissions(savedGroup.getId()));
 
-        // alta of the initial member, in the same transaction (014 FR-002)
-        initialMemberDetails.put("atCreation", true);
-        activityEventService.record(savedGroup.getId(), GroupActivity.GroupActivityType.MEMBER_ADDED,
-                creatorId, initialMemberDetails);
+        // alta of the initial members, in the same transaction (014 FR-002)
+        for (Map<String, Object> memberDetails : initialMembersDetails) {
+            memberDetails.put("atCreation", true);
+            activityEventService.record(savedGroup.getId(), GroupActivity.GroupActivityType.MEMBER_ADDED,
+                    creatorId, memberDetails);
+        }
 
         User creator = userRepository.findById(creatorId).orElseThrow();
-        return buildResponse(savedGroup, creator, 2);
+        return buildResponse(savedGroup, creator, 1 + initialMembersDetails.size());
+    }
+
+    /** {@code members} wins over the single {@code member} (spec 023 FR-028). */
+    private static List<CreateGroupRequest.MemberInput> memberInputsOf(CreateGroupRequest request) {
+        if (request.getMembers() != null && !request.getMembers().isEmpty()) {
+            return request.getMembers();
+        }
+        return request.getMember() == null ? List.of() : List.of(request.getMember());
     }
 
     private User resolveRegisterdFriend(Long creatorId, String identifier) {
