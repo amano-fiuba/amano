@@ -222,11 +222,24 @@ button.app-header__action {
   img {
     flex: 0 0 auto;
     border-radius: 50%;
+    object-fit: cover;
   }
 
   span {
     display: grid;
     min-width: 0;
+  }
+
+  .global-search__mark {
+    flex: 0 0 auto;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radio-control);
+    background: var(--color-superficie-fuerte);
+    color: var(--color-acento-oscuro);
+    font-weight: 700;
+    object-fit: cover;
   }
 
   strong,

@@ -1,5 +1,6 @@
 package com.amano.backend.groups;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +37,16 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
               AND other.id.userId = :b AND other.leftAt IS NULL
             """)
     boolean shareActiveGroup(@Param("a") Long a, @Param("b") Long b);
+
+    /** Which of {@code ids} share an active group with {@code userId}: shareActiveGroup in bulk. */
+    @Query("""
+            SELECT DISTINCT other.id.userId
+            FROM GroupMember m, GroupMember other
+            WHERE m.id.groupId = other.id.groupId
+              AND m.id.userId = :userId AND m.leftAt IS NULL
+              AND other.id.userId IN :ids AND other.leftAt IS NULL
+            """)
+    List<Long> findActiveMatesAmong(@Param("userId") Long userId, @Param("ids") Collection<Long> ids);
 
     /** Admins still active, for the last-admin guard (US4/US5). */
     @Query("""
