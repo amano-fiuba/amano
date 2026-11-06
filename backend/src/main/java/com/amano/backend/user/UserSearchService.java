@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.friendship.FriendshipRequest;
 import com.amano.backend.friendship.FriendshipRequestRepository;
 import com.amano.backend.friendship.FriendshipRequestStatus;
 
@@ -52,19 +53,19 @@ public class UserSearchService {
         if (users.isEmpty()) {
             return List.of();
         }
-        Map<Long, String> relationships = new HashMap<>();
-        friendshipRequestRepository
-                .findActiveBetween(currentUserId, users.stream().map(User::getId).toList())
-                .forEach(r -> {
-                    Long other = r.getSenderId().equals(currentUserId) ? r.getRecipientId() : r.getSenderId();
-                    String value = r.getStatus() == FriendshipRequestStatus.ACCEPTED
-                            ? UserSearchResult.FRIENDS : UserSearchResult.PENDING;
-                    // A friendship wins over any stray pending row.
-                    relationships.merge(other, value,
-                            (a, b) -> UserSearchResult.FRIENDS.equals(a) ? a : b);
-                });
+        Map<Long, String> statusByUser = new HashMap<>();
+        for (FriendshipRequest request : friendshipRequestRepository.findActiveBetween(
+                currentUserId, users.stream().map(User::getId).toList())) {
+            boolean sentByMe = currentUserId.equals(request.getSenderId());
+            Long other = sentByMe ? request.getRecipientId() : request.getSenderId();
+            String status = request.getStatus() == FriendshipRequestStatus.ACCEPTED
+                    ? UserSearchResult.FRIENDS
+                    : sentByMe ? UserSearchResult.PENDING_SENT : UserSearchResult.PENDING_RECEIVED;
+            statusByUser.merge(other, status, (a, b) -> UserSearchResult.FRIENDS.equals(a) ? a : b);
+        }
         return users.stream()
-                .map(u -> UserSearchResult.from(u, relationships.getOrDefault(u.getId(), UserSearchResult.NONE)))
+                .map(user -> UserSearchResult.from(user,
+                        statusByUser.getOrDefault(user.getId(), UserSearchResult.NONE)))
                 .toList();
     }
 }

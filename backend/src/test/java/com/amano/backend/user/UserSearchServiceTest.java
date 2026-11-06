@@ -116,4 +116,35 @@ class UserSearchServiceTest {
 
         assertThat(service.search(7L, "a".repeat(100))).isEmpty();
     }
+
+    @Test
+    void resultsCarryTheFriendshipStatusWithTheCaller() {
+        when(userRepository.searchVerified(anyString(), anyLong(), any(Pageable.class)))
+                .thenReturn(List.of(user(3L, "Ana", "Pérez", "ana@example.com"),
+                        user(4L, "Bruno", null, "bruno@example.com"),
+                        user(5L, "Carla", null, "carla@example.com")));
+        com.amano.backend.friendship.FriendshipRequest fromAna = request(3L, 1L,
+                com.amano.backend.friendship.FriendshipRequestStatus.PENDING);
+        com.amano.backend.friendship.FriendshipRequest toBruno = request(1L, 4L,
+                com.amano.backend.friendship.FriendshipRequestStatus.PENDING);
+        com.amano.backend.friendship.FriendshipRequest withCarla = request(5L, 1L,
+                com.amano.backend.friendship.FriendshipRequestStatus.ACCEPTED);
+        when(friendshipRequestRepository.findActiveBetween(eq(1L), any()))
+                .thenReturn(List.of(fromAna, toBruno, withCarla));
+
+        List<UserSearchResult> results = service.search(1L, "an");
+
+        assertThat(results).extracting(UserSearchResult::friendshipStatus)
+                .containsExactly("PENDING_RECEIVED", "PENDING_SENT", "FRIENDS");
+    }
+
+    private static com.amano.backend.friendship.FriendshipRequest request(Long sender, Long recipient,
+            com.amano.backend.friendship.FriendshipRequestStatus status) {
+        com.amano.backend.friendship.FriendshipRequest request = Mockito
+                .mock(com.amano.backend.friendship.FriendshipRequest.class);
+        when(request.getSenderId()).thenReturn(sender);
+        when(request.getRecipientId()).thenReturn(recipient);
+        when(request.getStatus()).thenReturn(status);
+        return request;
+    }
 }

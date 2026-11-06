@@ -74,4 +74,72 @@ describe('LeaveGroupPanel (T068/T065)', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/saldos pendientes/i)
   })
+
+  it('si es el último miembro avisa que el grupo se eliminará, confirma y vuelve a Mis grupos', async () => {
+    leaveGroup.mockResolvedValue({ ok: true, groupLeft: true, groupDeleted: true })
+
+    renderPanel({ isLastAdmin: true, isLastMember: true })
+
+    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    expect(
+      screen.getByText('Sos el último miembro: si confirmas, el grupo se eliminará'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/asigná otro administrador/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+
+    await waitFor(() => expect(leaveGroup).toHaveBeenCalledWith(42))
+    expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Se eliminó el grupo/i)
+  })
+
+  it('como único admin con otros miembros no ofrece salir y Cerrar no llama a la API', () => {
+    renderPanel({ isLastAdmin: true })
+
+    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+
+    expect(screen.queryByRole('button', { name: /Confirmar/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(leaveGroup).not.toHaveBeenCalled()
+  })
+
+  it('el doble clic en Confirmar envía una sola solicitud', async () => {
+    let resolve
+    leaveGroup.mockReturnValue(new Promise((r) => { resolve = r }))
+    renderPanel({})
+
+    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    const confirm = screen.getByRole('button', { name: /Confirmar/i })
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+
+    expect(leaveGroup).toHaveBeenCalledTimes(1)
+    resolve({ ok: true, groupLeft: true })
+    expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
+  })
+
+  it('tras un error de red permite reintentar', async () => {
+    leaveGroup
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValueOnce({ ok: true, groupLeft: true })
+    renderPanel({})
+
+    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/No se pudo conectar/i)
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+    expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
+  })
+
+  it('el mensaje de éxito lo define el servidor, no el modo del modal', async () => {
+    leaveGroup.mockResolvedValue({ ok: true, groupLeft: true, groupDeleted: false })
+    renderPanel({ isLastMember: true })
+
+    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/Se abandonó el grupo/i)
+  })
 })

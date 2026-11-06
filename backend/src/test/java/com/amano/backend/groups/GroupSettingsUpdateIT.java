@@ -33,7 +33,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 /**
  * US2 contract tests (T035, Testcards / real PostgreSQL): {@code PUT
  * /api/groups/{id}} saves the permission casillas (200 with the updated
- * state), denies a MEMBER when members_cannot_edit_settings = true (403) and
+ * state), denies a MEMBER when members_can_edit_group_data = false (403) and
  * reports unknown groups (404).
  */
 @SpringBootTest(properties = {
@@ -117,12 +117,12 @@ class GroupSettingsUpdateIT {
         mockMvc.perform(put("/api/groups/" + groupId).cookie(admin)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"permissions\": {\"membersCannotInvite\": true,"
-                        + " \"membersCannotEditSettings\": true,"
+                        + " \"membersCanEditGroupData\": true,"
                         + " \"membersCanManageSimulatedProfiles\": true,"
                         + " \"paymentsRequireValidation\": true}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.permissions.membersCannotInvite").value(true))
-                .andExpect(jsonPath("$.permissions.membersCannotEditSettings").value(true))
+                .andExpect(jsonPath("$.permissions.membersCanEditGroupData").value(true))
                 .andExpect(jsonPath("$.permissions.membersCanManageSimulatedProfiles").value(true))
                 .andExpect(jsonPath("$.permissions.paymentsRequireValidation").value(true))
                 .andExpect(jsonPath("$.permissions.membersCannotMakeExpenses").value(false))
@@ -141,7 +141,7 @@ class GroupSettingsUpdateIT {
 
         mockMvc.perform(put("/api/groups/" + groupId).cookie(admin)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"permissions\": {\"membersCannotEditSettings\": true}}"))
+                .content("{\"permissions\": {\"membersCanEditGroupData\": false}}"))
                 .andExpect(status().isOk());
 
         long memberId = jdbcTemplate
@@ -153,19 +153,29 @@ class GroupSettingsUpdateIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"description\": \"Intento inválido\"}"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.detail").value("No podés editar los ajustes de este grupo"));
+                .andExpect(jsonPath("$.detail").value("No podés editar los datos de este grupo"));
     }
 
     @Test
-    void memberCanEditWhileTheCasillaIsOff() throws Exception {
+    void memberCanEditGroupDataOnceTheAdminAllowsIt() throws Exception {
         Cookie admin = verifiedSessionOf("member-ok-admin@example.com");
         registeredFriend();
         long groupId = createGroup(admin);
+
+        mockMvc.perform(put("/api/groups/" + groupId).cookie(admin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\": {\"membersCanEditGroupData\": true}}"))
+                .andExpect(status().isOk());
 
         long memberId = jdbcTemplate
                 .queryForObject("SELECT user_id FROM group_members WHERE group_id = ? AND role = 'MEMBER'",
                         Long.class, groupId);
         Cookie member = new Cookie("amano_auth", jwtService.issueToken(memberId));
+
+        mockMvc.perform(put("/api/groups/" + groupId).cookie(member)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\": {\"membersCannotInvite\": true}}"))
+                .andExpect(status().isForbidden());
 
         mockMvc.perform(put("/api/groups/" + groupId).cookie(member)
                 .contentType(MediaType.APPLICATION_JSON)

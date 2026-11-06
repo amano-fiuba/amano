@@ -292,6 +292,23 @@ export async function uploadGroupPhoto(groupId, file) {
   }
 }
 
+/** DELETE /api/groups/{id}/photo: back to the default photo. */
+export async function deleteGroupPhoto(groupId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/photo`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail }
+    }
+    return { ok: true }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 async function jsonRequest(url, method) {
   try {
     const response = await fetch(url, { method, credentials: 'include' })

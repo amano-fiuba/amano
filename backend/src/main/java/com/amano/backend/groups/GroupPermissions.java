@@ -31,14 +31,14 @@ public class GroupPermissions {
     @Column(name = "members_cannot_invite", nullable = false)
     private boolean membersCannotInvite;
 
-    @Column(name = "members_cannot_edit_settings", nullable = false)
-    private boolean membersCannotEditSettings;
-
     @Column(name = "members_can_manage_simulated_profiles", nullable = false)
     private boolean membersCanManageSimulatedProfiles;
 
     @Column(name = "members_can_generate_expenses_for_others", nullable = false)
     private boolean membersCanGenerateExpensesForOthers;
+
+    @Column(name = "members_can_edit_group_data", nullable = false)
+    private boolean membersCanEditGroupData;
 
     @Column(name = "payments_require_validation", nullable = false)
     private boolean paymentsRequireValidation;
@@ -71,14 +71,6 @@ public class GroupPermissions {
         this.membersCannotInvite = membersCannotInvite;
     }
 
-    public boolean isMembersCannotEditSettings() {
-        return membersCannotEditSettings;
-    }
-
-    public void setMembersCannotEditSettings(boolean membersCannotEditSettings) {
-        this.membersCannotEditSettings = membersCannotEditSettings;
-    }
-
     public boolean isMembersCanManageSimulatedProfiles() {
         return membersCanManageSimulatedProfiles;
     }
@@ -101,5 +93,13 @@ public class GroupPermissions {
 
     public void setPaymentsRequireValidation(boolean paymentsRequireValidation) {
         this.paymentsRequireValidation = paymentsRequireValidation;
+    }
+
+    public boolean isMembersCanEditGroupData() {
+        return membersCanEditGroupData;
+    }
+
+    public void setMembersCanEditGroupData(boolean membersCanEditGroupData) {
+        this.membersCanEditGroupData = membersCanEditGroupData;
     }
 }

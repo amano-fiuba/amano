@@ -147,9 +147,9 @@ describe('UsersSearchPage (feature 008)', () => {
     usersClient.searchUsers.mockResolvedValue({
       ok: true,
       users: [
-        { ...ANA, relationship: 'FRIENDS' },
-        { ...JUAN, relationship: 'PENDING' },
-        { id: 5, firstName: 'Lola', lastName: null, email: 'lola@example.com', relationship: 'NONE' },
+        { ...ANA, friendshipStatus: 'FRIENDS' },
+        { ...JUAN, friendshipStatus: 'PENDING_RECEIVED' },
+        { id: 5, firstName: 'Lola', lastName: null, email: 'lola@example.com', friendshipStatus: 'NONE' },
       ],
     })
     const user = userEvent.setup()
@@ -160,11 +160,26 @@ describe('UsersSearchPage (feature 008)', () => {
     const friends = await screen.findByRole('button', { name: 'Ana Pérez ya es tu amigo' })
     expect(friends).toHaveTextContent('Amigos')
     expect(friends).toBeDisabled()
-    const pending = screen.getByRole('button', { name: 'Solicitud pendiente con Juan' })
+    const pending = screen.getByRole('button', { name: 'Solicitud pendiente de Juan' })
     expect(pending).toHaveTextContent('Pendiente')
     expect(pending).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Agregar a Lola' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Agregar a Ana Pérez' })).not.toBeInTheDocument()
+  })
+
+  it('muestra Solicitud enviada si yo ya le envié una solicitud', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: true,
+      users: [{ ...ANA, friendshipStatus: 'PENDING_SENT' }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    const sent = await screen.findByRole('button', { name: 'Solicitud enviada a Ana Pérez' })
+    expect(sent).toHaveTextContent('Solicitud enviada')
+    expect(sent).toBeDisabled()
   })
 
   it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {

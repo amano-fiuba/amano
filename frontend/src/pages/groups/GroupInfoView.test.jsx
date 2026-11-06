@@ -87,10 +87,10 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/Se abandonó el grupo/i)
   })
 
-  it('sugiere asignar otro admin cuando el usuario es último admin (memberCount 1)', async () => {
+  it('avisa al único admin aunque haya otros miembros (isLastAdmin del servidor)', async () => {
     getGroup.mockResolvedValue({
       ok: true,
-      group: { ...GROUP, memberCount: 1 },
+      group: { ...GROUP, memberCount: 4, isLastAdmin: true, isLastMember: false },
     })
 
     renderView()
