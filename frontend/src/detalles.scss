@@ -1,4 +1,5 @@
-// Detalles sobre la estética actual: botones en relieve y patrón de fondo.
+// Detalles sobre la estética actual: botones en relieve, patrón de fondo y los
+// colores del logo. El azul sigue siendo la base; el naranja marca interacción.
 // Se importa después de los estilos de cada pantalla.
 
 $quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete";
@@ -7,19 +8,29 @@ $primarios: "button:not(#{$quietos}, #{$secundarios}), .buttonLink, .home-cta:no
 $tiempo: 120ms;
 
 :root {
+  // Del logo. Sobre naranja el texto va oscuro: el blanco no llega a 3:1.
+  --color-naranja: #f77c42;
+  --color-naranja-claro: #fab370;
+  --color-sobre-naranja: #1c2e45;
+  --color-turquesa: #09a0a2;
   --tecla-luz: color-mix(in srgb, white 28%, transparent);
   --tecla-sombra: color-mix(in srgb, var(--color-texto) 26%, transparent);
   --tecla-borde: color-mix(in srgb, var(--color-texto) 62%, black);
-  --tecla-borde-hover: color-mix(in srgb, var(--color-acento-oscuro) 62%, black);
+  --tecla-borde-hover: var(--color-naranja);
+  --tecla-pulsada: var(--color-naranja);
+  --tecla-pulsada-texto: var(--color-sobre-naranja);
   --tecla-borde-error: color-mix(in srgb, var(--color-error) 62%, black);
-  --color-patron: color-mix(in srgb, var(--color-acento) 20%, transparent);
+  --color-patron: color-mix(in srgb, var(--color-turquesa) 20%, transparent);
 }
 
 :root[data-theme='dark'] {
+  --color-naranja: #fb8f46;
+  --color-sobre-naranja: #161e2a;
+  --color-turquesa: #24a0b3;
   --tecla-luz: color-mix(in srgb, white 45%, transparent);
   --tecla-sombra: color-mix(in srgb, black 55%, transparent);
   --tecla-borde: color-mix(in srgb, var(--color-texto) 58%, black);
-  --color-patron: color-mix(in srgb, var(--color-acento) 13%, transparent);
+  --color-patron: color-mix(in srgb, var(--color-turquesa) 22%, transparent);
 }
 
 // ---- Teclas ----
@@ -42,7 +53,10 @@ $tiempo: 120ms;
   }
 
   &:active:not(:disabled) {
+    border-color: var(--tecla-pulsada);
+    background: var(--tecla-pulsada);
     box-shadow: inset 0 1px 0 var(--tecla-luz), 0 0 0 var(--tecla-actual);
+    color: var(--tecla-pulsada-texto);
     transform: translateY(3px);
   }
 
@@ -56,6 +70,8 @@ $tiempo: 120ms;
 .delete-friend-dialog__confirm {
   --tecla-borde: var(--tecla-borde-error);
   --tecla-borde-hover: var(--tecla-borde-error);
+  --tecla-pulsada: var(--color-error);
+  --tecla-pulsada-texto: var(--color-superficie);
 }
 
 #{$secundarios} {
@@ -68,12 +84,16 @@ $tiempo: 120ms;
     transform $tiempo ease;
 
   &:hover:not(:disabled) {
-    box-shadow: 0 4px 0 var(--color-acento);
+    border-color: var(--color-naranja);
+    box-shadow: 0 4px 0 var(--color-naranja);
     transform: translateY(-1px);
   }
 
   &:active:not(:disabled) {
-    box-shadow: 0 0 0 var(--color-borde);
+    border-color: var(--color-naranja);
+    background: color-mix(in srgb, var(--color-naranja) 22%, var(--color-superficie));
+    box-shadow: 0 0 0 var(--color-naranja);
+    color: var(--color-texto);
     transform: translateY(3px);
   }
 
@@ -87,6 +107,17 @@ button.quick-actions__toggle {
   box-shadow: inset 0 1px 0 var(--tecla-luz), 0 4px 0 var(--tecla-borde), 0 12px 18px -8px var(--tecla-sombra);
   transition: box-shadow $tiempo ease, transform $tiempo ease;
 
+  &:hover {
+    box-shadow: inset 0 1px 0 var(--tecla-luz), 0 4px 0 var(--color-naranja), 0 12px 18px -8px var(--tecla-sombra);
+  }
+
+  &:active,
+  &.is-open,
+  &.is-open:hover {
+    background: var(--color-naranja);
+    color: var(--color-sobre-naranja);
+  }
+
   &:active {
     box-shadow: inset 0 1px 0 var(--tecla-luz), 0 0 0 var(--tecla-borde);
     transform: translateY(4px);
@@ -96,6 +127,10 @@ button.quick-actions__toggle {
 button.app-header__action {
   box-shadow: inset 0 1px 0 var(--tecla-luz), 0 2px 0 color-mix(in srgb, black 28%, transparent);
   transition: box-shadow $tiempo ease, transform $tiempo ease;
+
+  &:hover {
+    box-shadow: inset 0 0 0 2px var(--color-naranja-claro);
+  }
 
   &:active {
     box-shadow: none;
@@ -112,6 +147,35 @@ button.app-header__action {
   }
 }
 
+// AppHeader.scss fija el azul del botón "+" en modo oscuro con más especificidad.
+:root[data-theme='dark'] button.quick-actions__toggle:active,
+:root[data-theme='dark'] button.quick-actions__toggle.is-open,
+:root[data-theme='dark'] button.quick-actions__toggle.is-open:hover {
+  background: var(--color-naranja);
+  color: var(--color-sobre-naranja);
+}
+
+// ---- Detalles en naranja ----
+
+a.app-header__action:hover,
+a.app-header__action.is-active {
+  box-shadow: inset 0 0 0 2px var(--color-naranja-claro);
+}
+
+.app-header__action:hover img,
+.app-header__action.is-active img {
+  box-shadow: 0 0 0 2px var(--color-naranja-claro);
+}
+
+.role-chip--you {
+  background: color-mix(in srgb, var(--color-naranja) 24%, transparent);
+  color: var(--color-texto);
+}
+
+.group-row:hover {
+  border-color: var(--color-naranja);
+}
+
 // ---- Patrón de fondo ----
 // Es una máscara y no una imagen para tomar el color de las variables en
 // ambos temas. Queda detrás de las tarjetas y no recibe clics.
@@ -119,7 +183,7 @@ button.app-header__action {
 @mixin patron {
   background: var(--color-patron);
   content: "";
-  mask: url("./assets/patron-manos.svg") 0 0 / 200px 160px repeat;
+  mask: url("./assets/patron-fondo.svg") 0 0 / 340px 340px repeat;
   pointer-events: none;
 }
 
@@ -148,7 +212,7 @@ body::before {
 @media (max-width: 560px) {
   body::before,
   .home::before {
-    mask-size: 180px 150px;
+    mask-size: 255px 255px;
   }
 }
 
