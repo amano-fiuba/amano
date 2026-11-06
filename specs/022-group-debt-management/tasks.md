@@ -10,10 +10,10 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [ ] T001 Verificar código existente: confirmar que `Debt`, `DebtStatus`, `Payment` con `of()`, `EqualSplit` y `ActivityEventService` ya existen (según verification prerequisites del plan.md)
-- [ ] T002 [P] [US9] Configurar entorno OANDA: añadir credenciales a `.env.example` y Docker Compose para story 9 (multi-currency)
-- [ ] T003 [P] [US9] Crear estructura de paquetes frontend: `src/frontend/components/debts/`, `src/frontend/pages/groups/GroupDebtsView.jsx`
-- [ ] T004 [P] Configurar migraciones Flyway: asegurar que `migrations/` tiene versión base y espacio para 3 migraciones nuevas
+- [X] T001 Verificar código existente: confirmar que `Debt`, `DebtStatus`, `Payment` con `of()`, `EqualSplit` y `ActivityEventService` ya existen (según verification prerequisites del plan.md)
+- [X] T002 [P] [US9] Configurar entorno BCRA: añadir `BCRA_BASE_URL` (API pública, sin credenciales) a `.env.example` y Docker Compose para story 9 (multi-currency)
+- [X] T003 [P] [US9] Crear estructura de paquetes frontend: `frontend/src/components/debts/`, `frontend/src/pages/groups/GroupDebtsView.jsx`
+- [X] T004 [P] Configurar migraciones Flyway: asegurar que `migrations/` tiene versión base y espacio para 3 migraciones nuevas
 
 ---
 ## Phase 2: Foundational (Blocking Prerequisites)
@@ -22,13 +22,13 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 [P] [US1-US9] Añadir campo `primaryCurrency` a entity `Group` y generar migración `groups: debt_due_days + primary_currency`
-- [ ] T006 [P] [US1-US9] Añadir campo `debtDueDays` (Integer, nullable) a entity `Group` y generar migración `groups: debt_due_days`
-- [ ] T007 [P] [US1] Extender enum `DebtStatus` de 3 a 5 estados: `PENDING`, `PAYMENT_REPORTED`, `PAID`, `VERIFIED`, `OVERDUE` con restricción CHECK
-- [ ] T008 [P] [US6] Crear entity `Payment` con campos: `status` (`PENDING`, `REPORTED`, `CONFIRMED`, `REJECTED`), `decided_by_user_id`, `decided_at`, `idempotencyKey` (UUID); restricción única parcial en `payments(debt_id)` para estados activos
-- [ ] T009 [P] [US1] Implementar `BalanceCalculator` como función pura que recibe lista de deudas y devuelve mapa `<memberId, BigDecimal>` con invariante `Σ(balances) == 0`
-- [ ] T010 [P] [US9] Implementar `ConvertingAmount` frontend component that muestra "$50 USD · $925 ARS" cuando la moneda difiere
-- [ ] T011 [P] [US1-US9] Configurar `Clock` inyectable para todos los cálculos de fechas (vencimiento, cotizaciones históricas)
+- [X] T005 [P] [US1-US9] Añadir campo `primaryCurrency` a entity `Group` y migración V17 (con default para grupos existentes)
+- [X] T006 [P] [US1-US9] Añadir campo `debtDueDays` (Integer, nullable) a entity `Group`; la misma V17 agrega la columna una sola vez
+- [X] T007 [P] [US1] Extender enum `DebtStatus` a 6 estados (`PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED`, `PAID`, `VERIFIED`, `OVERDUE`) y recrear los CHECK de `debts`
+- [X] T008 [P] [US6] Extender la entity/tabla existente `Payment`/`payments` con `status`, `decided_by_user_id`, `decided_at` y `legacy`; los pagos existentes quedan `CONFIRMED` + legacy y el índice único parcial por `debt_id` excluye los legacy
+- [X] T009 [P] [US1] Implementar `BalanceCalculator` como función pura que recibe lista de deudas y devuelve mapa `<memberId, BigDecimal>` con invariante `Σ(balances) == 0`
+- [X] T010 [P] [US9] Implementar `ConvertedAmount` frontend component that muestra "$50 USD · $925 ARS" cuando la moneda difiere
+- [X] T011 [P] [US1-US9] Configurar `Clock` inyectable para todos los cálculos de fechas (vencimiento, cotizaciones históricas)
 
 ---
 ## Phase 3: User Story 3 - Ver cálculo automático de deudas (Priority: P1)
@@ -128,12 +128,12 @@
 ## Phase 11: User Story 9 - Operar en varias monedas (Priority: P2)
 
 **Goal**: Verify that expenses in different currencies show both original and converted amounts  
-**Independent Test**: Expense in USD shows "$50 USD - $925 ARS"; exchange rate stored and visible; if OANDA unavailable → 503 error, expense not saved
+**Independent Test**: Expense in USD shows "$50 USD - $925 ARS"; exchange rate stored and visible; if the BCRA API has no quote within 7 days → 503 error, expense not saved
 
 - [ ] T050 [P] [US9] Implementar lógica: si `expense.currency != group.primaryCurrency` → fetch rate; si falla 503 y no guarda gasto
 - [ ] T051 [US9] Probar expense en moneda distinta: muestra monto original + convertido + tasa aplicada
 - [ ] T052 [P] [US9] Probar rate cache: generar mismo expense en misma fecha usa cotización cached (sin segunda API call)
-- [ ] T053 [US9] Probar OANDA unavailable → 503 "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
+- [ ] T053 [US9] Probar BCRA unavailable o sin cotización dentro de 7 días → 503 "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
 - [ ] T054 [P] [US9] Probar misma moneda: tasa 1, sin llamada externa, `convertedAmount` = `amount`
 
 ---

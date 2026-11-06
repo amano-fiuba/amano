@@ -134,4 +134,4 @@ Define the contract for registering, confirming, and rejecting payments against 
 | `debt already has a payment with same idempotency key` | 200 | Returns existing result (no error) |
 | `different key over already-reported debt` | 409 | "Esta deuda ya tiene un pago registrado" |
 | `not admin` | 403 | "Solo los administradores pueden confirmar/rechazar pagos" |
-| `OANDA service unavailable during expense registration (if multi-currency)` | 503 | "No se pudo obtener la cotización; reintente después o registre en moneda del grupo" |
+| `BCRA API unavailable or no quote within 7 days during expense registration (if multi-currency)` | 503 | "No se pudo obtener la cotización; reintente después o registre en moneda del grupo" |

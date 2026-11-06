@@ -10,10 +10,10 @@ La 022 completa el núcleo del producto: a partir de los gastos compartidos de u
 
 1. Saldos netos por miembro derivados de las deudas pendientes (sin tabla de saldos), con la suma del grupo siempre en cero.
 2. Liquidación como módulo de dominio puro con algoritmo voraz (a lo sumo n-1 transferencias), de solo lectura.
-3. Máquina de estados de deuda de 5 estados, con confirmación o rechazo de pagos por un administrador según la casilla "Pagos requieren validación".
+3. Máquina de estados de deuda de 6 estados (`PARTIALLY_PAID` se conserva solo para lectura de datos de la 018), con confirmación o rechazo de pagos por un administrador según la casilla "Pagos requieren validación".
 4. Solo pagos completos, con bloqueo de fila para que dos pagos simultáneos no puedan saldar la misma deuda.
 5. Vencimiento automático mediante una tarea programada idempotente, con umbral configurable por grupo.
-6. Conversión de moneda con cotización de OANDA de la fecha del gasto, detrás de un adaptador, sin inventar nunca una tasa.
+6. Conversión de moneda con cotización oficial del BCRA de la fecha del gasto, detrás de un adaptador, sin inventar nunca una tasa.
 7. Integración con la 020: no se puede abandonar un grupo con deudas pendientes.
 
 Este plan **prevalece** sobre research.md, data-model.md, contracts/ y tasks.md donde se contradigan; la sección *Reconciliación de artefactos* lista cada diferencia.
@@ -22,17 +22,17 @@ Este plan **prevalece** sobre research.md, data-model.md, contracts/ y tasks.md 
 
 **Language/Version**: Java 25 (backend); JavaScript con React 19.2 (frontend)
 
-**Primary Dependencies**: Spring Boot 4.1.1; Maven; React, react-router, Vite. **Sin dependencias nuevas**: el cliente de OANDA usa el `RestClient` de Spring, la tarea programada usa `@Scheduled` y la caché es en memoria acotada (sin Caffeine ni Redis). Las pruebas de propiedades usan JUnit 5 con generadores de semilla fija (ver *Pruebas*).
+**Primary Dependencies**: Spring Boot 4.1.1; Maven; React, react-router, Vite. **Sin dependencias nuevas**: el cliente del BCRA usa el `RestClient` de Spring (con timeouts y reintentos), la tarea programada usa `@Scheduled` y la caché es en memoria acotada (sin Caffeine ni Redis). Las pruebas de propiedades usan JUnit 5 con generadores de semilla fija (ver *Pruebas*).
 
 **Storage**: PostgreSQL con migraciones Flyway en `backend/src/main/resources/db/migration`. Hay migraciones nuevas (ver *Migraciones*); las ya integradas no se editan.
 
-**Testing**: JUnit 5 + Mockito, Spring Boot Test + Testcontainers, Vitest + Testing Library. Umbrales JaCoCo y Vitest ≥ 85 %; no se bajan. CI: `mvn -B verify` y `npm ci && npm run lint && npm run test:coverage && npm run build`. Las pruebas nunca llaman a OANDA: el proveedor de cotizaciones se reemplaza por un doble.
+**Testing**: JUnit 5 + Mockito, Spring Boot Test + Testcontainers, Vitest + Testing Library. Umbrales JaCoCo y Vitest ≥ 85 %; no se bajan. CI: `mvn -B verify` y `npm ci && npm run lint && npm run test:coverage && npm run build`. Las pruebas nunca llaman a la API real del BCRA: el proveedor de cotizaciones se reemplaza por un doble.
 
 **Target Platform**: Servidor Linux vía Docker Compose; navegador web desktop y móvil.
 
 **Project Type**: Aplicación web monorepo (backend REST + frontend SPA).
 
-**Constraints**: mensajes de 010 sin cambios; cambios de contrato solo aditivos; voseo; montos con `BigDecimal` (escala 2, columnas `precision = 11, scale = 2`), sin punto flotante; reloj inyectable (`Clock`) para todo cálculo de fechas; credenciales de OANDA solo por variables de entorno.
+**Constraints**: mensajes de 010 sin cambios; cambios de contrato solo aditivos; voseo; montos con `BigDecimal` (escala 2, columnas `precision = 11, scale = 2`), sin punto flotante; reloj inyectable (`Clock`) para todo cálculo de fechas; `BCRA_BASE_URL` por variable de entorno (la API del BCRA no requiere credenciales).
 
 **Scale/Scope** (estimado): backend con unas 12 clases nuevas (cálculo de saldos, planificador de liquidación, adaptador y caché de cotizaciones, tarea de vencimiento, servicios, controladores y DTOs) y 6 clases modificadas (`Debt`, `DebtStatus`, `GroupExpense`, `Payment`, `GroupExpenseService`, `GroupService.leaveGroup` de la 020), más 3 migraciones; frontend con 1 página y unos 7 componentes nuevos y 4 archivos modificados.
 
@@ -50,9 +50,9 @@ Este plan **prevalece** sobre research.md, data-model.md, contracts/ y tasks.md 
 | VI | Integridad de reglas | PASS con nota | Nunca se inventa una cotización; una deuda solo se salda una vez (bloqueo de fila más índice parcial único); la suma de saldos es cero. La regla de solo pagos completos cambia a la 018 y debe revisarse en el PR |
 | VII | Contratos REST | PASS con nota | Campos y endpoints aditivos; los estados nuevos aparecen en respuestas existentes y el frontend se actualiza en el mismo release |
 | VIII | Validación y errores | PASS | `ProblemDetail`: 400 validación, 403 sin permiso, 404 neutral, 409 transición inválida, 503 cotización no disponible |
-| IX | Seguridad | PASS | El servidor decide siempre; solo miembros ven saldos; confirmar o rechazar pagos es solo para administradores; la clave de OANDA nunca va al repositorio ni a los logs |
+| IX | Seguridad | PASS | El servidor decide siempre; solo miembros ven saldos; confirmar o rechazar pagos es solo para administradores; no hay credenciales del BCRA y la URL base va por variable de entorno |
 | X | Código mantenible | PASS | Nombres de enum en inglés como el código existente; etiquetas en español solo en el frontend |
-| XI | Entorno reproducible | PASS con nota | Propiedades nuevas (`amano.exchange.oanda.*`, programación) en `.env.example` y Docker Compose; migraciones versionadas |
+| XI | Entorno reproducible | PASS con nota | Propiedades nuevas (`amano.exchange.bcra.*`, programación) en `.env.example` y Docker Compose; migraciones versionadas |
 | XII | Revisión por pares | PENDIENTE (posterior) | PR aún no abierto |
 | XIII | Commits y trazabilidad | PENDIENTE (posterior) | Conventional Commits al implementar |
 
@@ -68,7 +68,7 @@ research.md describe el código existente, pero no lo prueba. Antes de implement
 4. Si existen gastos o deudas en una moneda distinta a la del grupo (no se pueden convertir retroactivamente sin tasa).
 5. Si `@EnableScheduling` ya está activo y cómo se configura la zona horaria.
 6. Qué hacen hoy la edición y el borrado de gastos y el pago parcial (018).
-7. Que hay credencial de OANDA disponible. Sin ella, la historia 9 queda bloqueada.
+7. Confirmar con una consulta real a la API pública del BCRA la forma de la respuesta de Estadísticas Cambiarias v1.0 y qué campo de cotización se usa (USD y EUR contra ARS).
 
 ## Decisiones de diseño
 
@@ -76,28 +76,32 @@ research.md describe el código existente, pero no lo prueba. Antes de implement
 
 **D2. Dinero y redondeo.** `BigDecimal` con escala 2, comparación con `compareTo`. En el reparto, cada parte de los demás participantes se redondea al centavo (`HALF_UP`) y el **pagador absorbe la diferencia** (clarificación Q1): su parte es total menos la suma de las demás. Los importes personalizados deben sumar exactamente el total y los porcentajes exactamente 100.
 
-**D3. Estados de deuda.** Se conservan los nombres en inglés del código: `PENDING` (Pendiente), `PAYMENT_REPORTED` (Pago informado), `PAID` (Pagado), `VERIFIED` (Verificado), `OVERDUE` (Vencido). `PENDING` y `PAID` ya existen, por lo que no hace falta renombrar datos.
+**D3. Estados de deuda.** Se conservan los nombres en inglés del código: `PENDING` (Pendiente), `PARTIALLY_PAID` (Pago parcial, solo lectura), `PAYMENT_REPORTED` (Pago informado), `PAID` (Pagado), `VERIFIED` (Verificado), `OVERDUE` (Vencido). `PENDING`, `PARTIALLY_PAID` y `PAID` ya existen, por lo que no hace falta renombrar datos. `PARTIALLY_PAID` se conserva únicamente para poder leer deudas de la 018; la 022 nunca lo produce.
 
 | Desde | Hacia | Condición |
 |-------|-------|-----------|
 | (alta) | `PENDING` | Toda deuda nueva |
-| `PENDING` u `OVERDUE` | `PAID` | Se registra un pago completo y el grupo **no** requiere validación |
-| `PENDING` u `OVERDUE` | `PAYMENT_REPORTED` | Se registra un pago completo y el grupo requiere validación |
+| `PENDING`, `OVERDUE` o `PARTIALLY_PAID` | `PAID` | Se registra un pago por el saldo restante completo y el grupo **no** requiere validación |
+| `PENDING`, `OVERDUE` o `PARTIALLY_PAID` | `PAYMENT_REPORTED` | Se registra un pago por el saldo restante completo y el grupo requiere validación |
 | `PAYMENT_REPORTED` | `VERIFIED` | Un administrador confirma el pago |
 | `PAYMENT_REPORTED` | `PENDING` | Un administrador rechaza el pago |
-| `PENDING` | `OVERDUE` | La tarea programada detecta la deuda vencida (D7) |
+| `PENDING` | `OVERDUE` | La tarea programada detecta la deuda vencida (D7); `PARTIALLY_PAID` no pasa a `OVERDUE` |
 
-`PAID` y `VERIFIED` son estados finales y equivalentes para el saldo (Q7). El historial conserva el camino recorrido.
+`PAID` y `VERIFIED` son estados finales y equivalentes para el saldo (Q7). `PAYMENT_REPORTED` no se considera saldado hasta que un administrador lo confirme. El historial conserva el camino recorrido.
+
+La restricción `ck_debts_status` de V13 se elimina y se recrea con los seis valores; `ck_debts_status_matches_paid` también se recrea para admitir los estados nuevos sin romper las filas `PARTIALLY_PAID` existentes.
 
 **D4. Saldos derivados.** No hay tabla de saldos. Una deuda está **pendiente de saldar** en `PENDING`, `PAYMENT_REPORTED` y `OVERDUE`; está **saldada** en `PAID` y `VERIFIED`. Como solo se aceptan pagos completos, `paidAmount` vale 0 o el monto total, y la deuda pendiente aporta `amount − paidAmount` con el `getOutstanding()` existente. El saldo neto de un miembro es la suma de lo que le deben menos la suma de lo que debe, dentro del grupo, incluidas las personas simuladas. La suma de saldos del grupo es siempre 0. El cálculo es una función pura (`BalanceCalculator`) que recibe deudas y devuelve saldos; se evalúa en cada consulta.
 
 **D5. Liquidación.** `SettlementPlanner` es puro y recibe los saldos netos. Mientras haya saldos distintos de cero, toma el mayor acreedor y el mayor deudor (desempate por identificador, para que el resultado sea reproducible), transfiere el menor de los dos montos y repite. Cada paso deja al menos a un miembro en cero y el último deja a dos, por lo que hay **a lo sumo n-1 transferencias** (n = miembros con saldo distinto de cero). El mínimo absoluto es un problema NP-difícil y no se busca. Invariantes: el total transferido es la suma de los saldos positivos (no la suma bruta de deudas, que es mayor cuando hay deudas cruzadas), aplicar la propuesta deja a todos en cero y el cálculo no modifica gastos ni deudas.
 
-**D6. Pagos y concurrencia.** Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo pesimista de la fila de la deuda** (`PESSIMISTIC_WRITE`). La misma clave de idempotencia devuelve el pago existente (patrón actual); una clave distinta sobre una deuda ya informada o saldada responde 409. Un índice único parcial en `payments(debt_id)` para pagos activos (`REPORTED`, `CONFIRMED`) garantiza en la base que una deuda se salda una sola vez. Un pago menor al monto de la deuda se rechaza (400).
+**D6. Pagos y concurrencia.** Se **extiende la entidad y la tabla existentes** (`com.amano.backend.payment.Payment`, tabla `payments`, V14) con `ALTER TABLE`; no se crea otra clase ni otra tabla. La 018 sigue siendo dueña del flujo de registro. Las columnas nuevas son `status` (`PENDING`, `REPORTED`, `CONFIRMED`, `REJECTED`), `decided_by_user_id`, `decided_at` y `legacy`. Los pagos ya existentes se rellenan con `status = 'CONFIRMED'` y `legacy = TRUE`; los pagos nuevos son `legacy = FALSE`. Un índice único parcial sobre `payments(debt_id)` para pagos activos (`status IN ('REPORTED', 'CONFIRMED')`) **excluye los legacy**, de modo que no choca con los pagos parciales históricos de la 018 ni con los que esa feature genere mientras siga vigente su semántica anterior.
+
+Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo pesimista de la fila de la deuda** (`PESSIMISTIC_WRITE`). La misma clave de idempotencia devuelve el pago existente (patrón actual); una clave distinta sobre una deuda ya informada o saldada responde 409. Un pago menor al saldo restante se rechaza (400): solo se aceptan pagos completos. Al confirmar un pago `REPORTED`, la deuda pasa a `VERIFIED`; al rechazarlo, el pago queda `REJECTED` y la deuda vuelve a `PENDING` (o a `OVERDUE` en la próxima ejecución de D7 si ya estaba vencida).
 
 **D7. Vencimiento.** El grupo tiene `debtDueDays` (entero, nulo por defecto; nulo significa que nunca vence). Una tarea `@Scheduled` diaria, con `Clock` inyectado, pasa a `OVERDUE` las deudas `PENDING` cuya fecha de gasto más `debtDueDays` ya pasó. Es idempotente (actualización masiva con condición de estado) y segura con varias instancias. Una deuda vencida **sigue siendo saldo** y se puede pagar. Un rechazo devuelve la deuda a `PENDING`, y si ya está vencida la próxima ejecución la vuelve a `OVERDUE`.
 
-**D8. Cotizaciones.** `ExchangeRateProvider` es una interfaz de dominio, con `OandaExchangeRateClient` (infraestructura) y una caché decoradora en memoria acotada, por (par, fecha). Una cotización histórica no cambia, así que no hay TTL ni "tasa vieja". La conversión se aplica **una sola vez al total del gasto**; el reparto y las deudas se calculan sobre el monto convertido, en la moneda del grupo. En el gasto se guardan moneda y monto originales, monto convertido, tasa, fecha y fuente de la tasa. Si OANDA no responde tras los reintentos y la tasa no está en caché, **el gasto no se guarda**: 503 con mensaje en voseo que sugiere registrarlo en la moneda del grupo o reintentar. No existe tasa "por defecto". Misma moneda: tasa 1 y sin llamada externa.
+**D8. Cotizaciones.** `ExchangeRateProvider` es una interfaz de dominio, con `BcraExchangeRateClient` (infraestructura) detrás y una caché decoradora en memoria acotada, por (par, fecha). El cliente usa el `RestClient` de Spring, con timeouts y reintentos, sin dependencias nuevas. La API pública del BCRA, Estadísticas Cambiarias v1.0 (`/estadisticascambiarias/v1.0/Cotizaciones?fecha=YYYY-MM-DD` y `/Cotizaciones/{moneda}?fechadesde=...&fechahasta=...`), no requiere credenciales ni registro y devuelve la cotización de cada moneda contra el peso: USD y EUR contra ARS salen directo; USD↔EUR se calcula cruzando por ARS con `BigDecimal`, sin punto flotante. Si la fecha no tiene cotización (fin de semana o feriado), se usa la del último día hábil anterior, hasta 7 días hacia atrás; si no hay ninguna, el gasto se rechaza con 503 y **no se guarda**. Una cotización histórica no cambia, así que no hay TTL ni "tasa vieja". La conversión se aplica **una sola vez al total del gasto**; el reparto y las deudas se calculan sobre el monto convertido, en la moneda del grupo. En el gasto se guardan moneda y monto originales, monto convertido, tasa, fecha y fuente de la tasa: `rate_source = 'BCRA'` y `rate_date` con la fecha de la cotización efectivamente usada, no la del gasto. **No existe tasa por defecto ni carga manual de la tasa**: no se registra con la moneda original como alternativa. Misma moneda: tasa 1 y sin llamada externa.
 
 **D9. Gastos inmutables.** Un gasto con participantes además del pagador no se edita ni se elimina (Q4, 409 con mensaje). Un gasto personal (sin participantes) sí puede eliminarse.
 
@@ -109,7 +113,7 @@ research.md describe el código existente, pero no lo prueba. Antes de implement
 2. **Personas simuladas.** FR-003 y SC-001 las incluyen en los saldos, pero la clarificación Q6 dice que "no tienen obligación financiera". Hay que decidir si entran en la propuesta como origen o destino (marcadas como informativas), quién registra sus pagos y si pueden figurar como pagador de un gasto (hoy el acreedor es siempre un usuario registrado).
 3. **Alcance del vencimiento.** La clarificación dice umbral por grupo, pero también que solo vencen los gastos recurrentes. Este plan implementa el umbral por grupo para cualquier gasto; hay que confirmar si se restringe a recurrentes y qué mensaje ve el usuario.
 4. **"Pendiente" incluye "Vencido".** Se interpreta que se puede pagar una deuda `OVERDUE`; la spec dice solo "pendiente" y sería absurdo impedirlo. Confirmar.
-5. **Pagos parciales ya existentes (018).** Si hay filas `PARTIALLY_PAID` o pagos parciales registrados, hay que definir su migración. No se asume nada.
+5. **Pagos parciales ya existentes (018).** Resuelto: `PARTIALLY_PAID` y los pagos parciales históricos se conservan para lectura; se marcan `legacy` y quedan fuera del índice único parcial. La 022 solo acepta pagos por el saldo restante completo.
 6. **Cotización no disponible.** Se rechaza el gasto (D8). Confirmar que esa es la política, en vez de permitir cargar la tasa a mano.
 
 ## Project Structure
@@ -131,7 +135,7 @@ specs/022-group-debt-management/
 
 ```text
 backend/src/main/java/com/amano/backend/groupexpense/
-├── Debt.java, DebtStatus.java, GroupExpense.java, Payment.java   # modificados
+├── Debt.java, DebtStatus.java, GroupExpense.java   # modificados
 ├── GroupExpenseService.java        # modificado: redondeo (D2), conversión (D8), inmutabilidad (D9)
 ├── balance/                        # nuevo, dominio puro
 │   ├── MemberRef.java, MemberBalance.java
@@ -143,16 +147,19 @@ backend/src/main/java/com/amano/backend/groupexpense/
 │   └── PaymentValidationService.java   # registrar, confirmar, rechazar (D6)
 ├── exchange/                       # nuevo
 │   ├── ExchangeRateProvider.java       # interfaz de dominio
-│   ├── OandaExchangeRateClient.java    # infraestructura (RestClient)
+│   ├── BcraExchangeRateClient.java     # infraestructura (RestClient)
 │   └── CachingExchangeRateProvider.java
 ├── overdue/
 │   └── OverdueDebtJob.java         # nuevo (D7)
 └── api/                            # controladores y DTOs nuevos, según convención existente
 
-backend/src/main/java/com/amano/backend/groups/
-└── GroupService.java               # modificado: leaveGroup consulta saldo pendiente (D10)
+backend/src/main/java/com/amano/backend/payment/
+└── Payment.java, PaymentStatus.java   # extendidos: status, decisión, legacy (D6)
 
-backend/src/main/resources/db/migration/    # 3 migraciones nuevas
+backend/src/main/java/com/amano/backend/groups/
+└── Group.java, GroupService.java     # Group extendido; leaveGroup consulta saldo pendiente (D10)
+
+backend/src/main/resources/db/migration/    # V17, V18 y V19 nuevas
 backend/src/test/java/com/amano/backend/groupexpense/   # pruebas espejo
 
 frontend/src/
@@ -183,9 +190,13 @@ frontend/src/
 
 ## Migraciones
 
-1. `debts`: nuevos valores de estado (y su restricción, si existe), columna `overdue_at`.
-2. `group_expenses`: `converted_amount`, `exchange_rate` (decimal con 6 decimales como mínimo), `rate_date`, `rate_source`; relleno de `converted_amount = amount` donde la moneda coincide con la del grupo.
-3. `payments`: `status` (`REPORTED`, `CONFIRMED`, `REJECTED`), `decided_by_user_id`, `decided_at`, índice único parcial por `debt_id` para pagos activos. `groups`: `debt_due_days` (y moneda principal si faltara).
+Son tres migraciones nuevas, versionadas e inmutables una vez integradas:
+
+1. **V17 — `groups`**: `primary_currency VARCHAR(3) NOT NULL DEFAULT 'ARS'` (los grupos existentes quedan en ARS; el valor es explícito y no se infiere de otra tabla) y `debt_due_days INTEGER NULL` (NULL = nunca vence; la columna se agrega una sola vez). Se agregan los `CHECK` de moneda y de `debt_due_days >= 0`.
+2. **V18 — `debts` y `payments`**: se elimina y recrea `ck_debts_status` con `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED`, `PAID`, `VERIFIED`, `OVERDUE`; se recrea `ck_debts_status_matches_paid` para que `PAYMENT_REPORTED` y `VERIFIED` no violen la restricción y para conservar las filas `PARTIALLY_PAID`; se recrean los índices parciales `ix_debts_open_*` excluyendo `PAID` y `VERIFIED`. Sobre `payments` se agregan por `ALTER TABLE` las columnas `status`, `decided_by_user_id`, `decided_at` y `legacy`; se rellenan las filas existentes con `status = 'CONFIRMED'` y `legacy = TRUE`; se crea el índice único parcial `uq_payments_active_debt ON payments (debt_id) WHERE legacy = FALSE AND status IN ('REPORTED', 'CONFIRMED')`.
+3. **V19 — `group_expenses`**: `converted_amount`, `exchange_rate` (escala 8), `rate_date` y `rate_source`; se rellena `converted_amount = amount`, `exchange_rate = 1`, `rate_date = expense_date` y `rate_source = 'SAME_CURRENCY'` donde la moneda del gasto coincide con la del grupo.
+
+No se edita V13 ni V14 (ya integradas).
 
 ## Diseño del frontend
 

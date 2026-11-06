@@ -198,7 +198,7 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 
 - Los usuarios ya tienen cuentas, amistades y grupos configurados (la gestión de esas entidades es otra feature).
 - Las personas simuladas son cargadas manualmente por nombre y mail y no tienen acceso a la aplicación.
-- La cotización de divisas se obtiene de una fuente externa o se fija manualmente en el momento de la transacción; el sistema no sincroniza cotizaciones en tiempo real.
+- La fuente de cotizaciones es el tipo de cambio oficial del BCRA (API pública Estadísticas Cambiarias v1.0, sin credenciales). Este diseño reemplaza a OANDA, mencionado en el backlog original, y el cambio está pendiente de confirmar con el Product Owner. No se fija la tasa manualmente ni se usa una tasa por defecto: si no hay cotización disponible (incluidos fines de semana y feriados, con hasta 7 días hacia atrás), el gasto se rechaza con 503 y no se guarda.
 - Un "Administrador de grupo" es un miembro con permisos especiales para validar o rechazar pagos cuando la configuración "Pagos requiere validación" está activada.
 - Los gastos recurrentes (tipo "recurrente") se manejan según lo definido en la spec 009 (Pausa o finalización de gasto recurrente): la entidad Expense y su lógica de recurrencia ya existen en ese feature. Para la feature 022, los gastos recurrentes requieren una frecuencia (Semanal, Mensual o Anual) y generan sus repeticiones de forma automática, tal como quedó definido en la spec 009. La simplificación de deudas aplica sobre el saldo actual después de cada registro.
 - La moneda principal de un grupo se define cuando se crea el grupo y puede ser ARS, USD o EUR.

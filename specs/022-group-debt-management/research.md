@@ -179,50 +179,59 @@ PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
 
 **Rationale**: Reusing existing idempotency key pattern from group expenses. No new infrastructure needed.
 
-### 7. OANDA Exchange Rate Adapter ⚠️ NEW - NEEDS DESIGN
+### 7. BCRA Exchange Rate Adapter ✅ RESOLVED (implementation deferred to US9)
 
-**Design Decision**: "Cotizaciones OANDA: detrás de un adaptador, con cache por (par, fecha) y comportamiento definido si el servicio no responde. **Sin tasa por defecto, sin TTL.**"
+**Design Decision**: "Cotizaciones del BCRA: detrás de un adaptador, con cache por (par, fecha) y comportamiento definido si el servicio no responde. **Sin tasa por defecto, sin TTL.**"
 
 **Findings**:
 - No existing exchange rate service or adapter in the codebase
 - No external API calls for rates found
 - The project uses `Currency` enum with ARS, USD, EUR only
-- No existing HTTP client configuration found
+- No existing HTTP client configuration found; the implementation uses Spring's `RestClient` with timeouts and retries, adding no new dependencies
 
 **Required Design**:
-1. Create `ExchangeRateService` interface/adaptor:
+1. `BcraExchangeRateClient` implements the domain `ExchangeRateProvider` interface:
    - Method: `getRate(Currency from, Currency to, LocalDate date) -> BigDecimal`
-   - Cache: `Map<String, BigDecimal>` keyed by `from-to-date` or use Caffeine/Redis
-   - Fallback behavior when service doesn't respond:
-     - Return cached rate if available (stale is better than none)
-     - Or throw specific exception that caller must handle
-     - **No default rate**; if OANDA unavailable and no cache → expense not saved (503)
+   - Public API, no credentials or registration:
+     - `https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones?fecha=YYYY-MM-DD`
+     - `https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/{moneda}?fechadesde=...&fechahasta=...`
+   - The response gives each currency's quote against the peso: USD→ARS and EUR→ARS come directly; USD↔EUR is crossed through ARS with `BigDecimal` (no floating point)
+   - `BCRA_BASE_URL` is configurable by environment variable with default `https://api.bcra.gob.ar`
 
 2. Cache strategy:
    - Key: `"{from}-{to}-{date}"` (e.g., "USD-ARS-2026-01-15")
    - **No TTL** - rates are historical, same date always has same rate
-   - On cache miss → fetch from external service
-   - On service failure → if cached rate exists (any age), use it with warning; otherwise throw 503
+   - On cache miss → fetch from the BCRA API
+   - On service failure → if a cached rate exists, use it; otherwise throw 503
    - **No "stale data" concept** - rates for a given date are deterministic
 
-3. Exchange rate storage (per feature decision):
+3. Weekend and holiday handling:
+   - If the requested date has no quote, use the most recent previous business day, up to 7 days back
+   - If no quote is found in that window → **expense not saved (503)**
+   - The `rate_date` stored is the date of the quote actually used, not the expense date
+
+4. Exchange rate storage (per feature decision):
    - Store original currency, original amount, converted amount, and applied rate
+   - `rate_source = 'BCRA'` and `rate_date` = effective quote date
    - Per the design decision: "Guardar siempre moneda original, monto original, monto convertido y tasa aplicada"
 
 **Example Data Flow**:
 ```
-Expense in USD 50, group primary currency ARS, date 2026-01-15
-→ Fetch rate USD→ARS for 2026-01-15 (e.g., 18.50)
-→ Store: {currency: USD, amount: 50, convertedAmount: 925.0, rate: 18.50}
+Expense in USD 50, group primary currency ARS, date 2026-01-18 (Sunday)
+→ Fetch the latest BCRA quote on or before 2026-01-18
+  (e.g., Friday 2026-01-16: 18.50)
+→ Store: {currency: USD, amount: 50, convertedAmount: 925.00, rate: 18.50,
+          rateDate: 2026-01-16, rateSource: "BCRA"}
 → Display: "$50 USD - $925 ARS"
 ```
 
 **Fallback Behavior**:
-- If OANDA service unavailable and no cache → **expense not saved (503)**, message: "No se pudo obtener la cotización; registre el gasto en la moneda del grupo o reintente después"
+- If the BCRA API does not respond after retries and the rate is not cached → **expense not saved (503)**, message: "No se pudo obtener la cotización; registre el gasto en la moneda del grupo o reintente después"
+- If the requested date is a weekend or holiday → use the last business day's quote within 7 days
 - If cache hit → use it (no staleness concern for historical rates)
-- Log all fallback usage for monitoring
+- Tests never call the real BCRA API: they use a double of `ExchangeRateProvider`
 
-**Rationale**: Follows the design decision explicitly. Creates a clear contract for currency conversion that can be implemented/replaced later. No default rate - the group must always have a valid rate or the expense cannot be registered.
+**Rationale**: Uses the official BCRA rate, which is public and free. Creates a clear contract for currency conversion to be implemented in US9. No default rate - the group must always have a valid rate or the expense cannot be registered.
 
 ### 8. API Data Model Contracts ✅ RESOLVED (PARTIAL)
 

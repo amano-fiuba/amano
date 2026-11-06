@@ -130,14 +130,17 @@ mvn flyway:migrate
 1. Ensure the group's primary currency is `ARS`
 2. Register a new expense with currency `USD`
 3. Enter amount: `50`
-4. Enter date: `2026-01-15` (a date with a known/exchange rate)
+4. Enter date: `2026-01-15` (a business day with an official BCRA quote)
 5. Submit the expense
 6. **Expected outcomes**:
-   - Expense displays: `"$50 USD - $925 ARS"` (example, depending on the rate)
+   - Expense displays: `"$50 USD - $925 ARS"` (example, depending on the BCRA rate)
    - The expense detail shows: `monto original: $50 USD` and `monto convertido: $925 ARS`
    - The applied exchange rate (e.g., 18.50) is stored and visible
+   - `rateSource` is `BCRA` and `rate_date` is the date of the quote actually used
    - Group balance calculation includes both the original and converted amounts correctly
-7. **Rate cache test**: Generate the same expense again on the same date; the system should use the cached rate (no second API call)
+7. **Weekend/holiday test**: Register an expense on a Sunday; the system uses the previous business day's BCRA quote (up to 7 days back) and stores that date as `rate_date`
+8. **No quote test**: If the BCRA API has no quote within 7 days, the expense is rejected with 503 and is not saved
+9. **Rate cache test**: Generate the same expense again on the same date; the system should use the cached rate (no second BCRA API call)
 
 ### Scenario 5: Simulated Person in Debt Calculation
 
