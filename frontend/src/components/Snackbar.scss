@@ -14,7 +14,7 @@
   padding: 0.75rem 1rem;
   border: 1px solid color-mix(in srgb, var(--color-oliva) 45%, var(--color-borde));
   border-left: 0.3rem solid var(--color-oliva);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
   box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
   color: var(--color-texto);

@@ -244,16 +244,40 @@ class FriendListIT {
     }
 
     @Test
-    void unrelatedAccountsAndPendingRequestsCannotSeeTheAvatar() throws Exception {
+    void unrelatedAccountsCannotSeeTheAvatar() throws Exception {
         long me = verified("Ajena", "Diez");
         long stranger = verified("Extrana", "Diez");
-        long pending = verified("Pendiente", "Diez");
-        request(pending, me, "PENDING", null);
         avatar(stranger);
-        avatar(pending);
 
         avatarAs(me, stranger).andExpect(status().isNotFound());
-        avatarAs(me, pending).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aPendingRequestShowsTheSenderToTheRecipientOnly() throws Exception {
+        long recipient = verified("Destino", "Once");
+        long sender = verified("Remitente", "Once");
+        request(sender, recipient, "PENDING", null);
+        avatar(sender);
+        avatar(recipient);
+
+        avatarAs(recipient, sender).andExpect(status().isOk());
+        avatarAs(sender, recipient).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theInboxCarriesTheSenderAvatarUrl() throws Exception {
+        long recipient = verified("Bandeja", "Doce");
+        long withPhoto = verified("Aconfoto", "Doce");
+        long withoutPhoto = verified("Bsinfoto", "Doce");
+        request(withoutPhoto, recipient, "PENDING", null);
+        request(withPhoto, recipient, "PENDING", null);
+        avatar(withPhoto);
+
+        mockMvc.perform(get("/api/users/me/friendship-requests/received")
+                .cookie(new Cookie("amano_auth", jwtService.issueToken(recipient))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.sender.id == %s)].sender.avatarUrl", withPhoto)
+                        .value("/api/users/" + withPhoto + "/avatar"));
     }
 
     // ---- US3 ----

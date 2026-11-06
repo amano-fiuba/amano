@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import MainPage from './pages/MainPage'
 import SettingsPage from './pages/SettingsPage'
 import FaqPage from './pages/FaqPage'
+import ActivityPage from './pages/ActivityPage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import CheckEmailPage from './pages/CheckEmailPage'
@@ -168,6 +169,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activity"
+        element={
+          <ProtectedRoute>
+            <ActivityPage />
           </ProtectedRoute>
         }
       />

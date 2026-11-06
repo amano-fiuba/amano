@@ -183,7 +183,7 @@ export default function FriendsPage() {
                 >
                   <img
                     className="friend-request-card__avatar"
-                    src={DEFAULT_AVATAR}
+                    src={request.sender.avatarUrl || DEFAULT_AVATAR}
                     alt=""
                     width={44}
                     height={44}

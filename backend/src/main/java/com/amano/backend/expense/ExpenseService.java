@@ -81,6 +81,14 @@ public class ExpenseService {
                 .toList();
     }
 
+    /** Personal activity screen: the user's last 200 expenses, newest first. */
+    @Transactional(readOnly = true)
+    public List<ExpenseResponse> listHistory(Long userId) {
+        return expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
+                .map(ExpenseResponse::from)
+                .toList();
+    }
+
     /**
      * Validates and normalizes the whole payload, replays an existing operation of
      * the same user/key or persists a new expense linked to {@code userId}.

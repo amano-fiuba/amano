@@ -7,6 +7,8 @@ import {
 import { useDismiss } from '../hooks/useDismiss'
 import { BellIcon } from './NavIcons'
 
+const DEFAULT_AVATAR = '/avatar-default.png'
+
 export const NO_NOTIFICATIONS_MESSAGE = 'No tenés notificaciones'
 export const NOTIFICATIONS_ERROR_MESSAGE = 'No se pudieron cargar tus notificaciones'
 
@@ -84,9 +86,17 @@ export default function NotificationsMenu() {
           {requests.length > 0 && (
             <ul>
               {requests.map((request) => (
-                <li key={request.id}>
-                  <strong>{senderName(request.sender)}</strong> te envió una solicitud de
-                  amistad
+                <li key={request.id} className="app-notification">
+                  <img
+                    src={request.sender.avatarUrl || DEFAULT_AVATAR}
+                    alt=""
+                    width={36}
+                    height={36}
+                  />
+                  <span>
+                    <strong>{senderName(request.sender)}</strong> te envió una solicitud de
+                    amistad
+                  </span>
                 </li>
               ))}
             </ul>

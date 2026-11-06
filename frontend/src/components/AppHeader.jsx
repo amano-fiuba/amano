@@ -3,7 +3,7 @@ import { useAuth } from '../auth/AuthContext'
 import { userAvatarUrl } from '../auth/userAvatar'
 import GlobalSearch from './GlobalSearch'
 import NotificationsMenu from './NotificationsMenu'
-import { FriendsIcon, HelpIcon, SettingsIcon } from './NavIcons'
+import { ActivityIcon, FriendsIcon, GroupsIcon, HelpIcon, SettingsIcon } from './NavIcons'
 import './AppHeader.scss'
 
 const linkClass = ({ isActive }) =>
@@ -18,7 +18,7 @@ function ActionLink({ to, label, children }) {
 }
 
 // Barra superior con sesión (specs/015-main-screen, US2): logo, buscador y
-// accesos a perfil, amigos, notificaciones, FAQ y ajustes.
+// accesos a perfil, grupos, actividad, amigos, notificaciones, FAQ y ajustes.
 export default function AppHeader() {
   const { user } = useAuth()
 
@@ -34,6 +34,12 @@ export default function AppHeader() {
       <nav className="app-header__actions" aria-label="Navegación principal">
         <ActionLink to="/profile" label="Mi perfil">
           <img src={userAvatarUrl(user)} alt="" width={40} height={40} />
+        </ActionLink>
+        <ActionLink to="/groups" label="Mis grupos">
+          <GroupsIcon />
+        </ActionLink>
+        <ActionLink to="/activity" label="Actividad personal">
+          <ActivityIcon />
         </ActionLink>
         <ActionLink to="/friends" label="Amigos">
           <FriendsIcon />

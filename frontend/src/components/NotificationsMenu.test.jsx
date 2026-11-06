@@ -34,6 +34,24 @@ beforeEach(() => {
 })
 
 describe('NotificationsMenu (015, US2)', () => {
+  it('muestra la foto de quien envía o el avatar por defecto', async () => {
+    const user = userEvent.setup()
+    listReceivedFriendshipRequests.mockResolvedValue({
+      ok: true,
+      requests: [
+        { id: 1, sender: { firstName: 'Ana', lastName: null, avatarUrl: '/api/users/4/avatar' } },
+        { id: 2, sender: { firstName: 'Bruno', lastName: null, avatarUrl: null } },
+      ],
+    })
+    renderMenu()
+
+    await user.click(await screen.findByRole('button', { name: /Notificaciones, 2 sin leer/ }))
+
+    const [ana, bruno] = screen.getAllByRole('listitem')
+    expect(ana.querySelector('img')).toHaveAttribute('src', '/api/users/4/avatar')
+    expect(bruno.querySelector('img')).toHaveAttribute('src', '/avatar-default.png')
+  })
+
   it('indica la cantidad y lista las solicitudes con acceso a Amigos', async () => {
     listReceivedFriendshipRequests.mockResolvedValue({
       ok: true,
