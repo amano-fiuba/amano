@@ -108,6 +108,59 @@ class GroupRealFriendshipIT {
                 .content("{\"memberType\": \"REGISTERED\", \"identifier\": \"" + email + "\"}"));
     }
 
+    /** 023 US5: several friends and simulated profiles in one creation. */
+    @Test
+    void aGroupCanBeCreatedWithSeveralMembers() throws Exception {
+        Cookie ana = verifiedSessionOf("ana.varios@example.com", "Ana");
+        Cookie beto = verifiedSessionOf("beto.varios@example.com", "Beto");
+        Cookie caro = verifiedSessionOf("caro.varios@example.com", "Caro");
+        respond(beto, sendRequest(ana, "beto.varios@example.com"), "ACCEPT");
+        respond(caro, sendRequest(ana, "caro.varios@example.com"), "ACCEPT");
+
+        String body = mockMvc.perform(post("/api/groups").cookie(ana)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name": "Viaje", "members": [
+                          {"memberType": "REGISTERED", "identifier": "beto.varios@example.com"},
+                          {"memberType": "REGISTERED", "identifier": "caro.varios@example.com"},
+                          {"memberType": "SIMULATED", "identifier": "abuela@example.com", "name": "Abuela"}
+                        ]}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.membersCount").value(4))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/members").cookie(caro))
+                .andExpect(status().isOk());
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = 'MEMBER_ADDED'",
+                Long.class, groupId)).isEqualTo(3L);
+    }
+
+    /** 023 SC-007: one rejected member leaves no rows behind. */
+    @Test
+    void aRejectedMemberLeavesNothingInTheDatabase() throws Exception {
+        Cookie ana = verifiedSessionOf("ana.rechazo@example.com", "Ana");
+        Cookie beto = verifiedSessionOf("beto.rechazo@example.com", "Beto");
+        verifiedSessionOf("extra.rechazo@example.com", "Extra");
+        respond(beto, sendRequest(ana, "beto.rechazo@example.com"), "ACCEPT");
+        long groupsBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups", Long.class);
+
+        mockMvc.perform(post("/api/groups").cookie(ana)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"name": "Viaje", "members": [
+                          {"memberType": "REGISTERED", "identifier": "beto.rechazo@example.com"},
+                          {"memberType": "REGISTERED", "identifier": "extra.rechazo@example.com"}
+                        ]}
+                        """))
+                .andExpect(status().isNotFound());
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups", Long.class))
+                .isEqualTo(groupsBefore);
+    }
+
     @Test
     void acceptedFriendCanBeSearchedAndAddedButPendingCannot() throws Exception {
         Cookie ana = verifiedSessionOf("ana.real@example.com", "Ana");

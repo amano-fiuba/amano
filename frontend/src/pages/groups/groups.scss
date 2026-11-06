@@ -873,3 +873,155 @@
     grid-template-columns: 1fr;
   }
 }
+
+// Crear grupo: lista de amigos con casillas (spec 023 US5)
+@media (max-width: 720px) {
+  // Deja "Crear grupo" por encima del botón flotante al llegar al final.
+  .page.create-group {
+    margin-bottom: 6rem;
+  }
+}
+
+.create-group__members {
+  display: grid;
+  gap: 0.75rem;
+
+  label {
+    margin-right: 0;
+  }
+
+  .group-action {
+    justify-self: start;
+  }
+}
+
+.friend-picker {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.friend-picker__filter {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--color-texto-suave);
+
+  input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-control);
+    background: var(--color-superficie);
+    color: var(--color-texto);
+    font: inherit;
+  }
+}
+
+.friend-picker__list {
+  display: grid;
+  gap: 0.35rem;
+  max-height: 15rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.friend-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-naranja);
+  }
+
+  &.is-selected {
+    background: var(--color-superficie-fuerte);
+    border-color: var(--color-acento);
+  }
+
+  input {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0;
+    accent-color: var(--color-acento);
+  }
+
+  img {
+    flex: 0 0 auto;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+}
+
+.friend-picker__identity {
+  display: grid;
+  min-width: 0;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: var(--color-texto-suave);
+    font-size: 0.82rem;
+  }
+}
+
+.friend-picker__status {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--color-texto-suave);
+}
+
+.create-group__profiles {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-control);
+  }
+}
+
+.create-group__simulated {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.create-group__count {
+  margin: 0;
+  color: var(--color-texto-suave);
+  font-size: 0.88rem;
+}
+
+.create-group__error {
+  margin: 0;
+  color: var(--color-error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .friend-picker__row {
+    transition: none;
+  }
+}
