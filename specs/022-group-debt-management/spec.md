@@ -188,14 +188,10 @@ La propuesta de liquidación deja a todos saldados con una cantidad de transfere
 **Verificación**: Contar el número de miembros con saldo neto distinto de cero (M); el número de transferencias propuestas por el sistema de liquidación debe ser ≤ M - 1.
 
 ### SC-003: Sin cálculos manuales necesarios
-Nadie tiene que hacer cuentas manuales para saber quién le debe a quién.
-
-**Verificación**: Después de registrar gastos y pagos, cada miembro puede abrir la aplicación y ver claramente cuánto debe y a quién, sin necesidad de calcular manualmente.
+Ningún usuario debe hacer cuentas manuales para determinar quién le debe a quién en su grupo. Después de registrar cualquier combinación de gastos y pagos, la aplicación muestra claramente el balance neto de cada miembro (lo que debe y a quién) sin que el usuario necesite calcular manualmente. **Criterio de medición**: El 95% de los usuarios puede identificar su balance neto en una sola vista de la aplicación sin recurrir a operaciones aritméticas fuera de la app.
 
 ### SC-004: Pago informado reflejado en estado y historial
-Un pago informado queda reflejado en el estado de la deuda y en el historial, con o sin validación según la configuración del grupo.
-
-**Verificación**: Después de registrar un pago, consultar el estado de la deuda correspondiente muestra el estado correcto ("Pagado", "Pago informado" o "Verificado") y el historial de actividad refleja el pago registrado.
+Un pago informado queda reflejado en el estado de la deuda y en el historial de actividad del grupo, con o sin validación según la configuración "Pagos requiere validación" del grupo. **Criterio de medición**: Después de registrar un pago, consultar el estado de la deuda correspondiente muestra el estado correcto ("Pagado", "Pago informado" o "Verificado") y el historial de actividad refleja el pago registrado. La transición de estado es consistente independientemente de la configuración del grupo.
 
 ## Assumptions
 
@@ -203,7 +199,7 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial, co
 - Las personas simuladas son cargadas manualmente por nombre y mail y no tienen acceso a la aplicación.
 - La cotización de divisas se obtiene de una fuente externa o se fija manualmente en el momento de la transacción; el sistema no sincroniza cotizaciones en tiempo real.
 - Un "Administrador de grupo" es un miembro con permisos especiales para validar o rechazar pagos cuando la configuración "Pagos requiere validación" está activada.
-- Los gastos recurrentes (tipo "recurrente") se manejan como gastos separados en cada ocasión; la simplificación de deudas aplica sobre el saldo actual después de cada registro.
+- Los gastos recurrentes (tipo "recurrente") se manejan según lo definido en la spec 009 (Pausa o finalización de gasto recurrente): la entidad Expense y su lógica de recurrencia ya existen en ese feature. Para la feature 022, los gastos recurrentes requieren una frecuencia (Semanal, Mensual o Anual) y generan sus repeticiones de forma automática, tal como quedó definido en la spec 009. La simplificación de deudas aplica sobre el saldo actual después de cada registro.
 - La moneda principal de un grupo se define cuando se crea el grupo y puede ser ARS, USD o EUR.
 - Los porcentajes de reparto se ingresan como números enteros o decimales que suman 100 en total.
 - Los medios de pago (efectivo, transferencia, débito) son solo etiquetas informativas y no afectan el cálculo de montos ni el estado de las deudas.
