@@ -70,7 +70,7 @@ El sistema rechaza los envíos inválidos: hacia la propia cuenta, cuando ya exi
 
 ### User Story 3 - Ver las solicitudes pendientes recibidas (Priority: P2)
 
-Desde la nueva pantalla "Amigos" de la barra de navegación, la persona destinataria ve la sección "Solicitudes" con las solicitudes pendientes que recibió, ordenadas de la más reciente a la más antigua, cada una con el nombre, apellido, correo y foto del emisor (o avatar por defecto si no tiene) y una indicación de que está pendiente. Si no tiene ninguna, ve un mensaje de estado vacío.
+Desde la nueva pantalla "Amigos" de la barra de navegación, la persona destinataria ve la sección "Solicitudes" con las solicitudes pendientes que recibió, ordenadas de la más reciente a la más antigua, cada una con el nombre, apellido, correo y avatar por defecto del emisor y una indicación de que está pendiente. Si no tiene ninguna, ve un mensaje de estado vacío.
 
 **Why this priority**: Es la "notificación" que pide el criterio de aceptación. El envío ya aporta el valor principal, pero sin esta bandeja el destinatario no se enteraría.
 
@@ -78,7 +78,7 @@ Desde la nueva pantalla "Amigos" de la barra de navegación, la persona destinat
 
 **Acceptance Scenarios**:
 
-1. **Given** una persona con solicitudes pendientes recibidas, **When** abre "Amigos", **Then** la sección "Solicitudes" muestra cada una con nombre, apellido, correo y foto del emisor, o avatar por defecto si no tiene.
+1. **Given** una persona con solicitudes pendientes recibidas, **When** abre "Amigos", **Then** la sección "Solicitudes" muestra cada una con nombre, apellido, correo y avatar por defecto del emisor.
 2. **Given** varias solicitudes pendientes recibidas, **When** se listan, **Then** aparecen de la más reciente a la más antigua.
 3. **Given** una persona sin solicitudes pendientes recibidas, **When** abre "Amigos", **Then** ve "No tenés solicitudes de amistad pendientes".
 4. **Given** que la persona es emisora de una solicitud pero no destinataria, **When** abre "Amigos", **Then** esa solicitud no aparece en su sección "Solicitudes".
@@ -140,7 +140,7 @@ Solo una persona autenticada con cuenta verificada puede enviar solicitudes o ve
 **Notificación y bandeja (US3)**
 
 - **FR-010**: El sistema MUST ofrecer una pantalla protegida "Amigos", accesible desde la barra de navegación, con una sección "Solicitudes" que liste las solicitudes pendientes recibidas por la persona autenticada.
-- **FR-011**: La sección "Solicitudes" MUST mostrar, por cada solicitud, únicamente nombre, apellido, correo electrónico y foto del emisor (o avatar por defecto si no tiene), más una indicación de estado pendiente; MUST NOT mostrar CBU/CVU, monedas, contraseña ni otros datos privados.
+- **FR-011**: La sección "Solicitudes" MUST mostrar, por cada solicitud, únicamente nombre, apellido, correo electrónico y avatar por defecto del emisor, más una indicación de estado pendiente; MUST NOT mostrar CBU/CVU, monedas, contraseña ni otros datos privados.
 - **FR-012**: Las solicitudes recibidas MUST listarse de la más reciente a la más antigua y MUST limitarse a las que tienen a la persona autenticada como destinataria y estado `PENDIENTE`.
 - **FR-013**: Cuando no haya solicitudes pendientes recibidas, la sección MUST mostrar exactamente "No tenés solicitudes de amistad pendientes".
 - **FR-014**: La notificación de una nueva solicitud MUST ser exclusivamente dentro de la aplicación mediante esta bandeja; el envío de correos y las notificaciones en tiempo real quedan fuera de alcance.

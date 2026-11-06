@@ -6,7 +6,7 @@
 exclusivamente los dos contratos ya activados por [001-user-registration](../../001-user-registration/contracts/users-api.md):
 
 - `GET /api/users/me` — datos y preferencias del usuario en sesión (cookie `amano_auth`).
-- `GET /api/users/{id}/avatar` — binario del avatar. Accesible para el dueño, sus amigos (solicitud `ACCEPTED`), quienes comparten con él un grupo activo y quien recibió una solicitud pendiente suya (solo en ese sentido); para cualquier otro id responde `404`, igual que una cuenta sin avatar.
+- `GET /api/users/{id}/avatar` — binario del avatar. Accesible para el dueño, sus amigos (solicitud `ACCEPTED`) y quienes comparten con él un grupo activo; para cualquier otro id responde `404`, igual que una cuenta sin avatar.
 
 Este documento fija las **cláusulas de consumo** que la SPA debe respetar al renderizar el perfil.
 

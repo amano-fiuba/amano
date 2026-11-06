@@ -153,8 +153,8 @@ function UsersSearch({ initialTerm }) {
   }
 
   // Sends a friendship request (feature 011, US1/US2/US4). The row keeps its own
-  // sent state during this screen session; after a reload the search does not
-  // include relationship status, so a retry relies on the backend's 409.
+  // sent state during this screen session; after a reload the search reports it
+  // through `friendshipStatus` (spec 021).
   const handleAdd = async (user) => {
     if (sendingId !== null || sentIds.includes(user.id)) {
       return
@@ -386,18 +386,28 @@ function UsersSearch({ initialTerm }) {
                         : isPendingReceived
                           ? `Solicitud pendiente de ${name}`
                           : wasSent
-                        ? `Solicitud enviada a ${name}`
-                        : isSending
-                          ? `Enviando solicitud a ${name}`
-                          : `Agregar a ${name}`
+                            ? `Solicitud enviada a ${name}`
+                            : isSending
+                              ? `Enviando solicitud a ${name}`
+                              : `Agregar a ${name}`
                     }
                   >
-                    {isFriend ? <UsersIcon /> : isPendingReceived ? <UserClockIcon /> : <UserPlusIcon />}
+                    {isFriend ? (
+                      <UsersIcon />
+                    ) : isPendingReceived || wasSent ? (
+                      <UserClockIcon />
+                    ) : (
+                      <UserPlusIcon />
+                    )}
                     {isFriend
                       ? 'Amigos'
                       : isPendingReceived
                         ? 'Pendiente'
-                        : isSending ? 'Enviando…' : wasSent ? 'Solicitud enviada' : 'Agregar'}
+                        : isSending
+                          ? 'Enviando…'
+                          : wasSent
+                            ? 'Solicitud enviada'
+                            : 'Agregar'}
                   </button>
                 </li>
               )

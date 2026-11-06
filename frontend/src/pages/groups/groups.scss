@@ -224,6 +224,34 @@
   flex: 1 1 100%;
 }
 
+.leave-group-modal {
+  position: relative;
+}
+
+.leave-group-modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-texto-suave);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+
+  &:hover:enabled {
+    background: var(--color-fondo);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
 // Botones del módulo: la acción secundaria y la destructiva.
 .group-action svg {
   flex: 0 0 auto;
@@ -646,12 +674,6 @@
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-.member-rows__hint {
-  margin: 0 0 0.75rem;
-  color: var(--color-texto-suave);
-  font-size: 0.875rem;
 }
 
 .member-row {

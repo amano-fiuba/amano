@@ -60,8 +60,6 @@ export default function GroupInfoView() {
     refreshGroup()
   }
 
-  // UI anticipation only: the server always rules the last-admin motive.
-  const isLastAdmin = group?.currentUserRole === 'ADMIN' && group?.memberCount === 1
   const isAdmin = group?.currentUserRole === 'ADMIN'
   const canEditGroupData = isAdmin || Boolean(group?.permissions?.membersCanEditGroupData)
 
@@ -199,7 +197,7 @@ export default function GroupInfoView() {
           <footer className="group-detail__footer">
             <LeaveGroupPanel
               groupId={Number(id)}
-              isLastAdmin={isLastAdmin}
+              isLastAdmin={Boolean(group.isLastAdmin)}
               isLastMember={Boolean(group.isLastMember)}
             />
           </footer>

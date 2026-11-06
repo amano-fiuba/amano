@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
+
+import com.amano.backend.friendship.FriendshipRequestRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -27,14 +29,13 @@ import com.amano.backend.common.FieldValidationException;
 class UserSearchServiceTest {
 
     private UserRepository userRepository;
-    private com.amano.backend.friendship.FriendshipRequestRepository friendshipRequestRepository;
+    private FriendshipRequestRepository friendshipRequestRepository;
     private UserSearchService service;
 
     @BeforeEach
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
-        friendshipRequestRepository =
-                Mockito.mock(com.amano.backend.friendship.FriendshipRequestRepository.class);
+        friendshipRequestRepository = Mockito.mock(FriendshipRequestRepository.class);
         service = new UserSearchService(userRepository, friendshipRequestRepository);
     }
 

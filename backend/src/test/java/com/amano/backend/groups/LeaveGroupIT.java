@@ -116,11 +116,64 @@ class LeaveGroupIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].eventType").value("MEMBER_LEFT"));
 
-        // and the last remaining member can leave: the group is deleted, since
-        // nobody is left to hand the admin role to
+    }
+
+    @Test
+    void theOnlyAdminCannotLeaveWhileOtherMembersRemain() throws Exception {
+        Cookie admin = verifiedSessionOf("leave-only-admin@example.com");
+        verifiedSessionOf("friend@example.com");
+        long groupId = createGroup(admin);
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
+                .andExpect(jsonPath("$.isLastAdmin").value(true))
+                .andExpect(jsonPath("$.isLastMember").value(false));
+
+        mockMvc.perform(post("/api/groups/" + groupId + "/leave").cookie(admin))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value(
+                        "Sos el último administrador: asigná otro administrador antes de salir"));
+    }
+
+    @Test
+    void theLastMemberLeavesAndTheGroupStopsShowingButItsRecordsRemain() throws Exception {
+        Cookie admin = verifiedSessionOf("leave-last-member@example.com");
+        verifiedSessionOf("friend@example.com");
+        long groupId = createGroup(admin);
+        Cookie member = new Cookie("amano_auth", jwtService.issueToken(userIdOf("friend@example.com")));
+        mockMvc.perform(post("/api/groups/" + groupId + "/leave").cookie(member))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupDeleted").value(false));
+
+        // a simulated profile does not count as another member
+        jdbcTemplate.update("INSERT INTO simulated_profiles (group_id, name, email) VALUES (?, ?, ?)",
+                groupId, "Simulada", "simulada@example.com");
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
+                .andExpect(jsonPath("$.isLastMember").value(true))
+                .andExpect(jsonPath("$.isLastAdmin").value(true));
+
         mockMvc.perform(post("/api/groups/" + groupId + "/leave").cookie(admin))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.groupLeft").value(true))
                 .andExpect(jsonPath("$.groupDeleted").value(true));
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(post("/api/groups/" + groupId + "/leave").cookie(admin))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/groups").cookie(admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + groupId + ")]").isEmpty());
+
+        // nothing was deleted: spec 020 FR-013
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups WHERE id = ?",
+                Long.class, groupId)).isEqualTo(1L);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM group_members WHERE group_id = ?",
+                Long.class, groupId)).isEqualTo(2L);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM group_members WHERE group_id = ? AND left_at IS NULL",
+                Long.class, groupId)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM simulated_profiles WHERE group_id = ?",
+                Long.class, groupId)).isEqualTo(1L);
     }
 
     @Test

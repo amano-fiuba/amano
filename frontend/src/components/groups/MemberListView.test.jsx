@@ -116,6 +116,15 @@ describe('MemberListView (T079/T077, US6)', () => {
     expect(rows[1]).toHaveTextContent('Ana López')
   })
 
+  it('no muestra el aviso de último administrador: solo aparece en el modal de abandonar', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: [MEMBERS[0]] })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    expect(await screen.findByText('Ana López')).toBeInTheDocument()
+    expect(screen.queryByText(/Sos el último administrador/i)).not.toBeInTheDocument()
+  })
+
   it('el admin no tiene menú de acciones sobre sí mismo', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 

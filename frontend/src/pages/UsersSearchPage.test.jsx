@@ -143,21 +143,28 @@ describe('UsersSearchPage (feature 008)', () => {
     expect(screen.getByRole('button', { name: 'Agregar a Juan' })).toBeEnabled()
   })
 
-  it('muestra Pendiente si esa persona ya me envió una solicitud (y no ofrece Agregar)', async () => {
+  it('muestra Amigos, Pendiente o Agregar según la relación, sin acción en los dos primeros', async () => {
     usersClient.searchUsers.mockResolvedValue({
       ok: true,
-      users: [{ ...ANA, friendshipStatus: 'PENDING_RECEIVED' }, { ...JUAN, friendshipStatus: 'FRIENDS' }],
+      users: [
+        { ...ANA, friendshipStatus: 'FRIENDS' },
+        { ...JUAN, friendshipStatus: 'PENDING_RECEIVED' },
+        { id: 5, firstName: 'Lola', lastName: null, email: 'lola@example.com', friendshipStatus: 'NONE' },
+      ],
     })
     const user = userEvent.setup()
     renderPage()
 
     await search(user, 'an')
 
-    const pending = await screen.findByRole('button', { name: 'Solicitud pendiente de Ana Pérez' })
-    expect(pending).toBeDisabled()
+    const friends = await screen.findByRole('button', { name: 'Ana Pérez ya es tu amigo' })
+    expect(friends).toHaveTextContent('Amigos')
+    expect(friends).toBeDisabled()
+    const pending = screen.getByRole('button', { name: 'Solicitud pendiente de Juan' })
     expect(pending).toHaveTextContent('Pendiente')
-    expect(screen.getByRole('button', { name: 'Juan ya es tu amigo' })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: /^Agregar a/ })).not.toBeInTheDocument()
+    expect(pending).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Lola' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Agregar a Ana Pérez' })).not.toBeInTheDocument()
   })
 
   it('muestra Solicitud enviada si yo ya le envié una solicitud', async () => {
@@ -170,7 +177,9 @@ describe('UsersSearchPage (feature 008)', () => {
 
     await search(user, 'an')
 
-    expect(await screen.findByRole('button', { name: 'Solicitud enviada a Ana Pérez' })).toBeDisabled()
+    const sent = await screen.findByRole('button', { name: 'Solicitud enviada a Ana Pérez' })
+    expect(sent).toHaveTextContent('Solicitud enviada')
+    expect(sent).toBeDisabled()
   })
 
   it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {
