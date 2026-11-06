@@ -57,7 +57,7 @@
 - No existing liquidation/simplification module found
 - The `EqualSplit.split()` handles equal division but not debt compensation
 - The `Debt.applyPayment()` handles individual payments but not group liquidation
-- The feature spec (FR-004) requires: "proponiendo el conjunto mínimo de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados"
+- The feature spec (FR-004) requires: "proponiendo el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados"
 
 **Resolution**: Implement a pure domain greedy algorithm:
 1. Compute net balance for each member (sum of all owed/minus-all-owed within group)
@@ -70,7 +70,7 @@
    - Update balances
    - Remove members whose balance reached zero
 4. Document guarantee: At most n-1 transfers (where n = members with non-zero balance)
-5. Document that the absolute minimum number of transfers is NP-hard (set cover problem), so greedy is the practical approach
+5. Document that the absolute minimum number of transfers is NP-difícil, so greedy is the practical approach
 
 **Algorithm Pseudocode**:
 ```
@@ -90,7 +90,7 @@ Guarantee: ≤ n-1 transfers where n = |{members with balance != 0}|
 
 ### 4. Debt State Machine ⚠️ PARTIAL - NEEDS EXTENSION
 
-**Design Decision**: "Estados de deuda: máquina de estados explícita (Pendiente, Pago informado, Pagado, Verificado, Vencido) con transiciones válidas y reglas según la casilla "Pagos requieren validación" del grupo."
+**Design Decision**: "Estados de deuda: máquina de estados explícita (PENDING, PAYMENT_REPORTED, PAID, VERIFIED, OVERDUE) con transiciones válidas y reglas según la casilla "Pagos requiere validación" del grupo."
 
 **Findings**:
 - Current `DebtStatus` enum has: `PENDING`, `PARTIALLY_PAID`, `PAID` (3 states)
@@ -118,7 +118,7 @@ PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
 
 **Additional Changes needed**:
 - Extend `DebtStatus` enum (or create new enum)
-- Add `vencidoAt` field (optional, for recurring expenses)
+- Add `overdueAt` field (optional, for recurring expenses)
 - Add `dias_vencimiento` or configure per group
 - Update `Debt.applyPayment()` to handle the new state transitions
 - Update `GroupExpenseService.create()` to initialize new state
@@ -181,7 +181,7 @@ PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
 
 ### 7. OANDA Exchange Rate Adapter ⚠️ NEW - NEEDS DESIGN
 
-**Design Decision**: "Cotizaciones OANDA: detrás de un adaptador, con cache por (par, fecha) y comportamiento definido si el servicio no responde."
+**Design Decision**: "Cotizaciones OANDA: detrás de un adaptador, con cache por (par, fecha) y comportamiento definido si el servicio no responde. **Sin tasa por defecto, sin TTL.**"
 
 **Findings**:
 - No existing exchange rate service or adapter in the codebase
@@ -196,13 +196,14 @@ PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
    - Fallback behavior when service doesn't respond:
      - Return cached rate if available (stale is better than none)
      - Or throw specific exception that caller must handle
-     - Or use fixed default rate (1 USD = 1000 ARS, etc. - to be agreed)
+     - **No default rate**; if OANDA unavailable and no cache → expense not saved (503)
 
 2. Cache strategy:
-   - Key: `"{from}-{to}-{date}"` 
-   - TTL: 24 hours (daily updates sufficient for most use cases)
+   - Key: `"{from}-{to}-{date}"` (e.g., "USD-ARS-2026-01-15")
+   - **No TTL** - rates are historical, same date always has same rate
    - On cache miss → fetch from external service
-   - On service failure → use last cached rate or throw controlled exception
+   - On service failure → if cached rate exists (any age), use it with warning; otherwise throw 503
+   - **No "stale data" concept** - rates for a given date are deterministic
 
 3. Exchange rate storage (per feature decision):
    - Store original currency, original amount, converted amount, and applied rate
@@ -217,11 +218,11 @@ Expense in USD 50, group primary currency ARS, date 2026-01-15
 ```
 
 **Fallback Behavior**:
-- If OANDA service unavailable and no cache → use group's default/memo rate (documented)
-- If cache hit but stale (≥ 24h) → warn user and recompute
+- If OANDA service unavailable and no cache → **expense not saved (503)**, message: "No se pudo obtener la cotización; registre el gasto en la moneda del grupo o reintente después"
+- If cache hit → use it (no staleness concern for historical rates)
 - Log all fallback usage for monitoring
 
-**Rationale**: Follows the design decision explicitly. Creates a clear contract for currency conversion that can be implemented/replaced later.
+**Rationale**: Follows the design decision explicitly. Creates a clear contract for currency conversion that can be implemented/replaced later. No default rate - the group must always have a valid rate or the expense cannot be registered.
 
 ### 8. API Data Model Contracts ✅ RESOLVED (PARTIAL)
 
@@ -244,7 +245,6 @@ Expense in USD 50, group primary currency ARS, date 2026-01-15
 - Liquidation proposal request/response (new)
 - Currency conversion request/response (new, per Q7 design)
 - Pending debts view with full detail (already partially in `GroupExpenseResponse.DebtView`)
-- API-level DTOs (the existing ones are service-internal)
 
 **Resolution**:
 1. Keep using existing internal service contracts where possible (reuses `EqualSplit`, `DebtStatus`, etc.)
@@ -286,7 +286,7 @@ Expense in USD 50, group primary currency ARS, date 2026-01-15
    - Liquidation generation → transfer count verification → balance SC-001
    - Multi-currency expense display → original + converted amount
 
-3. **Property tests** (recommended framework: junit-quickcheck or manual property verification):
+3. **Property tests** (using JUnit 5 own generators, no junit-quickcheck dependency):
    - `forAllGroups: sum(balances) == 0`
    - `forAllLiquidations: transfersCount <= (nonZeroMembers - 1)`
    - `forAllPayments: afterPayment, groupBalancesSum == 0`
@@ -300,7 +300,7 @@ src/test/java/com/amano/backend/groupexpense/
   DebtLiquidationPropertyTest.java  # new property-based tests
 ```
 
-**Rationale**: Follows the project's testing strategy (JUnit 5, Testcontainers, 85% coverage). Property tests add the specific financial correctness guarantees the feature requires.
+**Rationale**: Follows the project's testing strategy (JUnit 5, Testcontainers, 85% coverage). Property tests add the specific financial correctness guarantees the feature requires. **No junit-quickcheck dependency**.
 
 ## Research Summary
 
@@ -311,5 +311,6 @@ All 9 unknowns have been addressed with findings from the codebase analysis. The
 3. **No floating point** - Already satisfied by BigDecimal pattern
 4. **Idempotency** - Already patterned, just needs to be applied to payments
 5. **New DTOs/contracts** - Only where API exposure required, not for internal services
+6. **No junit-quickcheck** - Use JUnit 5 own generators
 
 **Next Step**: Proceed to Phase 1: Design & Contracts, creating data-model.md, contracts/, and quickstart.md based on these research findings.

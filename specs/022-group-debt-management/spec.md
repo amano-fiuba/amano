@@ -11,7 +11,7 @@
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Registrar un gasto compartido (Priority: P1)
-[Describe this user journey in plain language]
+
 Un miembro del grupo registra un gasto compartido indicando monto, moneda, fecha, categoría, tipo (único o recurrente), medio de pago, quién pagó y con quiénes se comparte. La descripción es opcional. Quien pagó siempre forma parte del reparto y no puede quitarse. Sin participantes, el gasto es personal y no genera deudas.
 
 **Why this priority**: Esta es la funcionalidad básica del sistema; sin registrar gastos, no es posible calcular deudas. Es el punto de entrada para todas las demás funcionalidades.
@@ -24,7 +24,7 @@ Un miembro del grupo registra un gasto compartido indicando monto, moneda, fecha
 3. Given a registered expense, when viewed by any group member, then the expense details (monto, moneda, quién pagó, participantes) are displayed correctly.
 
 ### User Story 2 - Definir cómo se reparte el gasto (Priority: P1)
-[Describe this user journey in plain language]
+
 El registrador del gasto define el método de reparto: partes iguales (por defecto), importes personalizados (la suma debe coincidir con el total) o porcentajes. En el caso de porcentajes, la suma de todos los porcentajes debe ser 100%.
 
 **Why this priority**: El método de reparto determina cómo se calculan las deudas de cada participante. Sin esta definición, el sistema no sabe cómo asignar el monto entre los miembros.
@@ -37,7 +37,7 @@ El registrador del gasto define el método de reparto: partes iguales (por defec
 3. Given an expense with reparto "porcentajes", when the sum of percentages is 100%, then each participant's share is calculated as (percentage/100) × total; if the sum is not 100%, the system rejects the registration.
 
 ### User Story 3 - Ver cálculo automático de deudas (Priority: P1)
-[Describe this user journey in plain language]
+
 El sistema calcula automáticamente, dentro de cada grupo, cuánto debe y cuánto debe recibir cada miembro (incluyendo personas simuladas) a partir de los gastos y pagos registrados. Los saldos se recalculan cuando se registra un gasto o un pago. Solo cuentan los gastos y participantes del grupo en cuestión.
 
 **Why this priority**: El cálculo automático es el corazón del producto; los usuarios confían en que los saldos son consistentes y actualizados sin necesidad de hacer cuentas manuales.
@@ -50,8 +50,8 @@ El sistema calcula automáticamente, dentro de cada grupo, cuánto debe y cuánt
 3. Given a group with simulated persons (without accounts), when balances are calculated, then simulated persons are included in the calculations but do not appear in payment requests (they have no account).
 
 ### User Story 4 - Simplificar deudas (liquidación) (Priority: P2)
-[Describe this user journey in plain language]
-El sistema compensa deudas cruzadas y propone el conjunto mínimo de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales.
+
+El sistema compensa deudas cruzadas y propone el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales.
 
 **Why this priority**: La liquidación reduce la cantidad de transferencias necesarias para saldar el grupo, minimizando la fricción de cobrar. Los usuarios necesitan saber el número mínimo de movimientos.
 
@@ -63,7 +63,7 @@ El sistema compensa deudas cruzadas y propone el conjunto mínimo de transferenc
 3. Given the liquidation proposal, when reviewed, then the original expense history is unchanged.
 
 ### User Story 5 - Gestionar estado de cada deuda (Priority: P2)
-[Describe this user journey in plain language]
+
 Cada deuda tiene un estado: Pendiente (estado inicial), Pago informado, Pagado, Verificado y Vencido. Los estados evolucionan conforme se registran y verifican pagos.
 
 **Why this priority**: El seguimiento del estado de las deudas permite a los usuarios saber el estado actual de cada obligación y qué acciones aún deben realizar.
@@ -76,7 +76,7 @@ Cada deuda tiene un estado: Pendiente (estado inicial), Pago informado, Pagado, 
 3. Given a debt with state "Pago informado" in a group with "Pagos requiere validación", when an administrator confirms, then the state changes to "Verificado"; when rejected, the state remains "Pendiente".
 
 ### User Story 6 - Registrar pago de deuda pendiente (Priority: P2)
-[Describe this user journey in plain language]
+
 Registrar el pago de una deuda pendiente en la que el miembro está involucrado, dejando constancia en el historial. Si el grupo tiene activada "Pagos requieren validación", el pago queda como "Pago informado" hasta que un Administrador lo confirme (pasa a Verificado) o lo rechace (la deuda sigue Pendiente). Si está desactivada, el pago informado se considera confirmado (Pagado). No se puede registrar un pago sobre una deuda que no esté pendiente.
 
 **Why this priority**: Registrar pagos es esencial para mantener los saldos actualizados y cerrar deudas. La lógica de validación asegura el control según la configuración del grupo.
@@ -91,7 +91,7 @@ Registrar el pago de una deuda pendiente en la que el miembro está involucrado,
 5. Given a debt that is not "Pendiente" (e.g., already "Pagado"), when attempting to register a payment, then the system rejects the operation.
 
 ### User Story 7 - Ver mis deudas pendientes (Priority: P3)
-[Describe this user journey in plain language]
+
 Ver cuánto debo, a quién (persona o grupo), con acceso al detalle y origen de cada deuda, descontando pagos ya realizados y verificados.
 
 **Why this priority**: Los miembros necesitan ver su situación financiera dentro del grupo de forma clara y consolidada.
@@ -104,7 +104,7 @@ Ver cuánto debo, a quién (persona o grupo), con acceso al detalle y origen de 
 3. Given the detail view, when selecting a specific debt, then the origin (which expense generated it) is shown.
 
 ### User Story 8 - Mantener historial de actividad del grupo (Priority: P3)
-[Describe this user journey in plain language]
+
 Mantener un historial de actividad del grupo que incluya gastos y pagos, ordenados cronológicamente, para que los usuarios puedan consultar qué sucedió en el grupo.
 
 **Why this priority**: El historial brinda transparencia y permite a los usuarios revisar la historia de transacciones del grupo, resolviendo dudas sobre quién pagó qué y cuándo.
@@ -117,7 +117,7 @@ Mantener un historial de actividad del grupo que incluya gastos y pagos, ordenad
 3. Given both expenses and payments, when viewing the history, then events are sorted by date in descending order (most recent first).
 
 ### User Story 9 - Operar en varias monedas (Priority: P2)
-[Describe this user journey in plain language]
+
 Operar en varias monedas (ARS, USD y EUR como mínimo): cuando un gasto está en una moneda distinta a la principal del grupo, se muestra el monto original y su equivalente convertido, usando la cotización de la fecha de la transacción.
 
 **Why this priority**: Los usuarios viajan entre países y comparten gastos en divisas diferentes; mostrar tanto el monto original como el convertido brinda claridad.
@@ -141,7 +141,7 @@ The system MUST support defining cómo se reparte el gasto: partes iguales (por 
 The system MUST calculate automatically, within each group, cuánto debe y cuánto debe recibir cada miembro (incluyendo personas simuladas), a partir de los gastos y pagos registrados. Los saldos se recalculan cuando se registra un gasto o un pago. Solo cuentan los gastos y participantes del grupo en cuestión. La suma de todos los saldos del grupo es cero.
 
 ### FR-004: Liquidación de deudas (simplificación)
-The system MUST simplify group debts (liquidación) compensando deudas cruzadas y proponiendo el conjunto mínimo de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales. La cantidad de transferencias propuestas es menor o igual a la cantidad de miembros con saldo distinto de cero menos uno.
+The system MUST simplify group debts (liquidación) compensando deudas cruzadas y proponiendo el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales. La cantidad de transferencias propuestas es menor o igual a la cantidad de miembros con saldo distinto de cero menos uno.
 
 ### FR-005: Estados de deuda
 The system MUST manage the state of each debt with the following sequence: Pendiente (estado inicial) → Pago informado → Verificado (si requiere validación) / Pagado (si no requiere validación) → Vencido. Cada deuda comienza en estado Pendiente.
@@ -188,10 +188,11 @@ La propuesta de liquidación deja a todos saldados con una cantidad de transfere
 **Verificación**: Contar el número de miembros con saldo neto distinto de cero (M); el número de transferencias propuestas por el sistema de liquidación debe ser ≤ M - 1.
 
 ### SC-003: Sin cálculos manuales necesarios
-Ningún usuario debe hacer cuentas manuales para determinar quién le debe a quién en su grupo. Después de registrar cualquier combinación de gastos y pagos, la aplicación muestra claramente el balance neto de cada miembro (lo que debe y a quién) sin que el usuario necesite calcular manualmente. **Criterio de medición**: El 95% de los usuarios puede identificar su balance neto en una sola vista de la aplicación sin recurrir a operaciones aritméticas fuera de la app.
+Ningún usuario debe hacer cuentas manuales para determinar quién le debe a quién en su grupo. Después de registrar cualquier combinación de gastos y pagos, la aplicación muestra claramente el balance neto de cada miembro (lo que debe y a quién) sin que el usuario necesite calcular manualmente. **Criterio de medición**: La aplicación muestra claramente el balance neto de cada miembro en una vista unica sin requerir cálculos manuales por parte del usuario.
 
 ### SC-004: Pago informado reflejado en estado y historial
 Un pago informado queda reflejado en el estado de la deuda y en el historial de actividad del grupo, con o sin validación según la configuración "Pagos requiere validación" del grupo. **Criterio de medición**: Después de registrar un pago, consultar el estado de la deuda correspondiente muestra el estado correcto ("Pagado", "Pago informado" o "Verificado") y el historial de actividad refleja el pago registrado. La transición de estado es consistente independientemente de la configuración del grupo.
+
 
 ## Assumptions
 
@@ -216,4 +217,10 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 - Q: Si las deudas de una misma persona se consolidan entre grupos distintos? → A: Debts are tracked per-group and displayed separately. A member sees their debts organized by group, with the total across all groups shown as a summary, but each debt is settled independently within its group. Payments are applied to specific debts in specific groups. The "total owed" summary is informational only and doesn't create a cross-group obligation.
 - Q: Flujo exacto de gastos cargados en nombre de otra persona? → A: No se puede cargar un gasto en nombre de otro. Yo solo puedo cargar gasto a nombre mio. When an expense is loaded in someone else's name, the actual payer always appears as "quien pagó" in the system and in debt calculations. The person in whose name the expense is recorded (the "holder") is marked as the expense recorder/manager, but does not become financially responsible. The actual payer is always included in the participant reparto and their debt/credit reflects their actual contribution. For simulated persons, the expense is recorded under the simulated person's name, but any debt calculations treat the simulated person as having no financial obligation (they are informational only).
 - Q: Si Pagado y Verificado son equivalentes para el saldo? → A: Pagado y Verificado son equivalentes para el saldo: una vez que una deuda alcanza cualquiera de estos estados, el saldo correspondiente se considera saldado (cero) para todos los efectos del grupo. La diferencia semántica permanece en el historial (se registra el camino recorrido: Pendiente → Pago informado → Verificado/Pagado), pero no afecta los cálculos de deuda, liquidación, ni el reporte de saldos.
-</feature-specification>
+
+- Q: Pago de una transferencia propuesta cuando A le debe a B y B le debe a C, y se propone que A pague a C? → A: (a) la propuesta es solo orientativa y los pagos se registran sobre deudas directas
+- Q: Personas simuladas en saldos y liquidación? → A: incluidas en saldos y propuesta como informativas; sus pagos los registra un administrador; el pagador siempre es un usuario registrado
+- Q: Vencimiento: umbral por grupo o cualquier gasto? → A: cualquier gasto, con el umbral por grupo
+- Q: Una deuda vencida se puede pagar? → A: Confirmado: una deuda en estado Vencido puede pagarse, actualizando su estado a PAGO_INFORMADO o PAGADO según la configuración del grupo
+- Q: Pagos parciales: si la spec 018 permitió pagos parciales, ahora solo se aceptan pagos completos? → A: Ahora solo se aceptan pagos completos; los pagos parciales previos se mantienen como registrados pero no se pueden realizar nuevos pagos parciales
+- Q: Si el servicio de cotizaciones no responde, ¿se rechaza el gasto? → A: Rechazar el gasto con un mensaje claro indicando "No se pudo obtener la cotización; registrá el gasto en la moneda del grupo o reintentá más tarde"

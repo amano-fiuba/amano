@@ -21,8 +21,10 @@
 | `expenseDate` | `LocalDate` | No | Date of the expense | Not future; format `yyyy-MM-dd` |
 | `description` | `String` | Yes | Optional description | Max 200 chars |
 | `idempotencyKey` | `UUID` | No | For concurrent registration safety | Unique per (creator, key) |
-| `recurrent` | `boolean` | No | Whether expense is recurrent | Default: `false` |
-| `vencimientoDias` | `Integer` | Yes | Days until expense considered "Vencido" | Only applicable if `recurrent=true`; null otherwise |
+| `montoConvertido` | `BigDecimal` | Yes | Converted amount to group's primary currency | `precision=11, scale=2`; null if same currency |
+| `tasaAplicada` | `BigDecimal` | Yes | Exchange rate applied | `precision=11, scale=6`; null if same currency |
+| `fechaCotizacion` | `LocalDate` | Yes | Date the rate was effective from | null if same currency |
+| `rateSource` | `String` | Yes | Identifier of the rate source (e.g., "OANDA") | null if same currency |
 
 **Relationships**:
 - `1:N` with `GroupExpenseShare` (shares/participants)
@@ -32,7 +34,7 @@
 ** invariants**:
 - `amount > 0`
 - `currency in {ARS, USD, EUR}`
-- If `recurrent=true` then `vencimientoDias` must be set (enforced in service validation)
+- `montoConvertido` and `tasaAplicada` and `fechaCotizacion` and `rateSource` are set only when `currency` differs from group's primary currency
 - `idempotencyKey` uniqueness enforced per `(createdByUserId, idempotencyKey)`
 
 ## Entity: Deuda (Debt)
@@ -57,53 +59,82 @@
 | `status` | `DebtStatus` | No | Current state of the debt | See state machine below |
 | `createdAt` | `OffsetDateTime` | No | Auto-created | Hibernate `@CreationTimestamp` |
 | `updatedAt` | `OffsetDateTime` | No | Auto-updated | Hibernate `@UpdateTimestamp` |
-| `vencidoAt` | `OffsetDateTime` | Yes | When debt transitioned to Vencido | Null if not vencido |
 
-**Debt Status Machine** (`DebtStatus` enum extension):
+**Debt Status Machine** (`DebtStatus` enum):
 
 | Status | Meaning | Transition Rules |
 |--------|---------|------------------|
-| `PENDIENTE` | Initial state; no payments yet | Default on debt creation |
-| `PAGO_INFORMADO` | Payment registered (informative only) | When payment registered; with "Pagos requiere validación": stays until admin confirms/rejects; without: auto-becomes `PAGADO` |
-| `PAGADO` | Full payment received; saldo zero | When `paidAmount >= amount`; also auto-from `PAGO_INFORMADO` if no validation required |
-| `VERIFICADO` | Admin confirmed payment (groups with validation) | When admin confirms `PAGO_INFORMADO`; equivalent to `PAGADO` for balance calculations |
-| `VENCIDO` | Debt past due date (recurring expenses only) | Auto-transition when: `expense.recurrent=true` AND `currentDate > expense.expenseDate.plusDays(expense.vencimientoDias)` AND `debt.status in {PAGO_INFORMADO, PAGADO}` |
+| `PENDING` | Initial state; no payments yet | Default on debt creation |
+| `PAYMENT_REPORTED` | Payment registered (informative only) | When payment registered; with "Pagos requiere validación": stays until admin confirms/rejects; without: auto-becomes `PAID` |
+| `PAID` | Full payment received; saldo zero | When `paidAmount >= amount`; also auto-from `PAYMENT_REPORTED` if no validation required |
+| `VERIFIED` | Admin confirmed payment (groups with validation) | When admin confirms `PAYMENT_REPORTED`; equivalent to `PAID` for balance calculations |
+| `OVERDUE` | Debt past due date | Auto-transition when: group has `debtDueDays` configured AND `currentDate > expenseDate.plusDays(group.debtDueDays)` AND `debt.status in {PAYMENT_REPORTED, PAID}` |
 
 **Key Methods** (existing + new):
-- `Debt.pendingFor(expense, share)` → creates `PENDIENTE` debt (existing)
+- `Debt.pendingFor(expense, share)` → creates `PENDING` debt (existing)
 - `Debt.applyPayment(payment)` → updates `paidAmount` and `status` (existing, needs extension for new states)
 - `Debt.getOutstanding()` → `amount.subtract(paidAmount)` (existing)
-- `Debt.isSettled()` → `status == PAGADO` (existing, needs extension: also true for `VERIFICADO` per clarification Q7)
+- `Debt.isSettled()` → `status == PAID or status == VERIFIED` (existing, needs extension: also true for `VERIFIED`)
 
 **Invariants**:
 - `0 <= paidAmount <= amount`
 - Status transitions only forward (never backward)
-- `VENCIDO` only for recurring expenses
-- `PAGO_INFORMADO` and `PAGADO` are equivalent for balance calculations (SC-004)
+- `OVERDUE` only when group has `debtDueDays` configured
 
 **Relationships**:
 - `N:1` with `GroupExpense` (the expense that generated the debt)
 - `N:1` with `Currency` (the currency)
 - `1:N` with `Payment` (payments registered against this debt)
 
-## Entity: Persona Simulada (SimulatedProfile)
+## Entity: Payment (NUEVA)
 
-**Source**: Existing entity (inferred from `GroupExpenseService` and `ParticipantType.SIMULATED`)
+**Source**: New entity for 022 feature requirements
+
+| Field | Type | Nullable | Description | Constraints |
+|-------|------|----------|-------------|-------------|
+| `id` | `Long` | No | Primary key | `GenerationType.IDENTITY` |
+| `groupId` | `Long` | No | Foreign key to group | - |
+| `debtId` | `Long` | No | Origin debt | - |
+| `payerUserId` | `Long` | No | User who made the payment | - |
+| `amount` | `BigDecimal` | No | Payment amount | `precision=11, scale=2`; > 0; ≤ debt.getOutstanding() |
+| `status` | `PaymentStatus` | No | Payment state | PENDING, REPORTED, CONFIRMED, REJECTED |
+| `decidedByUserId` | `Long` | Yes | Admin who confirmed/rejected (if applicable) | Null if status != CONFIRMED/REJECTED |
+| `decidedAt` | `OffsetDateTime` | Yes | When decision was made | Null if not decided |
+| `idempotencyKey` | `UUID` | No | For concurrent registration safety | Unique per (debtId, key) |
+
+**PaymentStatus** enum values:
+- `PENDING`: Payment registered, not yet processed
+- `REPORTED`: Payment registered (informative); awaiting validation decision
+- `CONFIRMED`: Admin confirmed the payment (for groups with validation)
+- `REJECTED`: Admin rejected the payment
+
+**Invariants**:
+- `0 < amount <= debt.getOutstanding()`
+- Same `idempotencyKey` reused → returns existing result (no duplicate)
+- `decidedByUserId` and `decidedAt` must both be set or both be null
+
+## Entity: Group (extended)
+
+**Source**: Existing entity, extended for 022 feature requirements
 
 | Field | Type | Nullable | Description | Constraints |
 |-------|------|----------|-------------|-------------|
 | `id` | `Long` | No | Primary key | - |
-| `groupId` | `Long` | No | Group the persona belongs to | - |
-| `name` | `String` | No | Display name (loaded by name and email) | - |
-| `email` | `String` | Yes | Contact email (optional, for identification) | - |
-| `isActive` | `boolean` | Yes | Whether the persona is active in the group | Default: `true` |
+| `primaryCurrency` | `Currency` | No | Group's primary currency | - |
+| `debtDueDays` | `Integer` | Yes | Days until debt considered OVERDUE | Nullable; null = never vencido |
+| `createdByUserId` | `Long` | No | Group creator | - |
+| `name` | `String` | No | Group name | Max 100 chars |
+| `description` | `String` | Yes | Optional description | Max 200 chars |
 
-**Behavior**:
-- Participates in debt calculations identically to registered users
-- Does NOT have a user account; cannot receive payments directly
-- Debts with `debtorType=SIMULATED` have `debtorUserId=null`
-- `paidAmount` for simulated person debts can be updated only by admin/group processes
-- Included in group balance sums per SC-001 (confirmed by clarification Q5)
+**Relationships**:
+- `1:N` with `GroupExpense` (expenses in this group)
+- `1:N` with `GroupExpenseShare` (members/shares)
+- `1:N` with `Debt` (debts in this group)
+- `1:N` with `Payment` (payments in this group)
+
+**Invariants**:
+- `primaryCurrency in {ARS, USD, EUR}`
+- `debtDueDays >= 0` if set (null is valid meaning "never vencido")
 
 ## Enum: ParticipantType
 
@@ -138,10 +169,14 @@
 
 ## Summary of Changes from Existing Model
 
-1. **DebtStatus extended** from 3 states (PENDING/PARTIALLY_PAID/PAID) to 5 states (PENDIENTE/PAGO_INFORMADO/PAGADO/VERIFICADO/VENCIDO)
-2. **New fields**: `recurrent` (GroupExpense), `vencimientoDias` (GroupExpense), `vencidoAt` (Debt), `monedaOriginal`/`montoConvertido`/`tasaAplicada`/`fechaCotizacion` (MontoConvertido VO concept)
-3. **State machine rules** document the "payments require validation" group checkbox behavior and the "vencido" auto-transition for recurring expenses
-4. **`PAGADO` and `VERIFICADO` are equivalent for saldo calculations** per clarification Q7
+1. **DebtStatus extended** from 3 states (PENDING/PARTIALLY_PAID/PAID) to 5 states (PENDING/PAYMENT_REPORTED/PAID/VERIFIED/OVERDUE)
+2. **New entity: Payment** with status, decided_by_user_id, decided_at and idempotency key
+3. **Removed from GroupExpense**: `recurrent` field and `vencimientoDias` field (threshold now configured per Group via `debtDueDays`)
+4. **Added to Group**: `primaryCurrency` field and `debtDueDays` field
+5. **MontoConvertido VO**: Fields now owned by GroupExpense directly (`montoConvertido`, `tasaAplicada`, `fechaCotizacion`, `rateSource`)
+6. **State machine rules** document the "payments require validation" group checkbox behavior and the "vencido" auto-transition configured per group
+7. **`PAID` and `VERIFIED` are equivalent for saldo calculations** per clarification Q7
+8. **New `isSettled()` semantics**: returns true for both `PAID` and `VERIFIED`
 
 ## Invariants Across All Entities
 
@@ -151,3 +186,5 @@
 - Transactional integrity (Spring `@Transactional`)
 - Debts always belong to a group and an expense
 - Simulated persons participate in calculations but have no account
+- **PAYMENT_REPORTED ≠ PAID for saldo calculations**: a debt in `PAYMENT_REPORTED` state still contributes `amount - paidAmount` to net balance (non-settled)
+- **OVERDUE debts still count as saldo**: a debt in OVERDUE state still appears in net balance calculations and can be paid

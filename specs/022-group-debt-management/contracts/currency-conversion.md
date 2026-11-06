@@ -31,28 +31,26 @@ Define the contract for converting amounts between currencies when an expense is
 | `convertedAmount` | `BigDecimal` | The amount in the target currency |
 | `exchangeRate` | `BigDecimal` | The rate applied (fromCurrency → toCurrency) |
 | `date` | `LocalDate` | The date the rate was effective from |
-| `rateSource` | `String` | Identifier of the rate source (e.g., "OANDA-cache", "default-memo") |
+| `rateSource` | `String` | Identifier of the rate source (e.g., "OANDA") |
 
 ## Exchange Rate Logic
 
 ### 1. Primary Flow (OANDA Adaptor)
 
 1. Look up cached rate for `(fromCurrency, toCurrency, date)` key
-2. If cache hit → use cached rate
+2. If cache hit → use cached rate (historical rates are deterministic, no staleness concern)
 3. If cache miss → fetch from OANDA API
-4. Store result in cache with TTL of 24 hours
+4. Store result in cache for future requests with same par/date
 5. Return conversion
 
 ### 2. Fallback Flow (Service Unavailable)
 
 If OANDA service does not respond after retries:
 
-1. Check if there's a cached rate (even if stale, > 0 hours old)
-2. If cached rate exists → use it with a warning note in `rateSource = "OANDA-cache-stale"`
-3. If no cache → use group's default/memo rate
-   - Document the default rate in the group configuration
-   - Set `rateSource = "memo-default"`
-   - Log the fallback for operator awareness
+1. **Check if there's a cached rate** (for the same par/date, even if previously stored)
+2. If cached rate exists → use it with a warning note in `rateSource = "OANDA-cache"`
+3. If no cache → **expense not saved**: return error 503 with message "No se pudo obtener la cotización; registre el gasto en la moneda del grupo o reintente después"
+4. **No default memo rate** is used; the expense simply cannot be registered without a valid rate
 
 ### 3. Same Currency
 
@@ -66,11 +64,11 @@ If `fromCurrency == toCurrency`:
 | Aspect | Design |
 |--------|--------|
 | **Cache Key** | `"{fromCurrency}-{toCurrency}-{date}"` (e.g., "USD-ARS-2026-01-15") |
-| **TTL** | 24 hours (daily update sufficient for most use cases) |
+| **No TTL** | Historical rates for a given date are deterministic and never stale; cache persists for session lifetime |
 | **Storage** | In-memory map (Caffeine) or Redis (if already project-configured) |
 | **Eviction** | LRU (Least Recently Used) when cache exceeds configured size (e.g., 1000 entries) |
 | **Cache Miss** | Fetch from external service; on success, store in cache |
-| **Stale Data** | Rates ≥ 24h old should be recomputed; UI may show "rate updated" indicator |
+| **Rate Determinism** | Same par → same date always gives same rate; no "stale data" concept |
 
 ## Example
 
@@ -94,29 +92,23 @@ Output: CurrencyConversionResponse(
 
 1. **Original amount always shown**: The `amount` field always reflects the original user-entered value.
 2. **Converted amount always computed**: Even if the group's primary currency matches the expense currency, the converted amount is shown (equals the original).
-3. **Rate source transparency**: The `rateSource` field tells the user whether the rate came from the live service, cache, or default.
+3. **Rate source transparency**: The `rateSource` field tells the user whether the rate came from the live service or cache.
 4. **No floating point**: All monetary values use `BigDecimal` with 2 decimal places.
 5. **Rate persistence**: The applied rate is stored with the expense (per the money representation design decision: "guardar siempre moneda original, monto original, monto convertido y tasa aplicada").
-
-## Error Handling
-
-| Scenario | Response |
-|----------|----------|
-| `amount <= 0` | Error: "El monto debe ser mayor que cero" |
-| `fromCurrency == null` or `toCurrency == null` | Error: "La moneda es obligatoria" |
-| `date` is future | Error: "No se permiten fechas futuras para la cotización" |
-| OANDA service timeout after retries | Use cached rate if available; else error: "No se pudo obtener la cotización. Se muestra el monto original." |
-| Cache empty and service unavailable | Use memo-default rate; `rateSource = "memo-default"`; log warning |
+6. **If OANDA unavailable and no cache → expense not saved (503)**: no default/memo fallback; the user must register in the group's primary currency or retry later.
 
 ## Integration with Expense Registration
 
 When registering a gasto with a currency different from the group's primary:
 
 1. If `expense.currency != group.primaryCurrency`:
-   - Fetch conversion rate for `expense.date`
-   - Store `montoConvertido` and `tasaAplicada` with the expense
+   - Fetch conversion rate for `expense.date` via `CurrencyConversionService.getRate()`
+   - If 503 returned (no rate available) → **reject expense registration** with error message "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
+   - If rate obtained → store `montoConvertido` and `tasaAplicada` with the expense
    - Display both original and converted amounts in UI
+
 2. If `expense.currency == group.primaryCurrency`:
    - `convertedAmount` = `amount`
    - `exchangeRate` = 1
    - No external API call needed
+   - `montoConvertido` = `amount`, `tasaAplicada` = 1, `rateSource` = "same-currency"

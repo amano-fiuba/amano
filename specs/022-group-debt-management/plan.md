@@ -1,113 +1,225 @@
-# Implementation Plan: [FEATURE]
+# Implementation Plan: Gestión y cálculo de deudas de grupo
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Branch**: `feat/group-debt-management` | **Date**: 2026-11-06 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/speckit.plan` command; its definition describes the execution workflow.
+**Input**: Feature specification from `/specs/022-group-debt-management/spec.md`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+La 022 completa el núcleo del producto: a partir de los gastos compartidos de un grupo, calcular quién le debe a quién, proponer una liquidación con pocas transferencias y registrar y validar los pagos. **No parte de cero**: según research.md, el módulo `groupexpense` ya tiene gasto, reparto (`EqualSplit`), deuda (`Debt`), pago (`Payment`), claves de idempotencia y el enum `Currency`. El plan es por tanto una **extensión** de ese módulo:
+
+1. Saldos netos por miembro derivados de las deudas pendientes (sin tabla de saldos), con la suma del grupo siempre en cero.
+2. Liquidación como módulo de dominio puro con algoritmo voraz (a lo sumo n-1 transferencias), de solo lectura.
+3. Máquina de estados de deuda de 5 estados, con confirmación o rechazo de pagos por un administrador según la casilla "Pagos requieren validación".
+4. Solo pagos completos, con bloqueo de fila para que dos pagos simultáneos no puedan saldar la misma deuda.
+5. Vencimiento automático mediante una tarea programada idempotente, con umbral configurable por grupo.
+6. Conversión de moneda con cotización de OANDA de la fecha del gasto, detrás de un adaptador, sin inventar nunca una tasa.
+7. Integración con la 020: no se puede abandonar un grupo con deudas pendientes.
+
+Este plan **prevalece** sobre research.md, data-model.md, contracts/ y tasks.md donde se contradigan; la sección *Reconciliación de artefactos* lista cada diferencia.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
+**Language/Version**: Java 25 (backend); JavaScript con React 19.2 (frontend)
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
+**Primary Dependencies**: Spring Boot 4.1.1; Maven; React, react-router, Vite. **Sin dependencias nuevas**: el cliente de OANDA usa el `RestClient` de Spring, la tarea programada usa `@Scheduled` y la caché es en memoria acotada (sin Caffeine ni Redis). Las pruebas de propiedades usan JUnit 5 con generadores de semilla fija (ver *Pruebas*).
 
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
+**Storage**: PostgreSQL con migraciones Flyway en `backend/src/main/resources/db/migration`. Hay migraciones nuevas (ver *Migraciones*); las ya integradas no se editan.
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Testing**: JUnit 5 + Mockito, Spring Boot Test + Testcontainers, Vitest + Testing Library. Umbrales JaCoCo y Vitest ≥ 85 %; no se bajan. CI: `mvn -B verify` y `npm ci && npm run lint && npm run test:coverage && npm run build`. Las pruebas nunca llaman a OANDA: el proveedor de cotizaciones se reemplaza por un doble.
 
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
+**Target Platform**: Servidor Linux vía Docker Compose; navegador web desktop y móvil.
 
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: Aplicación web monorepo (backend REST + frontend SPA).
 
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+**Constraints**: mensajes de 010 sin cambios; cambios de contrato solo aditivos; voseo; montos con `BigDecimal` (escala 2, columnas `precision = 11, scale = 2`), sin punto flotante; reloj inyectable (`Clock`) para todo cálculo de fechas; credenciales de OANDA solo por variables de entorno.
 
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
-
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
-
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Scale/Scope** (estimado): backend con unas 12 clases nuevas (cálculo de saldos, planificador de liquidación, adaptador y caché de cotizaciones, tarea de vencimiento, servicios, controladores y DTOs) y 6 clases modificadas (`Debt`, `DebtStatus`, `GroupExpense`, `Payment`, `GroupExpenseService`, `GroupService.leaveGroup` de la 020), más 3 migraciones; frontend con 1 página y unos 7 componentes nuevos y 4 archivos modificados.
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+| # | Principio | Estado | Evidencia |
+|---|-----------|--------|-----------|
+| I | Arquitectura | PASS | Extiende `groupexpense`; el dominio nuevo (saldos, liquidación) es puro y sin dependencias de Spring ni JPA; sin capas nuevas |
+| II | Desarrollo guiado por especificaciones | PASS con nota | Hay que reconciliar los artefactos con este plan antes de `/speckit.tasks` |
+| III | Entrega incremental | PASS con nota | Orden por historia: saldos → liquidación → estados y pagos → vencimiento → moneda; tasks.md debe reordenarse (hoy casi todo está en "Foundational") |
+| IV | Alcance controlado | PASS con nota | Fuera: recordatorios, Whistle, estadísticas, amistades, administración de grupos. Toca comportamiento de la 018 (solo pagos completos) y de la 020 (bloqueo por deuda); ambos cambios quedan explícitos |
+| V | Calidad y cobertura | PASS | Unitarias, propiedades, IT con Testcontainers y Vitest; umbral 85 % |
+| VI | Integridad de reglas | PASS con nota | Nunca se inventa una cotización; una deuda solo se salda una vez (bloqueo de fila más índice parcial único); la suma de saldos es cero. La regla de solo pagos completos cambia a la 018 y debe revisarse en el PR |
+| VII | Contratos REST | PASS con nota | Campos y endpoints aditivos; los estados nuevos aparecen en respuestas existentes y el frontend se actualiza en el mismo release |
+| VIII | Validación y errores | PASS | `ProblemDetail`: 400 validación, 403 sin permiso, 404 neutral, 409 transición inválida, 503 cotización no disponible |
+| IX | Seguridad | PASS | El servidor decide siempre; solo miembros ven saldos; confirmar o rechazar pagos es solo para administradores; la clave de OANDA nunca va al repositorio ni a los logs |
+| X | Código mantenible | PASS | Nombres de enum en inglés como el código existente; etiquetas en español solo en el frontend |
+| XI | Entorno reproducible | PASS con nota | Propiedades nuevas (`amano.exchange.oanda.*`, programación) en `.env.example` y Docker Compose; migraciones versionadas |
+| XII | Revisión por pares | PENDIENTE (posterior) | PR aún no abierto |
+| XIII | Commits y trazabilidad | PENDIENTE (posterior) | Conventional Commits al implementar |
+
+**Gate resultado**: PASS con notas. Las decisiones pendientes de abajo bloquean `/speckit.tasks`, no el plan.
+
+## Verificaciones previas (primera tarea del feature)
+
+research.md describe el código existente, pero no lo prueba. Antes de implementar hay que confirmar cada punto; si alguno es falso, se corrige el plan:
+
+1. Existen `Debt`, `DebtStatus` (PENDING, PARTIALLY_PAID, PAID), `Payment` con `of()` e idempotencia, `EqualSplit` (partes iguales, personalizados y porcentajes) y `ActivityEventService`.
+2. El grupo ya guarda **moneda principal** y la casilla "Pagos requieren validación" (015). Si falta la moneda principal, se agrega en migración.
+3. Cómo persiste el estado de deuda (texto o enum ordinal, y si hay restricción `CHECK`) y si existen filas `PARTIALLY_PAID`.
+4. Si existen gastos o deudas en una moneda distinta a la del grupo (no se pueden convertir retroactivamente sin tasa).
+5. Si `@EnableScheduling` ya está activo y cómo se configura la zona horaria.
+6. Qué hacen hoy la edición y el borrado de gastos y el pago parcial (018).
+7. Que hay credencial de OANDA disponible. Sin ella, la historia 9 queda bloqueada.
+
+## Decisiones de diseño
+
+**D1. Reutilizar antes que crear.** Las historias 1 y 2 (registrar gasto y reparto) y gran parte de la 6 (registrar pago) ya existen; las tareas deben ser extensiones puntuales (redondeo, conversión, estados), no reimplementaciones.
+
+**D2. Dinero y redondeo.** `BigDecimal` con escala 2, comparación con `compareTo`. En el reparto, cada parte de los demás participantes se redondea al centavo (`HALF_UP`) y el **pagador absorbe la diferencia** (clarificación Q1): su parte es total menos la suma de las demás. Los importes personalizados deben sumar exactamente el total y los porcentajes exactamente 100.
+
+**D3. Estados de deuda.** Se conservan los nombres en inglés del código: `PENDING` (Pendiente), `PAYMENT_REPORTED` (Pago informado), `PAID` (Pagado), `VERIFIED` (Verificado), `OVERDUE` (Vencido). `PENDING` y `PAID` ya existen, por lo que no hace falta renombrar datos.
+
+| Desde | Hacia | Condición |
+|-------|-------|-----------|
+| (alta) | `PENDING` | Toda deuda nueva |
+| `PENDING` u `OVERDUE` | `PAID` | Se registra un pago completo y el grupo **no** requiere validación |
+| `PENDING` u `OVERDUE` | `PAYMENT_REPORTED` | Se registra un pago completo y el grupo requiere validación |
+| `PAYMENT_REPORTED` | `VERIFIED` | Un administrador confirma el pago |
+| `PAYMENT_REPORTED` | `PENDING` | Un administrador rechaza el pago |
+| `PENDING` | `OVERDUE` | La tarea programada detecta la deuda vencida (D7) |
+
+`PAID` y `VERIFIED` son estados finales y equivalentes para el saldo (Q7). El historial conserva el camino recorrido.
+
+**D4. Saldos derivados.** No hay tabla de saldos. Una deuda está **pendiente de saldar** en `PENDING`, `PAYMENT_REPORTED` y `OVERDUE`; está **saldada** en `PAID` y `VERIFIED`. Como solo se aceptan pagos completos, `paidAmount` vale 0 o el monto total, y la deuda pendiente aporta `amount − paidAmount` con el `getOutstanding()` existente. El saldo neto de un miembro es la suma de lo que le deben menos la suma de lo que debe, dentro del grupo, incluidas las personas simuladas. La suma de saldos del grupo es siempre 0. El cálculo es una función pura (`BalanceCalculator`) que recibe deudas y devuelve saldos; se evalúa en cada consulta.
+
+**D5. Liquidación.** `SettlementPlanner` es puro y recibe los saldos netos. Mientras haya saldos distintos de cero, toma el mayor acreedor y el mayor deudor (desempate por identificador, para que el resultado sea reproducible), transfiere el menor de los dos montos y repite. Cada paso deja al menos a un miembro en cero y el último deja a dos, por lo que hay **a lo sumo n-1 transferencias** (n = miembros con saldo distinto de cero). El mínimo absoluto es un problema NP-difícil y no se busca. Invariantes: el total transferido es la suma de los saldos positivos (no la suma bruta de deudas, que es mayor cuando hay deudas cruzadas), aplicar la propuesta deja a todos en cero y el cálculo no modifica gastos ni deudas.
+
+**D6. Pagos y concurrencia.** Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo pesimista de la fila de la deuda** (`PESSIMISTIC_WRITE`). La misma clave de idempotencia devuelve el pago existente (patrón actual); una clave distinta sobre una deuda ya informada o saldada responde 409. Un índice único parcial en `payments(debt_id)` para pagos activos (`REPORTED`, `CONFIRMED`) garantiza en la base que una deuda se salda una sola vez. Un pago menor al monto de la deuda se rechaza (400).
+
+**D7. Vencimiento.** El grupo tiene `debtDueDays` (entero, nulo por defecto; nulo significa que nunca vence). Una tarea `@Scheduled` diaria, con `Clock` inyectado, pasa a `OVERDUE` las deudas `PENDING` cuya fecha de gasto más `debtDueDays` ya pasó. Es idempotente (actualización masiva con condición de estado) y segura con varias instancias. Una deuda vencida **sigue siendo saldo** y se puede pagar. Un rechazo devuelve la deuda a `PENDING`, y si ya está vencida la próxima ejecución la vuelve a `OVERDUE`.
+
+**D8. Cotizaciones.** `ExchangeRateProvider` es una interfaz de dominio, con `OandaExchangeRateClient` (infraestructura) y una caché decoradora en memoria acotada, por (par, fecha). Una cotización histórica no cambia, así que no hay TTL ni "tasa vieja". La conversión se aplica **una sola vez al total del gasto**; el reparto y las deudas se calculan sobre el monto convertido, en la moneda del grupo. En el gasto se guardan moneda y monto originales, monto convertido, tasa, fecha y fuente de la tasa. Si OANDA no responde tras los reintentos y la tasa no está en caché, **el gasto no se guarda**: 503 con mensaje en voseo que sugiere registrarlo en la moneda del grupo o reintentar. No existe tasa "por defecto". Misma moneda: tasa 1 y sin llamada externa.
+
+**D9. Gastos inmutables.** Un gasto con participantes además del pagador no se edita ni se elimina (Q4, 409 con mensaje). Un gasto personal (sin participantes) sí puede eliminarse.
+
+**D10. Integración con la 020.** `GroupService.leaveGroup` consulta a `BalanceQuery.hasOutstandingBalance(groupId, member)`: si el miembro figura como deudor o acreedor en una deuda pendiente de saldar, no puede abandonar (409 con motivo). El mensaje se agrega sin modificar los de 010.
+
+## Decisiones pendientes (bloquean `/speckit.tasks`; resolver con `/speckit.clarify`)
+
+1. **¿Cómo se paga una transferencia propuesta?** La liquidación puede proponer "A le paga a C" cuando A solo le debe a B y B le debe a C; esa transferencia no coincide con ninguna deuda y el pago se registra por deuda. Opciones: (a) la propuesta es solo orientativa y cada pago se registra sobre una deuda directa; (b) registrar una transferencia propuesta salda las deudas de origen mediante neteo. Sin esta decisión, la propuesta no se puede ejecutar dentro de la app.
+2. **Personas simuladas.** FR-003 y SC-001 las incluyen en los saldos, pero la clarificación Q6 dice que "no tienen obligación financiera". Hay que decidir si entran en la propuesta como origen o destino (marcadas como informativas), quién registra sus pagos y si pueden figurar como pagador de un gasto (hoy el acreedor es siempre un usuario registrado).
+3. **Alcance del vencimiento.** La clarificación dice umbral por grupo, pero también que solo vencen los gastos recurrentes. Este plan implementa el umbral por grupo para cualquier gasto; hay que confirmar si se restringe a recurrentes y qué mensaje ve el usuario.
+4. **"Pendiente" incluye "Vencido".** Se interpreta que se puede pagar una deuda `OVERDUE`; la spec dice solo "pendiente" y sería absurdo impedirlo. Confirmar.
+5. **Pagos parciales ya existentes (018).** Si hay filas `PARTIALLY_PAID` o pagos parciales registrados, hay que definir su migración. No se asume nada.
+6. **Cotización no disponible.** Se rechaza el gasto (D8). Confirmar que esa es la política, en vez de permitir cargar la tasa a mano.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
-├── plan.md              # This file (/speckit.plan command output)
-├── research.md          # Phase 0 output (/speckit.plan command)
-├── data-model.md        # Phase 1 output (/speckit.plan command)
-├── quickstart.md        # Phase 1 output (/speckit.plan command)
-├── contracts/           # Phase 1 output (/speckit.plan command)
-└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
+specs/022-group-debt-management/
+├── spec.md, plan.md, research.md, data-model.md, quickstart.md, tasks.md
+├── contracts/
+│   ├── liquidation-proposal.md      # a corregir (ver Reconciliación)
+│   ├── currency-conversion.md       # a corregir
+│   ├── balances-and-debts.md        # nuevo: saldos, deudas pendientes, resumen entre grupos
+│   └── payment-validation.md        # nuevo: registrar, confirmar y rechazar pagos
+└── checklists/requirements.md
 ```
 
 ### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
 
 ```text
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+backend/src/main/java/com/amano/backend/groupexpense/
+├── Debt.java, DebtStatus.java, GroupExpense.java, Payment.java   # modificados
+├── GroupExpenseService.java        # modificado: redondeo (D2), conversión (D8), inmutabilidad (D9)
+├── balance/                        # nuevo, dominio puro
+│   ├── MemberRef.java, MemberBalance.java
+│   └── BalanceCalculator.java
+├── settlement/                     # nuevo, dominio puro
+│   ├── Transfer.java
+│   └── SettlementPlanner.java
+├── payment/                        # nuevo
+│   └── PaymentValidationService.java   # registrar, confirmar, rechazar (D6)
+├── exchange/                       # nuevo
+│   ├── ExchangeRateProvider.java       # interfaz de dominio
+│   ├── OandaExchangeRateClient.java    # infraestructura (RestClient)
+│   └── CachingExchangeRateProvider.java
+├── overdue/
+│   └── OverdueDebtJob.java         # nuevo (D7)
+└── api/                            # controladores y DTOs nuevos, según convención existente
 
-tests/
-├── contract/
-├── integration/
-└── unit/
+backend/src/main/java/com/amano/backend/groups/
+└── GroupService.java               # modificado: leaveGroup consulta saldo pendiente (D10)
 
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
+backend/src/main/resources/db/migration/    # 3 migraciones nuevas
+backend/src/test/java/com/amano/backend/groupexpense/   # pruebas espejo
 
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+frontend/src/
+├── pages/groups/GroupDebtsView.jsx                 # nuevo: pestañas Saldos | Mis deudas | Liquidación | Pagos por validar
+├── components/debts/                               # nuevo
+│   ├── BalanceList.jsx, DebtList.jsx, DebtDetailModal.jsx
+│   ├── RegisterPaymentModal.jsx, SettlementProposal.jsx
+│   ├── PaymentValidationList.jsx, ConvertedAmount.jsx
+│   └── debtStatusLabels.js         # etiquetas en español de los 5 estados
+└── (modificados) formulario y detalle de gasto, configuración de grupo (debtDueDays), aviso al abandonar grupo
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+**Structure Decision**: Se mantiene el monorepo existente (backend REST + frontend SPA); sin proyectos nuevos. El dominio nuevo vive en subpaquetes de `groupexpense`. Las rutas exactas de los archivos existentes se confirman en la verificación previa.
+
+## API (aditiva; rutas finales alineadas con los controladores existentes)
+
+| Endpoint | Quién | Notas |
+|----------|-------|-------|
+| `POST /groups/{groupId}/expenses` | Miembro | Existente; la respuesta suma monto convertido, tasa y fuente |
+| `GET /groups/{groupId}/balances` | Miembro | Saldo neto por miembro |
+| `GET /groups/{groupId}/settlement-proposal` | Miembro | Solo lectura; reemplaza el `POST` con cuerpo del contrato actual |
+| `GET /groups/{groupId}/debts/pending` | Miembro | Mis deudas, con origen y detalle |
+| `GET /users/me/debts` | Usuario | Resumen por grupo; el total entre grupos es informativo (Q5) |
+| `POST /groups/{groupId}/debts/{debtId}/payments` | Deudor involucrado | Existente; extiende estados y validación (D6) |
+| `GET /groups/{groupId}/payments/pending-validation` | Administrador | Cola de pagos informados |
+| `POST /groups/{groupId}/payments/{paymentId}/confirm` y `/reject` | Administrador | 403 si no es administrador |
+| Ajustes del grupo | Administrador | Campo aditivo `debtDueDays` |
+
+## Migraciones
+
+1. `debts`: nuevos valores de estado (y su restricción, si existe), columna `overdue_at`.
+2. `group_expenses`: `converted_amount`, `exchange_rate` (decimal con 6 decimales como mínimo), `rate_date`, `rate_source`; relleno de `converted_amount = amount` donde la moneda coincide con la del grupo.
+3. `payments`: `status` (`REPORTED`, `CONFIRMED`, `REJECTED`), `decided_by_user_id`, `decided_at`, índice único parcial por `debt_id` para pagos activos. `groups`: `debt_due_days` (y moneda principal si faltara).
+
+## Diseño del frontend
+
+- `GroupDebtsView` muestra cuatro pestañas; "Pagos por validar" solo para administradores.
+- Los estados se muestran siempre con `debtStatusLabels.js`, nunca con el valor del enum.
+- `ConvertedAmount` muestra "$50 USD · $925 ARS" cuando la moneda del gasto difiere de la del grupo.
+- La propuesta de liquidación indica quién transfiere, a quién y cuánto; si una parte es persona simulada se rotula como informativa (sujeto a la decisión 2).
+- Diseño responsive: las pestañas colapsan a lista en móvil.
+
+## Pruebas
+
+- **Unitarias (puras)**: `BalanceCalculator`, `SettlementPlanner`, redondeo del reparto y máquina de estados.
+- **Propiedades**, con JUnit 5 y generadores de semilla fija (se imprime la semilla al fallar): suma de saldos igual a cero; total transferido igual a la suma de saldos positivos; transferencias ≤ n-1; aplicar la propuesta deja todos los saldos en cero; las partes de un reparto suman el total; la propuesta no modifica deudas.
+- **Integración (Testcontainers)**: gasto → deudas → saldos; pago con y sin validación; confirmación y rechazo; **dos pagos concurrentes sobre la misma deuda dejan exactamente uno aplicado**; tarea de vencimiento ejecutada dos veces con el mismo resultado; abandono de grupo bloqueado por deuda; conversión con proveedor simulado y falla del proveedor.
+- **Frontend (Vitest)**: pestañas, modales de pago y validación, etiquetas de estado, monto convertido.
+
+## Reconciliación de artefactos (corregir antes de `/speckit.tasks`)
+
+| Artefacto | Problema | Corrección |
+|-----------|----------|------------|
+| research.md §4–5 | `VENCIDO` solo desde `PAGO_INFORMADO` o `PAGADO` (al revés: una deuda saldada no vence) y vencimiento por gasto recurrente | D3 y D7 |
+| research.md §3 | Llama "set cover" al problema NP-difícil de minimizar transferencias | Decir solo NP-difícil |
+| research.md §7 y currency-conversion.md | Tasa "memo-default", TTL de 24 h y "tasa vieja"; dos comportamientos contradictorios ante falla | D8 |
+| research.md §9 | Sugiere `junit-quickcheck` (dependencia nueva) | Generadores propios, sin dependencia |
+| data-model.md | `recurrent` y `vencimientoDias` en `GroupExpense` (duplica la 009 y contradice el umbral por grupo); dice que `PAGO_INFORMADO` equivale a `PAGADO` para el saldo; nombres de estado en español; falta la entidad `Payment` y los campos de `Group`; el VO de monto convertido no tiene dueño | D3, D4, D7, D8 y *Migraciones* |
+| liquidation-proposal.md | Incluye deudas `PAGADO` y excluye `VENCIDO`; invariante `totalTransferred = totalOriginalDebt` (falso con deudas cruzadas); excluye personas simuladas aunque tienen saldo; ejemplo con la cuenta rehecha a mitad del texto; `includeSummary` entre grupos no aplica | D4, D5 y decisión 2 |
+| tasks.md | T004 duplicada; subtareas con formato roto; T017 prueba una propiedad incorrecta; US8 y US9 dependen de sí mismas; casi no hay tareas de frontend; faltan tareas para inmutabilidad de gastos (D9), abandono de grupo (D10), confirmar y rechazar pagos, tarea de vencimiento, `debtDueDays` y migraciones; la tabla de cobertura y las métricas aparecen duplicadas; FR-010 apunta a tareas que no lo cubren | Regenerar con `/speckit.tasks` |
+| spec.md | SC-003 con "95 %" sin sustento; texto de plantilla `[Describe this user journey...]` en las 9 historias; etiqueta `</feature-specification>` suelta; FR-004 dice "mínimo" y SC-002 "≤ n-1" | Limpiar; usar "reducido" en FR-004 |
+| quickstart.md | Pide Java 17+ y PostgreSQL 15+ (el proyecto usa Java 25); el escenario de pago parcial y los de cotización dependen de D6 y D8 | Alinear versiones y escenarios |
+
+## Validación manual
+
+Ver [quickstart.md](./quickstart.md), una vez reconciliado.
 
 ## Complexity Tracking
 
-> **Fill ONLY if Constitution Check has violations that must be justified**
-
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+Sin desvíos.

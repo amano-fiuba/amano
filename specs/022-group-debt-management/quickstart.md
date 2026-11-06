@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Java 17+ (Spring Boot project)
+- Java 25 (backend Spring Boot project)
 - Maven 3.8+ (for backend: `mvn -B verify`)
 - Node.js 20+ + npm 10+ (for frontend: `npm ci && npm run lint && npm run test:coverage && npm run build`)
 - PostgreSQL 15+ running with `amano` database
@@ -94,11 +94,11 @@ mvn flyway:migrate
 1. Ensure Scenario 1 is complete (debts exist in `PENDIENTE` status)
 2. Navigate to the group's debt details
 3. Select a pending debt
-4. Enter payment amount (must be ≤ outstanding amount)
+4. Enter payment amount (must equal outstanding amount exactly; partial payments rejected)
 5. Enter payment date (today or past)
 6. Submit the payment
 7. **Expected outcomes** (depending on group "Pagos requiere validación" setting):
-   - **Without validation**: Debt state changes to `PAGADO` if full amount paid; partial payments rejected
+   - **Without validation**: Debt state changes to `PAGADO` if full amount paid; partial/rejected payments fail
    - **With validation**: Debt state changes to `PAGO_INFORMADO`; admin must confirm (changes to `VERIFICADO`) or reject (remains `PENDIENTE`)
    - Payment is recorded in the group's activity history
    - Group balances still sum to zero (SC-001)
@@ -118,7 +118,7 @@ mvn flyway:migrate
    - Transfer count ≤ (members with non-zero balance - 1) [SC-002]
    - Total transferred equals total net needed to settle [SC-001]
    - Original expense history is unchanged (verified by checking expense list)
-   - Summary shows `totalTransferred` and `totalOriginalDebt` with a guarantee they match
+   - Summary shows `totalTransferred` and `totalNetBalances` with a guarantee they match
 5. **Manual verification**: Apply the transfers manually and confirm all members end at zero balance
 
 ### Scenario 4: Multi-Currency Expense
@@ -177,11 +177,12 @@ The following properties should pass after implementation (verified via the proj
 |----------|-------------|-------------|
 | **SC-001** | Suma de saldos de un grupo es siempre cero | After any expense/payment/liquidation operation, compute `Σ(balance_i)` for all group members (including simulated persons); result must be exactly 0 |
 | **SC-002** | Transferencias ≤ n-1 | After liquidation, count members with balance ≠ 0 (call it M); verify `transferCount ≤ M - 1` |
-| **Partial payment rejected** | Attempting to register payment < outstanding amount fails | Payment registration with amount < `getOutstanding()` throws exception |
+| **Full payment required** | Attempting to register payment ≠ outstanding amount fails | Payment registration with amount ≠ `debt.getOutstanding()` throws exception / 400 error |
 | **Idempotency** | Same idempotency key twice → same result | Submitting payment with same key returns existing payment; no duplicate created |
 | **Pago informado → Verificado/Pagado** | State transitions follow the group's "Pagos requiere validación" setting | Verify debt state after payment registration with both settings |
-| **Vencido auto-transition** (recurring only) | Recurring expenses past their deadline → Vencido | For recurring expenses, check `currentDate > expenseDate + vencimientoDias` → debt status becomes VENCIDO |
+| **Vencido auto-transition** (recurring only) | Recurring expenses past their deadline → Vencido | For recurring expenses, check `currentDate > expenseDate + group.debtDueDays` → debt status becomes VENCIDO |
 | **No floating point** | All monetary values are BigDecimal with scale 2 | Verify no Double/Float types in financial domain; all DB columns precision=11, scale=2 |
+| **VENCIDO debts still count as saldo** | Debts in VENCIDO state contribute to net balance | Verify that VENCIDO debts still appear in balance calculations |
 
 ## Commands Summary
 

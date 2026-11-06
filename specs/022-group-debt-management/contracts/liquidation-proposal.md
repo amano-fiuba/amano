@@ -15,7 +15,8 @@ Define the contract for generating a debt liquidation proposal within a group. T
 | Field | Type | Description | Required |
 |-------|------|-------------|----------|
 | `groupId` | `Long` | Identifier of the group to liquidate | Yes |
-| `includeSummary` | `boolean` | Whether to include cross-group summary totals | No; default: `false` |
+
+_No body parameters needed. This is a GET request: `GET /groups/{groupId}/settlement-proposal`_
 
 ## Response
 
@@ -24,9 +25,8 @@ Define the contract for generating a debt liquidation proposal within a group. T
 | Field | Type | Description |
 |-------|------|-------------|
 | `groupId` | `Long` | The group that was liquidated |
-| `transfers` | `List<Transfer>` | The proposed transfers to settle all debts |
-| `summary` | `TransferSummary` | Informational totals (only if `includeSummary=true`) |
-| `originalExpenseCount` | `Integer` | Number of expenses in the group (unchanged by liquidation) |
+| `transfers` | `List<Transfer>` | The proposed transfers to settle all pending debts |
+| `summary` | `TransferSummary` | Informational totals (only relevant if needed for display) |
 
 ### `Transfer`
 
@@ -42,7 +42,7 @@ Define the contract for generating a debt liquidation proposal within a group. T
 | Field | Type | Description |
 |-------|------|-------------|
 | `totalTransferred` | `BigDecimal` | Sum of all transfer amounts |
-| `totalOriginalDebt` | `BigDecimal` | Sum of all debts before liquidation (should equal `totalTransferred`) |
+| `totalNetBalances` | `BigDecimal` | Sum of positive net balances (what needs to be transferred to settle) |
 | `membersSettled` | `Integer` | Number of members now at zero balance |
 | `transferCount` | `Integer` | Number of transfers proposed (guaranteed ≤ `nonZeroMembers - 1`) |
 
@@ -56,8 +56,8 @@ Define the contract for generating a debt liquidation proposal within a group. T
 ## Behavior Rules
 
 1. **Only group members** (registered or simulated) are included in the calculation.
-2. **Only debts in states** that can be settled are included (PENDIENTE, PAGO_INFORMADO, PAGADO; VENCIDO debts are excluded or handled per group rule).
-3. **Simulated persons** are included in the balance calculation but cannot be `fromMemberId` or `toMemberId` in transfers (they have no account for real transfers).
+2. **Only debts in states** that can be settled are included (PENDIENTE, PAGO_INFORMADO; VENCIDO debts are excluded from proposal but still appear as informational). ONLY debts that are NOT VENCIDO and NOT PAGADO/VERIFICADO are included.
+3. **Simulated persons** are included in the balance calculation but cannot be `fromMemberId` or `toMemberId` in real transfers (they have no account for real transfers). They may appear as `fromMemberId` or `toMemberId` marked as `[informativo]`.
 4. **The proposal is read-only**: It does not change any debt states, paid amounts, or expense records.
 5. **Currency consistency**: All transfers are in the group's primary currency. If the group has multi-currency expenses, converted amounts are shown but transfers are in the group currency.
 
@@ -70,12 +70,12 @@ Debts: Alice owes Bob $10, Bob owes Claire $5, Claire owes Alice $3
 LiquidationProposalResponse:
 {
   "transfers": [
-    { "fromMemberId": "Alice", "toMemberId": "Claire", "amount": "7.00", "originDebtIds": ["debt_AliceClaire"] },
-    { "fromMemberId": "Bob", "toMemberId": "Claire", "amount": "3.00", "originDebtIds": ["debt_BobClaire"] }
+    { "fromMemberId": "Alice", "toMemberId": "Bob", "amount": "7.00", "originDebtIds": ["debt_AliceBob"] },
+    { "fromMemberId": "Claire", "toMemberId": "Bob", "amount": "2.00", "originDebtIds": ["debt_ClaireBob"] }
   ],
   "summary": {
-    "totalTransferred": "10.00",
-    "totalOriginalDebt": "18.00",
+    "totalTransferred": "9.00",
+    "totalNetBalances": "9.00",
     "membersSettled": 3,
     "transferCount": 2
   }
@@ -83,10 +83,10 @@ LiquidationProposalResponse:
 ```
 
 **Verification**: After applying these transfers:
-- Alice: -7 (to Claire) + 3 (from Bob) = -4 net... wait, let me recalculate
-- Actually the net balances should be: Alice: -10 + 3 = -7 (still owes), Bob: +10 - 5 = +5 (is owed), Claire: +5 - 3 = +2 (is owed)... hmm this doesn't settle.
+- Alice: -7 (to Bob) → net -7 (debitor)
+- Bob: +7 (from Alice) + 2 (from Claire) → net +9 (creditor) ... wait, let me recalculate net balances:
 
-Let me reconsider. The algorithm should compute net balances:
+Net balances before liquidation:
 - Alice: -10 (owes Bob) + 3 (owed by Claire) = -7 (net debtor, owes 7)
 - Bob: +10 (owed by Alice) - 5 (owes Claire) = +5 (net creditor, is owed 5)
 - Claire: +5 (owed by Bob) - 3 (owed to Alice) = +2 (net creditor, is owed 2)
