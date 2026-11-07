@@ -157,6 +157,20 @@
 - [ ] T059 [P] Confirmar integración con feature 020: `GroupService.leaveGroup` bloquea si `hasOutstandingBalance(groupId, member)` es true
 
 ---
+## Phase 12: Frontend (022)
+
+- [ ] T068 [P] [US9] Selector de moneda principal (`primaryCurrency`) en la creación del grupo: verificar que `POST /api/groups` acepta `primaryCurrency` (backend ya expone el campo); si no, tarea de backend aparte. Archivos: `frontend/src/pages/groups/GroupCreateForm.jsx` (o equivalente), `frontend/src/api/groupsClient.js`. Tests: `GroupCreateForm.test.jsx`. Contrato: `contracts/expense-split-and-edit.md` §1.
+- [ ] T069 [P] [US9] Backend: `GET /api/groups/{groupId}/exchange-quote?currency=&date=` de solo lectura (tasa, fecha efectiva, fuente; 503 sin cotización; solo miembros). Archivos: `GroupExpenseController.java`, `GroupExpenseService.java`. Tests: `GroupExpenseControllerIT`. Contrato: `contracts/expense-split-and-edit.md` §1.
+- [ ] T070 [P] [US9] En el formulario de gasto, vista previa del monto convertido con la cotización de `exchange-quote`, con aviso de que la cotización final se fija al guardar. Archivos: `frontend/src/pages/groups/GroupExpenseFormView.jsx`, `frontend/src/components/debts/ConvertedAmount.jsx`. Tests: `GroupExpenseFormView.test.jsx`.
+- [ ] T071 [P] [US2] Helpers de reparto frontend (`frontend/src/pages/groups/splitCustom.js`, `splitPercentage.js`) con tests Vitest de suma exacta y resto al pagador. Archivos: helpers + tests. Contrato: `contracts/expense-split-and-edit.md` §1. (reemplaza T065)
+- [ ] T072 [P] [US2] UI de reparto en `GroupExpenseFormView.jsx`: selector EQUAL/CUSTOM/PERCENTAGE, inputs por participante, diferencia visible, botón deshabilitado hasta suma exacta (total para CUSTOM, 100 para PERCENTAGE). Tests: `GroupExpenseFormView.test.jsx`. Contrato: §1. (reemplaza T026)
+- [ ] T073 [P] [US2] Selector de pagador en el formulario de gasto respetando la casilla `members_can_generate_expenses_for_others` del grupo. Archivos: `GroupExpenseFormView.jsx`, `frontend/src/api/groupsClient.js`. Tests: `GroupExpenseFormView.test.jsx`.
+- [ ] T074 [P] [US1] `GroupDebtsView.jsx` con pestañas (mis deudas pendientes, saldos, propuesta de liquidación, "Pagos por validar" solo admins), responsive, estados con `debtStatusLabels.js`. Archivos: `frontend/src/pages/groups/GroupDebtsView.jsx`, `frontend/src/pages/groups/debtStatusLabels.js`. Tests: `GroupDebtsView.test.jsx`, `debtStatusLabels.test.js`.
+- [ ] T075 [P] [US6] Registrar un pago completo desde una deuda; confirmar y rechazar pagos (solo admin). Archivos: `frontend/src/components/groups/...`, `frontend/src/api/paymentsClient.js`. Tests: Vitest.
+- [ ] T076 [P] [US8] Historial: mostrar eventos nuevos (pago registrado, confirmado, rechazado, deuda vencida, liquidación propuesta, gasto editado, gasto borrado). Archivos: `frontend/src/pages/groups/GroupHistoryView.jsx`, `frontend/src/pages/groups/activityDescriptions.js`. Tests: `GroupHistoryView.test.jsx`, `activityDescriptions.test.js`.
+- [ ] T077 [P] [US1] Editar y borrar un gasto personal desde la UI (PATCH/DELETE). Archivos: `frontend/src/pages/groups/GroupExpenseFormView.jsx` o detalle. Tests: Vitest.
+- [ ] T078 [P] [US1] Configurar `debtDueDays` del grupo en la UI (si el backend ya lo expone). Archivos: `frontend/src/components/groups/GroupEditForm.jsx`. Tests: `GroupEditForm.test.jsx`.
+
 ## Coverage Table: FR-SC Alignment
 
 `Complete` requires every mapped task to be marked `[X]`; otherwise the requirement stays `Pending`.
