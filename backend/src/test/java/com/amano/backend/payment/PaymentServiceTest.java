@@ -272,6 +272,17 @@ class PaymentServiceTest {
     }
 
     @Test
+    void the018FlowAlwaysMarksItsPaymentAsLegacyEvenWhenItSettlesTheDebt() {
+        service.register(JUAN, KEY, pay("3333.33"));
+
+        ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(saved.capture());
+        assertThat(saved.getValue().isLegacy()).isTrue();
+        assertThat(saved.getValue().getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAID);
+    }
+
+    @Test
     void aPaidDebtAnswers409WithoutWriting() {
         debt.applyPayment(new BigDecimal("3333.33"));
 

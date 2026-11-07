@@ -20,6 +20,9 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
 
     List<Debt> findByExpenseId(Long expenseId);
 
+    /** All debts of a group, for the derived balances (022 D4). */
+    List<Debt> findByGroupId(Long groupId);
+
     /**
      * 018 (data-model.md §Concurrencia, plan.md D5): the debt with a pessimistic
      * write lock ({@code SELECT … FOR UPDATE}), so concurrent payments of the

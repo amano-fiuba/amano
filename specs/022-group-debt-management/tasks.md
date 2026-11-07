@@ -36,11 +36,11 @@
 **Goal**: Verify that group balance sums to zero after expense/payment registration  
 **Independent Test**: After registering an expense or payment, compute `Σ(balance_i)` for all group members (including simulated persons); result must be exactly 0
 
-- [ ] T012 [P] [US3] Implementar endpoint `GET /groups/{groupId}/balances` que devuelva saldo neto por miembro usando `BalanceCalculator` pura
-- [ ] T013 [US3] Probar que balances suman cero después de registrar gasto con participantes múltiples
+- [X] T012 [P] [US3] Implementar endpoint `GET /groups/{groupId}/balances` que devuelva saldo neto por miembro usando `BalanceCalculator` pura
+- [X] T013 [US3] Probar que balances suman cero después de registrar gasto con participantes múltiples
 - [ ] T014 [P] [US3] Probar que balances suman cero después de registrar pago (con y sin validación)
-- [ ] T015 [US3] Probar que balances suman cero después de liquidación
-- [ ] T016 [P] [US3] Integrar persona simulada en cálculo de saldos (contribuye al balance vía `debtorSimulatedProfileId`)
+- [X] T015 [US3] Probar que balances suman cero después de liquidación
+- [X] T016 [P] [US3] Integrar persona simulada en cálculo de saldos (contribuye al balance vía `debtorSimulatedProfileId`)
 
 ---
 ## Phase 4: User Story 1 - Registrar un gasto compartido (Priority: P1)

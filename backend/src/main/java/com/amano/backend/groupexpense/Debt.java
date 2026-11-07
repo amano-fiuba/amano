@@ -113,12 +113,13 @@ public class Debt {
     /**
      * Applies a payment (used by 018): {@code 0 < payment <= outstanding}, at most
      * two decimals. Moves PENDING → PARTIALLY_PAID → PAID or PENDING → PAID; a
-     * settled (PAID/VERIFIED) debt or an invalid amount is rejected without
-     * changes (FR-012). 022 keeps this legacy behavior for the 018 flow and adds
-     * the full-payment transitions through {@link DebtStatus#settledBy(boolean)}.
+     * debt that is not payable (PAYMENT_REPORTED/PAID/VERIFIED) or an invalid
+     * amount is rejected without changes (FR-012). 022 keeps this legacy behavior
+     * for the 018 flow and adds the full-payment transitions through
+     * {@link DebtStatus#settledBy(boolean)}.
      */
     public void applyPayment(BigDecimal payment) {
-        if (status.isSettled()) {
+        if (!status.isPayable()) {
             throw new IllegalStateException("La deuda ya está pagada");
         }
         if (payment == null || payment.signum() <= 0 || payment.stripTrailingZeros().scale() > 2) {

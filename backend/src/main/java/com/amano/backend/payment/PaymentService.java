@@ -114,13 +114,13 @@ public class PaymentService {
 
         debt.applyPayment(normalized.amount());
         String receiverName = nameOf(debt.getCreditorUserId());
-        // Transitional bridge for 022: while 018 still accepts partial payments,
-        // those rows are marked legacy so the partial unique index (which only
-        // covers active/reported-or-confirmed payments of the new flow) does not
-        // reject them. US6 switches the flow to full payments.
-        boolean legacy = debt.getStatus() == DebtStatus.PARTIALLY_PAID;
+        // Transitional bridge for 022: while the 018 flow owns payment
+        // registration, every payment it writes is legacy, even when that same
+        // payment settles the debt (PENDING -> PAID). The state is read after
+        // applyPayment, so it cannot decide the flag. The 022 full-payment flow
+        // will pass false explicitly.
         Payment payment = paymentRepository.save(Payment.of(debt, normalized.amount(), normalized.date(),
-                callerId, receiverName, idempotencyKey, legacy));
+                callerId, receiverName, idempotencyKey, true));
 
         activityEventService.recordPaymentMade(debt.getGroupId(), callerId, new PaymentActivityDetails(
                 payment.getId(), payment.getAmount(), payment.getCurrency().name(), payment.getPayerName(),

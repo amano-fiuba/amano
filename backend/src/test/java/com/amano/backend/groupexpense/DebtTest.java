@@ -177,4 +177,28 @@ class DebtTest {
         assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAID);
     }
+
+    @Test
+    void aReportedDebtRejectsPayments() {
+        Debt debt = pending("50.00");
+        ReflectionTestUtils.setField(debt, "status", DebtStatus.PAYMENT_REPORTED);
+
+        assertThatThrownBy(() -> debt.applyPayment(new BigDecimal("1.00")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("La deuda ya está pagada");
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+    }
+
+    @Test
+    void anOverdueDebtAcceptsPayments() {
+        Debt debt = pending("50.00");
+        ReflectionTestUtils.setField(debt, "status", DebtStatus.OVERDUE);
+
+        debt.applyPayment(new BigDecimal("50.00"));
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAID);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("0.00");
+    }
 }
