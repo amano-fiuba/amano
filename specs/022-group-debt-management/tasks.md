@@ -38,7 +38,7 @@
 
 - [X] T012 [P] [US3] Implementar endpoint `GET /groups/{groupId}/balances` que devuelva saldo neto por miembro usando `BalanceCalculator` pura
 - [X] T013 [US3] Probar que balances suman cero después de registrar gasto con participantes múltiples
-- [ ] T014 [P] [US3] Probar que balances suman cero después de registrar pago (con y sin validación)
+- [X] T014 [P] [US3] Probar que balances suman cero después de registrar pago (con y sin validación)
 - [X] T015 [US3] Probar que balances suman cero después de liquidación
 - [X] T016 [P] [US3] Integrar persona simulada en cálculo de saldos (contribuye al balance vía `debtorSimulatedProfileId`)
 
@@ -73,11 +73,11 @@
 **Goal**: Verify that liquidation proposal suggests minimum transfers (≤ n-1) to settle all debts  
 **Independent Test**: After liquidation, count members with balance ≠ 0 (call it M); verify `transferCount ≤ M - 1`; total transferred equals total net needed to settle
 
-- [ ] T027 [P] [US4] Implementar endpoint `GET /groups/{groupId}/settlement-proposal` (sin cuerpo, GET solo) que devuelva propuesta de liquidación
-- [ ] T028 [US4] Probar que transfer count ≤ (nonZeroMembers - 1) [SC-002]
-- [ ] T029 [P] [US4] Probar que total transferred = sum of positive net balances (no la deuda bruta, que es mayor con deudas cruzadas)
-- [ ] T030 [US4] Probar ejemplo correcto: Alice→Bob $5, Alice→Claire $2; total transferred $7, transfer count 2 = 3-1 ✓
-- [ ] T031 [P] [US4] Probar que propuesta NO modifica gastos ni records de deudas (solo lectura)
+- [X] T027 [P] [US4] Implementar endpoint `GET /groups/{groupId}/settlement-proposal` (sin cuerpo, GET solo) que devuelva propuesta de liquidación
+- [X] T028 [US4] Probar que transfer count ≤ (nonZeroMembers - 1) [SC-002]
+- [X] T029 [P] [US4] Probar que total transferred = sum of positive net balances (no la deuda bruta, que es mayor con deudas cruzadas)
+- [X] T030 [US4] Probar ejemplo correcto: Alice→Bob $5, Alice→Claire $2; total transferred $7, transfer count 2 = 3-1 ✓
+- [X] T031 [P] [US4] Probar que propuesta NO modifica gastos ni records de deudas (solo lectura)
 
 ---
 ## Phase 7: User Story 5 - Gestionar estado de cada deuda (Priority: P2)
@@ -110,7 +110,7 @@
 **Goal**: Verify that pending debts are listed with origin and detail  
 **Independent Test**: After registering expenses with different payers, pending debts list shows correct origin info
 
-- [ ] T043 [P] [US7] Implementar endpoint `GET /groups/{groupId}/debts/pending` que devuelva deudas con status `PENDING` o `PAYMENT_REPORTED`
+- [ ] T043 [P] [US7] Implementar endpoint `GET /groups/{groupId}/debts/pending` que devuelva deudas con status `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED` u `OVERDUE`, igual que el cálculo de saldos
 - [ ] T044 [US7] Probar que deuda incluye origen: `expenseId`, `shareId`, `currency`, amount, paidAmount, outstanding
 - [ ] T045 [P] [US7] Probar que persona simulada aparece en listado de deudas pendientes con su nombre
 
@@ -150,21 +150,23 @@
 - [ ] T059 [P] Confirmar integración con feature 020: `GroupService.leaveGroup` bloquea si `hasOutstandingBalance(groupId, member)` es true
 
 ---
----## Coverage Table: FR-SC Alignment
+## Coverage Table: FR-SC Alignment
 
-| Requirement | Status | Description |
-|-------------|--------|-------------|
-| **FR-001** | Partially | Registrar gasto compartido; depende de implementation US1 |
-| **FR-002** | Partially | Definir reparto; depende de EqualSplit validation US2 |
-| **FR-003** | Pending | Saldos consistentes; BalanceCalculator pura pending T009 |
-| **FR-004** | Complete | Liquidación con conjunto reducido de transferencias; implementado T027-T031 |
-| **FR-005** | Pending | Gestión estado deuda; pending T032-T037 |
-| **FR-006** | Pending | Registrar pago; pending T038-T042 |
-| **FR-007** | Pending | Ver deudas pendientes; pending T043-T045 |
-| **FR-008** | Pending | Historial actividad; pending T046-T049 |
-| **FR-009** | Pending | Conversión multi-currency; pending T050-T054 |
-| **FR-010** | Complete | Restricciones membresía: no abandonar grupo con saldo pendiente; T059 |
-| **SC-001** | Partial | Suma saldos grupo siempre cero; BalanceCalculator en T009 |
-| **SC-002** | Partial | Transferencias ≤ n-1; implementado T028, pending testing |
-| **SC-003** | Complete | Sin cálculos manuales; criterio verificado en SC-003 de spec.md |
-| **SC-004** | Complete | Pago informado reflejado en estado e historial; D4 implementado |
+`Complete` requires every mapped task to be marked `[X]`; otherwise the requirement stays `Pending`.
+
+| Requirement | Status | Mapped tasks | Description |
+|-------------|--------|--------------|-------------|
+| **FR-001** | Pending | T017-T022, T060 | Registrar gasto compartido; tareas de US1 sin completar |
+| **FR-002** | Pending | T023-T026 | Definir reparto; tareas de US2 sin completar |
+| **FR-003** | Complete | T012-T016 | Saldos consistentes con `BalanceCalculator`, endpoint y cero-sum |
+| **FR-004** | Complete | T027-T031 | Liquidación con conjunto reducido de transferencias y solo lectura |
+| **FR-005** | Pending | T032-T037 | Gestión de estado de deuda; tareas de US5 sin completar |
+| **FR-006** | Pending | T038-T042 | Registrar pago; tareas de US6 sin completar |
+| **FR-007** | Pending | T043-T045 | Ver deudas pendientes; tareas de US7 sin completar |
+| **FR-008** | Pending | T046-T049, T061 | Historial de actividad; tareas de US8 sin completar |
+| **FR-009** | Pending | T050-T054 | Conversión multi-currency; tareas de US9 sin completar |
+| **FR-010** | Pending | T059 | Restricción de salida con saldo pendiente; T059 sin completar |
+| **SC-001** | Complete | T009, T012-T016 | La suma de saldos es cero, incluida la persona simulada |
+| **SC-002** | Complete | T027-T031 | Transferencias ≤ M-1 y total igual a la suma de saldos positivos |
+| **SC-003** | Complete | T012-T016 | Saldo neto por miembro expuesto sin cálculos manuales |
+| **SC-004** | Pending | T034, T035, T047, T049 | Pago informado en estado e historial; tareas de US5/US6/US8 sin completar |

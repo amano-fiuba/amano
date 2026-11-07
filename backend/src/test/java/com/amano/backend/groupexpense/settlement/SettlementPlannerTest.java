@@ -27,6 +27,9 @@ class SettlementPlannerTest {
     private static final MemberRef JUAN = MemberRef.registered(15L);
     private static final MemberRef CARLA = MemberRef.registered(16L);
     private static final MemberRef ABUELA = MemberRef.simulated(4L);
+    private static final MemberRef ALICE = MemberRef.registered(17L);
+    private static final MemberRef BOB = MemberRef.registered(18L);
+    private static final MemberRef CLAIRE = MemberRef.registered(19L);
 
     private static Map<MemberRef, BigDecimal> balances(String... values) {
         Map<MemberRef, BigDecimal> map = new HashMap<>();
@@ -80,6 +83,47 @@ class SettlementPlannerTest {
         assertThat(transfers.stream().map(Transfer::amount).reduce(BigDecimal.ZERO, BigDecimal::add))
                 .isEqualByComparingTo(positiveTotal(net));
         assertThat(apply(net, transfers).values()).allMatch(value -> value.signum() == 0);
+    }
+
+    /** T030: the canonical example from the plan, with an exact proposal. */
+    @Test
+    void theCanonicalExampleProposesTwoTransfersForThreeMembers() {
+        Map<MemberRef, BigDecimal> net = Map.of(
+                ALICE, new BigDecimal("-7.00"),
+                BOB, new BigDecimal("5.00"),
+                CLAIRE, new BigDecimal("2.00"));
+
+        List<Transfer> transfers = SettlementPlanner.plan(net);
+
+        assertThat(transfers).containsExactly(
+                new Transfer(ALICE, BOB, new BigDecimal("5.00")),
+                new Transfer(ALICE, CLAIRE, new BigDecimal("2.00")));
+        assertThat(transfers.stream().map(Transfer::amount).reduce(BigDecimal.ZERO, BigDecimal::add))
+                .isEqualByComparingTo("7.00");
+        assertThat(transfers).hasSize(2).hasSize(3 - 1);
+    }
+
+    /** T015: applying the liquidation leaves every balance at zero, so the sum is zero. */
+    @Test
+    void applyingTheLiquidationLeavesEveryBalanceAtZero() {
+        Map<MemberRef, BigDecimal> net = balances("150.00", "-20.00", "-130.00", "0.00");
+
+        Map<MemberRef, BigDecimal> after = apply(net, SettlementPlanner.plan(net));
+
+        assertThat(after.values()).allMatch(value -> value.signum() == 0);
+        assertThat(after.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add))
+                .isEqualByComparingTo("0.00");
+    }
+
+    /** T031: planning is a pure function; it never mutates its input. */
+    @Test
+    void thePlanDoesNotModifyTheInputBalances() {
+        Map<MemberRef, BigDecimal> net = balances("150.00", "-20.00", "-130.00", "0.00");
+        Map<MemberRef, BigDecimal> before = new HashMap<>(net);
+
+        SettlementPlanner.plan(net);
+
+        assertThat(net).isEqualTo(before);
     }
 
     @Test

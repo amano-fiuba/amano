@@ -1,6 +1,7 @@
 package com.amano.backend.groupexpense.settlement;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Objects;
 
 import com.amano.backend.groupexpense.balance.MemberRef;
@@ -12,7 +13,8 @@ import com.amano.backend.groupexpense.balance.MemberRef;
  *
  * @param from   member that owes (negative net balance)
  * @param to     member that is owed (positive net balance)
- * @param amount positive amount, expressed in the currency of the balance map
+ * @param amount positive amount with scale 2, expressed in the currency of the
+ *               balance map
  */
 public record Transfer(MemberRef from, MemberRef to, BigDecimal amount) {
 
@@ -23,6 +25,7 @@ public record Transfer(MemberRef from, MemberRef to, BigDecimal amount) {
         if (from.equals(to)) {
             throw new IllegalArgumentException("Una transferencia no puede tener el mismo origen y destino");
         }
+        amount = amount.setScale(2, RoundingMode.HALF_UP);
         if (amount.signum() <= 0) {
             throw new IllegalArgumentException("El monto de la transferencia debe ser mayor que cero");
         }

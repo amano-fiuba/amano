@@ -3,6 +3,7 @@ package com.amano.backend.groupexpense;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -223,6 +224,32 @@ class GroupBalanceControllerIT {
                 .isEqualByComparingTo("0.00");
         assertThat(new BigDecimal(member(ars, ana, "REGISTERED").get("netBalance").asString()))
                 .isEqualByComparingTo("3333.33");
+        assertThat(new BigDecimal(member(ars, abuela, "SIMULATED").get("netBalance").asString()))
+                .isEqualByComparingTo("-3333.33");
+    }
+
+    /**
+     * T014: with "Pagos requiere validación" the balances must also stay
+     * zero-sum after a payment. The 018 flow used here still marks the debt
+     * PAID because the 022 report/verify flow (US5/US6) is not implemented yet;
+     * the checked invariant is the zero-sum balance, which holds either way.
+     */
+    @Test
+    void balancesStillSumToZeroAfterAPaymentWithValidation() throws Exception {
+        mockMvc.perform(put("/api/groups/" + groupId).cookie(anaSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\": {\"paymentsRequireValidation\": true}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions.paymentsRequireValidation").value(true));
+
+        pay(juanSession, juanDebt, "1000.00");
+
+        JsonNode ars = currency(balances(200, anaSession), "ARS");
+        assertThat(total(ars)).isEqualByComparingTo("0.00");
+        assertThat(new BigDecimal(member(ars, juan, "REGISTERED").get("netBalance").asString()))
+                .isEqualByComparingTo("-2333.33");
+        assertThat(new BigDecimal(member(ars, ana, "REGISTERED").get("netBalance").asString()))
+                .isEqualByComparingTo("5666.66");
         assertThat(new BigDecimal(member(ars, abuela, "SIMULATED").get("netBalance").asString()))
                 .isEqualByComparingTo("-3333.33");
     }
