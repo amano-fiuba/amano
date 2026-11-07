@@ -136,15 +136,29 @@ public class ActivityEventService {
 
     /**
      * 022 US8 (T048): records {@code LIQUIDATION_PROPOSED} when a member
-     * generates a settlement proposal for the group.
+     * generates a settlement proposal for the group, at most once per group
+     * and day (option a) to avoid filling the history with noise on repeated
+     * GET requests.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public GroupActivity recordLiquidationProposed(Long groupId, Long actorUserId, int transferCount,
-            String primaryCurrency) {
+            String primaryCurrency, OffsetDateTime dayStart, OffsetDateTime dayEnd) {
+        if (dayStart != null && dayEnd != null
+                && repository.existsByGroupIdAndEventTypeAndCreatedAtBetween(
+                        groupId, GroupActivity.GroupActivityType.LIQUIDATION_PROPOSED.name(), dayStart, dayEnd)) {
+            return null;
+        }
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("transferCount", transferCount);
         map.put("currency", blankToNull(primaryCurrency));
         return record(groupId, GroupActivity.GroupActivityType.LIQUIDATION_PROPOSED, actorUserId, map);
+    }
+
+    /** Overload without deduplication window, kept for direct unit testing. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordLiquidationProposed(Long groupId, Long actorUserId, int transferCount,
+            String primaryCurrency) {
+        return recordLiquidationProposed(groupId, actorUserId, transferCount, primaryCurrency, null, null);
     }
 
     private GroupActivity recordPaymentEvent(Long groupId, GroupActivity.GroupActivityType type, Long actorUserId,

@@ -137,17 +137,25 @@ class PendingDebtControllerIT {
         jdbc.update("UPDATE debts SET status = 'PAID', paid_amount = amount WHERE id = ?", paidDebt);
         jdbc.update("UPDATE debts SET status = 'VERIFIED', paid_amount = amount WHERE id = ?", verifiedDebt);
 
-        JsonNode converted = createExpense("100.00", "USD", ana, participants(
-                "{\"type\": \"REGISTERED\", \"userId\": %d}".formatted(ana),
-                "{\"type\": \"REGISTERED\", \"userId\": %d}".formatted(juan)));
-        convertedExpense = converted.get("id").asLong();
-        convertedDebt = converted.get("debts").get(0).get("id").asLong();
-        jdbc.update("""
-                UPDATE group_expenses
-                SET converted_amount = 100000.00, exchange_rate = 1000.00000000,
-                    rate_date = DATE '2026-11-05', rate_source = 'BCRA'
-                WHERE id = ?
-                """, convertedExpense);
+        convertedExpense = jdbc.queryForObject("""
+                INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
+                    expense_date, description, idempotency_key, converted_amount, exchange_rate, rate_date, rate_source)
+                VALUES (?, ?, ?, 100.00, 'USD', ?, 'Súper', gen_random_uuid(),
+                    100000.00, 1000.00000000, DATE '2026-11-05', 'BCRA')
+                RETURNING id
+                """, Long.class, groupId, ana, ana, java.sql.Date.valueOf(EXPENSE_DATE));
+        long convertedShare = jdbc.queryForObject("""
+                INSERT INTO group_expense_shares (expense_id, position, participant_type, user_id,
+                    participant_name, amount)
+                VALUES (?, 0, 'REGISTERED', ?, 'Juan Pérez', 50.00)
+                RETURNING id
+                """, Long.class, convertedExpense, juan);
+        convertedDebt = jdbc.queryForObject("""
+                INSERT INTO debts (group_id, expense_id, share_id, debtor_type, debtor_user_id, debtor_name,
+                    creditor_user_id, currency, amount, paid_amount, status)
+                VALUES (?, ?, ?, 'REGISTERED', ?, 'Juan Pérez', ?, 'USD', 50.00, 0.00, 'PENDING')
+                RETURNING id
+                """, Long.class, groupId, convertedExpense, convertedShare, juan, ana);
 
         JsonNode abuelaExpense = createExpense("100.00", "ARS", ana, participants(
                 "{\"type\": \"REGISTERED\", \"userId\": %d}".formatted(ana),

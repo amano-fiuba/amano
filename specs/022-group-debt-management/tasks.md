@@ -133,11 +133,11 @@
 **Goal**: Verify that expenses in different currencies show both original and converted amounts  
 **Independent Test**: Expense in USD shows "$50 USD - $925 ARS"; exchange rate stored and visible; if the BCRA API has no quote within 7 days → 503 error, expense not saved
 
-- [ ] T050 [P] [US9] Implementar lógica: si `expense.currency != group.primaryCurrency` → fetch rate; si falla 503 y no guarda gasto
-- [ ] T051 [US9] Probar expense en moneda distinta: muestra monto original + convertido + tasa aplicada
-- [ ] T052 [P] [US9] Probar rate cache: generar mismo expense en misma fecha usa cotización cached (sin segunda API call)
-- [ ] T053 [US9] Probar BCRA unavailable o sin cotización dentro de 7 días → 503 "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
-- [ ] T054 [P] [US9] Probar misma moneda: tasa 1, sin llamada externa, `convertedAmount` = `amount`
+- [X] T050 [P] [US9] Implementar lógica: si `expense.currency != group.primaryCurrency` → fetch rate; si falla 503 y no guarda gasto
+- [X] T051 [US9] Probar expense en moneda distinta: muestra monto original + convertido + tasa aplicada
+- [X] T052 [P] [US9] Probar rate cache: generar mismo expense en misma fecha usa cotización cached (sin segunda API call)
+- [X] T053 [US9] Probar BCRA unavailable o sin cotización dentro de 7 días → 503 "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
+- [X] T054 [P] [US9] Probar misma moneda: tasa 1, sin llamada externa, `convertedAmount` = `amount`
 
 ---
 ## Phase N: Polish & Cross-Cutting Concerns
@@ -165,7 +165,7 @@
 | **FR-006** | Complete | T038-T042 | Registrar pago; flujo de pago completo con validación, idempotencia, 409 y concurrencia |
 | **FR-007** | Complete | T043-T045 | Ver deudas pendientes; listado con origen, moneda y persona simulada |
 | **FR-008** | Complete | T046-T049, T061 | Historial de actividad; eventos de gastos (con pagador), pagos, liquidación y transiciones de estado |
-| **FR-009** | Pending | T050-T054 | Conversión multi-currency; tareas de US9 sin completar |
+| **FR-009** | Complete | T050-T054 | Conversión multi-currency; `BcraExchangeRateClient`, caché por (par, fecha), retroceso hasta 7 días y 503 sin guardar |
 | **FR-010** | Pending | T059 | Restricción de salida con saldo pendiente; T059 sin completar |
 | **SC-001** | Complete | T009, T012-T016 | La suma de saldos es cero, incluida la persona simulada |
 | **SC-002** | Complete | T027-T031 | Transferencias ≤ M-1 y total igual a la suma de saldos positivos |

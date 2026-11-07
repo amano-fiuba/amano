@@ -2,6 +2,9 @@ package com.amano.backend.groupexpense;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,20 +25,22 @@ import com.amano.backend.user.Currency;
  * each currency separately, so amounts in different currencies are never added.
  *
  * <p>The proposal does not create payments nor change any debt or expense; it
- * records {@code LIQUIDATION_PROPOSED} in the group activity history (T048). A
- * transfer that involves a simulated profile is marked as informative because
- * that person has no account to execute it.
+ * records {@code LIQUIDATION_PROPOSED} in the group activity history at most
+ * once per group and day (T048). A transfer that involves a simulated profile
+ * is marked as informative because that person has no account to execute it.
  */
 @Service
 public class GroupSettlementService {
 
     private final GroupBalanceService balanceService;
     private final ActivityEventService activityEventService;
+    private final Clock clock;
 
     public GroupSettlementService(GroupBalanceService balanceService,
-            ActivityEventService activityEventService) {
+            ActivityEventService activityEventService, Clock clock) {
         this.balanceService = balanceService;
         this.activityEventService = activityEventService;
+        this.clock = clock;
     }
 
     /** One proposal per currency with a non-zero balance (neutral 404 for non-members). */
@@ -53,8 +58,11 @@ public class GroupSettlementService {
                 transferCount += proposal.summary().transferCount();
             }
         }
+        LocalDate today = LocalDate.now(clock);
+        OffsetDateTime dayStart = today.atStartOfDay(clock.getZone()).toOffsetDateTime();
+        OffsetDateTime dayEnd = today.plusDays(1).atStartOfDay(clock.getZone()).toOffsetDateTime();
         activityEventService.recordLiquidationProposed(
-                groupId, callerId, transferCount, balances.primaryCurrency().name());
+                groupId, callerId, transferCount, balances.primaryCurrency().name(), dayStart, dayEnd);
         return new SettlementProposalResponse(groupId, balances.primaryCurrency(), List.copyOf(proposals));
     }
 

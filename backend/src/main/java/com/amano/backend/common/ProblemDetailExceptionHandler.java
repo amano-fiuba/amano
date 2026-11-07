@@ -363,6 +363,18 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** 022 D8/US9: BCRA exchange rate unavailable within the 7-day lookback window — 503. */
+    @ExceptionHandler(com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException.class)
+    public ProblemDetail handleExchangeRateUnavailable(
+            com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        problem.setTitle("Cotización no disponible");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException.CODE));
+        return problem;
+    }
+
     /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
     @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
     public ProblemDetail handleAdminRemovalBlocked(

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -176,6 +177,14 @@ class ActivityEventServiceTest {
         JsonNode liqJson = objectMapper.readTree(liquidation.getDetailsJson());
         assertThat(liqJson.get("transferCount").asInt()).isEqualTo(2);
         assertThat(liqJson.get("currency").asString()).isEqualTo("ARS");
+
+        Mockito.reset(repository);
+        OffsetDateTime dayStart = OffsetDateTime.parse("2026-11-05T00:00:00-03:00");
+        OffsetDateTime dayEnd = OffsetDateTime.parse("2026-11-06T00:00:00-03:00");
+        when(repository.existsByGroupIdAndEventTypeAndCreatedAtBetween(
+                GROUP_ID, "LIQUIDATION_PROPOSED", dayStart, dayEnd)).thenReturn(true);
+        assertThat(service.recordLiquidationProposed(GROUP_ID, ACTOR_ID, 2, "ARS", dayStart, dayEnd)).isNull();
+        verify(repository, never()).save(any(GroupActivity.class));
     }
 
     @Test

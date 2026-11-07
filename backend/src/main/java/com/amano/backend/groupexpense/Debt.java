@@ -91,6 +91,15 @@ public class Debt {
      * (it needs its id) and must not belong to the payer.
      */
     public static Debt pendingFor(GroupExpense expense, GroupExpenseShare share) {
+        return pendingFor(expense, share, expense.getCurrency());
+    }
+
+    /**
+     * New {@code PENDING} debt of the participant of {@code share} towards the
+     * payer of {@code expense}, expressed in {@code debtCurrency} (022 D8: the
+     * group's primary currency once the expense total is converted).
+     */
+    public static Debt pendingFor(GroupExpense expense, GroupExpenseShare share, Currency debtCurrency) {
         if (share.isOf(expense.getPayerUserId())) {
             throw new IllegalArgumentException("La parte del pagador no genera deuda");
         }
@@ -103,7 +112,7 @@ public class Debt {
         debt.debtorSimulatedProfileId = share.getSimulatedProfileId();
         debt.debtorName = share.getParticipantName();
         debt.creditorUserId = expense.getPayerUserId();
-        debt.currency = expense.getCurrency();
+        debt.currency = debtCurrency != null ? debtCurrency : expense.getCurrency();
         debt.amount = share.getAmount();
         debt.paidAmount = BigDecimal.ZERO.setScale(2);
         debt.status = DebtStatus.PENDING;

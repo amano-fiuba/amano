@@ -227,6 +227,7 @@ class GroupSettlementControllerIT {
                 "SELECT id, status, paid_amount FROM debts WHERE group_id = ? ORDER BY id", groupId);
 
         proposal(200, anaSession);
+        proposal(200, anaSession); // second call on the same day must not create duplicate noise
 
         assertThat(scalar("SELECT count(*) FROM group_expenses WHERE group_id = ?")).isEqualTo(expenses);
         assertThat(scalar("SELECT count(*) FROM debts WHERE group_id = ?")).isEqualTo(debts);
@@ -252,6 +253,18 @@ class GroupSettlementControllerIT {
                 .andExpect(jsonPath("$.content[0].actor.id").value(ana))
                 .andExpect(jsonPath("$.content[0].details.transferCount").value(3))
                 .andExpect(jsonPath("$.content[0].details.currency").value("ARS"));
+
+        // Move the previous event to yesterday: a new call on the next day records a new event
+        jdbc.update("""
+                UPDATE group_activity
+                SET created_at = created_at - INTERVAL '2 days'
+                WHERE group_id = ? AND event_type = 'LIQUIDATION_PROPOSED'
+                """, groupId);
+        proposal(200, anaSession);
+        assertThat(scalar("""
+                SELECT count(*) FROM group_activity
+                WHERE group_id = ? AND event_type = 'LIQUIDATION_PROPOSED'
+                """)).isEqualTo(2);
     }
 
     private Long scalar(String sql) {

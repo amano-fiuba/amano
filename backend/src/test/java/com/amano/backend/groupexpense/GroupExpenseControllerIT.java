@@ -4,6 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -11,6 +17,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -22,6 +31,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,8 +41,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
+import com.amano.backend.groupexpense.exchange.CachingExchangeRateProvider;
+import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
+import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
+import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.ExpenseActivityDetails;
+import com.amano.backend.user.Currency;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.JsonNode;
@@ -74,6 +90,12 @@ class GroupExpenseControllerIT {
     @MockitoSpyBean
     private ActivityEventService activityEventService;
 
+    @MockitoBean
+    private BcraExchangeRateClient bcraExchangeRateClient;
+
+    @Autowired
+    private ExchangeRateProvider exchangeRateProvider;
+
     private long ana;
     private long juan;
     private long outsider;
@@ -85,6 +107,15 @@ class GroupExpenseControllerIT {
 
     @BeforeEach
     void buildGroup() throws Exception {
+        if (exchangeRateProvider instanceof CachingExchangeRateProvider caching) {
+            caching.clear();
+        }
+        reset(bcraExchangeRateClient);
+        lenient().when(bcraExchangeRateClient.getQuote(any(), any(), any()))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("1.00000000"),
+                        LocalDate.of(2026, 11, 5),
+                        BcraExchangeRateClient.SOURCE_BCRA));
         int n = SEQUENCE.incrementAndGet();
         ana = user("Ana", "López", "ana" + n + "@expenses.dev");
         juan = user("Juan", "Pérez", "juan" + n + "@expenses.dev");
@@ -207,7 +238,9 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.shares[0].amount").value("50.00"))
                 .andExpect(jsonPath("$.shares[1].amount").value("50.00"))
                 .andExpect(jsonPath("$.debts.length()").value(2))
-                .andExpect(jsonPath("$.debts[0].currency").value("USD"))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.convertedCurrency").value("ARS"))
+                .andExpect(jsonPath("$.debts[0].currency").value("ARS"))
                 .andExpect(jsonPath("$.description").doesNotExist());
 
         String odd = """
@@ -430,5 +463,122 @@ class GroupExpenseControllerIT {
         mockMvc.perform(get("/api/groups/" + groupId).cookie(juanSession))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.expensesCount").value(2));
+    }
+
+    @Test
+    void t051DifferentCurrencyConvertsOnceAndStoresOriginalConvertedAndRate() throws Exception {
+        LocalDate sunday = LocalDate.of(2026, 1, 18);
+        LocalDate friday = LocalDate.of(2026, 1, 16);
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, sunday))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("18.50000000"), friday, BcraExchangeRateClient.SOURCE_BCRA));
+
+        String usdBody = """
+                {"amount": "50.00", "currency": "USD", "date": "2026-01-18", "description": "Hotel",
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d},
+                   {"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana, juan);
+
+        String response = postExpense(anaSession, UUID.randomUUID().toString(), usdBody)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.amount").value("50.00"))
+                .andExpect(jsonPath("$.currency").value("USD"))
+                .andExpect(jsonPath("$.convertedAmount").value("925.00"))
+                .andExpect(jsonPath("$.convertedCurrency").value("ARS"))
+                .andExpect(jsonPath("$.exchangeRate").value("18.5"))
+                .andExpect(jsonPath("$.rateDate").value("2026-01-16"))
+                .andExpect(jsonPath("$.rateSource").value("BCRA"))
+                // Split and debts are calculated once over the converted amount (925.00 ARS)
+                .andExpect(jsonPath("$.shares[0].amount").value("462.50"))
+                .andExpect(jsonPath("$.shares[1].amount").value("462.50"))
+                .andExpect(jsonPath("$.debts[0].amount").value("462.50"))
+                .andExpect(jsonPath("$.debts[0].currency").value("ARS"))
+                .andReturn().getResponse().getContentAsString();
+
+        long expenseId = objectMapper.readTree(response).get("id").asLong();
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT amount, currency, converted_amount, exchange_rate, rate_date, rate_source FROM group_expenses WHERE id = ?",
+                expenseId);
+        assertThat((BigDecimal) row.get("amount")).isEqualByComparingTo("50.00");
+        assertThat(row.get("currency")).isEqualTo("USD");
+        assertThat((BigDecimal) row.get("converted_amount")).isEqualByComparingTo("925.00");
+        assertThat((BigDecimal) row.get("exchange_rate")).isEqualByComparingTo("18.50000000");
+        assertThat(row.get("rate_date").toString()).isEqualTo("2026-01-16");
+        assertThat(row.get("rate_source")).isEqualTo("BCRA");
+    }
+
+    @Test
+    void t052SecondExpenseWithSameCurrencyAndDateUsesCachedQuoteWithoutSecondApiCall() throws Exception {
+        LocalDate date = LocalDate.of(2026, 1, 15);
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, date))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("18.50000000"), date, BcraExchangeRateClient.SOURCE_BCRA));
+
+        String usdBody = """
+                {"amount": "50.00", "currency": "USD", "date": "2026-01-15", "description": "Taxi",
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d},
+                   {"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana, juan);
+
+        postExpense(anaSession, UUID.randomUUID().toString(), usdBody).andExpect(status().isCreated());
+        postExpense(anaSession, UUID.randomUUID().toString(), usdBody).andExpect(status().isCreated());
+
+        assertThat(count("group_expenses")).isEqualTo(2);
+        verify(bcraExchangeRateClient, times(1)).getQuote(Currency.USD, Currency.ARS, date);
+    }
+
+    @Test
+    void t050AndT053WhenQuoteIsUnavailableAnswers503AndDoesNotSaveExpense() throws Exception {
+        LocalDate date = LocalDate.of(2026, 1, 18);
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, date))
+                .thenThrow(new ExchangeRateUnavailableException());
+
+        String usdBody = """
+                {"amount": "50.00", "currency": "USD", "date": "2026-01-18", "description": "Cena",
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d},
+                   {"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana, juan);
+
+        postExpense(anaSession, UUID.randomUUID().toString(), usdBody)
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.detail")
+                        .value("No se pudo obtener la cotización; reintente después o registre en moneda del grupo"))
+                .andExpect(jsonPath("$.properties.code").value("EXCHANGE_RATE_UNAVAILABLE"));
+
+        assertThat(count("group_expenses")).isZero();
+        assertThat(count("debts")).isZero();
+        assertThat(expenseEvents()).isZero();
+    }
+
+    @Test
+    void t054SameCurrencyUsesRateOneAndConvertedEqualsAmountWithoutCallingProvider() throws Exception {
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), threeWayBody("10000.00"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.amount").value("10000.00"))
+                .andExpect(jsonPath("$.currency").value("ARS"))
+                .andExpect(jsonPath("$.convertedAmount").value("10000.00"))
+                .andExpect(jsonPath("$.convertedCurrency").value("ARS"))
+                .andExpect(jsonPath("$.exchangeRate").value("1"))
+                .andExpect(jsonPath("$.rateDate").value("2026-11-05"))
+                .andExpect(jsonPath("$.rateSource").value("SAME_CURRENCY"))
+                .andReturn().getResponse().getContentAsString();
+
+        verify(bcraExchangeRateClient, never()).getQuote(any(), any(), any());
+
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT amount, converted_amount, exchange_rate, rate_date, rate_source FROM group_expenses WHERE id = ?",
+                expenseId);
+        assertThat((BigDecimal) row.get("converted_amount")).isEqualByComparingTo("10000.00");
+        assertThat((BigDecimal) row.get("exchange_rate")).isEqualByComparingTo("1.00000000");
+        assertThat(row.get("rate_date").toString()).isEqualTo("2026-11-05");
+        assertThat(row.get("rate_source")).isEqualTo("SAME_CURRENCY");
     }
 }

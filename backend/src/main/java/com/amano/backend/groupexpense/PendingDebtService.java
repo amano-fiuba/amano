@@ -81,7 +81,8 @@ public class PendingDebtService {
         BigDecimal convertedAmount = null;
         Currency convertedCurrency = null;
         if (expense != null && expense.getConvertedAmount() != null) {
-            if (expense.getCurrency() == group.getPrimaryCurrency()) {
+            if (expense.getCurrency() == group.getPrimaryCurrency()
+                    || debt.getCurrency() == group.getPrimaryCurrency()) {
                 convertedAmount = money(debt.getAmount());
                 convertedCurrency = group.getPrimaryCurrency();
             }

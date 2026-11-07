@@ -31,6 +31,21 @@ public interface GroupActivityRepository extends JpaRepository<GroupActivity, Lo
         OffsetDateTime getLastActivityAt();
     }
 
+    /** 022 US8 (T048): whether a given event type was already recorded for the group in [from, to). */
+    @Query("""
+            select count(a) > 0
+            from GroupActivity a
+            where a.groupId = :groupId
+              and a.eventType = :eventType
+              and a.createdAt >= :from
+              and a.createdAt < :to
+            """)
+    boolean existsByGroupIdAndEventTypeAndCreatedAtBetween(
+            @Param("groupId") Long groupId,
+            @Param("eventType") String eventType,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
     /** 015 FR-007: one aggregate query for all the groups of a listing. */
     @Query("""
             select a.groupId as groupId, max(a.createdAt) as lastActivityAt

@@ -1,6 +1,7 @@
 package com.amano.backend.groupexpense;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,8 +26,12 @@ import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.ExpenseDescriptionNormalizer;
 import com.amano.backend.expense.IdempotencyConflictException;
+import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
+import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
+import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.ExpenseActivityDetails;
+import com.amano.backend.groups.Group;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupNotFoundException;
@@ -33,6 +39,7 @@ import com.amano.backend.groups.GroupPermissionChecker;
 import com.amano.backend.groups.GroupPermissionDeniedException;
 import com.amano.backend.groups.GroupPermissions;
 import com.amano.backend.groups.GroupPermissionsRepository;
+import com.amano.backend.groups.GroupRepository;
 import com.amano.backend.groups.SimulatedProfile;
 import com.amano.backend.groups.SimulatedProfileRepository;
 import com.amano.backend.user.Currency;
@@ -74,13 +81,41 @@ public class GroupExpenseService {
     private final GroupExpenseRepository expenseRepository;
     private final GroupExpenseShareRepository shareRepository;
     private final DebtRepository debtRepository;
+    private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final GroupPermissionsRepository groupPermissionsRepository;
     private final GroupPermissionChecker permissionChecker;
     private final SimulatedProfileRepository simulatedProfileRepository;
     private final UserRepository userRepository;
     private final ActivityEventService activityEventService;
+    private final ExchangeRateProvider exchangeRateProvider;
 
+    @Autowired
+    public GroupExpenseService(GroupExpenseRepository expenseRepository,
+            GroupExpenseShareRepository shareRepository,
+            DebtRepository debtRepository,
+            GroupRepository groupRepository,
+            GroupMemberRepository groupMemberRepository,
+            GroupPermissionsRepository groupPermissionsRepository,
+            GroupPermissionChecker permissionChecker,
+            SimulatedProfileRepository simulatedProfileRepository,
+            UserRepository userRepository,
+            ActivityEventService activityEventService,
+            ExchangeRateProvider exchangeRateProvider) {
+        this.expenseRepository = expenseRepository;
+        this.shareRepository = shareRepository;
+        this.debtRepository = debtRepository;
+        this.groupRepository = groupRepository;
+        this.groupMemberRepository = groupMemberRepository;
+        this.groupPermissionsRepository = groupPermissionsRepository;
+        this.permissionChecker = permissionChecker;
+        this.simulatedProfileRepository = simulatedProfileRepository;
+        this.userRepository = userRepository;
+        this.activityEventService = activityEventService;
+        this.exchangeRateProvider = exchangeRateProvider;
+    }
+
+    /** 017 constructor kept for existing unit tests without multi-currency mocks. */
     public GroupExpenseService(GroupExpenseRepository expenseRepository,
             GroupExpenseShareRepository shareRepository,
             DebtRepository debtRepository,
@@ -90,15 +125,9 @@ public class GroupExpenseService {
             SimulatedProfileRepository simulatedProfileRepository,
             UserRepository userRepository,
             ActivityEventService activityEventService) {
-        this.expenseRepository = expenseRepository;
-        this.shareRepository = shareRepository;
-        this.debtRepository = debtRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.groupPermissionsRepository = groupPermissionsRepository;
-        this.permissionChecker = permissionChecker;
-        this.simulatedProfileRepository = simulatedProfileRepository;
-        this.userRepository = userRepository;
-        this.activityEventService = activityEventService;
+        this(expenseRepository, shareRepository, debtRepository, null, groupMemberRepository,
+                groupPermissionsRepository, permissionChecker, simulatedProfileRepository,
+                userRepository, activityEventService, null);
     }
 
     /** Result of a registration: the representation plus whether rows were inserted. */
@@ -143,18 +172,50 @@ public class GroupExpenseService {
             return replay(existing.get(), groupId, normalized, caller);
         }
 
+        Currency groupCurrency = primaryCurrencyOf(groupId, normalized.currency());
+        BigDecimal convertedAmount;
+        BigDecimal exchangeRate;
+        LocalDate rateDate;
+        String rateSource;
+        if (normalized.currency() == groupCurrency) {
+            // 022 D8 / T054: same currency -> rate 1, no external call, convertedAmount = amount
+            convertedAmount = normalized.amount();
+            exchangeRate = BigDecimal.ONE;
+            rateDate = normalized.date();
+            rateSource = BcraExchangeRateClient.SOURCE_SAME_CURRENCY;
+        }
+        else {
+            // 022 D8 / T050: fetch quote before any DB write; if unavailable, throws 503 and nothing is saved
+            ExchangeRateQuote quote = requireExchangeRateProvider()
+                    .getQuote(normalized.currency(), groupCurrency, normalized.date());
+            exchangeRate = quote.rate();
+            rateDate = quote.rateDate();
+            rateSource = quote.rateSource();
+            convertedAmount = normalized.amount()
+                    .multiply(exchangeRate)
+                    .setScale(2, RoundingMode.HALF_UP);
+            if (!EqualSplit.fits(convertedAmount, normalized.participants().size())) {
+                throw new FieldValidationException(Map.of(
+                        "amount", AMOUNT_TOO_SMALL.formatted(normalized.participants().size())));
+            }
+        }
+
         GroupExpense expense = new GroupExpense();
         expense.setGroupId(groupId);
         expense.setCreatedByUserId(callerId);
         expense.setPayerUserId(normalized.payerUserId());
         expense.setAmount(normalized.amount());
         expense.setCurrency(normalized.currency());
+        expense.setConvertedAmount(convertedAmount);
+        expense.setExchangeRate(exchangeRate);
+        expense.setRateDate(rateDate);
+        expense.setRateSource(rateSource);
         expense.setExpenseDate(normalized.date());
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
         GroupExpense saved = expenseRepository.save(expense);
 
-        List<BigDecimal> amounts = EqualSplit.split(normalized.amount(), normalized.participants().size(),
+        List<BigDecimal> amounts = EqualSplit.split(convertedAmount, normalized.participants().size(),
                 normalized.payerIndex());
         List<GroupExpenseShare> shares = new ArrayList<>();
         List<Debt> debts = new ArrayList<>();
@@ -168,7 +229,7 @@ public class GroupExpenseService {
             GroupExpenseShare savedShare = shareRepository.save(share);
             shares.add(savedShare);
             if (position != normalized.payerIndex()) {
-                debts.add(Debt.pendingFor(saved, savedShare));
+                debts.add(Debt.pendingFor(saved, savedShare, groupCurrency));
             }
         }
         List<Debt> savedDebts = debtRepository.saveAll(debts);
@@ -177,7 +238,7 @@ public class GroupExpenseService {
                 saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription(),
                 saved.getPayerUserId(), normalized.payerName()));
 
-        return new Registration(toResponse(saved, shares, savedDebts, caller), true);
+        return new Registration(toResponse(saved, shares, savedDebts, caller, groupCurrency), true);
     }
 
     /**
@@ -201,8 +262,9 @@ public class GroupExpenseService {
         GroupMember caller = activeMembership(callerId, groupId);
         GroupExpense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
                 .orElseThrow(() -> new GroupNotFoundException(EXPENSE_NOT_FOUND));
+        Currency groupCurrency = primaryCurrencyOf(groupId, expense.getCurrency());
         return toResponse(expense, shareRepository.findByExpenseIdOrderByPositionAsc(expense.getId()),
-                debtRepository.findByExpenseId(expense.getId()), caller);
+                debtRepository.findByExpenseId(expense.getId()), caller, groupCurrency);
     }
 
     private Registration replay(GroupExpense existing, Long groupId, NormalizedExpense normalized,
@@ -211,8 +273,26 @@ public class GroupExpenseService {
         if (!existing.getGroupId().equals(groupId) || !samePayload(existing, shares, normalized)) {
             throw new IdempotencyConflictException();
         }
+        Currency groupCurrency = primaryCurrencyOf(groupId, existing.getCurrency());
         return new Registration(toResponse(existing, shares, debtRepository.findByExpenseId(existing.getId()),
-                caller), false);
+                caller, groupCurrency), false);
+    }
+
+    private Currency primaryCurrencyOf(Long groupId, Currency fallback) {
+        if (groupRepository == null) {
+            return fallback;
+        }
+        return groupRepository.findById(groupId)
+                .map(Group::getPrimaryCurrency)
+                .filter(Objects::nonNull)
+                .orElse(fallback);
+    }
+
+    private ExchangeRateProvider requireExchangeRateProvider() {
+        if (exchangeRateProvider == null) {
+            throw new IllegalStateException("ExchangeRateProvider no configurado");
+        }
+        return exchangeRateProvider;
     }
 
     private static boolean samePayload(GroupExpense existing, List<GroupExpenseShare> shares,
@@ -402,7 +482,7 @@ public class GroupExpenseService {
     }
 
     private GroupExpenseResponse toResponse(GroupExpense expense, List<GroupExpenseShare> shares,
-            List<Debt> debts, GroupMember caller) {
+            List<Debt> debts, GroupMember caller, Currency groupCurrency) {
         Map<Long, String> names = new HashMap<>();
         Set<Long> people = new HashSet<>(List.of(expense.getPayerUserId(), expense.getCreatedByUserId()));
         for (User user : userRepository.findAllById(people)) {
@@ -424,11 +504,34 @@ public class GroupExpenseService {
                 .map(debt -> GroupExpenseResponse.DebtView.of(debt, names.get(debt.getCreditorUserId()),
                         canRegisterPayment(debt, caller)))
                 .toList();
-        return new GroupExpenseResponse(expense.getId(), expense.getGroupId(), expense.getAmount().toPlainString(),
-                expense.getCurrency().name(), expense.getExpenseDate().toString(), expense.getDescription(), payer,
+
+        String convertedAmount = expense.getConvertedAmount() == null
+                ? null : expense.getConvertedAmount().setScale(2, RoundingMode.HALF_UP).toPlainString();
+        String convertedCurrency = convertedAmount == null || groupCurrency == null
+                ? null : groupCurrency.name();
+        String exchangeRate = expense.getExchangeRate() == null
+                ? null : expense.getExchangeRate().stripTrailingZeros().toPlainString();
+        String rateDate = expense.getRateDate() == null
+                ? null : expense.getRateDate().toString();
+
+        return new GroupExpenseResponse(
+                expense.getId(),
+                expense.getGroupId(),
+                expense.getAmount().toPlainString(),
+                expense.getCurrency().name(),
+                convertedAmount,
+                convertedCurrency,
+                exchangeRate,
+                rateDate,
+                expense.getRateSource(),
+                expense.getExpenseDate().toString(),
+                expense.getDescription(),
+                payer,
                 new GroupExpenseResponse.Person(expense.getCreatedByUserId(),
                         names.get(expense.getCreatedByUserId())),
-                expense.getCreatedAt(), shareViews, debtViews);
+                expense.getCreatedAt(),
+                shareViews,
+                debtViews);
     }
 
     /** 018 FR-016: the debt is not settled and the caller is its debtor, its creditor or an ADMIN. */
