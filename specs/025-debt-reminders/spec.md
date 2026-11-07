@@ -47,6 +47,7 @@ Juan debe $ 3.333,33 en el grupo "Depto" y la deuda tiene fecha límite de pago.
 6. **Given** un miembro con dos deudas pendientes con la misma fecha límite, **When** llega la fecha de envío, **Then** recibe un recordatorio por cada deuda (único por deuda, sin reenvíos posteriores).
 7. **Given** una deuda de un grupo sin días de vencimiento configurados (sin fecha límite), **When** se evalúan los recordatorios, **Then** esa deuda no genera recordatorio y no se reporta error.
 8. **Given** una deuda cuyo recordatorio ya fue enviado, **When** se vuelve a evaluar al día siguiente, **Then** no se envía un segundo correo por esa deuda.
+9. **Given** una deuda pendiente de un perfil simulado del grupo con correo cargado, **When** llega la fecha de envío, **Then** el perfil simulado recibe el recordatorio en ese correo.
 
 ---
 
@@ -100,7 +101,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **Miembro sin correo válido o fallo de entrega**: el fallo queda registrado, no bloquea los demás recordatorios del grupo y no se reintenta (un único intento por deuda).
 - **Mensaje vacío o que excede la longitud máxima**: vacío → vuelve al mensaje predeterminado; más de 500 caracteres → rechazado al guardar con error de validación.
 - **Deuda en "Pago informado" al llegar la fecha de envío**: tratamiento según la respuesta de la aclaración de FR-006.
-- **Perfil simulado con deuda**: tratamiento según la respuesta de la aclaración de FR-008.
+- **Perfil simulado con deuda**: recibe el recordatorio en el correo cargado por el Administrador; si el correo es inválido o la entrega falla, aplica la regla de fallo de entrega (queda registrado, sin reintento y sin bloquear los demás envíos).
 
 ## Requirements *(mandatory)*
 
@@ -118,7 +119,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 
 - **FR-006**: Al generar los recordatorios, el sistema MUST identificar qué miembros del grupo tienen deudas pendientes de pago (no saldadas ni vencidas) con fecha límite definida. Se consideran saldadas las deudas Pagado y Verificado; el tratamiento de las deudas en "Pago informado" (pago reportado aún no verificado) es [NEEDS CLARIFICATION: ¿una deuda con pago informado pero sin verificar recibe el recordatorio, o solo se excluyen las deudas saldadas (Pagado/Verificado)?].
 - **FR-007**: La fecha de envío MUST calcularse como la fecha límite de pago de la deuda menos el tiempo de envío configurado. La fecha límite de pago es la fecha del gasto originario más los días de vencimiento del grupo (022); una deuda de un grupo sin días de vencimiento MUST NOT generar recordatorio.
-- **FR-008**: El recordatorio MUST enviarse por correo electrónico al miembro deudor con deuda pendiente, en la fecha de envío calculada. Los destinatarios son [NEEDS CLARIFICATION: ¿los perfiles simulados (miembros sin cuenta, cuyo correo cargó el Administrador al agregarlos) reciben el recordatorio por correo, o solo lo reciben los miembros con cuenta?].
+- **FR-008**: El recordatorio MUST enviarse por correo electrónico al miembro deudor con deuda pendiente, en la fecha de envío calculada. Los destinatarios son todos los deudores con correo: miembros con cuenta y perfiles simulados (cuyo correo cargó el Administrador al agregarlos).
 - **FR-009**: Si la fecha de envío calculada ya pasó y la fecha límite aún no pasó, el recordatorio MUST enviarse en la evaluación siguiente; si la deuda ya está vencida, MUST NOT enviarse.
 - **FR-010**: MUST enviarse un único recordatorio por deuda según la configuración; el sistema MUST impedir reenvíos y duplicados para la misma deuda.
 - **FR-011**: No MUST enviarse recordatorio por deudas saldadas (Pagado o Verificado). Si la deuda se salda o se verifica antes de la fecha programada, el recordatorio MUST cancelarse.
@@ -157,10 +158,16 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - El mensaje personalizado acompaña a los datos de identificación (grupo, concepto, monto y fecha límite), que siempre están presentes; no los reemplaza.
 - Un mensaje en blanco equivale a "sin mensaje personalizado" (se usa el predeterminado).
 - La entrega se intenta una sola vez por recordatorio; los fallos se registran y no se reintentan.
-- Los usuarios con cuenta tienen su correo verificado (003); los perfiles simulados tienen el correo cargado por quien los agregó al grupo (sujeto a la aclaración de FR-008).
+- Los usuarios con cuenta tienen su correo verificado (003); los perfiles simulados tienen el correo cargado por quien los agregó al grupo y también reciben los recordatorios (aclaración del 2026-11-07).
 - Un miembro con deudas sin saldar no puede abandonar el grupo ni ser removido (017), por lo que el destinatario sigue siendo miembro al momento del envío.
 - La evaluación de recordatorios es periódica y diaria, como el proceso de vencimiento existente (022); la fecha de envío se interpreta a nivel de día, sin hora específica.
 - Se reutiliza la infraestructura de envío de correo electrónico existente (verificación de cuenta y recuperación de contraseña); no se agrega una dependencia nueva.
 - Solo el deudor recibe el recordatorio; el acreedor no recibe copia.
 - Los textos para el usuario están en español con voseo (convención del proyecto).
 - Configurar los días de vencimiento del grupo sigue siendo responsabilidad del Administrador en la configuración existente de 022; esta feature no lo altera.
+
+## Clarifications
+
+**Session 2026-11-07**
+
+- Q: ¿Los perfiles simulados (miembros sin cuenta) con deuda pendiente reciben el recordatorio por correo? → A: Sí. Todos los deudores con correo reciben el recordatorio, incluidos los perfiles simulados: el correo es la única vía por la que una persona simulada se entera de que debe, ya que no usa la aplicación. Un correo inválido o una entrega fallida siguen la regla general (se registra el fallo, sin reintento).

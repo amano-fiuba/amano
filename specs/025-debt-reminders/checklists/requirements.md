@@ -31,8 +31,7 @@
 
 ## Notes
 
-- Quedan 2 marcadores [NEEDS CLARIFICATION] que bloquean los ítems desmarcados:
+- Queda 1 marcador [NEEDS CLARIFICATION] que bloquea los ítems desmarcados:
   - FR-006: tratamiento de deudas en "Pago informado" (pago reportado aún no verificado) al llegar la fecha de envío.
-  - FR-008: perfiles simulados como destinatarios del recordatorio.
-- Ambas preguntas fueron presentadas a la persona usuaria; los ítems se marcarán completos cuando se resuelvan y la spec se actualice.
+- Resuelta la aclaración de FR-008 (perfiles simulados como destinatarios: sí reciben, sesión 2026-11-07); la spec y este checklist quedaron actualizados.
 - Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`
