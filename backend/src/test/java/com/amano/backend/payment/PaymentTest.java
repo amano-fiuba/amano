@@ -41,8 +41,21 @@ class PaymentTest {
         assertThat(payment.getCurrency()).isEqualTo(Currency.ARS);
         assertThat(payment.getPaymentDate()).isEqualTo(LocalDate.of(2026, 11, 5));
         assertThat(payment.getIdempotencyKey()).isEqualTo(KEY);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+        assertThat(payment.isLegacy()).isFalse();
+        assertThat(payment.getDecidedByUserId()).isNull();
+        assertThat(payment.getDecidedAt()).isNull();
         assertThat(payment.getId()).isNull();
         assertThat(payment.getCreatedAt()).isNull();
+    }
+
+    @Test
+    void theLegacyFlagCanBeSetExplicitly() {
+        Payment payment = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
+                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true);
+
+        assertThat(payment.isLegacy()).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
     }
 
     @Test

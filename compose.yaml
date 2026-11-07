@@ -36,6 +36,8 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8081}
+      # Cotizaciones (feature 022): API pública del BCRA, sin credenciales.
+      BCRA_BASE_URL: ${BCRA_BASE_URL:-https://api.bcra.gob.ar}
     depends_on:
       db:
         condition: service_healthy

@@ -60,6 +60,22 @@ public class GroupExpense {
     @Column(name = "idempotency_key", nullable = false)
     private UUID idempotencyKey;
 
+    /** 022 D8: amount converted to the group currency (null until converted). */
+    @Column(name = "converted_amount", precision = 11, scale = 2)
+    private BigDecimal convertedAmount;
+
+    /** 022 D8: rate applied from the expense currency to the group currency. */
+    @Column(name = "exchange_rate", precision = 18, scale = 8)
+    private BigDecimal exchangeRate;
+
+    /** 022 D8: date of the historical quote. */
+    @Column(name = "rate_date")
+    private LocalDate rateDate;
+
+    /** 022 D8: source of the quote (for example {@code BCRA}). */
+    @Column(name = "rate_source", length = 40)
+    private String rateSource;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -130,6 +146,38 @@ public class GroupExpense {
 
     public void setIdempotencyKey(UUID idempotencyKey) {
         this.idempotencyKey = idempotencyKey;
+    }
+
+    public BigDecimal getConvertedAmount() {
+        return convertedAmount;
+    }
+
+    public void setConvertedAmount(BigDecimal convertedAmount) {
+        this.convertedAmount = convertedAmount;
+    }
+
+    public BigDecimal getExchangeRate() {
+        return exchangeRate;
+    }
+
+    public void setExchangeRate(BigDecimal exchangeRate) {
+        this.exchangeRate = exchangeRate;
+    }
+
+    public LocalDate getRateDate() {
+        return rateDate;
+    }
+
+    public void setRateDate(LocalDate rateDate) {
+        this.rateDate = rateDate;
+    }
+
+    public String getRateSource() {
+        return rateSource;
+    }
+
+    public void setRateSource(String rateSource) {
+        this.rateSource = rateSource;
     }
 
     public OffsetDateTime getCreatedAt() {

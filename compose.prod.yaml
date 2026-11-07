@@ -33,6 +33,8 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:?Falta MAIL_USERNAME en .env}
       MAIL_PASSWORD: ${MAIL_PASSWORD:?Falta MAIL_PASSWORD en .env}
       APP_BASE_URL: ${APP_BASE_URL:?Falta APP_BASE_URL en .env}
+      # Cotizaciones (feature 022): API pública del BCRA, sin credenciales.
+      BCRA_BASE_URL: ${BCRA_BASE_URL:-https://api.bcra.gob.ar}
     depends_on:
       db:
         condition: service_healthy

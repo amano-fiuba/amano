@@ -66,10 +66,25 @@ class DebtTest {
     }
 
     @Test
-    void onlyPendingAndPartiallyPaidAreUnsettled() {
+    void onlyPaidAndVerifiedAreSettled() {
         assertThat(DebtStatus.PENDING.isSettled()).isFalse();
         assertThat(DebtStatus.PARTIALLY_PAID.isSettled()).isFalse();
+        assertThat(DebtStatus.PAYMENT_REPORTED.isSettled()).isFalse();
+        assertThat(DebtStatus.OVERDUE.isSettled()).isFalse();
         assertThat(DebtStatus.PAID.isSettled()).isTrue();
+        assertThat(DebtStatus.VERIFIED.isSettled()).isTrue();
+
+        assertThat(DebtStatus.PENDING.isPayable()).isTrue();
+        assertThat(DebtStatus.OVERDUE.isPayable()).isTrue();
+        assertThat(DebtStatus.PAYMENT_REPORTED.isPayable()).isFalse();
+        assertThat(DebtStatus.PAID.isPayable()).isFalse();
+        assertThat(DebtStatus.VERIFIED.isPayable()).isFalse();
+    }
+
+    @Test
+    void aFullPaymentSettlesOrReportsAccordingToTheGroupSetting() {
+        assertThat(DebtStatus.settledBy(false)).isEqualTo(DebtStatus.PAID);
+        assertThat(DebtStatus.settledBy(true)).isEqualTo(DebtStatus.PAYMENT_REPORTED);
     }
 
     @Test

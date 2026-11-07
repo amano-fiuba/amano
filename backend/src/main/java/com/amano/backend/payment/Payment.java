@@ -78,6 +78,27 @@ public class Payment {
     @Column(name = "idempotency_key", nullable = false)
     private UUID idempotencyKey;
 
+    /** 022: payment state; the 018 flow writes CONFIRMED. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private PaymentStatus status;
+
+    /** 022: administrator that confirmed/rejected, when applicable. */
+    @Column(name = "decided_by_user_id")
+    private Long decidedByUserId;
+
+    /** 022: instant of the administrator decision, when applicable. */
+    @Column(name = "decided_at")
+    private OffsetDateTime decidedAt;
+
+    /**
+     * 022: pre-022 payment (always TRUE for rows that existed before V18).
+     * Legacy rows are excluded from the partial unique index on {@code debt_id}
+     * so the partial payments of 018 keep coexisting.
+     */
+    @Column(name = "legacy", nullable = false)
+    private boolean legacy;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -91,6 +112,17 @@ public class Payment {
      */
     public static Payment of(Debt debt, BigDecimal amount, LocalDate date, Long registeredByUserId,
             String receiverName, UUID idempotencyKey) {
+        return of(debt, amount, date, registeredByUserId, receiverName, idempotencyKey, false);
+    }
+
+    /**
+     * New payment with an explicit {@code legacy} flag (022 D6). The 018 flow
+     * passes {@code true} while it still accepts partial payments, so those rows
+     * stay outside the 022 partial unique index; the 022 full-payment flow will
+     * pass {@code false}.
+     */
+    public static Payment of(Debt debt, BigDecimal amount, LocalDate date, Long registeredByUserId,
+            String receiverName, UUID idempotencyKey, boolean legacy) {
         Payment payment = new Payment();
         payment.groupId = debt.getGroupId();
         payment.debtId = debt.getId();
@@ -105,6 +137,8 @@ public class Payment {
         payment.currency = debt.getCurrency();
         payment.paymentDate = date;
         payment.idempotencyKey = idempotencyKey;
+        payment.status = PaymentStatus.CONFIRMED;
+        payment.legacy = legacy;
         return payment;
     }
 
@@ -162,6 +196,22 @@ public class Payment {
 
     public UUID getIdempotencyKey() {
         return idempotencyKey;
+    }
+
+    public PaymentStatus getStatus() {
+        return status;
+    }
+
+    public Long getDecidedByUserId() {
+        return decidedByUserId;
+    }
+
+    public OffsetDateTime getDecidedAt() {
+        return decidedAt;
+    }
+
+    public boolean isLegacy() {
+        return legacy;
     }
 
     public OffsetDateTime getCreatedAt() {

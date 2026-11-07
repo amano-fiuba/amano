@@ -80,8 +80,8 @@ class PaymentMigrationIT {
         jdbc.update("""
                 INSERT INTO payments (group_id, debt_id, payer_type, payer_user_id, payer_simulated_profile_id,
                     payer_name, receiver_user_id, receiver_name, registered_by_user_id, amount, currency,
-                    payment_date, idempotency_key)
-                VALUES (?, ?, ?, ?, ?, 'Pagador', ?, 'Ana', ?, ?::numeric, ?, CURRENT_DATE, ?)
+                    payment_date, idempotency_key, status, legacy)
+                VALUES (?, ?, ?, ?, ?, 'Pagador', ?, 'Ana', ?, ?::numeric, ?, CURRENT_DATE, ?, 'CONFIRMED', TRUE)
                 """, groupId, debtId, payerType, payerUser, payerProfile, receiver, registeredBy, amount, currency,
                 key);
     }
