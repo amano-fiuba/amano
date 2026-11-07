@@ -85,12 +85,12 @@
 **Goal**: Verify debt state transitions follow group's "Pagos requiere validación" setting  
 **Independent Test**: After payment registration, debt state is `PAYMENT_REPORTED` (con validación) o `PAID` (sin validación); state transitions confirmed/rejected by admin work correctly
 
-- [ ] T032 [P] [US5] Implementar endpoint `POST /groups/{groupId}/payments/{paymentId}/confirm` (solo admin)
-- [ ] T033 [P] [US5] Implementar endpoint `POST /groups/{groupId}/payments/{paymentId}/reject` (solo admin)
-- [ ] T034 [US5] Probar que pago sin validación → debt state → `PAID` inmediatamente
-- [ ] T035 [P] [US5] Probar que pago con validación → debt state → `PAYMENT_REPORTED`; admin confirma → `VERIFIED`; admin rechaza → vuelve a `PENDING`
-- [ ] T036 [P] [US5] Probar que `PAID` y `VERIFIED` son equivalentes para cálculos de saldo (Q7 invariant)
-- [ ] T037 [US5] Probar que deuda `OVERDUE` aún se puede pagar y sigue contando en saldo
+- [X] T032 [P] [US5] Implementar endpoint `POST /groups/{groupId}/payments/{paymentId}/confirm` (solo admin)
+- [X] T033 [P] [US5] Implementar endpoint `POST /groups/{groupId}/payments/{paymentId}/reject` (solo admin)
+- [X] T034 [US5] Probar que pago sin validación → debt state → `PAID` inmediatamente
+- [X] T035 [P] [US5] Probar que pago con validación → debt state → `PAYMENT_REPORTED`; admin confirma → `VERIFIED`; admin rechaza → vuelve a `PENDING`
+- [X] T036 [P] [US5] Probar que `PAID` y `VERIFIED` son equivalentes para cálculos de saldo (Q7 invariant)
+- [X] T037 [US5] Probar que deuda `OVERDUE` aún se puede pagar y sigue contando en saldo
 
 ---
 ## Phase 8: User Story 6 - Registrar pago de deuda pendiente (Priority: P2)
@@ -161,7 +161,7 @@
 | **FR-002** | Pending | T023-T026 | Definir reparto; tareas de US2 sin completar |
 | **FR-003** | Complete | T012-T016 | Saldos consistentes con `BalanceCalculator`, endpoint y cero-sum |
 | **FR-004** | Complete | T027-T031 | Liquidación con conjunto reducido de transferencias y solo lectura |
-| **FR-005** | Pending | T032-T037 | Gestión de estado de deuda; tareas de US5 sin completar |
+| **FR-005** | Complete | T032-T037 | Gestión de estado de deuda; confirmación/rechazo de pagos y transiciones verificadas |
 | **FR-006** | Complete | T038-T042 | Registrar pago; flujo de pago completo con validación, idempotencia, 409 y concurrencia |
 | **FR-007** | Pending | T043-T045 | Ver deudas pendientes; tareas de US7 sin completar |
 | **FR-008** | Pending | T046-T049, T061 | Historial de actividad; tareas de US8 sin completar |

@@ -145,6 +145,40 @@ class BalanceCalculatorTest {
         assertThat(BalanceCalculator.calculate(List.of(paid, verified))).isEmpty();
     }
 
+    /** 022 T036 (Q7): PAID and VERIFIED are equivalent for balance calculations. */
+    @Test
+    void paidAndVerifiedProduceExactlyTheSameBalances() {
+        Debt paid = registeredDebt(41L, JUAN, "1000.00");
+        paid.applyPayment(new BigDecimal("1000.00"));
+        Debt verified = withStatus(registeredDebt(42L, CARLA, "1000.00"), DebtStatus.VERIFIED);
+        Debt pending = registeredDebt(43L, JUAN, "250.00");
+
+        Map<Currency, Map<MemberRef, BigDecimal>> withPaid =
+                BalanceCalculator.calculate(List.of(paid, pending));
+        Map<Currency, Map<MemberRef, BigDecimal>> withVerified =
+                BalanceCalculator.calculate(List.of(verified, pending));
+
+        assertThat(withPaid).isEqualTo(withVerified);
+        assertThat(only(withPaid, Currency.ARS).get(MemberRef.registered(JUAN)))
+                .isEqualByComparingTo("-250.00");
+    }
+
+    /** 022 T037: an OVERDUE debt still counts until a full payment settles it. */
+    @Test
+    void anOverdueDebtStillCountsInTheBalanceUntilItIsPaid() {
+        Debt overdue = withStatus(registeredDebt(41L, JUAN, "1000.00"), DebtStatus.OVERDUE);
+
+        Map<MemberRef, BigDecimal> before =
+                only(BalanceCalculator.calculate(List.of(overdue)), Currency.ARS);
+        assertThat(before.get(MemberRef.registered(JUAN))).isEqualByComparingTo("-1000.00");
+        assertThat(before.get(MemberRef.registered(ANA))).isEqualByComparingTo("1000.00");
+
+        overdue.applyFullPayment(false);
+
+        assertThat(overdue.getStatus()).isEqualTo(DebtStatus.PAID);
+        assertThat(BalanceCalculator.calculate(List.of(overdue))).isEmpty();
+    }
+
     @Test
     void reportedAndOverdueDebtsStillCount() {
         Debt reported = withStatus(registeredDebt(41L, JUAN, "1000.00"), DebtStatus.PAYMENT_REPORTED);

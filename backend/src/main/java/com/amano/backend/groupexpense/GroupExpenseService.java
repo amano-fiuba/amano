@@ -429,9 +429,9 @@ public class GroupExpenseService {
                 expense.getCreatedAt(), shareViews, debtViews);
     }
 
-    /** 018 FR-016: the debt is not PAID and the caller is its debtor, its creditor or an ADMIN. */
+    /** 018 FR-016: the debt is not settled and the caller is its debtor, its creditor or an ADMIN. */
     private boolean canRegisterPayment(Debt debt, GroupMember caller) {
-        return debt.getStatus() != DebtStatus.PAID
+        return !debt.getStatus().isSettled()
                 && permissionChecker.canRegisterPayment(caller.getRole(), caller.getId().getUserId(),
                         debt.getDebtorUserId(), debt.getCreditorUserId());
     }

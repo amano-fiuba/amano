@@ -257,4 +257,63 @@ class DebtTest {
         assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
         assertThat(debt.getOutstanding()).isEqualByComparingTo("0.00");
     }
+
+    @Test
+    void aReportedPaymentMovesTheDebtToVerifiedOnConfirmation() {
+        Debt debt = pending("50.00");
+        debt.applyFullPayment(true);
+
+        debt.confirmReportedPayment();
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.VERIFIED);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("0.00");
+        assertThat(debt.getStatus().isSettled()).isTrue();
+    }
+
+    @Test
+    void aRejectedReportedPaymentReturnsTheDebtToPending() {
+        Debt debt = pending("50.00");
+        debt.applyFullPayment(true);
+
+        debt.rejectReportedPayment(new BigDecimal("50.00"));
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PENDING);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("50.00");
+        assertThat(debt.getStatus().isPayable()).isTrue();
+    }
+
+    @Test
+    void rejectingTheReportedPaymentOfALegacyPartialDebtRestoresThePreviousAmount() {
+        Debt debt = pending("50.00");
+        debt.applyPayment(new BigDecimal("20.00"));
+        debt.applyFullPayment(true);
+
+        debt.rejectReportedPayment(new BigDecimal("30.00"));
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("20.00");
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("30.00");
+    }
+
+    @Test
+    void onlyReportedDebtsAcceptAConfirmationOrRejection() {
+        Debt pendingDebt = pending("50.00");
+
+        assertThatThrownBy(pendingDebt::confirmReportedPayment)
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> pendingDebt.rejectReportedPayment(new BigDecimal("50.00")))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(pendingDebt.getStatus()).isEqualTo(DebtStatus.PENDING);
+
+        Debt reported = pending("50.00");
+        reported.applyFullPayment(true);
+
+        assertThatThrownBy(() -> reported.rejectReportedPayment(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reported.rejectReportedPayment(new BigDecimal("0")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+    }
 }

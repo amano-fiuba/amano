@@ -36,7 +36,8 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
     @Query("""
             SELECT COUNT(d) > 0 FROM Debt d
             WHERE d.groupId = :groupId
-              AND d.status <> com.amano.backend.groupexpense.DebtStatus.PAID
+              AND d.status NOT IN (com.amano.backend.groupexpense.DebtStatus.PAID,
+                  com.amano.backend.groupexpense.DebtStatus.VERIFIED)
               AND (d.debtorUserId = :userId OR d.creditorUserId = :userId)
             """)
     boolean existsOpenForUser(@Param("groupId") Long groupId, @Param("userId") Long userId);
@@ -45,7 +46,8 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
     @Query("""
             SELECT COUNT(d) > 0 FROM Debt d
             WHERE d.groupId = :groupId
-              AND d.status <> com.amano.backend.groupexpense.DebtStatus.PAID
+              AND d.status NOT IN (com.amano.backend.groupexpense.DebtStatus.PAID,
+                  com.amano.backend.groupexpense.DebtStatus.VERIFIED)
               AND d.debtorSimulatedProfileId = :profileId
             """)
     boolean existsOpenForSimulatedProfile(@Param("groupId") Long groupId, @Param("profileId") Long profileId);

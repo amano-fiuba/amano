@@ -90,6 +90,17 @@ class PaymentMigrationIT {
         payment("REGISTERED", juan, null, ana, juan, amount, "ARS", UUID.randomUUID());
     }
 
+    /** A 022 payment row (legacy FALSE) with the given status. */
+    private void activePayment(String status) {
+        jdbc.update("""
+                INSERT INTO payments (group_id, debt_id, payer_type, payer_user_id, payer_simulated_profile_id,
+                    payer_name, receiver_user_id, receiver_name, registered_by_user_id, amount, currency,
+                    payment_date, idempotency_key, status, legacy)
+                VALUES (?, ?, 'REGISTERED', ?, NULL, 'Pagador', ?, 'Ana', ?, 50.00, 'ARS',
+                    CURRENT_DATE, ?, ?, FALSE)
+                """, groupId, debtId, juan, ana, juan, UUID.randomUUID(), status);
+    }
+
     @Test
     void theTableAndItsIndexesExist() {
         assertThat(jdbc.queryForObject("""
@@ -99,7 +110,33 @@ class PaymentMigrationIT {
         List<String> indexes = jdbc.queryForList(
                 "SELECT indexname FROM pg_indexes WHERE tablename = 'payments' ORDER BY indexname", String.class);
         assertThat(indexes).contains("ix_payments_debt", "ix_payments_group",
-                "uq_payments_registered_by_idempotency_key");
+                "uq_payments_registered_by_idempotency_key", "uq_payments_active_debt");
+    }
+
+    /**
+     * 022 T032/T033 (D6): the partial unique index allows one active
+     * non-legacy payment per debt; REJECTED rows leave the index, so the debt
+     * can receive a new payment. Legacy rows of 018 never collide.
+     */
+    @Test
+    void onlyOneActiveNonLegacyPaymentIsAllowedPerDebt() {
+        activePayment("REPORTED");
+
+        assertThatThrownBy(() -> activePayment("CONFIRMED"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        jdbc.update("UPDATE payments SET status = 'REJECTED' WHERE debt_id = ? AND legacy = FALSE", debtId);
+        activePayment("CONFIRMED");
+        validRegistered("1.00");
+        validRegistered("2.00");
+
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = FALSE"
+                        + " AND status IN ('REPORTED', 'CONFIRMED')",
+                Integer.class, debtId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = TRUE", Integer.class, debtId))
+                .isEqualTo(2);
     }
 
     @Test

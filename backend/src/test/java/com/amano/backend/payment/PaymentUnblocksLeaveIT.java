@@ -123,6 +123,20 @@ class PaymentUnblocksLeaveIT {
     }
 
     @Test
+    void aVerifiedDebtDoesNotBlockLeaving() throws Exception {
+        s.requireValidation();
+        long paymentId = s.registerReported(s.juanSession, s.juanDebt, "3333.33");
+
+        leave(s.juanSession).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.properties.code").value("PENDING_DEBTS"));
+
+        s.confirmPayment(s.anaSession, paymentId).andExpect(status().isOk());
+
+        leave(s.juanSession).andExpect(status().isOk());
+        assertThat(isActiveMember(s.juan)).isFalse();
+    }
+
+    @Test
     void aSimulatedProfileWithItsDebtPaidCanBeRemovedAndThePaymentKeepsItsName() throws Exception {
         mockMvc.perform(delete("/api/groups/" + s.groupId + "/simulated-profiles/" + s.abuela).cookie(s.anaSession))
                 .andExpect(status().isForbidden());

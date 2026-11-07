@@ -26,7 +26,9 @@ import jakarta.persistence.Table;
  * Payment of a group debt (table {@code payments}, 018 data-model.md). Payer,
  * receiver, group and currency are always copied from the debt (plan.md D3):
  * the client never chooses them. Names are copied at payment time
- * (preservation pattern of 010/014). Payments are immutable: no setters.
+ * (preservation pattern of 010/014). The only allowed change is the
+ * administrator decision of a reported payment (022 US5); it is expressed with
+ * domain methods, never with setters.
  */
 @Entity
 @Table(name = "payments")
@@ -151,6 +153,39 @@ public class Payment {
         payment.status = status;
         payment.legacy = legacy;
         return payment;
+    }
+
+    /**
+     * 022 US5: an administrator confirms this reported payment. The debt
+     * transition is applied by the caller in the same transaction.
+     */
+    public void confirmBy(Long adminUserId, OffsetDateTime decidedAt) {
+        decide(PaymentStatus.CONFIRMED, adminUserId, decidedAt);
+    }
+
+    /**
+     * 022 US5: an administrator rejects this reported payment. The debt
+     * transition is applied by the caller in the same transaction.
+     */
+    public void rejectBy(Long adminUserId, OffsetDateTime decidedAt) {
+        decide(PaymentStatus.REJECTED, adminUserId, decidedAt);
+    }
+
+    /**
+     * Only a non-legacy {@code REPORTED} payment accepts a decision, and the
+     * database CHECK {@code ck_payments_decision} requires both decision
+     * columns together, so they are always written as a pair.
+     */
+    private void decide(PaymentStatus target, Long adminUserId, OffsetDateTime decidedAt) {
+        if (status != PaymentStatus.REPORTED || legacy) {
+            throw new IllegalStateException("Este pago no está pendiente de validación");
+        }
+        if (adminUserId == null || decidedAt == null) {
+            throw new IllegalArgumentException("La decisión del pago requiere administrador y fecha");
+        }
+        status = target;
+        decidedByUserId = adminUserId;
+        this.decidedAt = decidedAt;
     }
 
     public Long getId() {

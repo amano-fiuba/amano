@@ -19,7 +19,6 @@ import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
-import com.amano.backend.groupexpense.DebtStatus;
 import com.amano.backend.groupexpense.GroupExpense;
 import com.amano.backend.groupexpense.GroupExpenseRepository;
 import com.amano.backend.groupexpense.GroupExpenseResponse;
@@ -104,7 +103,7 @@ public class PaymentService {
             return replay(existing.get(), normalized, caller);
         }
 
-        if (debt.getStatus() == DebtStatus.PAID) {
+        if (debt.getStatus().isSettled()) {
             throw new DebtAlreadyPaidException();
         }
         if (normalized.amount().compareTo(debt.getOutstanding()) > 0) {
@@ -213,7 +212,7 @@ public class PaymentService {
     }
 
     private PaymentResponse toResponse(Payment payment, Debt debt, GroupMember caller) {
-        boolean canPay = debt.getStatus() != DebtStatus.PAID
+        boolean canPay = !debt.getStatus().isSettled()
                 && permissionChecker.canRegisterPayment(caller.getRole(), caller.getId().getUserId(),
                         debt.getDebtorUserId(), debt.getCreditorUserId());
         return new PaymentResponse(payment.getId(), payment.getGroupId(), debt.getExpenseId(), payment.getDebtId(),

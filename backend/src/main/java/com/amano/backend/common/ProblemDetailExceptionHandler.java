@@ -344,6 +344,25 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** 022 US5: unknown payment, payment of another group or caller outside the group — neutral 404. */
+    @ExceptionHandler(com.amano.backend.payment.PaymentNotFoundException.class)
+    public ProblemDetail handlePaymentNotFound(com.amano.backend.payment.PaymentNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Pago no encontrado");
+        return problem;
+    }
+
+    /** 022 US5: already decided, legacy or debt no longer reported — 409 with a code. */
+    @ExceptionHandler(com.amano.backend.payment.PaymentNotDecidableException.class)
+    public ProblemDetail handlePaymentNotDecidable(
+            com.amano.backend.payment.PaymentNotDecidableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("El pago no se puede decidir");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.payment.PaymentNotDecidableException.CODE));
+        return problem;
+    }
+
     /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
     @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
     public ProblemDetail handleAdminRemovalBlocked(

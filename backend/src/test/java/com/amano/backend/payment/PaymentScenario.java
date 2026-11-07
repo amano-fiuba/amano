@@ -44,11 +44,13 @@ final class PaymentScenario {
 
     private final MockMvc mockMvc;
     private final JdbcTemplate jdbc;
+    private final ObjectMapper objectMapper;
 
     PaymentScenario(MockMvc mockMvc, JdbcTemplate jdbc, JwtService jwtService, ObjectMapper objectMapper)
             throws Exception {
         this.mockMvc = mockMvc;
         this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
         int n = SEQUENCE.incrementAndGet() + (int) (System.nanoTime() % 100000);
         ana = user(jdbc, "Ana", "López", "ana" + n + "@payments.dev");
         juan = user(jdbc, "Juan", "Pérez", "juan" + n + "@payments.dev");
@@ -149,6 +151,37 @@ final class PaymentScenario {
 
     ResultActions registerFull(Cookie session, long debtId, String amount) throws Exception {
         return registerFull(session, debtId, amount, UUID.randomUUID().toString());
+    }
+
+    /** 022 US5: registers a payment with validation and returns its id. */
+    long registerReported(Cookie session, long debtId, String amount) throws Exception {
+        String body = registerFull(session, debtId, amount)
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("paymentId").asLong();
+    }
+
+    /** 022 US5: administrator confirmation of a reported payment. */
+    ResultActions confirmPayment(Cookie session, long paymentId) throws Exception {
+        return decidePayment(session, paymentId, "confirm");
+    }
+
+    /** 022 US5: administrator rejection of a reported payment. */
+    ResultActions rejectPayment(Cookie session, long paymentId) throws Exception {
+        return decidePayment(session, paymentId, "reject");
+    }
+
+    private ResultActions decidePayment(Cookie session, long paymentId, String action) throws Exception {
+        var request = post("/api/groups/" + groupId + "/payments/" + paymentId + "/" + action);
+        if (session != null) {
+            request.cookie(session);
+        }
+        return mockMvc.perform(request);
+    }
+
+    /** Promotes an existing active member to ADMIN for the decision tests. */
+    void makeAdmin(long userId) {
+        jdbc.update("UPDATE group_members SET role = 'ADMIN' WHERE group_id = ? AND user_id = ?", groupId, userId);
     }
 
     String statusOf(long debtId) {

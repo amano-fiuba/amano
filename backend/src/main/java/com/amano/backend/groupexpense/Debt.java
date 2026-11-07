@@ -151,6 +151,41 @@ public class Debt {
         status = DebtStatus.settledBy(requiresValidation);
     }
 
+    /**
+     * 022 US5: an administrator confirmed the reported full payment, so the
+     * debt is settled as {@code VERIFIED} (equivalent to {@code PAID} for
+     * balances). The reported payment already set {@code paidAmount} to the
+     * whole amount.
+     */
+    public void confirmReportedPayment() {
+        if (status != DebtStatus.PAYMENT_REPORTED) {
+            throw new IllegalStateException("La deuda no tiene un pago pendiente de validación");
+        }
+        paidAmount = amount.setScale(2);
+        status = DebtStatus.VERIFIED;
+    }
+
+    /**
+     * 022 US5: an administrator rejected the reported full payment. The
+     * {@code paidAmount} from before that payment is restored (zero for a
+     * {@code PENDING}/{@code OVERDUE} debt, the legacy captured amount for a
+     * {@code PARTIALLY_PAID} debt) and the status follows that amount again:
+     * {@code PENDING} in the normal case, {@code PARTIALLY_PAID} only when an
+     * earlier 018 payment existed.
+     */
+    public void rejectReportedPayment(BigDecimal rejectedPaymentAmount) {
+        if (status != DebtStatus.PAYMENT_REPORTED) {
+            throw new IllegalStateException("La deuda no tiene un pago pendiente de validación");
+        }
+        if (rejectedPaymentAmount == null || rejectedPaymentAmount.signum() <= 0
+                || rejectedPaymentAmount.compareTo(amount) > 0) {
+            throw new IllegalArgumentException("El monto del pago rechazado no es válido");
+        }
+        BigDecimal previousPaid = amount.subtract(rejectedPaymentAmount).setScale(2);
+        paidAmount = previousPaid;
+        status = DebtStatus.of(amount, previousPaid);
+    }
+
     /** Amount still to pay: {@code amount - paidAmount}. */
     public BigDecimal getOutstanding() {
         return amount.subtract(paidAmount);
