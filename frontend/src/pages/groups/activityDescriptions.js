@@ -76,11 +76,18 @@ function memberRemoved(details) {
   return `quitó a ${name} del grupo`
 }
 
-function expenseCreated(details) {
+function expenseCreated(details, actor) {
   const money = formatMoney(details.amount, details.currency)
   let sentence = money ? `registró un gasto de ${money}` : 'registró un gasto'
   const description = text(details.description)
   if (description) sentence += ` «${description}»`
+  const payerName = text(details.payerName)
+  if (payerName) {
+    const differentPayer =
+      (details.payerUserId != null && actor?.id != null && details.payerUserId !== actor.id)
+      || (actor && payerName !== actorName(actor))
+    sentence += differentPayer ? ` pagado por ${payerName}` : ` (pagó ${payerName})`
+  }
   return sentence
 }
 
@@ -94,6 +101,45 @@ function paymentMade(details) {
   return sentence
 }
 
+function paymentConfirmed(details) {
+  const money = formatMoney(details.amount, details.currency)
+  let sentence = money ? `confirmó el pago de ${money}` : 'confirmó un pago'
+  const from = text(details.fromName)
+  const to = text(details.toName)
+  if (from) sentence += ` de ${from}`
+  if (to) sentence += ` a ${to}`
+  return sentence
+}
+
+function paymentRejected(details) {
+  const money = formatMoney(details.amount, details.currency)
+  let sentence = money ? `rechazó el pago de ${money}` : 'rechazó un pago'
+  const from = text(details.fromName)
+  const to = text(details.toName)
+  if (from) sentence += ` de ${from}`
+  if (to) sentence += ` a ${to}`
+  return sentence
+}
+
+function debtOverdue(details) {
+  const money = formatMoney(details.amount, details.currency)
+  let sentence = money ? `venció la deuda de ${money}` : 'venció una deuda'
+  const from = text(details.fromName)
+  const to = text(details.toName)
+  if (from) sentence += ` de ${from}`
+  if (to) sentence += ` con ${to}`
+  return sentence
+}
+
+function liquidationProposed(details) {
+  const count = Number(details.transferCount)
+  if (Number.isInteger(count) && count > 0) {
+    const word = count === 1 ? 'transferencia' : 'transferencias'
+    return `generó una propuesta de liquidación (${count} ${word})`
+  }
+  return 'generó una propuesta de liquidación'
+}
+
 const DESCRIBERS = {
   MEMBER_ADDED: memberAdded,
   MEMBER_REMOVED: memberRemoved,
@@ -102,15 +148,21 @@ const DESCRIBERS = {
   PHOTO_CHANGED: () => 'cambió la foto del grupo',
   EXPENSE_CREATED: expenseCreated,
   PAYMENT_MADE: paymentMade,
+  PAYMENT_REGISTERED: paymentMade,
+  PAYMENT_CONFIRMED: paymentConfirmed,
+  PAYMENT_REJECTED: paymentRejected,
+  DEBT_OVERDUE: debtOverdue,
+  LIQUIDATION_PROPOSED: liquidationProposed,
 }
 
 // FR-014: { actor, text } para una entrada del historial.
 export function describeActivity(entry) {
   const details = entry?.details && typeof entry.details === 'object' ? entry.details : {}
   const describe = DESCRIBERS[entry?.eventType]
+  const actor = entry?.eventType === 'DEBT_OVERDUE' && !entry?.actor ? 'Sistema' : actorName(entry?.actor)
   return {
-    actor: actorName(entry?.actor),
-    text: describe ? describe(details) : 'realizó una acción en el grupo',
+    actor,
+    text: describe ? describe(details, entry?.actor) : 'realizó una acción en el grupo',
   }
 }
 

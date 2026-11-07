@@ -53,6 +53,37 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
     List<Debt> findOpenForUserInGroup(@Param("groupId") Long groupId, @Param("userId") Long userId);
 
     /**
+     * 022 D7/T063/T049: PENDING debts of a group whose origin expense is older
+     * than {@code before}, read before the conditional bulk transition so only
+     * the debts actually transitioned by this run get a {@code DEBT_OVERDUE}
+     * activity event.
+     */
+    @Query("""
+            SELECT d FROM Debt d
+            WHERE d.status = com.amano.backend.groupexpense.DebtStatus.PENDING
+              AND d.groupId = :groupId
+              AND EXISTS (SELECT 1 FROM GroupExpense e
+                          WHERE e.id = d.expenseId AND e.expenseDate < :before)
+            ORDER BY d.id
+            """)
+    List<Debt> findPendingDueBefore(@Param("groupId") Long groupId, @Param("before") LocalDate before);
+
+    /**
+     * 022 D7/T063: idempotent conditional transition PENDING → OVERDUE for a
+     * single debt. The {@code status = PENDING} predicate ensures that even if
+     * two instances run concurrently, at most one transitions the row.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Debt d
+            SET d.status = com.amano.backend.groupexpense.DebtStatus.OVERDUE,
+                d.updatedAt = :now
+            WHERE d.id = :debtId
+              AND d.status = com.amano.backend.groupexpense.DebtStatus.PENDING
+            """)
+    int markDebtOverdueIfPending(@Param("debtId") Long debtId, @Param("now") OffsetDateTime now);
+
+    /**
      * 022 D7/T063: idempotent bulk transition PENDING → OVERDUE for the debts
      * of one group whose origin expense is older than {@code before}. The
      * {@code status = PENDING} predicate makes a second execution a no-op and

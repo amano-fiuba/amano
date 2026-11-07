@@ -13,39 +13,48 @@ import org.springframework.transaction.annotation.Transactional;
 import com.amano.backend.groupexpense.balance.MemberRef;
 import com.amano.backend.groupexpense.settlement.SettlementPlanner;
 import com.amano.backend.groupexpense.settlement.Transfer;
+import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.user.Currency;
 
 /**
- * Settlement proposal (022 T027, D5). It reuses the derived balances of
+ * Settlement proposal (022 T027, T048, D5). It reuses the derived balances of
  * {@link GroupBalanceService} and runs the pure {@link SettlementPlanner} on
  * each currency separately, so amounts in different currencies are never added.
  *
- * <p>The proposal is advisory and read-only: it does not create payments nor
- * change any debt or expense. A transfer that involves a simulated profile is
- * marked as informative because that person has no account to execute it.
+ * <p>The proposal does not create payments nor change any debt or expense; it
+ * records {@code LIQUIDATION_PROPOSED} in the group activity history (T048). A
+ * transfer that involves a simulated profile is marked as informative because
+ * that person has no account to execute it.
  */
 @Service
 public class GroupSettlementService {
 
     private final GroupBalanceService balanceService;
+    private final ActivityEventService activityEventService;
 
-    public GroupSettlementService(GroupBalanceService balanceService) {
+    public GroupSettlementService(GroupBalanceService balanceService,
+            ActivityEventService activityEventService) {
         this.balanceService = balanceService;
+        this.activityEventService = activityEventService;
     }
 
     /** One proposal per currency with a non-zero balance (neutral 404 for non-members). */
-    @Transactional(readOnly = true)
+    @Transactional
     public SettlementProposalResponse proposal(Long callerId, Long groupId) {
         GroupBalancesResponse balances = balanceService.balances(callerId, groupId);
 
         List<SettlementProposalResponse.CurrencyProposal> proposals = new ArrayList<>();
+        int transferCount = 0;
         for (GroupBalancesResponse.CurrencyBalances currencyBalances : balances.currencies()) {
             SettlementProposalResponse.CurrencyProposal proposal =
                     proposalOf(currencyBalances.currency(), currencyBalances.balances());
             if (proposal != null) {
                 proposals.add(proposal);
+                transferCount += proposal.summary().transferCount();
             }
         }
+        activityEventService.recordLiquidationProposed(
+                groupId, callerId, transferCount, balances.primaryCurrency().name());
         return new SettlementProposalResponse(groupId, balances.primaryCurrency(), List.copyOf(proposals));
     }
 

@@ -66,8 +66,8 @@ describe('describeActivity: altas y bajas (014 US1)', () => {
   })
 })
 
-describe('describeActivity: gastos y pagos (014 US2)', () => {
-  it('describe gastos con monto en pesos y descripción opcional', () => {
+describe('describeActivity: gastos y pagos (014 US2 / 022 US8)', () => {
+  it('describe gastos viejos (sin pagador) con monto en pesos y descripción opcional (T061)', () => {
     const withDescription = phrase('EXPENSE_CREATED', { amount: '1500.00', currency: 'ARS', description: 'Súper' })
     expect(withDescription).toMatch(/^Ana López registró un gasto de \$\s?1\.500,00 «Súper»$/)
     expect(phrase('EXPENSE_CREATED', { amount: '1500.00', currency: 'ARS' }))
@@ -75,12 +75,59 @@ describe('describeActivity: gastos y pagos (014 US2)', () => {
     expect(phrase('EXPENSE_CREATED', {})).toBe('Ana López registró un gasto')
   })
 
-  it('describe pagos con quién paga y quién recibe', () => {
+  it('incluye al pagador en EXPENSE_CREATED y muestra a quien registró y al pagador cuando son distintos o iguales (T061)', () => {
+    const differentPayer = phrase('EXPENSE_CREATED', {
+      expenseId: 10,
+      amount: '1500.00',
+      currency: 'ARS',
+      description: 'Súper',
+      payerUserId: 15,
+      payerName: 'Juan Pérez',
+    })
+    expect(differentPayer)
+      .toMatch(/^Ana López registró un gasto de \$\s?1\.500,00 «Súper» pagado por Juan Pérez$/)
+
+    const samePayer = phrase('EXPENSE_CREATED', {
+      expenseId: 11,
+      amount: '1500.00',
+      currency: 'ARS',
+      description: 'Súper',
+      payerUserId: 7,
+      payerName: 'Ana López',
+    })
+    expect(samePayer)
+      .toMatch(/^Ana López registró un gasto de \$\s?1\.500,00 «Súper» \(pagó Ana López\)$/)
+  })
+
+  it('describe pagos con quién paga y quién recibe (PAYMENT_MADE y PAYMENT_REGISTERED)', () => {
     expect(phrase('PAYMENT_MADE', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez', toName: 'Ana López' }))
+      .toMatch(/^Ana López registró un pago de \$\s?500,00 de Juan Pérez a Ana López$/)
+    expect(phrase('PAYMENT_REGISTERED', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez', toName: 'Ana López' }))
       .toMatch(/^Ana López registró un pago de \$\s?500,00 de Juan Pérez a Ana López$/)
     expect(phrase('PAYMENT_MADE', { amount: '500', currency: 'ARS', toName: 'Ana' }))
       .toMatch(/registró un pago de \$\s?500,00 a Ana$/)
     expect(phrase('PAYMENT_MADE', { fromName: 'Juan' })).toBe('Ana López registró un pago de Juan')
+  })
+
+  it('describe transiciones de estado de pagos y deudas y propuesta de liquidación (T048, T049)', () => {
+    expect(phrase('PAYMENT_CONFIRMED', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez', toName: 'Ana López' }))
+      .toMatch(/^Ana López confirmó el pago de \$\s?500,00 de Juan Pérez a Ana López$/)
+    expect(phrase('PAYMENT_CONFIRMED', {})).toBe('Ana López confirmó un pago')
+
+    expect(phrase('PAYMENT_REJECTED', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez', toName: 'Ana López' }))
+      .toMatch(/^Ana López rechazó el pago de \$\s?500,00 de Juan Pérez a Ana López$/)
+    expect(phrase('PAYMENT_REJECTED', {})).toBe('Ana López rechazó un pago')
+
+    expect(phrase('DEBT_OVERDUE', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez', toName: 'Ana López' }, null))
+      .toMatch(/^Sistema venció la deuda de \$\s?500,00 de Juan Pérez con Ana López$/)
+    expect(phrase('DEBT_OVERDUE', {}, null)).toBe('Sistema venció una deuda')
+
+    expect(phrase('LIQUIDATION_PROPOSED', { transferCount: 2, currency: 'ARS' }))
+      .toBe('Ana López generó una propuesta de liquidación (2 transferencias)')
+    expect(phrase('LIQUIDATION_PROPOSED', { transferCount: 1, currency: 'ARS' }))
+      .toBe('Ana López generó una propuesta de liquidación (1 transferencia)')
+    expect(phrase('LIQUIDATION_PROPOSED', { transferCount: 0, currency: 'ARS' }))
+      .toBe('Ana López generó una propuesta de liquidación')
   })
 
   it('formatea montos y tolera monedas desconocidas o datos faltantes', () => {

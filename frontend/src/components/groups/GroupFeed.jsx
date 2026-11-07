@@ -8,7 +8,14 @@ import GroupRowsSkeleton from './GroupRowsSkeleton'
 export const FEED_ERROR_MESSAGE = 'No se pudo cargar esta información'
 
 // Los eventos con gasto asociado abren su detalle, igual que en el historial.
-const LINKS_TO_EXPENSE = ['EXPENSE_CREATED', 'PAYMENT_MADE']
+const LINKS_TO_EXPENSE = [
+  'EXPENSE_CREATED',
+  'PAYMENT_MADE',
+  'PAYMENT_REGISTERED',
+  'PAYMENT_CONFIRMED',
+  'PAYMENT_REJECTED',
+  'DEBT_OVERDUE',
+]
 
 /**
  * Últimos eventos del grupo para las tarjetas de su pantalla. `eventTypes` acota

@@ -214,7 +214,7 @@ class GroupSettlementControllerIT {
     }
 
     @Test
-    void theProposalIsReadOnlyAndDoesNotTouchExpensesDebtsPaymentsOrHistory() throws Exception {
+    void theProposalIsReadOnlyForExpensesDebtsAndPaymentsAndRecordsLiquidationProposed() throws Exception {
         Long expenses = scalar("SELECT count(*) FROM group_expenses WHERE group_id = ?");
         Long debts = scalar("SELECT count(*) FROM debts WHERE group_id = ?");
         Long payments = scalar("""
@@ -235,14 +235,23 @@ class GroupSettlementControllerIT {
                 JOIN debts d ON d.id = p.debt_id
                 WHERE d.group_id = ?
                 """)).isEqualTo(payments);
-        assertThat(scalar("SELECT count(*) FROM group_activity WHERE group_id = ?")).isEqualTo(activity);
+        assertThat(scalar("SELECT count(*) FROM group_activity WHERE group_id = ?")).isEqualTo(activity + 1);
         assertThat(jdbc.queryForList(
                 "SELECT id, status, paid_amount FROM debts WHERE group_id = ? ORDER BY id", groupId))
                 .isEqualTo(debtRows);
         assertThat(scalar("""
                 SELECT count(*) FROM group_activity
                 WHERE group_id = ? AND event_type = 'LIQUIDATION_PROPOSED'
-                """)).isZero();
+                """)).isEqualTo(1);
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(anaSession)
+                .param("eventType", "LIQUIDATION_PROPOSED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].eventType").value("LIQUIDATION_PROPOSED"))
+                .andExpect(jsonPath("$.content[0].actor.id").value(ana))
+                .andExpect(jsonPath("$.content[0].details.transferCount").value(3))
+                .andExpect(jsonPath("$.content[0].details.currency").value("ARS"));
     }
 
     private Long scalar(String sql) {

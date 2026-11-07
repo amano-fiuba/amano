@@ -115,14 +115,16 @@ public class PaymentValidationService {
         boolean requiresValidation = groupPermissionsRepository.findByGroupId(groupId)
                 .map(GroupPermissions::isPaymentsRequireValidation)
                 .orElse(false);
+        String debtStatusBefore = debt.getStatus().name();
         debt.applyFullPayment(requiresValidation);
         PaymentStatus status = requiresValidation ? PaymentStatus.REPORTED : PaymentStatus.CONFIRMED;
         Payment payment = paymentRepository.save(Payment.of(debt, normalized.amount(), LocalDate.now(clock),
                 callerId, nameOf(debt.getCreditorUserId()), normalized.idempotencyKey(), false, status));
 
-        activityEventService.recordPaymentMade(debt.getGroupId(), callerId, new PaymentActivityDetails(
+        activityEventService.recordPaymentRegistered(debt.getGroupId(), callerId, new PaymentActivityDetails(
                 payment.getId(), payment.getAmount(), payment.getCurrency().name(), payment.getPayerName(),
-                payment.getReceiverName(), debt.getExpenseId(), debt.getId()));
+                payment.getReceiverName(), debt.getExpenseId(), debt.getId(),
+                debtStatusBefore, debt.getStatus().name()));
 
         return new Registration(toResponse(payment, debt), true);
     }

@@ -190,7 +190,7 @@ final class PaymentScenario {
 
     int paymentEvents() {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = 'PAYMENT_MADE'",
+                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type IN ('PAYMENT_MADE', 'PAYMENT_REGISTERED')",
                 Integer.class, groupId);
     }
 

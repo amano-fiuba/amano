@@ -272,7 +272,7 @@ class GroupExpenseServiceTest {
         service.create(ANA, GROUP_ID, KEY, threeWay());
 
         verify(activityEventService).recordExpenseCreated(GROUP_ID, ANA,
-                new ExpenseActivityDetails(12L, new BigDecimal("10000.00"), "ARS", "Súper"));
+                new ExpenseActivityDetails(12L, new BigDecimal("10000.00"), "ARS", "Súper", ANA, "Ana López"));
     }
 
     @Test
@@ -428,7 +428,8 @@ class GroupExpenseServiceTest {
 
         assertThat(response.payer().userId()).isEqualTo(ANA);
         assertThat(response.createdBy()).isEqualTo(new GroupExpenseResponse.Person(JUAN, "Juan Pérez"));
-        verify(activityEventService).recordExpenseCreated(eq(GROUP_ID), eq(JUAN), any());
+        verify(activityEventService).recordExpenseCreated(GROUP_ID, JUAN,
+                new ExpenseActivityDetails(12L, new BigDecimal("10.00"), "ARS", "Súper", ANA, "Ana López"));
     }
 
     private GroupExpense existingThreeWay() {

@@ -25,8 +25,15 @@ function initialFilter(value) {
 // agrupadas por día, filtro "Mostrar", paginación y estados de carga, vacío y
 // error. Una respuesta vieja nunca pisa a la consulta más reciente.
 
-// Entries that open the expense detail: the expense itself (017) and its payments (018 FR-022).
-const LINKS_TO_EXPENSE = ['EXPENSE_CREATED', 'PAYMENT_MADE']
+// Entries that open the expense detail: the expense itself (017) and its payments/debts (018 FR-022; 022 US8).
+const LINKS_TO_EXPENSE = [
+  'EXPENSE_CREATED',
+  'PAYMENT_MADE',
+  'PAYMENT_REGISTERED',
+  'PAYMENT_CONFIRMED',
+  'PAYMENT_REJECTED',
+  'DEBT_OVERDUE',
+]
 export default function GroupHistoryView({ groupId }) {
   const auth = useAuth()
   const setUser = auth?.setUser

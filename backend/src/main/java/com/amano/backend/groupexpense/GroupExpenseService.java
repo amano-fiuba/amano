@@ -114,7 +114,7 @@ public class GroupExpenseService {
     }
 
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date, String description,
-            Long payerUserId, List<ResolvedParticipant> participants, int payerIndex) {
+            Long payerUserId, String payerName, List<ResolvedParticipant> participants, int payerIndex) {
     }
 
     /**
@@ -174,7 +174,8 @@ public class GroupExpenseService {
         List<Debt> savedDebts = debtRepository.saveAll(debts);
 
         activityEventService.recordExpenseCreated(groupId, callerId, new ExpenseActivityDetails(
-                saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription()));
+                saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription(),
+                saved.getPayerUserId(), normalized.payerName()));
 
         return new Registration(toResponse(saved, shares, savedDebts, caller), true);
     }
@@ -288,7 +289,8 @@ public class GroupExpenseService {
             }
         }
         return new NormalizedExpense(ExpenseAmountNormalizer.normalize(request.getAmount()), currency, date,
-                ExpenseDescriptionNormalizer.normalize(request.getDescription()), payer, participants, payerIndex);
+                ExpenseDescriptionNormalizer.normalize(request.getDescription()), payer,
+                activeMemberNames.get(payer), participants, payerIndex);
     }
 
     /** Visible names of the active registered members of the group, by user id. */

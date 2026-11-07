@@ -108,6 +108,20 @@ class OverdueDebtJobIT {
         return jdbc.queryForObject("SELECT updated_at FROM debts WHERE id = ?", OffsetDateTime.class, debtId);
     }
 
+    private int overdueEvents(long groupId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = 'DEBT_OVERDUE'",
+                Integer.class, groupId);
+    }
+
+    @Test
+    void scheduledAnnotationUsesTheBuenosAiresZone() throws Exception {
+        var scheduled = OverdueDebtJob.class.getMethod("markOverdueDebts")
+                .getAnnotation(org.springframework.scheduling.annotation.Scheduled.class);
+        assertThat(scheduled).isNotNull();
+        assertThat(scheduled.zone()).isEqualTo("America/Argentina/Buenos_Aires");
+    }
+
     @Test
     void runningTheJobTwiceIsIdempotent() {
         long groupId = group(5);
@@ -116,12 +130,14 @@ class OverdueDebtJobIT {
         at("2026-11-10");
         job.markOverdueDebts();
         assertThat(statusOf(debtId)).isEqualTo("OVERDUE");
+        assertThat(overdueEvents(groupId)).isEqualTo(1);
         OffsetDateTime firstRun = updatedAt(debtId);
 
         at("2026-11-11");
         job.markOverdueDebts();
         assertThat(statusOf(debtId)).isEqualTo("OVERDUE");
         assertThat(updatedAt(debtId)).isEqualTo(firstRun);
+        assertThat(overdueEvents(groupId)).isEqualTo(1);
     }
 
     @Test

@@ -9,10 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
 import com.amano.backend.groupexpense.DebtStatus;
+import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupPermissionChecker;
 import com.amano.backend.groups.GroupPermissionDeniedException;
+import com.amano.backend.groups.PaymentActivityDetails;
 
 /**
  * Administrator decision over a reported payment (022 US5, plan.md D6). Confirm
@@ -37,14 +39,17 @@ public class PaymentDecisionService {
     private final DebtRepository debtRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final GroupPermissionChecker permissionChecker;
+    private final ActivityEventService activityEventService;
     private final Clock clock;
 
     public PaymentDecisionService(PaymentRepository paymentRepository, DebtRepository debtRepository,
-            GroupMemberRepository groupMemberRepository, GroupPermissionChecker permissionChecker, Clock clock) {
+            GroupMemberRepository groupMemberRepository, GroupPermissionChecker permissionChecker,
+            ActivityEventService activityEventService, Clock clock) {
         this.paymentRepository = paymentRepository;
         this.debtRepository = debtRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.permissionChecker = permissionChecker;
+        this.activityEventService = activityEventService;
         this.clock = clock;
     }
 
@@ -54,8 +59,10 @@ public class PaymentDecisionService {
     @Transactional
     public PaymentConfirmationResponse confirm(Long callerId, Long groupId, Long paymentId) {
         Locked locked = lockAndAuthorize(callerId, groupId, paymentId, CONFIRM_NOT_ADMIN);
+        String debtStatusBefore = locked.debt().getStatus().name();
         locked.payment().confirmBy(callerId, OffsetDateTime.now(clock));
         locked.debt().confirmReportedPayment();
+        activityEventService.recordPaymentConfirmed(groupId, callerId, detailsOf(locked, debtStatusBefore));
         return new PaymentConfirmationResponse(locked.payment().getId(), locked.payment().getStatus(),
                 locked.debt().getStatus(), callerId);
     }
@@ -63,10 +70,20 @@ public class PaymentDecisionService {
     @Transactional
     public PaymentRejectionResponse reject(Long callerId, Long groupId, Long paymentId) {
         Locked locked = lockAndAuthorize(callerId, groupId, paymentId, REJECT_NOT_ADMIN);
+        String debtStatusBefore = locked.debt().getStatus().name();
         locked.payment().rejectBy(callerId, OffsetDateTime.now(clock));
         locked.debt().rejectReportedPayment(locked.payment().getAmount());
+        activityEventService.recordPaymentRejected(groupId, callerId, detailsOf(locked, debtStatusBefore));
         return new PaymentRejectionResponse(locked.payment().getId(), locked.payment().getStatus(),
                 locked.debt().getStatus(), callerId);
+    }
+
+    private static PaymentActivityDetails detailsOf(Locked locked, String debtStatusBefore) {
+        Payment payment = locked.payment();
+        Debt debt = locked.debt();
+        return new PaymentActivityDetails(payment.getId(), payment.getAmount(), payment.getCurrency().name(),
+                payment.getPayerName(), payment.getReceiverName(), debt.getExpenseId(), debt.getId(),
+                debtStatusBefore, debt.getStatus().name());
     }
 
     /**

@@ -1,11 +1,13 @@
 package com.amano.backend.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +24,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -240,6 +243,70 @@ class PaymentDecisionControllerIT {
         s.rejectPayment(null, paymentId).andExpect(status().isUnauthorized());
 
         assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAYMENT_REPORTED");
+    }
+
+    @Test
+    void t049ActivityHistoryPreservesTheFullPathOfDebtStateTransitions() throws Exception {
+        s.requireValidation();
+
+        // 1) PENDING -> PAYMENT_REPORTED (Juan reports payment)
+        long firstPayment = s.registerReported(s.juanSession, s.juanDebt, "3333.33");
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAYMENT_REPORTED");
+
+        // 2) PAYMENT_REPORTED -> PENDING (Ana rejects payment)
+        s.rejectPayment(s.anaSession, firstPayment).andExpect(status().isOk());
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PENDING");
+
+        // 3) PENDING -> PAYMENT_REPORTED -> VERIFIED (Juan reports again, Ana confirms)
+        long secondPayment = s.registerReported(s.juanSession, s.juanDebt, "3333.33");
+        s.confirmPayment(s.anaSession, secondPayment).andExpect(status().isOk());
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("VERIFIED");
+
+        // 4) Second debt (Abuela): disable validation and pay directly -> PAID
+        jdbc.update("UPDATE group_permissions SET payments_require_validation = FALSE WHERE group_id = ?", s.groupId);
+        s.registerFull(s.anaSession, s.abuelaDebt, "3333.33").andExpect(status().isCreated());
+        assertThat(s.statusOf(s.abuelaDebt)).isEqualTo("PAID");
+
+        String historyBody = mockMvc.perform(get("/api/groups/" + s.groupId + "/activity")
+                .cookie(s.anaSession)
+                .param("eventType", "EXPENSE_CREATED,PAYMENT_REGISTERED,PAYMENT_REJECTED,PAYMENT_CONFIRMED"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode entries = objectMapper.readTree(historyBody).get("content");
+
+        // Descending chronological order (newest first):
+        // [0] PAYMENT_REGISTERED (abuelaDebt: PENDING -> PAID)
+        // [1] PAYMENT_CONFIRMED  (juanDebt: PAYMENT_REPORTED -> VERIFIED)
+        // [2] PAYMENT_REGISTERED (juanDebt: PENDING -> PAYMENT_REPORTED)
+        // [3] PAYMENT_REJECTED   (juanDebt: PAYMENT_REPORTED -> PENDING)
+        // [4] PAYMENT_REGISTERED (juanDebt: PENDING -> PAYMENT_REPORTED)
+        // [5] EXPENSE_CREATED
+        assertThat(entries).hasSize(6);
+        assertThat(List.of(
+                entries.get(0).get("eventType").asString(),
+                entries.get(1).get("eventType").asString(),
+                entries.get(2).get("eventType").asString(),
+                entries.get(3).get("eventType").asString(),
+                entries.get(4).get("eventType").asString(),
+                entries.get(5).get("eventType").asString()))
+                .containsExactly(
+                        "PAYMENT_REGISTERED",
+                        "PAYMENT_CONFIRMED",
+                        "PAYMENT_REGISTERED",
+                        "PAYMENT_REJECTED",
+                        "PAYMENT_REGISTERED",
+                        "EXPENSE_CREATED");
+
+        assertThat(entries.get(4).get("details").get("debtStatusBefore").asString()).isEqualTo("PENDING");
+        assertThat(entries.get(4).get("details").get("debtStatusAfter").asString()).isEqualTo("PAYMENT_REPORTED");
+        assertThat(entries.get(3).get("details").get("debtStatusBefore").asString()).isEqualTo("PAYMENT_REPORTED");
+        assertThat(entries.get(3).get("details").get("debtStatusAfter").asString()).isEqualTo("PENDING");
+        assertThat(entries.get(2).get("details").get("debtStatusBefore").asString()).isEqualTo("PENDING");
+        assertThat(entries.get(2).get("details").get("debtStatusAfter").asString()).isEqualTo("PAYMENT_REPORTED");
+        assertThat(entries.get(1).get("details").get("debtStatusBefore").asString()).isEqualTo("PAYMENT_REPORTED");
+        assertThat(entries.get(1).get("details").get("debtStatusAfter").asString()).isEqualTo("VERIFIED");
+        assertThat(entries.get(0).get("details").get("debtStatusBefore").asString()).isEqualTo("PENDING");
+        assertThat(entries.get(0).get("details").get("debtStatusAfter").asString()).isEqualTo("PAID");
     }
 
     /** A second admin is needed twice; promote Carla through the real membership row. */

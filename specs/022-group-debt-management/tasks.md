@@ -54,7 +54,7 @@
 - [ ] T020 [US1] Probar restricción: editar gasto con participantes → 409 "No se permite editar un gasto que ya tiene participantes"
 - [ ] T021 [US1] Probar restricción: eliminar gasto con deudas asociadas → 409 "No se puede eliminar un gasto con deudas asociadas"
 - [ ] T022 [P] [US1] Probar delete personal expense (sin participantes) succeeds y balances recalculados
-- [ ] T060 [US1] Permitir que cualquier miembro del grupo registre un gasto pagado por otro miembro conservando la casilla `members_can_generate_expenses_for_others` como permiso por grupo: los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración V20 que cambia solo el DEFAULT de la columna, sin tocar filas existentes) y los grupos existentes mantienen su valor; validar en servidor que pagador y participantes sean miembros del grupo; mantener el 403 con el mensaje "Solo podés registrar gastos pagados por vos" cuando la casilla está en `false` y agregar el caso con la casilla en `true`; cubrir con tests que `createdByUserId` y `payerUserId` quedan separados
+- [ ] T060 [US1] Permitir que cualquier miembro del grupo registre un gasto pagado por otro miembro conservando la casilla `members_can_generate_expenses_for_others` como permiso por grupo: los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración en la siguiente versión libre que cambia solo el DEFAULT de la columna, sin tocar filas existentes) y los grupos existentes mantienen su valor; validar en servidor que pagador y participantes sean miembros del grupo; mantener el 403 con el mensaje "Solo podés registrar gastos pagados por vos" cuando la casilla está en `false` y agregar el caso con la casilla en `true`; cubrir con tests que `createdByUserId` y `payerUserId` quedan separados
 
 ---
 ## Phase 5: User Story 2 - Definir cómo se reparte el gasto (Priority: P1)
@@ -104,7 +104,6 @@
 - [X] T040 [P] [US6] Probar idempotency: mesma `idempotencyKey` sobre deuda misma → returns existing result, no duplicate
 - [X] T041 [US6] Probar que clave distinta sobre deuda ya reportada/saldada → 409 "Esta deuda ya tiene un pago registrado"
 - [X] T042 [P] [US6] Probar concurrency: dos pagos concurrentes sobre la misma deuda con claves diferentes → solo uno se aplica (PESSIMISTIC_WRITE lock)
-- [ ] T062 [US6] Implementar job programado idempotente que pasa deudas `PENDING` a `OVERDUE` usando `debtDueDays` del grupo (`null` = nunca vence) y `Clock` inyectable (plan D7); no implementado en esta etapa
 
 ---
 ## Phase 9: User Story 7 - Ver mis deudas pendientes (Priority: P3)
@@ -122,11 +121,11 @@
 **Goal**: Verify that activity history reflects events correctly  
 **Independent Test**: After expense/payment/liquidation operations, activity history shows correct events
 
-- [ ] T046 [P] [US8] Probar que evento `EXPENSE_CREATED` aparece en historial después de registrar gasto
-- [ ] T047 [P] [US8] Probar que evento `PAYMENT_REGISTERED` aparece en historial después de registrar pago
-- [ ] T048 [P] [US8] Probar que evento `LIQUIDATION_PROPOSED` aparece en historial después de generar propuesta
-- [ ] T049 [US8] Probar que el historial conserva el camino recorrido de transiciones de estado (Q7)
-- [ ] T061 [US8] Incluir al pagador en el evento `EXPENSE_CREATED` y mostrar en el historial tanto a quien registró el gasto como al pagador (D11)
+- [X] T046 [P] [US8] Probar que evento `EXPENSE_CREATED` aparece en historial después de registrar gasto
+- [X] T047 [P] [US8] Probar que evento `PAYMENT_REGISTERED` aparece en historial después de registrar pago
+- [X] T048 [P] [US8] Probar que evento `LIQUIDATION_PROPOSED` aparece en historial después de generar propuesta
+- [X] T049 [US8] Probar que el historial conserva el camino recorrido de transiciones de estado (Q7)
+- [X] T061 [US8] Incluir al pagador en el evento `EXPENSE_CREATED` y mostrar en el historial tanto a quien registró el gasto como al pagador (D11)
 
 ---
 ## Phase 11: User Story 9 - Operar en varias monedas (Priority: P2)
@@ -148,7 +147,7 @@
 - [ ] T055 [P] Documentar invariantes clave en README: `Σ(balances) == 0`; transfer count ≤ n-1; PAYMENT_REPORTED ≠ PAID; OVERDUE debts still count as saldo
 - [ ] T056 [P] Ejecutar validación completa quickstart.md y corregir cualquier fallo
 - [ ] T057 [P] Añadir cobertura FR/SC tabla al final de tasks.md (ver abajo)
-- [ ] T058 [P] Revisar que no hay numeración de ID duplicada en tasks.md
+- [X] T058 [P] Revisar que no hay numeración de ID duplicada en tasks.md
 - [ ] T059 [P] Confirmar integración con feature 020: `GroupService.leaveGroup` bloquea si `hasOutstandingBalance(groupId, member)` es true
 
 ---
@@ -165,10 +164,10 @@
 | **FR-005** | Complete | T032-T037, T063 | Gestión de estado de deuda; confirmación/rechazo de pagos, transiciones verificadas y vencimiento programado |
 | **FR-006** | Complete | T038-T042 | Registrar pago; flujo de pago completo con validación, idempotencia, 409 y concurrencia |
 | **FR-007** | Complete | T043-T045 | Ver deudas pendientes; listado con origen, moneda y persona simulada |
-| **FR-008** | Pending | T046-T049, T061 | Historial de actividad; tareas de US8 sin completar |
+| **FR-008** | Complete | T046-T049, T061 | Historial de actividad; eventos de gastos (con pagador), pagos, liquidación y transiciones de estado |
 | **FR-009** | Pending | T050-T054 | Conversión multi-currency; tareas de US9 sin completar |
 | **FR-010** | Pending | T059 | Restricción de salida con saldo pendiente; T059 sin completar |
 | **SC-001** | Complete | T009, T012-T016 | La suma de saldos es cero, incluida la persona simulada |
 | **SC-002** | Complete | T027-T031 | Transferencias ≤ M-1 y total igual a la suma de saldos positivos |
 | **SC-003** | Complete | T012-T016 | Saldo neto por miembro expuesto sin cálculos manuales |
-| **SC-004** | Pending | T034, T035, T047, T049 | Pago informado en estado e historial; tareas de US5/US6/US8 sin completar |
+| **SC-004** | Complete | T034, T035, T047, T049 | Pago informado en estado e historial; transiciones registradas en el historial de actividad |

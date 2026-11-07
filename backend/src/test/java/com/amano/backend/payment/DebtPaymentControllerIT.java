@@ -2,6 +2,7 @@ package com.amano.backend.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -106,6 +107,18 @@ class DebtPaymentControllerIT {
                 s.juanDebt)).isEqualByComparingTo("3333.33");
         assertThat(s.activePayments(s.juanDebt)).isEqualTo(1);
         assertThat(s.paymentEvents()).isEqualTo(1);
+
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/activity").cookie(s.anaSession)
+                .param("eventType", "PAYMENT_REGISTERED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].eventType").value("PAYMENT_REGISTERED"))
+                .andExpect(jsonPath("$.content[0].actor.id").value(s.juan))
+                .andExpect(jsonPath("$.content[0].details.paymentId").value(paymentId))
+                .andExpect(jsonPath("$.content[0].details.debtId").value(s.juanDebt))
+                .andExpect(jsonPath("$.content[0].details.amount").value("3333.33"))
+                .andExpect(jsonPath("$.content[0].details.debtStatusBefore").value("PENDING"))
+                .andExpect(jsonPath("$.content[0].details.debtStatusAfter").value("PAID"));
     }
 
     @Test

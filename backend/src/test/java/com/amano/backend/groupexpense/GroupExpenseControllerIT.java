@@ -256,7 +256,9 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.content[0].details.expenseId").value(expenseId))
                 .andExpect(jsonPath("$.content[0].details.amount").value("10000.00"))
                 .andExpect(jsonPath("$.content[0].details.currency").value("ARS"))
-                .andExpect(jsonPath("$.content[0].details.description").value("Súper"));
+                .andExpect(jsonPath("$.content[0].details.description").value("Súper"))
+                .andExpect(jsonPath("$.content[0].details.payerUserId").value(ana))
+                .andExpect(jsonPath("$.content[0].details.payerName").value("Ana López"));
     }
 
     @Test
@@ -340,6 +342,16 @@ class GroupExpenseControllerIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.createdBy.userId").value(juan))
                 .andExpect(jsonPath("$.payer.userId").value(ana));
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(anaSession)
+                .param("eventType", "EXPENSE_CREATED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].actor.id").value(juan))
+                .andExpect(jsonPath("$.content[0].actor.firstName").value("Juan"))
+                .andExpect(jsonPath("$.content[0].actor.lastName").value("Pérez"))
+                .andExpect(jsonPath("$.content[0].details.payerUserId").value(ana))
+                .andExpect(jsonPath("$.content[0].details.payerName").value("Ana López"));
 
         mockMvc.perform(put("/api/groups/" + groupId).cookie(anaSession)
                 .contentType(MediaType.APPLICATION_JSON)

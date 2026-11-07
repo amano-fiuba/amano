@@ -221,6 +221,38 @@ class GroupActivityControllerIT {
     }
 
     @Test
+    void legacyExpenseCreatedEventWithoutPayerStillWorksAlongsideNewEventWithPayer() throws Exception {
+        long groupId = createGroupAndAddMembers();
+        Cookie admin = verifiedSessionOf("history-admin@example.com");
+        long adminId = userIdOf("history-admin@example.com");
+        long friendId = userIdOf("friend@example.com");
+
+        // Legacy pre-022 EXPENSE_CREATED row without payerUserId / payerName
+        jdbcTemplate.update("""
+                INSERT INTO group_activity (group_id, event_type, actor_user_id, details_json, created_at)
+                VALUES (?, 'EXPENSE_CREATED', ?, '{"expenseId":1,"amount":"800.00","currency":"ARS","description":"Pan"}', NOW() - INTERVAL '1 hour')
+                """, groupId, adminId);
+
+        // New 022 EXPENSE_CREATED row with payerUserId / payerName
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> activityEventService.recordExpenseCreated(groupId, adminId,
+                new ExpenseActivityDetails(2L, new java.math.BigDecimal("1500.00"), "ARS", "Cena", friendId, "Juan Pérez")));
+
+        mockMvc.perform(get("/api/groups/" + groupId + "/activity").cookie(admin)
+                .param("eventType", "EXPENSE_CREATED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].details.expenseId").value(2))
+                .andExpect(jsonPath("$.content[0].details.payerUserId").value(friendId))
+                .andExpect(jsonPath("$.content[0].details.payerName").value("Juan Pérez"))
+                .andExpect(jsonPath("$.content[1].details.expenseId").value(1))
+                .andExpect(jsonPath("$.content[1].details.amount").value("800.00"))
+                .andExpect(jsonPath("$.content[1].details.description").value("Pan"))
+                .andExpect(jsonPath("$.content[1].details.payerUserId").doesNotExist())
+                .andExpect(jsonPath("$.content[1].details.payerName").doesNotExist());
+    }
+
+    @Test
     void registeredBajaKeepsTheNameAndLegacyInvalidDetailsDegradeToNull() throws Exception {
         long groupId = createGroupAndAddMembers();
         Cookie admin = verifiedSessionOf("history-admin@example.com");

@@ -56,8 +56,9 @@ public class ActivityEventService {
     }
 
     /**
-     * Hook for the future group-expenses module (014 US2, FR-006/FR-008):
-     * records {@code EXPENSE_CREATED} with the data-model format.
+     * Hook for the group-expenses module (014 US2, FR-006/FR-008; 022 D11, T061):
+     * records {@code EXPENSE_CREATED} with the data-model format, including the
+     * optional payer fields when present.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public GroupActivity recordExpenseCreated(Long groupId, Long actorUserId, ExpenseActivityDetails details) {
@@ -70,15 +71,84 @@ public class ActivityEventService {
         map.put("amount", details.amount().toPlainString());
         map.put("currency", currency);
         map.put("description", blankToNull(details.description()));
+        if (details.payerUserId() != null) {
+            map.put("payerUserId", details.payerUserId());
+        }
+        map.put("payerName", blankToNull(details.payerName()));
         return record(groupId, GroupActivity.GroupActivityType.EXPENSE_CREATED, actorUserId, map);
     }
 
     /**
-     * Hook for the future group-payments module (014 US2, FR-007/FR-008):
+     * Hook for the group-payments module (014 US2, FR-007/FR-008):
      * records {@code PAYMENT_MADE} with the data-model format.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public GroupActivity recordPaymentMade(Long groupId, Long actorUserId, PaymentActivityDetails details) {
+        return recordPaymentEvent(groupId, GroupActivity.GroupActivityType.PAYMENT_MADE, actorUserId, details);
+    }
+
+    /**
+     * 022 US8 (T047/T049): records {@code PAYMENT_REGISTERED} when a full debt
+     * payment is registered, preserving the debt status transition.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordPaymentRegistered(Long groupId, Long actorUserId, PaymentActivityDetails details) {
+        return recordPaymentEvent(groupId, GroupActivity.GroupActivityType.PAYMENT_REGISTERED, actorUserId, details);
+    }
+
+    /**
+     * 022 US8 (T049): records {@code PAYMENT_CONFIRMED} when an admin confirms a
+     * reported payment ({@code PAYMENT_REPORTED → VERIFIED}).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordPaymentConfirmed(Long groupId, Long actorUserId, PaymentActivityDetails details) {
+        return recordPaymentEvent(groupId, GroupActivity.GroupActivityType.PAYMENT_CONFIRMED, actorUserId, details);
+    }
+
+    /**
+     * 022 US8 (T049): records {@code PAYMENT_REJECTED} when an admin rejects a
+     * reported payment ({@code PAYMENT_REPORTED → PENDING/PARTIALLY_PAID}).
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordPaymentRejected(Long groupId, Long actorUserId, PaymentActivityDetails details) {
+        return recordPaymentEvent(groupId, GroupActivity.GroupActivityType.PAYMENT_REJECTED, actorUserId, details);
+    }
+
+    /**
+     * 022 US8 (T049): records {@code DEBT_OVERDUE} when the scheduled job
+     * transitions a {@code PENDING} debt to {@code OVERDUE}.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordDebtOverdue(Long groupId, Long debtId, Long expenseId, BigDecimal amount,
+            String currency, String debtorName, String creditorName) {
+        String normalizedCurrency = validatedCurrency(amount, currency);
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("debtId", debtId);
+        map.put("expenseId", expenseId);
+        map.put("amount", amount.toPlainString());
+        map.put("currency", normalizedCurrency);
+        map.put("fromName", blankToNull(debtorName));
+        map.put("toName", blankToNull(creditorName));
+        map.put("debtStatusBefore", "PENDING");
+        map.put("debtStatusAfter", "OVERDUE");
+        return record(groupId, GroupActivity.GroupActivityType.DEBT_OVERDUE, null, map);
+    }
+
+    /**
+     * 022 US8 (T048): records {@code LIQUIDATION_PROPOSED} when a member
+     * generates a settlement proposal for the group.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordLiquidationProposed(Long groupId, Long actorUserId, int transferCount,
+            String primaryCurrency) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("transferCount", transferCount);
+        map.put("currency", blankToNull(primaryCurrency));
+        return record(groupId, GroupActivity.GroupActivityType.LIQUIDATION_PROPOSED, actorUserId, map);
+    }
+
+    private GroupActivity recordPaymentEvent(Long groupId, GroupActivity.GroupActivityType type, Long actorUserId,
+            PaymentActivityDetails details) {
         if (details == null) {
             throw new IllegalArgumentException("Faltan los datos del pago");
         }
@@ -96,7 +166,13 @@ public class ActivityEventService {
         if (details.debtId() != null) {
             map.put("debtId", details.debtId());
         }
-        return record(groupId, GroupActivity.GroupActivityType.PAYMENT_MADE, actorUserId, map);
+        if (details.debtStatusBefore() != null) {
+            map.put("debtStatusBefore", blankToNull(details.debtStatusBefore()));
+        }
+        if (details.debtStatusAfter() != null) {
+            map.put("debtStatusAfter", blankToNull(details.debtStatusAfter()));
+        }
+        return record(groupId, type, actorUserId, map);
     }
 
     /** Visible name of a registered user, without "null" or extra spaces (014 D4). */
