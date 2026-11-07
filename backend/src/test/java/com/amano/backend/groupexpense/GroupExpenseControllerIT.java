@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -595,6 +597,10 @@ class GroupExpenseControllerIT {
 
     @Test
     void theV9CasillasAreEnforced() throws Exception {
+        mockMvc.perform(put("/api/groups/" + groupId).cookie(anaSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"permissions\": {\"membersCanGenerateExpensesForOthers\": false}}"))
+                .andExpect(status().isOk());
         String juanPaysForAna = threeWayBody("10.00");
         postExpense(juanSession, UUID.randomUUID().toString(), juanPaysForAna)
                 .andExpect(status().isForbidden())
@@ -813,5 +819,184 @@ class GroupExpenseControllerIT {
         assertThat((BigDecimal) row.get("exchange_rate")).isEqualByComparingTo("1.00000000");
         assertThat(row.get("rate_date").toString()).isEqualTo("2026-11-05");
         assertThat(row.get("rate_source")).isEqualTo("SAME_CURRENCY");
+    }
+
+    @Test
+    void t020PatchEmptyBodyAnswers400() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void t020PatchExpenseWithParticipantsAnswers409() throws Exception {
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), threeWayBody("100.00"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\": \"200.00\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.properties.code").value("EXPENSE_HAS_PARTICIPANTS"));
+    }
+
+    @Test
+    void t020PatchPersonalExpenseUpdatesAndRecordsEvent() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\": \"25.00\", \"description\": \"Editado\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.amount").value("25.00"))
+                .andExpect(jsonPath("$.description").value("Editado"));
+    }
+
+    @Test
+    void t020PatchCurrencyWithoutQuoteAnswers503WithoutSaving() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        when(bcraExchangeRateClient.getQuote(any(), any(), any()))
+                .thenThrow(new com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException());
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"currency\": \"USD\"}"))
+                .andExpect(status().isServiceUnavailable());
+
+        assertThat(jdbc.queryForObject("SELECT currency FROM group_expenses WHERE id = ?",
+                String.class, id)).isEqualTo("ARS");
+    }
+
+    @Test
+    void t021DeleteExpenseWithDebtsAnswers409() throws Exception {
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), threeWayBody("100.00"))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(delete("/api/groups/" + groupId + "/expenses/" + id).cookie(anaSession))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.properties.code").value("EXPENSE_HAS_DEBTS"));
+    }
+
+    @Test
+    void t022DeletePersonalExpenseAnswers204AndRecordsEvents() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\": \"15.00\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/groups/" + groupId + "/expenses/" + id).cookie(anaSession))
+                .andExpect(status().isNoContent());
+
+        assertThat(count("group_expenses")).isZero();
+        Integer edited = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = 'EXPENSE_EDITED'",
+                Integer.class, groupId);
+        Integer deleted = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = 'EXPENSE_DELETED'",
+                Integer.class, groupId);
+        assertThat(edited).isEqualTo(1);
+        assertThat(deleted).isEqualTo(1);
+    }
+
+    @Test
+    void t020AndT021PermissionsAreEnforced() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        // unauthenticated -> 401
+        mockMvc.perform(delete("/api/groups/" + groupId + "/expenses/" + id))
+                .andExpect(status().isUnauthorized());
+
+        // non-member -> 404
+        mockMvc.perform(delete("/api/groups/" + groupId + "/expenses/" + id).cookie(outsiderSession))
+                .andExpect(status().isNotFound());
+
+        // other regular member -> 403
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(juanSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"amount\": \"99.00\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("No podés editar este gasto"));
+        mockMvc.perform(delete("/api/groups/" + groupId + "/expenses/" + id).cookie(juanSession))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("No podés eliminar este gasto"));
+    }
+
+    @Test
+    void t022DeletePersonalExpenseKeepsGroupBalancesZero() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(delete("/api/groups/" + groupId + "/expenses/" + id).cookie(anaSession))
+                .andExpect(status().isNoContent());
+
+        String balBody = mockMvc.perform(get("/api/groups/" + groupId + "/balances").cookie(anaSession))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var root = objectMapper.readTree(balBody);
+        BigDecimal sum = BigDecimal.ZERO;
+        for (var c : root.get("currencies")) {
+            for (var m : c.get("balances")) {
+                sum = sum.add(new BigDecimal(m.get("netBalance").asText()));
+            }
+        }
+        assertThat(sum).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void t060NewGroupStartsWithExpensesForOthersTrueAndEnforcesActivePayer() throws Exception {
+        Boolean flag = jdbc.queryForObject(
+                "SELECT members_can_generate_expenses_for_others FROM group_permissions WHERE group_id = ?",
+                Boolean.class, groupId);
+        assertThat(flag).isTrue();
+
+        String nonMemberPayer = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(outsider, ana);
+        postExpense(anaSession, UUID.randomUUID().toString(), nonMemberPayer)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.payerUserId")
+                        .value("Quien pagó tiene que ser miembro del grupo"));
     }
 }

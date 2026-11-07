@@ -294,6 +294,7 @@ public class GroupExpenseService {
     public static final String NOT_ALLOWED_TO_EDIT = "No podés editar este gasto";
     public static final String NOT_ALLOWED_TO_DELETE = "No podés eliminar este gasto";
 
+    @Transactional
     public GroupExpenseResponse updatePersonal(Long callerId, Long groupId, Long expenseId,
             Map<String, String> fields) {
         GroupMember caller = activeMembership(callerId, groupId);
@@ -304,7 +305,7 @@ public class GroupExpenseService {
         if (!caller.getId().getUserId().equals(expense.getCreatedByUserId())
                 && !caller.getId().getUserId().equals(expense.getPayerUserId())
                 && !GroupMember.ROLE_ADMIN.equals(caller.getRole())) {
-            throw new FieldValidationException(Map.of("permission", NOT_ALLOWED_TO_EDIT));
+            throw new GroupPermissionDeniedException(NOT_ALLOWED_TO_EDIT);
         }
 
         List<GroupExpenseShare> shares = shareRepository.findByExpenseIdOrderByPositionAsc(expense.getId());
@@ -365,18 +366,18 @@ public class GroupExpenseService {
         expense.setRateDate(rateDate);
         expense.setRateSource(rateSource);
 
+        if (!shares.isEmpty()) {
+            shares.get(0).setAmount(convertedAmount);
+            shareRepository.save(shares.get(0));
+        }
         GroupExpense saved = expenseRepository.save(expense);
-        shareRepository.deleteAll(shares);
-        GroupExpenseShare newShare = GroupExpenseShare.registered(
-                saved.getId(), 0, expense.getPayerUserId(),
-                caller.getName() == null ? "" : caller.getName(), convertedAmount);
-        shareRepository.save(newShare);
         activityEventService.record(groupId, GroupActivity.GroupActivityType.EXPENSE_EDITED,
                 callerId, Map.of("expenseId", expenseId));
         return toResponse(saved, shareRepository.findByExpenseIdOrderByPositionAsc(saved.getId()),
                 debtRepository.findByExpenseId(saved.getId()), caller, groupCurrency);
     }
 
+    @Transactional
     public void deletePersonal(Long callerId, Long groupId, Long expenseId) {
         GroupMember caller = activeMembership(callerId, groupId);
         GroupExpense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
@@ -385,7 +386,7 @@ public class GroupExpenseService {
         if (!caller.getId().getUserId().equals(expense.getCreatedByUserId())
                 && !caller.getId().getUserId().equals(expense.getPayerUserId())
                 && !GroupMember.ROLE_ADMIN.equals(caller.getRole())) {
-            throw new FieldValidationException(Map.of("permission", NOT_ALLOWED_TO_DELETE));
+            throw new GroupPermissionDeniedException(NOT_ALLOWED_TO_DELETE);
         }
 
         List<Debt> debts = debtRepository.findByExpenseId(expense.getId());

@@ -370,7 +370,7 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
         problem.setTitle("Conflicto");
         problem.setDetail(exception.getMessage());
-        problem.setProperty("code", exception.getCode());
+        problem.setProperty("properties", Map.of("code", exception.getCode()));
         return problem;
     }
 

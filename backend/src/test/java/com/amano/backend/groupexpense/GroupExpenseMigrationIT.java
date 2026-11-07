@@ -263,4 +263,14 @@ class GroupExpenseMigrationIT {
                 "UPDATE group_expenses SET split_method = 'HALF' WHERE id = ?", expenseId))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void v23DefaultMembersCanGenerateExpensesForOthersIsTrue() {
+        String colDefault = jdbc.queryForObject("""
+                SELECT column_default FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'group_permissions'
+                  AND column_name = 'members_can_generate_expenses_for_others'
+                """, String.class);
+        assertThat(colDefault).containsIgnoringCase("true");
+    }
 }

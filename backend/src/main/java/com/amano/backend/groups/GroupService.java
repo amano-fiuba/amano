@@ -188,6 +188,7 @@ public class GroupService {
     private static GroupPermissions defaultPermissions(Long groupId) {
         GroupPermissions permissions = new GroupPermissions();
         permissions.setGroupId(groupId);
+        permissions.setMembersCanGenerateExpensesForOthers(true);
         return permissions;
     }
 
