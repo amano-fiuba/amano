@@ -26,6 +26,7 @@ Los identificadores FR-### y SC-### de esta especificación son propios de la 02
 - Recordatorios para deudas directas entre amigos sin grupo (016).
 - Modificar los estados, transiciones o el proceso de vencimiento de deudas de 017/022.
 - La configuración de los días de vencimiento del grupo (022); esta spec solo configura cuándo y con qué mensaje se recuerda una deuda que ya tiene fecha límite.
+- La personalización del texto del aviso al pagador (usa un texto predeterminado propio).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -33,7 +34,7 @@ Los identificadores FR-### y SC-### de esta especificación son propios de la 02
 
 Juan debe $ 3.333,33 en el grupo "Depto" y la deuda tiene fecha límite de pago. Sin que nadie configure nada de recordatorios, el sistema le envía un correo 5 días antes del vencimiento (tiempo predeterminado), con el mensaje predeterminado que identifica el grupo, el concepto, el monto y la fecha límite. El envío queda registrado en el historial de actividad del grupo. Ana, cuya deuda ya fue saldada y verificada, no recibe nada.
 
-**Why this priority**: Es el valor central de la feature y debe funcionar por sí sola con la configuración predeterminada (mensaje y tiempo de envío), sin que el Administrador configure nada. Las historias 2 y 3 solo personalizan este comportamiento.
+**Why this priority**: Es el valor central de la feature y debe funcionar por sí sola con la configuración predeterminada (mensaje y tiempo de envío), sin que el Administrador configure nada. Las demás historias se apoyan en este mecanismo: la 2 y la 4 lo personalizan y la 3 lo extiende al pagador del gasto.
 
 **Independent Test**: Con un grupo que ya tiene días de vencimiento configurados (022) y un gasto que genera deudas, sin tocar ninguna configuración de recordatorios, cada deudor con deuda sin saldar recibe exactamente un correo en la fecha calculada (5 días antes del vencimiento), con grupo, concepto, monto y fecha límite; los miembros con deuda saldada no reciben nada y el envío aparece en el historial del grupo.
 
@@ -48,6 +49,7 @@ Juan debe $ 3.333,33 en el grupo "Depto" y la deuda tiene fecha límite de pago.
 7. **Given** una deuda de un grupo sin días de vencimiento configurados (sin fecha límite), **When** se evalúan los recordatorios, **Then** esa deuda no genera recordatorio y no se reporta error.
 8. **Given** una deuda cuyo recordatorio ya fue enviado, **When** se vuelve a evaluar al día siguiente, **Then** no se envía un segundo correo por esa deuda.
 9. **Given** una deuda pendiente de un perfil simulado del grupo con correo cargado, **When** llega la fecha de envío, **Then** el perfil simulado recibe el recordatorio en ese correo.
+10. **Given** una deuda en "Pago informado" (grupo con validación de pagos) cuya fecha de envío llegó, **When** se generan los recordatorios, **Then** el deudor recibe el recordatorio porque su pago aún no fue verificado.
 
 ---
 
@@ -72,7 +74,27 @@ El Administrador del grupo "Depto" elige, entre las opciones fijas (7, 5, 3 o 1 
 
 ---
 
-### User Story 3 - Personalizar mensaje del recordatorio (Priority: P3)
+### User Story 3 - Avisar al pagador que se acerca el vencimiento (Priority: P2)
+
+Ana pagó el gasto "Súper" del grupo "Depto" y Juan y Abuela le deben sus partes. En la misma fecha de envío de los recordatorios (5 días antes con la configuración predeterminada), Ana recibe un aviso: indica cuánto falta para el vencimiento del gasto y le dice si ella también tiene deudas pendientes en el grupo (con el monto total) o si no debe nada, según el caso.
+
+**Why this priority**: Quien pagó quiere saber que se acerca la fecha en que debería recuperar su dinero y si, a la vez, también tiene deudas propias por pagar. Se apoya en el mecanismo de US1 (misma fecha de envío y misma configuración de tiempo) y aporta valor independiente sin requerir personalización.
+
+**Independent Test**: Con los recordatorios funcionando (US1) y la configuración predeterminada, un gasto pagado por Ana con deudas pendientes y fecha límite D genera, en D − 5, un aviso a Ana con el tiempo restante para el vencimiento y su situación de deudas en el grupo; si todas las deudas del gasto están saldadas, Ana no recibe nada.
+
+**Acceptance Scenarios**:
+
+1. **Given** un gasto pagado por Ana con al menos una deuda pendiente y fecha límite D, **When** llega la fecha de envío (D − 5 con la configuración predeterminada), **Then** Ana recibe un aviso que indica cuánto falta para el vencimiento del gasto, identificando el grupo y el concepto.
+2. **Given** Ana con deudas pendientes en el grupo, **When** recibe el aviso, **Then** el aviso indica que también debe, con el monto total pendiente.
+3. **Given** Ana sin deudas pendientes en el grupo, **When** recibe el aviso, **Then** el aviso indica explícitamente que no debe nada.
+4. **Given** un gasto cuyas deudas fueron todas saldadas o verificadas antes de la fecha de envío, **When** llega esa fecha, **Then** el pagador no recibe el aviso y los deudores no reciben recordatorios.
+5. **Given** un aviso ya enviado para el gasto, **When** se vuelve a evaluar, **Then** no se envía un segundo aviso por ese gasto.
+6. **Given** un aviso enviado, **When** se consulta el historial de actividad del grupo, **Then** el envío del aviso aparece registrado.
+7. **Given** dos gastos pagados por Ana con la misma fecha límite, **When** llega la fecha de envío, **Then** Ana recibe un aviso por cada gasto.
+
+---
+
+### User Story 4 - Personalizar mensaje del recordatorio (Priority: P3)
 
 El Administrador del grupo escribe un mensaje personalizado en un campo de texto de hasta 500 caracteres. El sistema valida la longitud antes de guardar. Los próximos recordatorios del grupo usan ese mensaje, que acompaña a los datos de la deuda (grupo, concepto, monto y fecha límite). Si no hay mensaje personalizado, se usa el predeterminado. El Administrador puede modificarlo cuando quiera o dejarlo en blanco para volver al predeterminado.
 
@@ -100,14 +122,16 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **Miembro que sale del grupo o deuda cancelada antes del envío**: la salida o remoción con deudas sin saldar está bloqueada (017); si la deuda se salda (paga o verifica) antes del envío, el recordatorio se cancela. El dominio actual no tiene cancelación ni condonación de deudas, por lo que "deuda cancelada" se cubre con saldarla.
 - **Miembro sin correo válido o fallo de entrega**: el fallo queda registrado, no bloquea los demás recordatorios del grupo y no se reintenta (un único intento por deuda).
 - **Mensaje vacío o que excede la longitud máxima**: vacío → vuelve al mensaje predeterminado; más de 500 caracteres → rechazado al guardar con error de validación.
-- **Deuda en "Pago informado" al llegar la fecha de envío**: tratamiento según la respuesta de la aclaración de FR-006.
+- **Deuda en "Pago informado" al llegar la fecha de envío**: recibe el recordatorio (solo Pagado y Verificado excluyen); si el pago se verifica después del envío, no hay reenvío.
 - **Perfil simulado con deuda**: recibe el recordatorio en el correo cargado por el Administrador; si el correo es inválido o la entrega falla, aplica la regla de fallo de entrega (queda registrado, sin reintento y sin bloquear los demás envíos).
+- **Gasto sin deudas pendientes al llegar la fecha de envío**: no se envía el aviso al pagador (ni recordatorios a los deudores).
+- **Gasto de un grupo sin días de vencimiento**: no genera recordatorios ni aviso al pagador.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-**Configuración por grupo (US2 y US3)**
+**Configuración por grupo (US2 y US4)**
 
 - **FR-001**: El sistema MUST mantener una única configuración de recordatorios por grupo, compuesta por el tiempo de envío y el mensaje. Mientras el Administrador no la personalice, MUST aplicarse la configuración predeterminada: 5 días antes del vencimiento y mensaje predeterminado.
 - **FR-002**: El tiempo de envío MUST ser una única opción elegida de la lista fija de 7 días, 5 días, 3 días o 1 día antes del vencimiento (incluye como mínimo una semana y cinco días antes). La opción elegida aplica a todos los recordatorios automáticos del grupo.
@@ -117,7 +141,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 
 **Generación y envío (US1)**
 
-- **FR-006**: Al generar los recordatorios, el sistema MUST identificar qué miembros del grupo tienen deudas pendientes de pago (no saldadas ni vencidas) con fecha límite definida. Se consideran saldadas las deudas Pagado y Verificado; el tratamiento de las deudas en "Pago informado" (pago reportado aún no verificado) es [NEEDS CLARIFICATION: ¿una deuda con pago informado pero sin verificar recibe el recordatorio, o solo se excluyen las deudas saldadas (Pagado/Verificado)?].
+- **FR-006**: Al generar los recordatorios, el sistema MUST identificar qué miembros del grupo tienen deudas pendientes de pago (no saldadas ni vencidas) con fecha límite definida. Solo las deudas saldadas (Pagado o Verificado) quedan excluidas; las deudas en "Pago informado" (pago reportado aún no verificado) MUST recibir el recordatorio hasta que se salden o verifiquen (aclaración del 2026-11-07).
 - **FR-007**: La fecha de envío MUST calcularse como la fecha límite de pago de la deuda menos el tiempo de envío configurado. La fecha límite de pago es la fecha del gasto originario más los días de vencimiento del grupo (022); una deuda de un grupo sin días de vencimiento MUST NOT generar recordatorio.
 - **FR-008**: El recordatorio MUST enviarse por correo electrónico al miembro deudor con deuda pendiente, en la fecha de envío calculada. Los destinatarios son todos los deudores con correo: miembros con cuenta y perfiles simulados (cuyo correo cargó el Administrador al agregarlos).
 - **FR-009**: Si la fecha de envío calculada ya pasó y la fecha límite aún no pasó, el recordatorio MUST enviarse en la evaluación siguiente; si la deuda ya está vencida, MUST NOT enviarse.
@@ -127,9 +151,15 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **FR-013**: El envío de cada recordatorio MUST registrarse en el historial de actividad del grupo.
 - **FR-014**: Un fallo de entrega o un correo electrónico inválido MUST quedar registrado sin impedir el envío de los demás recordatorios, y MUST NOT reintentarse.
 
-**Interfaz del Administrador (US2 y US3)**
+**Aviso al pagador (US3)**
 
-- **FR-015**: El Administrador MUST poder ver y editar la configuración de recordatorios desde la configuración del grupo, con las opciones de tiempo de FR-002 y el campo de texto de FR-005, y con los errores de validación informados en el formulario.
+- **FR-016**: En la fecha de envío calculada para las deudas de un gasto, el sistema MUST enviar por correo electrónico al miembro que pagó el gasto un aviso que indique cuánto falta para el vencimiento del gasto, siempre que el gasto tenga al menos una deuda pendiente de pago (no saldada ni vencida) en ese momento. El aviso MUST identificar el grupo y el concepto del gasto.
+- **FR-017**: El aviso al pagador MUST indicar si el pagador tiene deudas pendientes en el grupo y, si las tiene, el monto total pendiente; si no tiene, MUST indicarlo explícitamente. La parte del pagador en su propio gasto no cuenta como deuda (quedó cubierta al pagarlo).
+- **FR-018**: El aviso al pagador MUST seguir las mismas reglas que el recordatorio de deudas: único por gasto, sin reenvíos; mismas reglas de fecha (FR-007 y FR-009); sin envío si todas las deudas del gasto se saldan antes; registrado en el historial de actividad del grupo; y con fallos de entrega tratados según FR-014. Usa un texto predeterminado propio: el mensaje personalizado de FR-005 no le aplica.
+
+**Interfaz del Administrador (US2 y US4)**
+
+- **FR-019**: El Administrador MUST poder ver y editar la configuración de recordatorios desde la configuración del grupo, con las opciones de tiempo de FR-002 y el campo de texto de FR-005, y con los errores de validación informados en el formulario.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -138,6 +168,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **Deuda** (existente, 017/022): obligación de un miembro (deudor) con otro (acreedor) nacida de un gasto de grupo, con monto, moneda y estado (Pendiente, Pago informado, Pagado, Verificado, Vencido). El recordatorio se asocia a la deuda y a su grupo.
 - **Grupo** (existente, 010/022): define los días de vencimiento de las deudas que determinan la fecha límite de pago; sin días de vencimiento no hay fecha límite ni recordatorios.
 - **Historial de actividad del grupo** (existente, 014): registra el envío de cada recordatorio como evento del grupo.
+- **Aviso de vencimiento al pagador**: uno por gasto con fecha límite. Se envía al miembro que pagó el gasto en la misma fecha que los recordatorios de sus deudas; indica el tiempo restante para el vencimiento y si el pagador tiene deudas pendientes en el grupo. Comparte las reglas y estados del recordatorio (programado, enviado, cancelado, fallido).
 
 ## Success Criteria *(mandatory)*
 
@@ -149,6 +180,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **SC-004**: El 100 % de los correos de recordatorio identifica el grupo, el concepto, el monto y la fecha límite sin abrir la aplicación.
 - **SC-005**: Un Administrador completa el cambio de tiempo de envío o del mensaje en menos de 1 minuto.
 - **SC-006**: El 100 % de los recordatorios enviados queda registrado en el historial de actividad del grupo.
+- **SC-007**: El 100 % de los gastos con al menos una deuda pendiente al llegar la fecha de envío genera exactamente un aviso al pagador, con el tiempo restante para el vencimiento y la situación de deudas del pagador en el grupo.
 
 ## Assumptions
 
@@ -165,9 +197,15 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - Solo el deudor recibe el recordatorio; el acreedor no recibe copia.
 - Los textos para el usuario están en español con voseo (convención del proyecto).
 - Configurar los días de vencimiento del grupo sigue siendo responsabilidad del Administrador en la configuración existente de 022; esta feature no lo altera.
+- El aviso al pagador se envía por gasto: si un miembro pagó varios gastos con la misma fecha límite, recibe un aviso por cada uno (igual que los deudores reciben un correo por deuda).
+- El "si debe o no" del aviso al pagador refiere a las deudas pendientes del pagador en ese grupo (se informa el monto total pendiente); su parte del propio gasto quedó cubierta al pagarlo y nunca es una deuda.
+- El aviso al pagador usa un texto predeterminado propio; el mensaje personalizado de la configuración no le aplica.
+- El pagador de un gasto siempre es un miembro con cuenta (017: los perfiles simulados no pueden pagar), por lo que el aviso al pagador no tiene el caso del correo de un perfil simulado.
 
 ## Clarifications
 
 **Session 2026-11-07**
 
 - Q: ¿Los perfiles simulados (miembros sin cuenta) con deuda pendiente reciben el recordatorio por correo? → A: Sí. Todos los deudores con correo reciben el recordatorio, incluidos los perfiles simulados: el correo es la única vía por la que una persona simulada se entera de que debe, ya que no usa la aplicación. Un correo inválido o una entrega fallida siguen la regla general (se registra el fallo, sin reintento).
+- Q: ¿Una deuda con pago informado (reportado pero aún no verificado) recibe el recordatorio? → A: Sí (opción A). Solo las deudas saldadas (Pagado o Verificado) quedan excluidas; una deuda en "Pago informado" recibe el recordatorio hasta que se salde o verifique. Si se verifica después del envío, no hay reenvío.
+- Q: Pedido adicional sobre el pagador del gasto → A: Se agrega la US3. En la misma fecha de envío de los recordatorios de un gasto, el miembro que lo pagó recibe un aviso que indica cuánto falta para el vencimiento del gasto y si él también tiene deudas pendientes en el grupo (monto total) o no, según el caso. El aviso es único por gasto, usa un texto predeterminado propio y sigue las mismas reglas de fechas, cancelación y fallos de entrega que los recordatorios.

@@ -13,8 +13,8 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
-- [ ] Requirements are testable and unambiguous
+- [x] No [NEEDS CLARIFICATION] markers remain
+- [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
 - [x] All acceptance scenarios are defined
@@ -31,7 +31,8 @@
 
 ## Notes
 
-- Queda 1 marcador [NEEDS CLARIFICATION] que bloquea los ítems desmarcados:
-  - FR-006: tratamiento de deudas en "Pago informado" (pago reportado aún no verificado) al llegar la fecha de envío.
-- Resuelta la aclaración de FR-008 (perfiles simulados como destinatarios: sí reciben, sesión 2026-11-07); la spec y este checklist quedaron actualizados.
-- Items marked incomplete require spec updates before `/speckit.clarify` or `/speckit.plan`
+- 16/16 items passing. Ambas aclaraciones resueltas en la sesión del 2026-11-07:
+  - FR-008 (perfiles simulados como destinatarios): sí reciben el recordatorio.
+  - FR-006 (deudas en "Pago informado"): reciben el recordatorio; solo Pagado y Verificado excluyen.
+- Alcance ampliado por pedido del 2026-11-07: US3 "Avisar al pagador que se acerca el vencimiento" (FR-016 a FR-018, SC-007), documentada también en la sección Clarifications de la spec.
+- Spec ready for `/speckit.clarify` or `/speckit.plan`
