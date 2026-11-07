@@ -120,10 +120,10 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **Fecha de envío ya pasada** (deuda creada con vencimiento más cercano que el tiempo configurado, o cambio de configuración sobre deudas existentes): el recordatorio se envía en la evaluación siguiente si la fecha límite aún no pasó; si la deuda ya está vencida, no se envía (el vencimiento ya queda registrado por el proceso existente de 022).
 - **Cambio de configuración con recordatorios programados**: los aún no enviados se recalculan con la configuración vigente (misma regla de fecha pasada); los ya enviados no cambian.
 - **Miembro que sale del grupo o deuda cancelada antes del envío**: la salida o remoción con deudas sin saldar está bloqueada (017); si la deuda se salda (paga o verifica) antes del envío, el recordatorio se cancela. El dominio actual no tiene cancelación ni condonación de deudas, por lo que "deuda cancelada" se cubre con saldarla.
-- **Miembro sin correo válido o fallo de entrega**: el Administrador del grupo recibe un correo avisando qué recordatorio falló y a quién iba dirigido; el fallo no bloquea los demás recordatorios del grupo y no se reintenta (un único intento por deuda).
+- **Miembro sin correo válido o fallo de entrega**: los administradores activos del grupo reciben un correo avisando qué recordatorio falló y a quién iba dirigido; el fallo no bloquea los demás recordatorios del grupo y no se reintenta (un único intento por deuda).
 - **Mensaje vacío o que excede la longitud máxima**: vacío → vuelve al mensaje predeterminado; más de 500 caracteres → rechazado al guardar con error de validación.
 - **Deuda en "Pago informado" al llegar la fecha de envío**: recibe el recordatorio (solo Pagado y Verificado excluyen), con la indicación "pagado a verificar"; si el pago se verifica después del envío, no hay reenvío.
-- **Perfil simulado con deuda**: recibe el recordatorio en el correo cargado por el Administrador; si el correo es inválido o la entrega falla, aplica la regla de fallo de entrega (aviso al Administrador, sin reintento y sin bloquear los demás envíos).
+- **Perfil simulado con deuda**: recibe el recordatorio en el correo cargado por el Administrador; si el correo es inválido o la entrega falla, aplica la regla de fallo de entrega (aviso a los administradores activos, sin reintento y sin bloquear los demás envíos).
 - **Gasto sin deudas pendientes al llegar la fecha de envío**: no se envía el aviso al pagador (ni recordatorios a los deudores).
 - **Gasto de un grupo sin días de vencimiento**: no genera recordatorios ni aviso al pagador.
 
@@ -151,7 +151,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **FR-011**: No MUST enviarse recordatorio por deudas saldadas (Pagado o Verificado). Si la deuda se salda o se verifica antes de la fecha programada, el recordatorio MUST cancelarse.
 - **FR-012**: El correo MUST incluir la información suficiente para identificar la deuda y su grupo: nombre del grupo, concepto del gasto originario, monto y fecha límite de pago. El mensaje personalizado acompaña a esos datos; el mensaje predeterminado los incluye. Si la deuda está en "Pago informado" al momento del envío, el correo MUST indicarlo (pago informado, pendiente de verificación, estilo "pagado a verificar") en lugar de solicitar el pago como si no existiera (aclaración del 2026-11-07).
 - **FR-013**: El envío de cada recordatorio MUST registrarse en el historial de actividad del grupo.
-- **FR-014**: Ante un fallo de entrega o un correo electrónico inválido, el sistema MUST notificar por correo electrónico al Administrador del grupo qué recordatorio falló y a quién estaba dirigido, sin impedir el envío de los demás recordatorios, y MUST NOT reintentarse. El historial de actividad del grupo solo registra los envíos exitosos (FR-013).
+- **FR-014**: Ante un fallo de entrega o un correo electrónico inválido, el sistema MUST notificar por correo electrónico a todos los administradores activos del grupo (si no hay ninguno, el fallo solo se registra en el log) qué recordatorio falló y a quién estaba dirigido, sin impedir el envío de los demás recordatorios, y MUST NOT reintentarse. El historial de actividad del grupo solo registra los envíos exitosos (FR-013).
 
 **Aviso al pagador (US3)**
 
@@ -181,7 +181,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **SC-003**: El 100 % de los grupos tiene recordatorios operativos sin ninguna acción de configuración del Administrador (configuración predeterminada).
 - **SC-004**: El 100 % de los correos de recordatorio identifica el grupo, el concepto, el monto y la fecha límite sin abrir la aplicación.
 - **SC-005**: Un Administrador completa el cambio de tiempo de envío o del mensaje en menos de 1 minuto.
-- **SC-006**: El 100 % de los recordatorios enviados queda registrado en el historial de actividad del grupo.
+- **SC-006**: El 100 % de los recordatorios enviados con éxito queda registrado en el historial de actividad del grupo.
 - **SC-007**: El 100 % de los gastos con al menos una deuda pendiente al llegar la fecha de envío genera exactamente un aviso al pagador, con el tiempo restante para el vencimiento y la situación de deudas del pagador en el grupo.
 
 ## Assumptions
@@ -191,7 +191,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - Se envía un correo por deuda: no se agrupan en un mismo correo varias deudas del mismo miembro (confirmado en la sesión del 2026-11-07).
 - El mensaje personalizado acompaña a los datos de identificación (grupo, concepto, monto y fecha límite), que siempre están presentes; no los reemplaza.
 - Un mensaje en blanco equivale a "sin mensaje personalizado" (se usa el predeterminado).
-- La entrega se intenta una sola vez por recordatorio; los fallos se notifican al Administrador del grupo y no se reintentan.
+- La entrega se intenta una sola vez por recordatorio; los fallos se notifican a los administradores activos del grupo y no se reintentan.
 - Los usuarios con cuenta tienen su correo verificado (003); los perfiles simulados tienen el correo cargado por quien los agregó al grupo y también reciben los recordatorios (aclaración del 2026-11-07).
 - Un miembro con deudas sin saldar no puede abandonar el grupo ni ser removido (017), por lo que el destinatario sigue siendo miembro al momento del envío.
 - La evaluación de recordatorios es periódica y diaria, como el proceso de vencimiento existente (022); la fecha de envío se interpreta a nivel de día, sin hora específica.
@@ -212,5 +212,5 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - Q: ¿Los perfiles simulados (miembros sin cuenta) con deuda pendiente reciben el recordatorio por correo? → A: Sí. Todos los deudores con correo reciben el recordatorio, incluidos los perfiles simulados: el correo es la única vía por la que una persona simulada se entera de que debe, ya que no usa la aplicación. Un correo inválido o una entrega fallida siguen la regla general (se registra el fallo, sin reintento).
 - Q: ¿Una deuda con pago informado (reportado pero aún no verificado) recibe el recordatorio? → A: Sí (opción A, refinada). En grupos sin validación de pagos, el pago pasa directo a Pagado y la deuda no recibe recordatorio. En grupos con validación, el pago debe estar Verificado para excluir el recordatorio; una deuda pagada pero no verificada ("Pago informado") recibe el correo igual, con una indicación del estilo "pagado a verificar" (pago informado, pendiente de verificación). Si se verifica después del envío, no hay reenvío.
 - Q: Pedido adicional sobre el pagador del gasto → A: Se agrega la US3. En la misma fecha de envío de los recordatorios de un gasto, el miembro que lo pagó recibe un aviso que indica cuánto falta para el vencimiento del gasto y si él también tiene deudas pendientes en el grupo (monto total) o no, según el caso. El aviso es único por gasto, usa un texto predeterminado propio y sigue las mismas reglas de fechas, cancelación y fallos de entrega que los recordatorios.
-- Q: ¿Dónde se registra el fallo de entrega de un recordatorio y quién puede verlo? → A: Opción C. Se notifica por correo electrónico al Administrador del grupo, indicando qué recordatorio falló y a quién iba dirigido. El fallo no bloquea los demás envíos ni se reintenta; el historial de actividad del grupo queda solo para los envíos exitosos.
+- Q: ¿Dónde se registra el fallo de entrega de un recordatorio y quién puede verlo? → A: Opción C. Se notifica por correo electrónico al Administrador del grupo (entendido como todos los administradores activos del grupo), indicando qué recordatorio falló y a quién iba dirigido. El fallo no bloquea los demás envíos ni se reintenta; el historial de actividad del grupo queda solo para los envíos exitosos.
 - Q: ¿Cómo se agrupan los correos cuando un miembro tiene varias deudas del grupo con la misma fecha de envío? → A: Opción A. Un correo por deuda: cada correo identifica una deuda (grupo, concepto, monto y fecha límite); no se consolidan varias deudas en un mismo correo.
