@@ -9,6 +9,7 @@ import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupEditForm from '../../components/groups/GroupEditForm'
 import { PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
+import GroupReminderSettingsPanel from '../../components/groups/GroupReminderSettingsPanel'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
 import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
@@ -139,6 +140,7 @@ export default function GroupInfoView() {
             {showPermissions && (
               <div className="group-admin-panel" data-testid="permissions-panel">
                 <GroupPermissionsPanel group={group} permissions={group.permissions ?? {}} />
+                <GroupReminderSettingsPanel groupId={group.id} isAdmin={isAdmin} />
               </div>
             )}
           </header>
