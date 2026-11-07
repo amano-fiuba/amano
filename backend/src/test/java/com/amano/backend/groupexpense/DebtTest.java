@@ -191,6 +191,62 @@ class DebtTest {
     }
 
     @Test
+    void aFullPaymentOfTheBalanceMovesTheDebtToPaidOrPaymentReported() {
+        Debt settled = pending("50.00");
+
+        settled.applyFullPayment(false);
+
+        assertThat(settled.getStatus()).isEqualTo(DebtStatus.PAID);
+        assertThat(settled.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(settled.getOutstanding()).isEqualByComparingTo("0.00");
+
+        Debt reported = pending("50.00");
+
+        reported.applyFullPayment(true);
+
+        assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+        assertThat(reported.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(reported.getOutstanding()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void aFullPaymentOfTheRemainingBalanceAlsoWorksForLegacyPartialAndOverdueDebts() {
+        Debt partial = pending("50.00");
+        partial.applyPayment(new BigDecimal("20.00"));
+
+        partial.applyFullPayment(true);
+
+        assertThat(partial.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+        assertThat(partial.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(partial.getOutstanding()).isEqualByComparingTo("0.00");
+
+        Debt overdue = pending("50.00");
+        ReflectionTestUtils.setField(overdue, "status", DebtStatus.OVERDUE);
+
+        overdue.applyFullPayment(false);
+
+        assertThat(overdue.getStatus()).isEqualTo(DebtStatus.PAID);
+    }
+
+    @Test
+    void aReportedOrSettledDebtRejectsAnotherFullPayment() {
+        Debt reported = pending("50.00");
+        reported.applyFullPayment(true);
+
+        assertThatThrownBy(() -> reported.applyFullPayment(false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("La deuda ya tiene un pago registrado");
+        assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+
+        Debt paid = pending("50.00");
+        paid.applyFullPayment(false);
+
+        assertThatThrownBy(() -> paid.applyFullPayment(false))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(paid.getStatus()).isEqualTo(DebtStatus.PAID);
+    }
+
+    @Test
     void anOverdueDebtAcceptsPayments() {
         Debt debt = pending("50.00");
         ReflectionTestUtils.setField(debt, "status", DebtStatus.OVERDUE);

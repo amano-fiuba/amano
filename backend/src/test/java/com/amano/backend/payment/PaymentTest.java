@@ -59,6 +59,15 @@ class PaymentTest {
     }
 
     @Test
+    void theStateCanBeReportedForThe022FullPaymentFlow() {
+        Payment payment = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("3333.33"),
+                LocalDate.of(2026, 11, 7), ANA, "Ana López", KEY, false, PaymentStatus.REPORTED);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REPORTED);
+        assertThat(payment.isLegacy()).isFalse();
+    }
+
+    @Test
     void aPaymentOfASimulatedDebtorKeepsTheProfile() {
         Payment payment = Payment.of(PaymentFixtures.abuelaDebt(), new BigDecimal("3333.33"),
                 LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY);

@@ -123,6 +123,17 @@ public class Payment {
      */
     public static Payment of(Debt debt, BigDecimal amount, LocalDate date, Long registeredByUserId,
             String receiverName, UUID idempotencyKey, boolean legacy) {
+        return of(debt, amount, date, registeredByUserId, receiverName, idempotencyKey, legacy,
+                PaymentStatus.CONFIRMED);
+    }
+
+    /**
+     * New payment with an explicit {@code legacy} flag and state (022 D6). The
+     * full-payment flow passes {@code false} and {@code REPORTED} when the group
+     * requires validation, or {@code CONFIRMED} when it does not.
+     */
+    public static Payment of(Debt debt, BigDecimal amount, LocalDate date, Long registeredByUserId,
+            String receiverName, UUID idempotencyKey, boolean legacy, PaymentStatus status) {
         Payment payment = new Payment();
         payment.groupId = debt.getGroupId();
         payment.debtId = debt.getId();
@@ -137,7 +148,7 @@ public class Payment {
         payment.currency = debt.getCurrency();
         payment.paymentDate = date;
         payment.idempotencyKey = idempotencyKey;
-        payment.status = PaymentStatus.CONFIRMED;
+        payment.status = status;
         payment.legacy = legacy;
         return payment;
     }

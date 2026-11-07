@@ -333,6 +333,17 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** 022 D6: the debt already has a reported or settled payment — 409. */
+    @ExceptionHandler(com.amano.backend.payment.DebtAlreadyHasPaymentException.class)
+    public ProblemDetail handleDebtAlreadyHasPayment(
+            com.amano.backend.payment.DebtAlreadyHasPaymentException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("La deuda ya tiene un pago registrado");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.payment.DebtAlreadyHasPaymentException.CODE));
+        return problem;
+    }
+
     /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
     @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
     public ProblemDetail handleAdminRemovalBlocked(

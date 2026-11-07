@@ -130,6 +130,27 @@ final class PaymentScenario {
         return pay(session, UUID.randomUUID().toString(), body(debtId, amount, EXPENSE_DATE));
     }
 
+    static String fullBody(String amount, String idempotencyKey) {
+        return """
+                {"amount": "%s", "idempotencyKey": "%s"}
+                """.formatted(amount, idempotencyKey);
+    }
+
+    /** 022 US6: full payment through the group debt endpoint. */
+    ResultActions registerFull(Cookie session, long debtId, String amount, String key) throws Exception {
+        var request = post("/api/groups/" + groupId + "/debts/" + debtId + "/payments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(fullBody(amount, key));
+        if (session != null) {
+            request.cookie(session);
+        }
+        return mockMvc.perform(request);
+    }
+
+    ResultActions registerFull(Cookie session, long debtId, String amount) throws Exception {
+        return registerFull(session, debtId, amount, UUID.randomUUID().toString());
+    }
+
     String statusOf(long debtId) {
         return jdbc.queryForObject("SELECT status FROM debts WHERE id = ?", String.class, debtId);
     }
@@ -142,5 +163,14 @@ final class PaymentScenario {
 
     int payments(long debtId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE debt_id = ?", Integer.class, debtId);
+    }
+
+    int activePayments(long debtId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = FALSE", Integer.class, debtId);
+    }
+
+    void requireValidation() {
+        jdbc.update("UPDATE group_permissions SET payments_require_validation = TRUE WHERE group_id = ?", groupId);
     }
 }

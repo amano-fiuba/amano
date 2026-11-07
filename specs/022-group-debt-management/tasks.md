@@ -98,11 +98,12 @@
 **Goal**: Verify that only full payments are allowed (no partial payments per clarification Q5)  
 **Independent Test**: Attempting to register payment < outstanding amount fails; payment = outstanding amount succeeds
 
-- [ ] T038 [P] [US6] Implementar validación: payment amount must equal exactly `debt.getOutstanding()`; reject if `amount < outstanding` or `amount > outstanding` with 400 error
-- [ ] T039 [US6] Probar que pago parcial (amount < outstanding) es rechazado con mensaje claro
-- [ ] T040 [P] [US6] Probar idempotency: mesma `idempotencyKey` sobre deuda misma → returns existing result, no duplicate
-- [ ] T041 [US6] Probar que clave distinta sobre deuda ya reportada/saldada → 409 "Esta deuda ya tiene un pago registrado"
-- [ ] T042 [P] [US6] Probar concurrency: dos pagos concurrentes sobre la misma deuda con claves diferentes → solo uno se aplica (PESSIMISTIC_WRITE lock)
+- [X] T038 [P] [US6] Implementar validación: payment amount must equal exactly `debt.getOutstanding()`; reject if `amount < outstanding` or `amount > outstanding` with 400 error
+- [X] T039 [US6] Probar que pago parcial (amount < outstanding) es rechazado con mensaje claro
+- [X] T040 [P] [US6] Probar idempotency: mesma `idempotencyKey` sobre deuda misma → returns existing result, no duplicate
+- [X] T041 [US6] Probar que clave distinta sobre deuda ya reportada/saldada → 409 "Esta deuda ya tiene un pago registrado"
+- [X] T042 [P] [US6] Probar concurrency: dos pagos concurrentes sobre la misma deuda con claves diferentes → solo uno se aplica (PESSIMISTIC_WRITE lock)
+- [ ] T062 [US6] Implementar job programado idempotente que pasa deudas `PENDING` a `OVERDUE` usando `debtDueDays` del grupo (`null` = nunca vence) y `Clock` inyectable (plan D7); no implementado en esta etapa
 
 ---
 ## Phase 9: User Story 7 - Ver mis deudas pendientes (Priority: P3)
@@ -161,7 +162,7 @@
 | **FR-003** | Complete | T012-T016 | Saldos consistentes con `BalanceCalculator`, endpoint y cero-sum |
 | **FR-004** | Complete | T027-T031 | Liquidación con conjunto reducido de transferencias y solo lectura |
 | **FR-005** | Pending | T032-T037 | Gestión de estado de deuda; tareas de US5 sin completar |
-| **FR-006** | Pending | T038-T042 | Registrar pago; tareas de US6 sin completar |
+| **FR-006** | Complete | T038-T042 | Registrar pago; flujo de pago completo con validación, idempotencia, 409 y concurrencia |
 | **FR-007** | Pending | T043-T045 | Ver deudas pendientes; tareas de US7 sin completar |
 | **FR-008** | Pending | T046-T049, T061 | Historial de actividad; tareas de US8 sin completar |
 | **FR-009** | Pending | T050-T054 | Conversión multi-currency; tareas de US9 sin completar |

@@ -14,4 +14,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     /** Payments of a debt in registration order ({@code ix_payments_debt}). */
     List<Payment> findByDebtIdOrderByCreatedAtAsc(Long debtId);
+
+    /**
+     * The payment with a given key on a debt (022 D6): reusing the key returns
+     * the existing result instead of inserting a duplicate.
+     */
+    Optional<Payment> findByDebtIdAndIdempotencyKey(Long debtId, UUID idempotencyKey);
 }

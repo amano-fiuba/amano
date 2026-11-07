@@ -133,6 +133,24 @@ public class Debt {
         paidAmount = newPaid;
     }
 
+    /**
+     * Applies a full payment of the remaining balance (022 D3/D6): moves
+     * {@code PENDING}, {@code PARTIALLY_PAID} or {@code OVERDUE} to
+     * {@code PAYMENT_REPORTED} when the group requires validation, or to
+     * {@code PAID} when it does not. A debt that already received a reported or
+     * settled payment is rejected without changes.
+     */
+    public void applyFullPayment(boolean requiresValidation) {
+        if (!status.isPayable()) {
+            throw new IllegalStateException("La deuda ya tiene un pago registrado");
+        }
+        if (getOutstanding().signum() <= 0) {
+            throw new IllegalStateException("La deuda no tiene saldo pendiente");
+        }
+        paidAmount = amount.setScale(2);
+        status = DebtStatus.settledBy(requiresValidation);
+    }
+
     /** Amount still to pay: {@code amount - paidAmount}. */
     public BigDecimal getOutstanding() {
         return amount.subtract(paidAmount);
