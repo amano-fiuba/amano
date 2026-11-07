@@ -12,7 +12,7 @@
 
 - **017/022 (deudas y estados)**: los recordatorios usan los estados de deuda existentes (Pendiente, Pago informado, Pagado, Verificado, Vencido) y el vencimiento por grupo definido en 022 (fecha límite = fecha del gasto originario + días de vencimiento del grupo). Esta spec no crea estados ni transiciones nuevas. 017 dejó explícitamente los recordatorios y su configuración fuera de su alcance.
 - **018/022 (pagos y verificación)**: si una deuda se salda o se verifica antes de la fecha programada, el recordatorio se cancela. No se modifican los flujos de pago ni de validación.
-- **014 (historial de actividad)**: el envío de cada recordatorio se registra como evento del historial del grupo, igual que los eventos de gasto registrado o deuda vencida.
+- **014 (historial de actividad)**: el envío de cada recordatorio se registra como evento del historial del grupo, igual que los eventos de gasto registrado o deuda vencida. Los dos eventos nuevos (`DEBT_REMINDER_SENT` y `PAYER_DUE_NOTICE_SENT`) se muestran con frases propias, aparecen en el filtro "Recordatorios" del historial y enlazan al detalle del gasto, como extensión de la mecánica de frases y filtros que ya provee la 014.
 - **003/006 (correo electrónico)**: se reutiliza la infraestructura de envío de correo existente (verificación de cuenta y recuperación de contraseña); no se agrega un canal nuevo.
 - **010 (grupos)**: la configuración de recordatorios pertenece a la configuración del grupo y solo el Administrador puede modificarla, con los permisos existentes.
 
@@ -129,12 +129,14 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 
 ## Requirements *(mandatory)*
 
+> Nota de numeración: el identificador FR-015 no se utilizó (el requisito que lo ocupaba se eliminó durante las aclaraciones del 2026-11-07). Los identificadores FR-016 a FR-019 conservan su numeración para mantener la trazabilidad con los artefactos de planificación.
+
 ### Functional Requirements
 
 **Configuración por grupo (US2 y US4)**
 
 - **FR-001**: El sistema MUST mantener una única configuración de recordatorios por grupo, compuesta por el tiempo de envío y el mensaje. Mientras el Administrador no la personalice, MUST aplicarse la configuración predeterminada: 5 días antes del vencimiento y mensaje predeterminado.
-- **FR-002**: El tiempo de envío MUST ser una única opción elegida de la lista fija de 7 días, 5 días, 3 días o 1 día antes del vencimiento (incluye como mínimo una semana y cinco días antes). La opción elegida aplica a todos los recordatorios automáticos del grupo.
+- **FR-002**: El tiempo de envío MUST ser una única opción elegida de la lista fija de 7 días, 5 días, 3 días o 1 día antes del vencimiento. La opción elegida aplica a todos los recordatorios automáticos del grupo.
 - **FR-003**: La configuración MUST poder modificarse en cualquier momento. Un cambio MUST aplicar solo a los recordatorios futuros: los ya enviados no cambian y los programados aún no enviados se recalculan con la configuración vigente.
 - **FR-004**: Solo el Administrador del grupo MUST poder consultar y modificar la configuración de recordatorios; la operación MUST ser rechazada para cualquier otro miembro.
 - **FR-005**: El mensaje personalizado MUST ingresarse en un campo de texto con longitud máxima de 500 caracteres, validada antes de guardar: un mensaje que la excede MUST ser rechazado, y un mensaje en blanco MUST dejar al grupo sin mensaje personalizado (vuelve al predeterminado).
@@ -185,7 +187,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 ## Assumptions
 
 - La fecha límite de pago de una deuda es la fecha del gasto originario más los días de vencimiento del grupo (definición de 022). Un grupo sin días de vencimiento no genera fecha límite y, por lo tanto, no genera recordatorios.
-- Lista fija de tiempos de envío: 7, 5, 3 y 1 días antes (ajustable; como mínimo incluye una semana y cinco días). Tiempo predeterminado: 5 días antes. Las opciones se expresan en días (la entrada admite días u horas; se adoptan días).
+- Lista fija de tiempos de envío: 7, 5, 3 y 1 días antes (ajustable como decisión de producto, no por configuración). Tiempo predeterminado: 5 días antes. Las opciones se expresan en días (la entrada admite días u horas; se adoptan días).
 - Se envía un correo por deuda: no se agrupan en un mismo correo varias deudas del mismo miembro (confirmado en la sesión del 2026-11-07).
 - El mensaje personalizado acompaña a los datos de identificación (grupo, concepto, monto y fecha límite), que siempre están presentes; no los reemplaza.
 - Un mensaje en blanco equivale a "sin mensaje personalizado" (se usa el predeterminado).
