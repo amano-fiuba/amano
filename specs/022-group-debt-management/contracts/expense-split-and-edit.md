@@ -63,13 +63,15 @@ For `PERCENTAGE`, replace `amount` with `percentage` (for example `"30"`, `"60"`
 
 ### Rules
 
-- The payer always participates and cannot be removed (017 FR-004).
+- For `CUSTOM` and `PERCENTAGE`, the payer must be among the participants (022 spec: the payer always takes part in the split) and cannot be removed. The legacy 017 `EQUAL` payload keeps its 017 behavior: when `splitMethod` is omitted, a payer who is not a participant is still accepted.
 - Every participant (including the payer) supplies its own `amount` or `percentage` in the corresponding method.
+- Simulated profiles may carry their own `amount` in `CUSTOM` or `percentage` in `PERCENTAGE`, exactly like a registered participant (confirmed decision).
 - If the participant list contains nobody other than the payer, the expense is **personal**: no debts are generated and `splitMethod` is not applied.
 - The payer and all registered participants must be active members of the group; simulated participants must belong to the group (017 D11).
 - Shared expenses require at least one participant other than the payer.
 - `CUSTOM`: each participant amount must be `> 0`; the sum of all amounts must equal the expense total **exactly**.
 - `PERCENTAGE`: each percentage must be `> 0`; the sum of all percentages must be exactly `100`.
+- `PERCENTAGE`: the payer's percentage is validated (it must be `> 0` and part of the `100` sum) but is **not** used to compute the payer's amount. The payer's share is always `total - sum(non-payer shares)`, so the payer absorbs the rounding remainder.
 - Applying `amount`/`percentage` to `EQUAL`, or mixing both per-participant fields, is rejected.
 - Currency conversion (022 D8) is applied **once to the total** before splitting; `CUSTOM` and `PERCENTAGE` operate on the converted total, in the group currency.
 
@@ -91,6 +93,7 @@ Examples (payer last):
 | Field / rule | Message |
 |--------------|---------|
 | `splitMethod` not one of the three values | `El método de reparto debe ser EQUAL, CUSTOM o PERCENTAGE` |
+| `CUSTOM`/`PERCENTAGE`, payer not among the participants | `Quien pagó tiene que participar del reparto` |
 | `CUSTOM`, participant amount missing, non-positive or not canonical | `Cada importe personalizado tiene que ser mayor que 0` |
 | `CUSTOM`, sum differs from the total | `Los importes personalizados deben sumar exactamente el total del gasto` |
 | `PERCENTAGE`, participant percentage missing or `<= 0` | `Cada porcentaje tiene que ser mayor que 0` |
@@ -161,7 +164,7 @@ Partial update of a **personal** group expense (no participants other than the p
 - Success answers `200` with the updated `GroupExpenseResponse`.
 - Validation errors answer `400` with `properties.fields`; non-members answer the neutral `404`.
 
-**Who may edit (proposed, pending confirmation)**: the member who registered the expense (`createdByUserId`), the payer (`payerUserId`), or a group administrator.
+**Who may edit (confirmed)**: the member who registered the expense (`createdByUserId`), the payer (`payerUserId`), or a group administrator.
 
 ---
 
@@ -187,7 +190,7 @@ Deletes a **personal** group expense (no participants other than the payer) that
 - Balances are derived from debts (`BalanceCalculator`, D4); there is no stored balance table to rewrite. After a successful personal-expense deletion the next balance query simply reflects the removed expense (which contributed no debts).
 - Non-members answer the neutral `404`; anonymous users answer `401`.
 
-**Who may delete (proposed, pending confirmation)**: the member who registered the expense (`createdByUserId`), the payer (`payerUserId`), or a group administrator.
+**Who may delete (confirmed)**: the member who registered the expense (`createdByUserId`), the payer (`payerUserId`), or a group administrator.
 
 ---
 
@@ -208,12 +211,12 @@ ALTER TABLE group_expenses
 
 Existing rows stay `EQUAL`, which matches the 017 behavior.
 
-## Open product decisions (not defined by the spec)
+## Decisiones tomadas
 
-These are intentionally **not** invented here and must be confirmed before implementing:
+These decisions are confirmed and close the previous open questions:
 
-1. Who may edit/delete: the proposal above (creator, payer or group admin) is not stated by the spec.
-2. Whether a simulated profile may carry a custom amount or a percentage of its own, or only participate in `EQUAL`.
-3. Whether the 007 personal `Expense` (outside groups, without a `participants` concept) also gets edit/delete endpoints under this contract.
-4. Whether the payer of a personal expense may be changed through `PATCH` (this contract says no).
-5. Concurrency control for `PATCH`/`DELETE` (for example `If-Match`/ETag) is not defined by the spec.
+1. **Quién edita y borra**: pueden editar y borrar el gasto quien lo registró (`createdByUserId`), el pagador (`payerUserId`) o un administrador del grupo.
+2. **Personas simuladas**: pueden llevar `amount` propio en `CUSTOM` y `percentage` propio en `PERCENTAGE`, igual que un participante registrado.
+3. **Gasto personal de la 007**: el `Expense` personal de la 007 queda fuera del alcance de la 022; esta feature solo edita y borra gastos de grupo.
+4. **Cambio de pagador**: el pagador no se puede cambiar con `PATCH`; `payerUserId` queda inmutable.
+5. **Concurrencia**: no se usa `ETag`/`If-Match`; si dos pedidos `PATCH`/`DELETE` compiten, gana el último en guardar (last write wins).

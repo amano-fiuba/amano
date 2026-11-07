@@ -306,6 +306,240 @@ class GroupExpenseControllerIT {
     }
 
     @Test
+    void t066TheSplitMethodDefaultsToEqualForLegacyPayloads() throws Exception {
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), threeWayBody("10000.00"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splitMethod").value("EQUAL"))
+                .andReturn().getResponse().getContentAsString();
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("SELECT split_method FROM group_expenses WHERE id = ?",
+                String.class, expenseId)).isEqualTo("EQUAL");
+        mockMvc.perform(get("/api/groups/" + groupId + "/expenses/" + expenseId).cookie(juanSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.splitMethod").value("EQUAL"));
+    }
+
+    @Test
+    void t023CustomSplitPersistsTheRequestedShares() throws Exception {
+        String custom = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "description": "Súper",
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "60.00"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "amount": "10.00"}]}
+                """.formatted(ana, ana, juan, abuela);
+
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), custom)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splitMethod").value("CUSTOM"))
+                .andExpect(jsonPath("$.shares[0].amount").value("30.00"))
+                .andExpect(jsonPath("$.shares[1].amount").value("60.00"))
+                .andExpect(jsonPath("$.shares[2].amount").value("10.00"))
+                .andExpect(jsonPath("$.debts.length()").value(2))
+                .andExpect(jsonPath("$.debts[0].amount").value("60.00"))
+                .andExpect(jsonPath("$.debts[1].amount").value("10.00"))
+                .andReturn().getResponse().getContentAsString();
+
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+        assertThat(jdbc.queryForObject("SELECT SUM(amount) FROM group_expense_shares WHERE expense_id = ?",
+                BigDecimal.class, expenseId)).isEqualByComparingTo("100.00");
+        assertThat(jdbc.queryForObject("SELECT split_method FROM group_expenses WHERE id = ?",
+                String.class, expenseId)).isEqualTo("CUSTOM");
+    }
+
+    @Test
+    void t023CustomSplitMustSumTheConvertedTotal() throws Exception {
+        String invalid = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "60.00"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "amount": "9.99"}]}
+                """.formatted(ana, ana, juan, abuela);
+
+        postExpense(anaSession, UUID.randomUUID().toString(), invalid)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.participants")
+                        .value("Los importes personalizados deben sumar exactamente el total del gasto"));
+
+        assertThat(count("group_expenses")).isZero();
+        assertThat(count("debts")).isZero();
+    }
+
+    @Test
+    void t024PercentageSplitFloorsNonPayersAndThePayerAbsorbsTheRemainder() throws Exception {
+        String percentage = """
+                {"amount": "0.05", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "PERCENTAGE",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "percentage": "33.33"},
+                   {"type": "REGISTERED", "userId": %d, "percentage": "33.33"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "percentage": "33.34"}]}
+                """.formatted(ana, ana, juan, abuela);
+
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), percentage)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.splitMethod").value("PERCENTAGE"))
+                .andExpect(jsonPath("$.shares[0].amount").value("0.03"))
+                .andExpect(jsonPath("$.shares[1].amount").value("0.01"))
+                .andExpect(jsonPath("$.shares[2].amount").value("0.01"))
+                .andExpect(jsonPath("$.debts[0].amount").value("0.01"))
+                .andExpect(jsonPath("$.debts[1].amount").value("0.01"))
+                .andReturn().getResponse().getContentAsString();
+
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+        assertThat(jdbc.queryForObject("SELECT SUM(amount) FROM group_expense_shares WHERE expense_id = ?",
+                BigDecimal.class, expenseId)).isEqualByComparingTo("0.05");
+    }
+
+    @Test
+    void t024SplitValidationMessagesAreVoseoAndRejectInvalidCombinations() throws Exception {
+        String equalWithAmount = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "EQUAL",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "50.00"},
+                   {"type": "REGISTERED", "userId": %d},
+                   {"type": "SIMULATED", "simulatedProfileId": %d}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, UUID.randomUUID().toString(), equalWithAmount)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.participants")
+                        .value("El reparto en partes iguales no acepta importes ni porcentajes por participante"));
+
+        String unknownMethod = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "HALF",
+                 "participants": [{"type": "REGISTERED", "userId": %d},
+                                  {"type": "REGISTERED", "userId": %d},
+                                  {"type": "SIMULATED", "simulatedProfileId": %d}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, UUID.randomUUID().toString(), unknownMethod)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.splitMethod")
+                        .value("El método de reparto debe ser EQUAL, CUSTOM o PERCENTAGE"));
+
+        String zeroPercentage = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "PERCENTAGE",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "percentage": "0"},
+                   {"type": "REGISTERED", "userId": %d, "percentage": "50"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "percentage": "50"}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, UUID.randomUUID().toString(), zeroPercentage)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.participants")
+                        .value("Cada porcentaje tiene que ser mayor que 0"));
+
+        String wrongPercentageSum = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "PERCENTAGE",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "percentage": "33.33"},
+                   {"type": "REGISTERED", "userId": %d, "percentage": "33.33"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "percentage": "33.33"}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, UUID.randomUUID().toString(), wrongPercentageSum)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.participants")
+                        .value("Los porcentajes deben sumar exactamente 100"));
+
+        String mixed = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "30.00", "percentage": "30"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "amount": "40.00"}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, UUID.randomUUID().toString(), mixed)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.participants")
+                        .value("Elegí importe o porcentaje, no ambos"));
+
+        String payerOutside = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "60.00"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "amount": "40.00"}]}
+                """.formatted(ana, juan, abuela);
+        postExpense(anaSession, UUID.randomUUID().toString(), payerOutside)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.participants")
+                        .value("Quien pagó tiene que participar del reparto"));
+
+        assertThat(count("group_expenses")).isZero();
+        assertThat(expenseEvents()).isZero();
+    }
+
+    @Test
+    void t023AndT024IdempotencyConsidersTheSplitMethodAndAmounts() throws Exception {
+        String key = UUID.randomUUID().toString();
+        String custom = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "60.00"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "amount": "10.00"}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, key, custom).andExpect(status().isCreated());
+
+        postExpense(anaSession, key, custom)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.splitMethod").value("CUSTOM"));
+        postExpense(anaSession, key, threeWayBody("100.00"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.properties.code").value("IDEMPOTENCY_KEY_REUSED"));
+
+        String otherAmounts = """
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "50.00"},
+                   {"type": "SIMULATED", "simulatedProfileId": %d, "amount": "20.00"}]}
+                """.formatted(ana, ana, juan, abuela);
+        postExpense(anaSession, key, otherAmounts)
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.properties.code").value("IDEMPOTENCY_KEY_REUSED"));
+
+        assertThat(count("group_expenses")).isEqualTo(1);
+        assertThat(count("debts")).isEqualTo(2);
+    }
+
+    @Test
+    void t023CustomSplitOperatesOnTheConvertedTotal() throws Exception {
+        LocalDate date = LocalDate.of(2026, 1, 15);
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, date))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("18.50000000"), date, BcraExchangeRateClient.SOURCE_BCRA));
+
+        String usd = """
+                {"amount": "50.00", "currency": "USD", "date": "2026-01-15", "payerUserId": %d,
+                 "splitMethod": "CUSTOM",
+                 "participants": [
+                   {"type": "REGISTERED", "userId": %d, "amount": "425.00"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "500.00"}]}
+                """.formatted(ana, ana, juan);
+
+        postExpense(anaSession, UUID.randomUUID().toString(), usd)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.convertedAmount").value("925.00"))
+                .andExpect(jsonPath("$.splitMethod").value("CUSTOM"))
+                .andExpect(jsonPath("$.shares[0].amount").value("425.00"))
+                .andExpect(jsonPath("$.shares[1].amount").value("500.00"))
+                .andExpect(jsonPath("$.debts[0].amount").value("500.00"))
+                .andExpect(jsonPath("$.debts[0].currency").value("ARS"));
+    }
+
+    @Test
     void invalidFieldsAnswer400PerFieldWithoutWriting() throws Exception {
         String body = """
                 {"amount": "0.02", "currency": "XYZ", "date": "2999-01-01", "payerUserId": %d,

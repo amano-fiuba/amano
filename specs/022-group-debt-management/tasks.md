@@ -13,7 +13,7 @@
 - [X] T001 Verificar código existente: confirmar que `Debt`, `DebtStatus`, `Payment` con `of()`, `EqualSplit` y `ActivityEventService` ya existen (según verification prerequisites del plan.md)
 - [X] T002 [P] [US9] Configurar entorno BCRA: añadir `BCRA_BASE_URL` (API pública, sin credenciales) a `.env.example` y Docker Compose para story 9 (multi-currency)
 - [X] T003 [P] [US9] Crear estructura de paquetes frontend: `frontend/src/components/debts/`, `frontend/src/pages/groups/GroupDebtsView.jsx`
-- [X] T004 [P] Configurar migraciones Flyway: asegurar que `migrations/` tiene versión base y espacio para 3 migraciones nuevas
+- [X] T004 [P] Configurar migraciones Flyway: asegurar que `migrations/` tiene versión base y espacio para 5 migraciones nuevas
 
 ---
 ## Phase 2: Foundational (Blocking Prerequisites)
@@ -55,7 +55,7 @@
 - [ ] T021 [US1] Implementar `DELETE /api/groups/{groupId}/expenses/{expenseId}` en `GroupExpenseController` y `GroupExpenseService.deletePersonal(...)`: si el gasto tiene deudas asociadas responde 409 "No se puede eliminar un gasto con deudas asociadas". Tests: `GroupExpenseServiceTest` y `GroupExpenseControllerIT`. Contrato: `contracts/expense-split-and-edit.md` §3
 - [ ] T022 [P] [US1] Implementar el borrado exitoso de un gasto personal (sin participantes además del pagador) con `204 No Content`, eliminando `group_expenses` y su share personal; verificar que los saldos derivados (`BalanceCalculator`) siguen sumando cero y no se alteran por el borrado. Tests: `GroupExpenseControllerIT` y `GroupBalanceServiceTest`. Contrato: `contracts/expense-split-and-edit.md` §3
 - [ ] T067 [US1] Permitir crear un gasto de grupo personal (solo el pagador, sin otros participantes) sin generar deudas, como prerrequisito de T020–T022; ajustar la validación de `GroupExpenseService` y cubrirlo en `GroupExpenseServiceTest`/`GroupExpenseControllerIT`. Contrato: `contracts/expense-split-and-edit.md` §1
-- [ ] T060 [US1] Permitir que cualquier miembro del grupo registre un gasto pagado por otro miembro conservando la casilla `members_can_generate_expenses_for_others` como permiso por grupo: los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración en la siguiente versión libre que cambia solo el DEFAULT de la columna, sin tocar filas existentes) y los grupos existentes mantienen su valor; validar en servidor que pagador y participantes sean miembros del grupo; mantener el 403 con el mensaje "Solo podés registrar gastos pagados por vos" cuando la casilla está en `false` y agregar el caso con la casilla en `true`; cubrir con tests que `createdByUserId` y `payerUserId` quedan separados
+- [ ] T060 [US1] Permitir que cualquier miembro del grupo registre un gasto pagado por otro miembro conservando la casilla `members_can_generate_expenses_for_others` como permiso por grupo: los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración V22, que cambia solo el DEFAULT de la columna, sin tocar filas existentes) y los grupos existentes mantienen su valor; validar en servidor que pagador y participantes sean miembros del grupo; mantener el 403 con el mensaje "Solo podés registrar gastos pagados por vos" cuando la casilla está en `false` y agregar el caso con la casilla en `true`; cubrir con tests que `createdByUserId` y `payerUserId` quedan separados
 
 ---
 ## Phase 5: User Story 2 - Definir cómo se reparte el gasto (Priority: P1)
@@ -70,6 +70,8 @@
 - [ ] T064 [P] [US2] Agregar tests de propiedad del reparto `CUSTOM`/`PERCENTAGE`: la suma de las shares es siempre exactamente el total y ningún participante no pagador queda por encima de su parte exacta. Archivo: nuevo `GroupExpenseSplitTest.java` (o `EqualSplitTest` si el cálculo se extrae a una utilidad pura). Contrato: `contracts/expense-split-and-edit.md` §1
 - [ ] T065 [P] [US2] Extraer los helpers de cálculo `CUSTOM`/`PERCENTAGE` del frontend (por ejemplo `frontend/src/pages/groups/splitCustom.js`) con tests unitarios Vitest de suma exacta y resto al pagador, reutilizables por la UI de T026. Contrato: `contracts/expense-split-and-edit.md` §1
 - [ ] T066 [US2] Persistir y exponer `splitMethod`: agregar `splitMethod` a `GroupExpense`/`GroupExpenseResponse` y la migración nueva `V21__add_group_expense_split_method.sql` (`split_method VARCHAR(10) NOT NULL DEFAULT 'EQUAL'` + CHECK), sin editar migraciones existentes. Tests: `GroupExpenseControllerIT`. Contrato: `contracts/expense-split-and-edit.md` §1 y *Compatibility and migration*
+
+**Orden de dependencias (sin cambiar casillas)**: `T066 → T023 → T024 → T064` para el reparto; `T067 → T020 → T021 → T022` para el gasto personal y su edición/borrado; `T065 → T026` para los helpers y la UI de reparto.
 
 ---
 ## Phase 6: User Story 4 - Simplificar deudas (liquidación) (Priority: P2)

@@ -13,6 +13,8 @@ import com.amano.backend.user.CurrencyConversion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -75,6 +77,11 @@ public class GroupExpense {
     /** 022 D8: source of the quote (for example {@code BCRA}). */
     @Column(name = "rate_source", length = 40)
     private String rateSource;
+
+    /** 022 D2/T066: how the expense was split. Existing and omitted payloads stay EQUAL. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "split_method", nullable = false, length = 10)
+    private SplitMethod splitMethod = SplitMethod.EQUAL;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -178,6 +185,14 @@ public class GroupExpense {
 
     public void setRateSource(String rateSource) {
         this.rateSource = rateSource;
+    }
+
+    public SplitMethod getSplitMethod() {
+        return splitMethod;
+    }
+
+    public void setSplitMethod(SplitMethod splitMethod) {
+        this.splitMethod = splitMethod;
     }
 
     public OffsetDateTime getCreatedAt() {

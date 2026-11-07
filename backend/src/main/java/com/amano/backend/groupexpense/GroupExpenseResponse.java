@@ -11,8 +11,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * text with two decimals, as in 007 and 014. Names are the copies stored when
  * the expense was registered; payer and creator use the current visible name.
  * Conversion fields ({@code convertedAmount}, {@code convertedCurrency},
- * {@code exchangeRate}, {@code rateDate}, {@code rateSource}) are additive (022
- * D8).
+ * {@code exchangeRate}, {@code rateDate}, {@code rateSource}) and
+ * {@code splitMethod} are additive (022 D8 and D2/T066).
  */
 public record GroupExpenseResponse(
         Long id,
@@ -30,7 +30,30 @@ public record GroupExpenseResponse(
         Person createdBy,
         OffsetDateTime createdAt,
         List<Share> shares,
-        List<DebtView> debts) {
+        List<DebtView> debts,
+        String splitMethod) {
+
+    /** 022 constructor without the split method, kept for backward compatibility. */
+    public GroupExpenseResponse(
+            Long id,
+            Long groupId,
+            String amount,
+            String currency,
+            String convertedAmount,
+            String convertedCurrency,
+            String exchangeRate,
+            String rateDate,
+            String rateSource,
+            String date,
+            String description,
+            Person payer,
+            Person createdBy,
+            OffsetDateTime createdAt,
+            List<Share> shares,
+            List<DebtView> debts) {
+        this(id, groupId, amount, currency, convertedAmount, convertedCurrency, exchangeRate, rateDate,
+                rateSource, date, description, payer, createdBy, createdAt, shares, debts, "EQUAL");
+    }
 
     /** 017 constructor without conversion fields, kept for backward compatibility. */
     public GroupExpenseResponse(
@@ -46,7 +69,7 @@ public record GroupExpenseResponse(
             List<Share> shares,
             List<DebtView> debts) {
         this(id, groupId, amount, currency, null, null, null, null, null, date, description, payer,
-                createdBy, createdAt, shares, debts);
+                createdBy, createdAt, shares, debts, "EQUAL");
     }
 
     /** A registered user. */

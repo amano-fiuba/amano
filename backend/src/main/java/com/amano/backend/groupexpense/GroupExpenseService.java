@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +73,19 @@ public class GroupExpenseService {
     static final String PARTICIPANTS_NOT_IN_GROUP = "Algún participante no pertenece al grupo";
     static final String AMOUNT_TOO_SMALL = "El monto no alcanza para dividirlo entre %d participantes";
     static final String UNKNOWN_PROPERTY = "No se permite informar este campo";
+
+    /** 022 D2/T023/T024: split method and per-participant values. */
+    static final String SPLIT_METHOD_INVALID = "El método de reparto debe ser EQUAL, CUSTOM o PERCENTAGE";
+    static final String PAYER_MUST_PARTICIPATE = "Quien pagó tiene que participar del reparto";
+    static final String CUSTOM_AMOUNT_INVALID = "Cada importe personalizado tiene que ser mayor que 0";
+    static final String CUSTOM_SUM_INVALID = "Los importes personalizados deben sumar exactamente el total del gasto";
+    static final String PERCENTAGE_INVALID = "Cada porcentaje tiene que ser mayor que 0";
+    static final String PERCENTAGE_SUM_INVALID = "Los porcentajes deben sumar exactamente 100";
+    static final String EQUAL_NO_SPLIT_VALUES = "El reparto en partes iguales no acepta importes ni porcentajes por participante";
+    static final String MIXED_SPLIT_VALUES = "Elegí importe o porcentaje, no ambos";
+
+    private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
+    private static final Pattern PLAIN_DECIMAL = Pattern.compile("^\\d+(\\.\\d+)?$");
 
     /** Same texts as {@code ExpenseService} (007) for currency and date format. */
     static final String CURRENCY_REQUIRED = "La moneda es obligatoria";
@@ -143,7 +157,12 @@ public class GroupExpenseService {
     }
 
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date, String description,
-            Long payerUserId, String payerName, List<ResolvedParticipant> participants, int payerIndex) {
+            Long payerUserId, String payerName, List<ResolvedParticipant> participants, int payerIndex,
+            SplitMethod splitMethod, List<BigDecimal> customAmounts, List<BigDecimal> percentages) {
+    }
+
+    /** Parsed values of the requested split; both lists are null when any participant is invalid. */
+    private record ParsedSplit(List<BigDecimal> amounts, List<BigDecimal> percentages) {
     }
 
     /**
@@ -194,12 +213,14 @@ public class GroupExpenseService {
             convertedAmount = normalized.amount()
                     .multiply(exchangeRate)
                     .setScale(2, RoundingMode.HALF_UP);
-            if (!EqualSplit.fits(convertedAmount, normalized.participants().size())) {
+            if (normalized.splitMethod() == SplitMethod.EQUAL
+                    && !EqualSplit.fits(convertedAmount, normalized.participants().size())) {
                 throw new FieldValidationException(Map.of(
                         "amount", AMOUNT_TOO_SMALL.formatted(normalized.participants().size())));
             }
         }
 
+        List<BigDecimal> amounts = sharesOf(convertedAmount, normalized);
         GroupExpense expense = new GroupExpense();
         expense.setGroupId(groupId);
         expense.setCreatedByUserId(callerId);
@@ -210,13 +231,12 @@ public class GroupExpenseService {
         expense.setExchangeRate(exchangeRate);
         expense.setRateDate(rateDate);
         expense.setRateSource(rateSource);
+        expense.setSplitMethod(normalized.splitMethod());
         expense.setExpenseDate(normalized.date());
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
         GroupExpense saved = expenseRepository.save(expense);
 
-        List<BigDecimal> amounts = EqualSplit.split(convertedAmount, normalized.participants().size(),
-                normalized.payerIndex());
         List<GroupExpenseShare> shares = new ArrayList<>();
         List<Debt> debts = new ArrayList<>();
         for (int position = 0; position < amounts.size(); position++) {
@@ -297,7 +317,8 @@ public class GroupExpenseService {
 
     private static boolean samePayload(GroupExpense existing, List<GroupExpenseShare> shares,
             NormalizedExpense normalized) {
-        if (existing.getAmount().compareTo(normalized.amount()) != 0
+        if (existing.getSplitMethod() != normalized.splitMethod()
+                || existing.getAmount().compareTo(normalized.amount()) != 0
                 || existing.getCurrency() != normalized.currency()
                 || !existing.getExpenseDate().equals(normalized.date())
                 || !Objects.equals(existing.getDescription(), normalized.description())
@@ -305,16 +326,78 @@ public class GroupExpenseService {
                 || shares.size() != normalized.participants().size()) {
             return false;
         }
+        BigDecimal total = existing.getConvertedAmount() == null
+                ? existing.getAmount() : existing.getConvertedAmount();
+        List<BigDecimal> expected = expectedShares(total, normalized);
+        if (expected == null) {
+            return false;
+        }
         for (int i = 0; i < shares.size(); i++) {
             GroupExpenseShare share = shares.get(i);
             ResolvedParticipant participant = normalized.participants().get(i);
             Long shareId = share.getParticipantType() == ParticipantType.REGISTERED
                     ? share.getUserId() : share.getSimulatedProfileId();
-            if (share.getParticipantType() != participant.type() || !Objects.equals(shareId, participant.id())) {
+            if (share.getParticipantType() != participant.type() || !Objects.equals(shareId, participant.id())
+                    || share.getAmount().compareTo(expected.get(i)) != 0) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Shares computed from the converted total for the requested method. Used
+     * both to persist a new expense and to compare an idempotent replay.
+     */
+    private static List<BigDecimal> sharesOf(BigDecimal total, NormalizedExpense normalized) {
+        return switch (normalized.splitMethod()) {
+            case EQUAL -> EqualSplit.split(total, normalized.participants().size(), normalized.payerIndex());
+            case CUSTOM -> {
+                if (sumOf(normalized.customAmounts()).compareTo(total) != 0) {
+                    throw new FieldValidationException(Map.of("participants", CUSTOM_SUM_INVALID));
+                }
+                yield ExpenseSplit.custom(total, normalized.customAmounts());
+            }
+            case PERCENTAGE -> {
+                if (sumOf(normalized.percentages()).compareTo(ONE_HUNDRED) != 0) {
+                    throw new FieldValidationException(Map.of("participants", PERCENTAGE_SUM_INVALID));
+                }
+                List<BigDecimal> shares =
+                        ExpenseSplit.percentage(total, normalized.percentages(), normalized.payerIndex());
+                if (shares.stream().anyMatch(share -> share.compareTo(ExpenseAmountNormalizer.MIN) < 0)) {
+                    throw new FieldValidationException(Map.of("amount",
+                            AMOUNT_TOO_SMALL.formatted(normalized.participants().size())));
+                }
+                yield shares;
+            }
+        };
+    }
+
+    private static List<BigDecimal> expectedShares(BigDecimal total, NormalizedExpense normalized) {
+        if (normalized.splitMethod() == SplitMethod.EQUAL && !EqualSplit.fits(total, normalized.participants().size())) {
+            return null;
+        }
+        if (normalized.splitMethod() == SplitMethod.CUSTOM
+                && sumOf(normalized.customAmounts()).compareTo(total) != 0) {
+            return null;
+        }
+        if (normalized.splitMethod() == SplitMethod.PERCENTAGE
+                && sumOf(normalized.percentages()).compareTo(ONE_HUNDRED) != 0) {
+            return null;
+        }
+        try {
+            return sharesOf(total, normalized);
+        }
+        catch (FieldValidationException | IllegalArgumentException exception) {
+            return null;
+        }
+    }
+
+    private static BigDecimal sumOf(List<BigDecimal> values) {
+        if (values == null) {
+            return BigDecimal.ZERO;
+        }
+        return values.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private GroupMember activeMembership(Long userId, Long groupId) {
@@ -347,8 +430,40 @@ public class GroupExpenseService {
         }
         List<ResolvedParticipant> participants = resolveParticipants(groupId, request.getParticipants(),
                 payer, activeMemberNames, fieldErrors);
+        SplitMethod splitMethod = parseSplitMethod(request.getSplitMethod(), fieldErrors);
+        int payerIndex = payerIndex(participants, payer);
+        List<BigDecimal> customAmounts = null;
+        List<BigDecimal> percentages = null;
 
-        if (amountError == null && participants != null) {
+        // Only validate split values when the method itself is valid; an unknown
+        // method already answers with SPLIT_METHOD_INVALID.
+        if (participants != null && !fieldErrors.containsKey("splitMethod")) {
+            if (splitMethod == SplitMethod.EQUAL) {
+                if (request.getParticipants().stream().anyMatch(GroupExpenseService::hasSplitValue)) {
+                    fieldErrors.put("participants", EQUAL_NO_SPLIT_VALUES);
+                }
+            }
+            else {
+                if (payerIndex < 0 && payer != null && activeMemberNames.containsKey(payer)) {
+                    fieldErrors.put("participants", PAYER_MUST_PARTICIPATE);
+                }
+                ParsedSplit parsed = validateSplitValues(request.getParticipants(), splitMethod, fieldErrors);
+                if (parsed.amounts() != null) {
+                    if (splitMethod == SplitMethod.CUSTOM) {
+                        customAmounts = parsed.amounts();
+                    }
+                    else {
+                        percentages = parsed.percentages();
+                        if (sumOf(percentages).compareTo(ONE_HUNDRED) != 0) {
+                            fieldErrors.put("participants", PERCENTAGE_SUM_INVALID);
+                            percentages = null;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (amountError == null && participants != null && splitMethod == SplitMethod.EQUAL) {
             BigDecimal amount = ExpenseAmountNormalizer.normalize(request.getAmount());
             if (!EqualSplit.fits(amount, participants.size())) {
                 fieldErrors.put("amount", AMOUNT_TOO_SMALL.formatted(participants.size()));
@@ -362,15 +477,103 @@ public class GroupExpenseService {
             throw new FieldValidationException(fieldErrors);
         }
 
-        int payerIndex = -1;
-        for (int i = 0; i < participants.size(); i++) {
-            if (participants.get(i).isUser(payer)) {
-                payerIndex = i;
-            }
-        }
         return new NormalizedExpense(ExpenseAmountNormalizer.normalize(request.getAmount()), currency, date,
                 ExpenseDescriptionNormalizer.normalize(request.getDescription()), payer,
-                activeMemberNames.get(payer), participants, payerIndex);
+                activeMemberNames.get(payer), participants, payerIndex, splitMethod, customAmounts, percentages);
+    }
+
+    private static SplitMethod parseSplitMethod(String raw, Map<String, String> fieldErrors) {
+        if (raw == null || raw.isBlank()) {
+            return SplitMethod.EQUAL;
+        }
+        try {
+            return SplitMethod.valueOf(raw);
+        }
+        catch (IllegalArgumentException exception) {
+            fieldErrors.put("splitMethod", SPLIT_METHOD_INVALID);
+            return SplitMethod.EQUAL;
+        }
+    }
+
+    private static int payerIndex(List<ResolvedParticipant> participants, Long payer) {
+        if (participants == null || payer == null) {
+            return -1;
+        }
+        for (int i = 0; i < participants.size(); i++) {
+            if (participants.get(i).isUser(payer)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean hasSplitValue(CreateGroupExpenseRequest.Participant participant) {
+        return participant != null
+                && (isPresent(participant.amount()) || isPresent(participant.percentage()));
+    }
+
+    private static boolean isPresent(String raw) {
+        return raw != null && !raw.isBlank();
+    }
+
+    /** Validates every participant value for the requested method, accumulating one error. */
+    private static ParsedSplit validateSplitValues(List<CreateGroupExpenseRequest.Participant> raw,
+            SplitMethod method, Map<String, String> fieldErrors) {
+        List<BigDecimal> amounts = new ArrayList<>();
+        List<BigDecimal> percentages = new ArrayList<>();
+        boolean invalid = false;
+        for (CreateGroupExpenseRequest.Participant participant : raw) {
+            String rawAmount = participant == null ? null : participant.amount();
+            String rawPercentage = participant == null ? null : participant.percentage();
+            boolean hasAmount = isPresent(rawAmount);
+            boolean hasPercentage = isPresent(rawPercentage);
+            if (hasAmount && hasPercentage) {
+                fieldErrors.put("participants", MIXED_SPLIT_VALUES);
+                invalid = true;
+            }
+            else if (method == SplitMethod.CUSTOM) {
+                BigDecimal amount = customAmount(rawAmount);
+                if (amount == null) {
+                    fieldErrors.put("participants", CUSTOM_AMOUNT_INVALID);
+                    invalid = true;
+                }
+                else {
+                    amounts.add(amount);
+                }
+            }
+            else {
+                BigDecimal percentage = percentage(rawPercentage);
+                if (percentage == null) {
+                    fieldErrors.put("participants", PERCENTAGE_INVALID);
+                    invalid = true;
+                }
+                else {
+                    percentages.add(percentage);
+                }
+            }
+        }
+        return invalid ? new ParsedSplit(null, null) : new ParsedSplit(amounts, percentages);
+    }
+
+    /** Canonical positive amount with at most two decimals, or null when invalid. */
+    private static BigDecimal customAmount(String raw) {
+        if (!isPresent(raw) || !PLAIN_DECIMAL.matcher(raw.trim()).matches()) {
+            return null;
+        }
+        BigDecimal value = new BigDecimal(raw.trim());
+        if (value.scale() > 2 || value.signum() <= 0) {
+            return null;
+        }
+        return value.setScale(2);
+    }
+
+    /** Plain positive decimal percentage, or null when invalid. */
+    private static BigDecimal percentage(String raw) {
+        if (!isPresent(raw) || !PLAIN_DECIMAL.matcher(raw.trim()).matches()) {
+            return null;
+        }
+        BigDecimal value = new BigDecimal(raw.trim());
+        return value.signum() > 0 ? value : null;
     }
 
     /** Visible names of the active registered members of the group, by user id. */
@@ -531,7 +734,9 @@ public class GroupExpenseService {
                         names.get(expense.getCreatedByUserId())),
                 expense.getCreatedAt(),
                 shareViews,
-                debtViews);
+                debtViews,
+                expense.getSplitMethod() == null ? SplitMethod.EQUAL.name()
+                        : expense.getSplitMethod().name());
     }
 
     /** 018 FR-016: the debt is not settled and the caller is its debtor, its creditor or an ADMIN. */

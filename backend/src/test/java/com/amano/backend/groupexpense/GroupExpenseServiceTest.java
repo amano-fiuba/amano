@@ -157,6 +157,29 @@ class GroupExpenseServiceTest {
         return new CreateGroupExpenseRequest.Participant("SIMULATED", null, profileId);
     }
 
+    private static CreateGroupExpenseRequest.Participant registeredAmount(Long userId, String amount) {
+        return new CreateGroupExpenseRequest.Participant("REGISTERED", userId, null, amount, null);
+    }
+
+    private static CreateGroupExpenseRequest.Participant simulatedAmount(Long profileId, String amount) {
+        return new CreateGroupExpenseRequest.Participant("SIMULATED", null, profileId, amount, null);
+    }
+
+    private static CreateGroupExpenseRequest.Participant registeredPercentage(Long userId, String percentage) {
+        return new CreateGroupExpenseRequest.Participant("REGISTERED", userId, null, null, percentage);
+    }
+
+    private static CreateGroupExpenseRequest.Participant simulatedPercentage(Long profileId, String percentage) {
+        return new CreateGroupExpenseRequest.Participant("SIMULATED", null, profileId, null, percentage);
+    }
+
+    private static CreateGroupExpenseRequest splitRequest(String amount, Long payer, String splitMethod,
+            CreateGroupExpenseRequest.Participant... participants) {
+        CreateGroupExpenseRequest request = request(amount, payer, participants);
+        request.setSplitMethod(splitMethod);
+        return request;
+    }
+
     private static CreateGroupExpenseRequest request(String amount, Long payer,
             CreateGroupExpenseRequest.Participant... participants) {
         CreateGroupExpenseRequest request = new CreateGroupExpenseRequest();
@@ -172,6 +195,12 @@ class GroupExpenseServiceTest {
 
     private CreateGroupExpenseRequest threeWay() {
         return request("10000.00", ANA, registered(ANA), registered(JUAN), simulated(ABUELA));
+    }
+
+    private CreateGroupExpenseRequest customThreeWay() {
+        return splitRequest("10000.00", ANA, "CUSTOM",
+                registeredAmount(ANA, "3000.00"), registeredAmount(JUAN, "6000.00"),
+                simulatedAmount(ABUELA, "1000.00"));
     }
 
     @SuppressWarnings("unchecked")
@@ -359,6 +388,121 @@ class GroupExpenseServiceTest {
     }
 
     @Test
+    void theSplitMethodDefaultsToEqualForLegacyPayloads() {
+        GroupExpenseResponse response = service.create(ANA, GROUP_ID, KEY, threeWay()).expense();
+
+        assertThat(response.splitMethod()).isEqualTo("EQUAL");
+        ArgumentCaptor<GroupExpense> captor = ArgumentCaptor.forClass(GroupExpense.class);
+        verify(expenseRepository).save(captor.capture());
+        assertThat(captor.getValue().getSplitMethod()).isEqualTo(SplitMethod.EQUAL);
+    }
+
+    @Test
+    void customSplitKeepsTheRequestedSharesAndPersistsTheMethod() {
+        GroupExpenseResponse response = service.create(ANA, GROUP_ID, KEY, customThreeWay()).expense();
+
+        assertThat(response.splitMethod()).isEqualTo("CUSTOM");
+        assertThat(response.shares()).extracting(GroupExpenseResponse.Share::amount)
+                .containsExactly("3000.00", "6000.00", "1000.00");
+        assertThat(response.debts()).extracting(GroupExpenseResponse.DebtView::amount)
+                .containsExactly("6000.00", "1000.00");
+        ArgumentCaptor<GroupExpense> captor = ArgumentCaptor.forClass(GroupExpense.class);
+        verify(expenseRepository).save(captor.capture());
+        assertThat(captor.getValue().getSplitMethod()).isEqualTo(SplitMethod.CUSTOM);
+    }
+
+    @Test
+    void customSplitAmountsMustSumTheTotalExactly() {
+        assertThat(fieldErrorsOf(splitRequest("10000.00", ANA, "CUSTOM",
+                registeredAmount(ANA, "3000.00"), registeredAmount(JUAN, "6000.00"),
+                simulatedAmount(ABUELA, "999.99"))))
+                .containsEntry("participants", GroupExpenseService.CUSTOM_SUM_INVALID);
+    }
+
+    @Test
+    void customSplitRejectsMissingOrNonPositiveAmounts() {
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "CUSTOM",
+                registeredAmount(ANA, "30.00"), registeredAmount(JUAN, "70.00"), simulated(ABUELA))))
+                .containsEntry("participants", GroupExpenseService.CUSTOM_AMOUNT_INVALID);
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "CUSTOM",
+                registeredAmount(ANA, "30.00"), registeredAmount(JUAN, "70.00"),
+                simulatedAmount(ABUELA, "0.00"))))
+                .containsEntry("participants", GroupExpenseService.CUSTOM_AMOUNT_INVALID);
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "CUSTOM",
+                registeredAmount(ANA, "30.00"), registeredAmount(JUAN, "69.999"),
+                simulatedAmount(ABUELA, "0.001"))))
+                .containsEntry("participants", GroupExpenseService.CUSTOM_AMOUNT_INVALID);
+    }
+
+    @Test
+    void percentageSplitFloorsNonPayersAndThePayerAbsorbsTheRemainder() {
+        GroupExpenseResponse response = service.create(ANA, GROUP_ID, KEY,
+                splitRequest("0.05", ANA, "PERCENTAGE",
+                        registeredPercentage(ANA, "33.33"), registeredPercentage(JUAN, "33.33"),
+                        simulatedPercentage(ABUELA, "33.34"))).expense();
+
+        assertThat(response.splitMethod()).isEqualTo("PERCENTAGE");
+        assertThat(response.shares()).extracting(GroupExpenseResponse.Share::amount)
+                .containsExactly("0.03", "0.01", "0.01");
+        assertThat(response.debts()).extracting(GroupExpenseResponse.DebtView::amount)
+                .containsExactly("0.01", "0.01");
+    }
+
+    @Test
+    void percentageSplitThatWouldGiveAShareBelowOneCentIsRejected() {
+        assertThat(fieldErrorsOf(splitRequest("0.02", ANA, "PERCENTAGE",
+                registeredPercentage(ANA, "33.33"), registeredPercentage(JUAN, "33.33"),
+                simulatedPercentage(ABUELA, "33.34"))))
+                .containsEntry("amount", "El monto no alcanza para dividirlo entre 3 participantes");
+    }
+
+    @Test
+    void percentageValuesMustBePositiveAndSumExactlyOneHundred() {
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "PERCENTAGE",
+                registeredPercentage(ANA, "0"), registeredPercentage(JUAN, "50"),
+                simulatedPercentage(ABUELA, "50"))))
+                .containsEntry("participants", GroupExpenseService.PERCENTAGE_INVALID);
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "PERCENTAGE",
+                registeredPercentage(ANA, "33.33"), registeredPercentage(JUAN, "33.33"),
+                simulatedPercentage(ABUELA, "33.33"))))
+                .containsEntry("participants", GroupExpenseService.PERCENTAGE_SUM_INVALID);
+    }
+
+    @Test
+    void equalSplitDoesNotAcceptPerParticipantAmountsOrPercentages() {
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "EQUAL",
+                registeredAmount(ANA, "50.00"), registeredPercentage(JUAN, "50"), simulated(ABUELA))))
+                .containsEntry("participants", GroupExpenseService.EQUAL_NO_SPLIT_VALUES);
+    }
+
+    @Test
+    void aParticipantCannotCarryAnAmountAndAPercentageAtTheSameTime() {
+        CreateGroupExpenseRequest.Participant mixed =
+                new CreateGroupExpenseRequest.Participant("REGISTERED", ANA, null, "30.00", "30");
+
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "CUSTOM", mixed,
+                registeredAmount(JUAN, "30.00"), simulatedAmount(ABUELA, "40.00"))))
+                .containsEntry("participants", GroupExpenseService.MIXED_SPLIT_VALUES);
+    }
+
+    @Test
+    void customAndPercentageRequireThePayerAmongTheParticipants() {
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "CUSTOM",
+                registeredAmount(JUAN, "60.00"), simulatedAmount(ABUELA, "40.00"))))
+                .containsEntry("participants", GroupExpenseService.PAYER_MUST_PARTICIPATE);
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "PERCENTAGE",
+                registeredPercentage(JUAN, "60"), simulatedPercentage(ABUELA, "40"))))
+                .containsEntry("participants", GroupExpenseService.PAYER_MUST_PARTICIPATE);
+    }
+
+    @Test
+    void anUnknownSplitMethodIsRejected() {
+        assertThat(fieldErrorsOf(splitRequest("100.00", ANA, "HALF",
+                registered(ANA), registered(JUAN), simulated(ABUELA))))
+                .containsEntry("splitMethod", GroupExpenseService.SPLIT_METHOD_INVALID);
+    }
+
+    @Test
     void unknownPropertiesAreRejectedOnTheirOwnField() {
         CreateGroupExpenseRequest request = threeWay();
         request.putUnknownProperty("category", "FOOD");
@@ -457,6 +601,33 @@ class GroupExpenseServiceTest {
         return existing;
     }
 
+    private GroupExpense existingCustom() {
+        GroupExpense existing = new GroupExpense();
+        ReflectionTestUtils.setField(existing, "id", 12L);
+        existing.setGroupId(GROUP_ID);
+        existing.setCreatedByUserId(ANA);
+        existing.setPayerUserId(ANA);
+        existing.setAmount(new BigDecimal("10000.00"));
+        existing.setConvertedAmount(new BigDecimal("10000.00"));
+        existing.setCurrency(com.amano.backend.user.Currency.ARS);
+        existing.setExpenseDate(LocalDate.of(2026, 11, 5));
+        existing.setDescription("Súper");
+        existing.setIdempotencyKey(KEY);
+        existing.setSplitMethod(SplitMethod.CUSTOM);
+        when(expenseRepository.findByCreatedByUserIdAndIdempotencyKey(ANA, KEY)).thenReturn(Optional.of(existing));
+        List<GroupExpenseShare> shares = List.of(
+                GroupExpenseShare.registered(12L, 0, ANA, "Ana López", new BigDecimal("3000.00")),
+                GroupExpenseShare.registered(12L, 1, JUAN, "Juan Pérez", new BigDecimal("6000.00")),
+                GroupExpenseShare.simulated(12L, 2, ABUELA, "Abuela", new BigDecimal("1000.00")));
+        for (int i = 0; i < shares.size(); i++) {
+            ReflectionTestUtils.setField(shares.get(i), "id", 40L + i);
+        }
+        when(shareRepository.findByExpenseIdOrderByPositionAsc(12L)).thenReturn(shares);
+        when(debtRepository.findByExpenseId(12L)).thenReturn(List.of(
+                Debt.pendingFor(existing, shares.get(1)), Debt.pendingFor(existing, shares.get(2))));
+        return existing;
+    }
+
     @Test
     void theSameKeyAndPayloadReplaysTheExistingExpense() {
         existingThreeWay();
@@ -478,6 +649,32 @@ class GroupExpenseServiceTest {
                 IdempotencyConflictException.class)).isNotNull();
         assertThat(catchThrowableOfType(() -> service.create(ANA, GROUP_ID, KEY,
                 request("10000.00", ANA, registered(JUAN), registered(ANA), simulated(ABUELA))),
+                IdempotencyConflictException.class)).isNotNull();
+        nothingWasSaved();
+    }
+
+    @Test
+    void theSameKeyAndCustomPayloadReplaysTheExistingExpense() {
+        existingCustom();
+
+        GroupExpenseService.Registration registration = service.create(ANA, GROUP_ID, KEY, customThreeWay());
+
+        assertThat(registration.created()).isFalse();
+        assertThat(registration.expense().splitMethod()).isEqualTo("CUSTOM");
+        nothingWasSaved();
+    }
+
+    @Test
+    void theSameKeyWithAnotherSplitMethodOrDifferentAmountsIsAConflict() {
+        existingCustom();
+
+        assertThat(catchThrowableOfType(() -> service.create(ANA, GROUP_ID, KEY,
+                request("10000.00", ANA, registered(ANA), registered(JUAN), simulated(ABUELA))),
+                IdempotencyConflictException.class)).isNotNull();
+        assertThat(catchThrowableOfType(() -> service.create(ANA, GROUP_ID, KEY,
+                splitRequest("10000.00", ANA, "CUSTOM",
+                        registeredAmount(ANA, "3000.00"), registeredAmount(JUAN, "5000.00"),
+                        simulatedAmount(ABUELA, "2000.00"))),
                 IdempotencyConflictException.class)).isNotNull();
         nothingWasSaved();
     }
