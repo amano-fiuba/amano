@@ -2,17 +2,23 @@ package com.amano.backend.groupexpense.exchange;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.ExpectedCount.once;
+import static org.springframework.test.web.client.ExpectedCount.times;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -85,6 +91,26 @@ class BcraExchangeRateClientTest {
                   }
                 }
                 """.formatted(date);
+    }
+
+    /** A 200 whose {@code results} has no usable date (T050 lookback by null date). */
+    private static String undatedBcraJson() {
+        return """
+                {
+                  "status": 200,
+                  "results": {
+                    "fecha": null,
+                    "detalle": [
+                      {
+                        "codigoMoneda": "USD",
+                        "descripcion": "DOLAR ESTADOUNIDENSE",
+                        "tipoPase": 1,
+                        "tipoCotizacion": 999.99
+                      }
+                    ]
+                  }
+                }
+                """;
     }
 
     @Test
@@ -168,6 +194,26 @@ class BcraExchangeRateClientTest {
     }
 
     @Test
+    void responseWithoutFechaWalksBackToTheLastDatedQuote() {
+        LocalDate sunday = LocalDate.of(2026, 1, 18);
+        LocalDate saturday = LocalDate.of(2026, 1, 17);
+        LocalDate friday = LocalDate.of(2026, 1, 16);
+
+        server.expect(requestTo(urlFor(sunday)))
+                .andRespond(withSuccess(undatedBcraJson(), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(urlFor(saturday)))
+                .andRespond(withSuccess(emptyBcraJson(saturday), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(urlFor(friday)))
+                .andRespond(withSuccess(bcraJson(friday, "18.50", "20.00"), MediaType.APPLICATION_JSON));
+
+        ExchangeRateQuote quote = client.getQuote(Currency.USD, Currency.ARS, sunday);
+
+        assertThat(quote.rate()).isEqualByComparingTo("18.50000000");
+        assertThat(quote.rateDate()).isEqualTo(friday);
+        server.verify();
+    }
+
+    @Test
     void retriesTransientErrorOnTheSameDateBeforeSucceeding() {
         LocalDate date = LocalDate.of(2026, 1, 15);
 
@@ -198,16 +244,38 @@ class BcraExchangeRateClientTest {
     }
 
     @Test
-    void apiDownAcrossAllLookbackDaysThrowsExchangeRateUnavailable() {
-        LocalDate start = LocalDate.of(2026, 1, 18);
-        for (int offset = 0; offset <= 7; offset++) {
-            LocalDate day = start.minusDays(offset);
-            // 2 attempts per day
-            server.expect(requestTo(urlFor(day))).andRespond(withServerError());
-            server.expect(requestTo(urlFor(day))).andRespond(withServerError());
-        }
+    void serverErrorOnRequestedDayFailsFastWithoutQueryingOlderDates() {
+        LocalDate requested = LocalDate.of(2026, 1, 18);
+        // maxAttempts = 2. No expectation for older dates: a lookback would fail.
+        server.expect(times(2), requestTo(urlFor(requested))).andRespond(withServerError());
 
-        assertThatThrownBy(() -> client.getQuote(Currency.USD, Currency.ARS, start))
+        assertThatThrownBy(() -> client.getQuote(Currency.USD, Currency.ARS, requested))
+                .isInstanceOf(ExchangeRateUnavailableException.class)
+                .hasMessage(ExchangeRateUnavailableException.MESSAGE);
+        server.verify();
+    }
+
+    @Test
+    void transportErrorOnRequestedDayFailsFastAfterConfiguredAttempts() {
+        LocalDate requested = LocalDate.of(2026, 1, 18);
+        // Only the configured 2 attempts for this one query, never 8 lookback days.
+        server.expect(times(2), requestTo(urlFor(requested)))
+                .andRespond(withException(new IOException("read timed out")));
+
+        assertThatThrownBy(() -> client.getQuote(Currency.USD, Currency.ARS, requested))
+                .isInstanceOf(ExchangeRateUnavailableException.class)
+                .hasMessage(ExchangeRateUnavailableException.MESSAGE);
+        server.verify();
+    }
+
+    @Test
+    void clientErrorIsTerminalAndDoesNotLookBack() {
+        LocalDate requested = LocalDate.of(2026, 1, 18);
+        // 4xx cannot be fixed by retrying or by an older date.
+        server.expect(once(), requestTo(urlFor(requested)))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(() -> client.getQuote(Currency.USD, Currency.ARS, requested))
                 .isInstanceOf(ExchangeRateUnavailableException.class)
                 .hasMessage(ExchangeRateUnavailableException.MESSAGE);
         server.verify();

@@ -48,12 +48,12 @@
 **Goal**: Verify that registering a shared expense creates debts for all non-payer participants  
 **Independent Test**: After registering an expense, 2 debts are created (one for each non-payer participant); debts start in `PENDING` status; group balance sums to zero
 
-- [ ] T017 [P] [US1] Verificar que registrar gasto crea deudas para todos los participantes no-payer (reusando `GroupExpenseService.create()` existente)
-- [ ] T018 [US1] Probar que debts start en `PENDING` status después de registro de gasto
-- [ ] T019 [P] [US1] Probar idempotency: submitting same expense twice con mismo `idempotencyKey` devuelve resultado existente, no crea duplicado
-- [ ] T020 [US1] Probar restricción: editar gasto con participantes → 409 "No se permite editar un gasto que ya tiene participantes"
-- [ ] T021 [US1] Probar restricción: eliminar gasto con deudas asociadas → 409 "No se puede eliminar un gasto con deudas asociadas"
-- [ ] T022 [P] [US1] Probar delete personal expense (sin participantes) succeeds y balances recalculados
+- [X] T017 [P] [US1] Verificar que registrar gasto crea deudas para todos los participantes no-payer (reusando `GroupExpenseService.create()` existente) — Evidencia: `GroupExpenseServiceTest.createsTheSharesAndOnePendingDebtPerParticipantOtherThanThePayer` (2 deudas para 3 participantes, acreedor = pagador) y `GroupExpenseControllerIT.createsTheExpenseWithItsSharesAndPendingDebts` (HTTP 201 + `debts.length() == 2` + `SUM(group_expense_shares.amount) == total`)
+- [X] T018 [US1] Probar que debts start en `PENDING` status después de registro de gasto — Evidencia: `GroupExpenseServiceTest.createsTheSharesAndOnePendingDebtPerParticipantOtherThanThePayer` (`Debt::getStatus == PENDING`) y `GroupExpenseControllerIT.createsTheExpenseWithItsSharesAndPendingDebts` (`debts[*].status == "PENDING"` y `SELECT status FROM debts` solo `PENDING`)
+- [X] T019 [P] [US1] Probar idempotency: submitting same expense twice con mismo `idempotencyKey` devuelve resultado existente, no crea duplicado — Evidencia: `GroupExpenseServiceTest.theSameKeyAndPayloadReplaysTheExistingExpense` (`created == false`, mismo id, `nothingWasSaved()`) y `GroupExpenseControllerIT.theExpenseAppearsInTheHistoryOnceEvenWhenReplayed` (segundo POST 200, 1 `group_expenses`, 2 `debts`, 1 evento)
+- [ ] T020 [US1] Probar restricción: editar gasto con participantes → 409 "No se permite editar un gasto que ya tiene participantes" — **Bloqueada**: no existe endpoint de edición (solo `POST`/`GET` en `GroupExpenseController`); 017 declara "Editar o borrar gastos de grupo" fuera de alcance y el contrato 017 solo define `POST /api/groups/{id}/expenses` con reparto igualitario
+- [ ] T021 [US1] Probar restricción: eliminar gasto con deudas asociadas → 409 "No se puede eliminar un gasto con deudas asociadas" — **Bloqueada**: no existe endpoint `DELETE` de gastos de grupo ni de gastos personales; 017 declara la edición/borrado fuera de alcance
+- [ ] T022 [P] [US1] Probar delete personal expense (sin participantes) succeeds y balances recalculados — **Bloqueada**: `ExpenseController` no expone `DELETE`; no hay endpoint que elimine un gasto personal ni recálculo de saldos asociado
 - [ ] T060 [US1] Permitir que cualquier miembro del grupo registre un gasto pagado por otro miembro conservando la casilla `members_can_generate_expenses_for_others` como permiso por grupo: los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración en la siguiente versión libre que cambia solo el DEFAULT de la columna, sin tocar filas existentes) y los grupos existentes mantienen su valor; validar en servidor que pagador y participantes sean miembros del grupo; mantener el 403 con el mensaje "Solo podés registrar gastos pagados por vos" cuando la casilla está en `false` y agregar el caso con la casilla en `true`; cubrir con tests que `createdByUserId` y `payerUserId` quedan separados
 
 ---
@@ -62,10 +62,10 @@
 **Goal**: Verify that EqualSplit handles equal, custom, and percentage divisions correctly  
 **Independent Test**: After split operation, share amounts sum to total expense amount
 
-- [ ] T023 [P] [US2] Verificar `EqualSplit.split()` produce shares that sum to total (partes iguales, personalizados y porcentajes exactly 100%)
-- [ ] T024 [P] [US2] Implementar validación de porcentajes: suma exacta 100% en registro de gasto
-- [ ] T025 [US2] Probar redondeo: cada parte se redondea al centavo (`HALF_UP`) y pagador absorbe la diferencia (clarificación Q1)
-- [ ] T026 [P] [US2] Implementar validación en frontend: importes personalizados deben sumar exactamente el total
+- [ ] T023 [P] [US2] Verificar `EqualSplit.split()` produce shares that sum to total (partes iguales, personalizados y porcentajes exactly 100%) — **Parcial**: la suma exacta del total en partes iguales está cubierta por `EqualSplitTest.theSumIsAlwaysExactlyTheTotal` y `theMaximumAmountSplitsWithoutLosingCents`; `EqualSplit` no implementa importes personalizados ni porcentajes (017 los declara fuera de alcance)
+- [ ] T024 [P] [US2] Implementar validación de porcentajes: suma exacta 100% en registro de gasto — **Bloqueada**: `CreateGroupExpenseRequest`/`GroupExpenseService` no tienen método de reparto ni campo de porcentajes; 017 excluye "División no igualitaria (porcentajes, montos fijos, partes)" y no hay contrato 022 que defina el payload
+- [X] T025 [US2] Probar redondeo: cada parte se redondea al centavo (`HALF_UP`) y pagador absorbe la diferencia (clarificación Q1) — Evidencia: `EqualSplitTest.thePayerAbsorbsTheRemainderWhenParticipating` (100.00/3 → 3333.34/3333.33/3333.33 y 0.05/3), `theSumIsAlwaysExactlyTheTotal` (múltiples totales y participantes, con y sin pagador) y `everyShareHasTwoDecimals`
+- [ ] T026 [P] [US2] Implementar validación en frontend: importes personalizados deben sumar exactamente el total — **Bloqueada**: `GroupExpenseFormView` solo ofrece reparto igualitario y previsualización `splitEqually`; no existe UI de importes personalizados ni porcentajes, ni contrato de API que los reciba
 
 ---
 ## Phase 6: User Story 4 - Simplificar deudas (liquidación) (Priority: P2)
@@ -157,8 +157,8 @@
 
 | Requirement | Status | Mapped tasks | Description |
 |-------------|--------|--------------|-------------|
-| **FR-001** | Pending | T017-T022, T060 | Registrar gasto compartido; tareas de US1 sin completar |
-| **FR-002** | Pending | T023-T026 | Definir reparto; tareas de US2 sin completar |
+| **FR-001** | Pending | T017-T022, T060 | Registrar gasto compartido; T017-T019 completas, T020-T022 bloqueadas por falta de endpoints de edición/borrado (017 los declara fuera de alcance) |
+| **FR-002** | Pending | T023-T026 | Definir reparto; solo partes iguales existe (T025 completa); personalizados/porcentajes (T023/T024/T026) bloqueados porque 017 excluye la división no igualitaria |
 | **FR-003** | Complete | T012-T016 | Saldos consistentes con `BalanceCalculator`, endpoint y cero-sum |
 | **FR-004** | Complete | T027-T031 | Liquidación con conjunto reducido de transferencias y solo lectura |
 | **FR-005** | Complete | T032-T037, T063 | Gestión de estado de deuda; confirmación/rechazo de pagos, transiciones verificadas y vencimiento programado |

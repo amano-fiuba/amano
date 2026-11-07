@@ -10,6 +10,7 @@ import java.util.Map;
 
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import com.amano.backend.user.Currency;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -21,11 +22,16 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * using Spring's {@link RestClient} with retries and no external dependencies.
  *
  * <p>All rates are parsed and crossed using {@link BigDecimal} with scale 8
- * ({@link RoundingMode#HALF_UP}), never floating point. If a date has an empty
- * {@code detalle} list or fails after retries (e.g. weekend, holiday or API
- * error for that date), the client walks back day by day up to 7 days. If no
- * valid quote is found in {@code [date - 7, date]}, it throws
- * {@link ExchangeRateUnavailableException} (503).
+ * ({@link RoundingMode#HALF_UP}), never floating point.
+ *
+ * <p>Only a successful response with an empty {@code detalle} list (or without a
+ * {@code fecha}, as happens on weekends and holidays) makes the client walk back
+ * day by day up to {@link #MAX_LOOKBACK_DAYS} days to reuse the last official
+ * quote. Transport failures, timeouts and HTTP errors (4xx/5xx) are terminal:
+ * after the configured retries for the requested date the client throws
+ * {@link ExchangeRateUnavailableException} (503) immediately, without querying
+ * older dates. If no valid quote is found in {@code [date - 7, date]}, it also
+ * throws {@link ExchangeRateUnavailableException} (503).
  */
 public class BcraExchangeRateClient implements ExchangeRateProvider {
 
@@ -62,8 +68,10 @@ public class BcraExchangeRateClient implements ExchangeRateProvider {
 
     private BigDecimal fetchRateForDate(Currency from, Currency to, LocalDate date) {
         BcraResponse response = getWithRetry(date);
-        if (response == null || response.results() == null || response.results().detalle() == null
-                || response.results().detalle().isEmpty()) {
+        // A 200 without a date or with an empty detail means "no quote that day"
+        // (weekend/holiday): only this case triggers the day-by-day lookback.
+        if (response == null || response.results() == null || response.results().fecha() == null
+                || response.results().detalle() == null || response.results().detalle().isEmpty()) {
             return null;
         }
         Map<String, BigDecimal> arsPerUnit = new HashMap<>();
@@ -79,6 +87,7 @@ public class BcraExchangeRateClient implements ExchangeRateProvider {
     }
 
     private BcraResponse getWithRetry(LocalDate date) {
+        RestClientException lastFailure = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
                 return restClient.get()
@@ -89,13 +98,20 @@ public class BcraExchangeRateClient implements ExchangeRateProvider {
                         .retrieve()
                         .body(BcraResponse.class);
             }
-            catch (RestClientException exception) {
-                if (attempt == maxAttempts) {
-                    return null;
+            catch (RestClientResponseException exception) {
+                // A 4xx is a contract/client error: retrying cannot help, so fail
+                // fast with 503 instead of walking back or hammering the API.
+                if (exception.getStatusCode().is4xxClientError()) {
+                    throw new ExchangeRateUnavailableException(exception);
                 }
+                lastFailure = exception;
+            }
+            catch (RestClientException exception) {
+                lastFailure = exception;
             }
         }
-        return null;
+        // Transport errors and 5xx are terminal: never fall back to older dates.
+        throw new ExchangeRateUnavailableException(lastFailure);
     }
 
     static BigDecimal computeRate(Currency from, Currency to, Map<String, BigDecimal> arsPerUnit) {
