@@ -128,6 +128,10 @@ describe('describeActivity: gastos y pagos (014 US2 / 022 US8)', () => {
       .toBe('Ana López generó una propuesta de liquidación (1 transferencia)')
     expect(phrase('LIQUIDATION_PROPOSED', { transferCount: 0, currency: 'ARS' }))
       .toBe('Ana López generó una propuesta de liquidación')
+
+    expect(phrase('DEBT_REMINDER_SENT', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez' }, null))
+      .toMatch(/^Sistema envió el recordatorio de la deuda de \$\s?500,00 a Juan Pérez$/)
+    expect(phrase('DEBT_REMINDER_SENT', {}, null)).toBe('Sistema envió un recordatorio de deuda')
   })
 
   it('formatea montos y tolera monedas desconocidas o datos faltantes', () => {
@@ -166,9 +170,11 @@ describe('agrupación por día (014 FR-015)', () => {
 
   it('expone los filtros del contrato', () => {
     expect(ACTIVITY_FILTERS.map((option) => option.label)).toEqual([
-      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Cambios del grupo',
+      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Recordatorios', 'Cambios del grupo',
     ])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMOVED').eventTypes)
       .toEqual(['MEMBER_REMOVED', 'MEMBER_LEFT'])
+    expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMINDERS').eventTypes)
+      .toEqual(['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
   })
 })

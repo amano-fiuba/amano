@@ -1,6 +1,7 @@
 package com.amano.backend.groups;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -132,6 +133,27 @@ public class ActivityEventService {
         map.put("debtStatusBefore", "PENDING");
         map.put("debtStatusAfter", "OVERDUE");
         return record(groupId, GroupActivity.GroupActivityType.DEBT_OVERDUE, null, map);
+    }
+
+    /**
+     * 025: records {@code DEBT_REMINDER_SENT} after a successful delivery. The
+     * snapshot of the mail itself lives in {@code reminders}; this event only
+     * keeps the data needed by the history.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordDebtReminderSent(Long groupId, Long reminderId, Long debtId, Long expenseId,
+            BigDecimal amount, String currency, String debtorName, String creditorName, LocalDate dueDate) {
+        String normalizedCurrency = validatedCurrency(amount, currency);
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("reminderId", reminderId);
+        map.put("debtId", debtId);
+        map.put("expenseId", expenseId);
+        map.put("amount", amount.toPlainString());
+        map.put("currency", normalizedCurrency);
+        map.put("fromName", blankToNull(debtorName));
+        map.put("toName", blankToNull(creditorName));
+        map.put("dueDate", dueDate == null ? null : dueDate.toString());
+        return record(groupId, GroupActivity.GroupActivityType.DEBT_REMINDER_SENT, null, map);
     }
 
     /**

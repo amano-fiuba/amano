@@ -33,6 +33,7 @@ export const ACTIVITY_FILTERS = [
   { value: 'REMOVED', label: 'Bajas', eventTypes: ['MEMBER_REMOVED', 'MEMBER_LEFT'] },
   { value: 'EXPENSES', label: 'Gastos', eventTypes: ['EXPENSE_CREATED'] },
   { value: 'PAYMENTS', label: 'Pagos', eventTypes: ['PAYMENT_MADE'] },
+  { value: 'REMINDERS', label: 'Recordatorios', eventTypes: ['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'] },
   { value: 'SETTINGS', label: 'Cambios del grupo', eventTypes: ['PERMISSION_CHANGED', 'PHOTO_CHANGED'] },
 ]
 
@@ -140,6 +141,16 @@ function liquidationProposed(details) {
   return 'generó una propuesta de liquidación'
 }
 
+function debtReminderSent(details) {
+  const money = formatMoney(details.amount, details.currency)
+  const debtor = text(details.fromName)
+  let sentence = money ? `envió el recordatorio de la deuda de ${money}` : 'envió un recordatorio de deuda'
+  if (debtor) sentence += ` a ${debtor}`
+  return sentence
+}
+
+const SYSTEM_EVENTS = new Set(['DEBT_OVERDUE', 'DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
+
 const DESCRIBERS = {
   MEMBER_ADDED: memberAdded,
   MEMBER_REMOVED: memberRemoved,
@@ -153,13 +164,14 @@ const DESCRIBERS = {
   PAYMENT_REJECTED: paymentRejected,
   DEBT_OVERDUE: debtOverdue,
   LIQUIDATION_PROPOSED: liquidationProposed,
+  DEBT_REMINDER_SENT: debtReminderSent,
 }
 
 // FR-014: { actor, text } para una entrada del historial.
 export function describeActivity(entry) {
   const details = entry?.details && typeof entry.details === 'object' ? entry.details : {}
   const describe = DESCRIBERS[entry?.eventType]
-  const actor = entry?.eventType === 'DEBT_OVERDUE' && !entry?.actor ? 'Sistema' : actorName(entry?.actor)
+  const actor = SYSTEM_EVENTS.has(entry?.eventType) && !entry?.actor ? 'Sistema' : actorName(entry?.actor)
   return {
     actor,
     text: describe ? describe(details, entry?.actor) : 'realizó una acción en el grupo',

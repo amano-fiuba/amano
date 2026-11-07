@@ -3,11 +3,13 @@ package com.amano.backend.groupexpense.reminder;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Persistence of {@link Reminder} (025). The conditional updates are the
@@ -30,11 +32,16 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
 
     boolean existsByKindAndExpenseId(ReminderKind kind, Long expenseId);
 
+    Optional<Reminder> findByKindAndDebtId(ReminderKind kind, Long debtId);
+
+    Optional<Reminder> findByKindAndExpenseId(ReminderKind kind, Long expenseId);
+
     @Query("SELECT DISTINCT r.groupId FROM Reminder r WHERE r.status = :status")
     List<Long> findDistinctGroupIdsByStatus(@Param("status") ReminderStatus status);
 
     /** Claims a never-claimed scheduled row; a second run gets 0 and does not send. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
     @Query("""
             UPDATE Reminder r
             SET r.claimedAt = :now, r.updatedAt = :now
@@ -46,6 +53,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
 
     /** Marks a claimed row as sent, storing the subject/body snapshot. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
     @Query("""
             UPDATE Reminder r
             SET r.status = com.amano.backend.groupexpense.reminder.ReminderStatus.SENT,
@@ -58,6 +66,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
 
     /** Marks a claimed row as failed; it is never retried. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
     @Query("""
             UPDATE Reminder r
             SET r.status = com.amano.backend.groupexpense.reminder.ReminderStatus.FAILED,
@@ -69,6 +78,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
 
     /** Cancels a scheduled row that was never claimed. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
     @Query("""
             UPDATE Reminder r
             SET r.status = com.amano.backend.groupexpense.reminder.ReminderStatus.CANCELLED,
@@ -81,6 +91,7 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
 
     /** Reschedules a scheduled row that was never claimed. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
     @Query("""
             UPDATE Reminder r
             SET r.sendDate = :sendDate, r.updatedAt = :now
