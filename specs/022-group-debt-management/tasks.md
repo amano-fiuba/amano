@@ -54,6 +54,7 @@
 - [ ] T020 [US1] Probar restricción: editar gasto con participantes → 409 "No se permite editar un gasto que ya tiene participantes"
 - [ ] T021 [US1] Probar restricción: eliminar gasto con deudas asociadas → 409 "No se puede eliminar un gasto con deudas asociadas"
 - [ ] T022 [P] [US1] Probar delete personal expense (sin participantes) succeeds y balances recalculados
+- [ ] T060 [US1] Permitir que cualquier miembro del grupo registre un gasto pagado por otro miembro conservando la casilla `members_can_generate_expenses_for_others` como permiso por grupo: los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración V20 que cambia solo el DEFAULT de la columna, sin tocar filas existentes) y los grupos existentes mantienen su valor; validar en servidor que pagador y participantes sean miembros del grupo; mantener el 403 con el mensaje "Solo podés registrar gastos pagados por vos" cuando la casilla está en `false` y agregar el caso con la casilla en `true`; cubrir con tests que `createdByUserId` y `payerUserId` quedan separados
 
 ---
 ## Phase 5: User Story 2 - Definir cómo se reparte el gasto (Priority: P1)
@@ -123,6 +124,7 @@
 - [ ] T047 [P] [US8] Probar que evento `PAYMENT_REGISTERED` aparece en historial después de registrar pago
 - [ ] T048 [P] [US8] Probar que evento `LIQUIDATION_PROPOSED` aparece en historial después de generar propuesta
 - [ ] T049 [US8] Probar que el historial conserva el camino recorrido de transiciones de estado (Q7)
+- [ ] T061 [US8] Incluir al pagador en el evento `EXPENSE_CREATED` y mostrar en el historial tanto a quien registró el gasto como al pagador (D11)
 
 ---
 ## Phase 11: User Story 9 - Operar en varias monedas (Priority: P2)

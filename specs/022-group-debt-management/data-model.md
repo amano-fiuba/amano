@@ -36,6 +36,9 @@
 - `currency in {ARS, USD, EUR}`
 - `montoConvertido` and `tasaAplicada` and `fechaCotizacion` and `rateSource` are set only when `currency` differs from group's primary currency
 - `idempotencyKey` uniqueness enforced per `(createdByUserId, idempotencyKey)`
+- `payerUserId` and every registered participant must be active members of the group; simulated participants must belong to the group. The server validates this (D11)
+- `payerUserId` may differ from `createdByUserId`; both are stored separately (D11)
+- Debts are always owed to the payer: `debt.creditorUserId = expense.payerUserId` (D11)
 - If the expense currency differs from the group currency and no quote is available, the
   expense is **rejected with 503 and not saved**: it is never registered using the original
   currency as a fallback
@@ -254,6 +257,7 @@ source to infer it from); `debt_due_days` is nullable and is added exactly once.
 6. **State machine rules** document the "payments require validation" group checkbox behavior and the "overdue" auto-transition configured per group
 7. **`PAID` and `VERIFIED` are equivalent for saldo calculations** per clarification Q7
 8. **New `isSettled()` semantics**: returns true for both `PAID` and `VERIFIED`; `PAYMENT_REPORTED` is not settled
+9. **Payer and creator are distinct**: any group member can register an expense paid by another member; `payerUserId` and `createdByUserId` are stored separately, debts are owed to the payer and both appear in the activity history (D11)
 
 ## Invariants Across All Entities
 
