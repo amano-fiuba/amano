@@ -25,6 +25,9 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
 
     Optional<Group> findById(Long id);
 
+    /** 022 D7/T063: groups that configure a deadline; null means "never overdue". */
+    List<Group> findByDebtDueDaysIsNotNull();
+
     /**
      * 017 FR-027: number of group expenses of the group, for {@code expensesCount}
      * of the detail. JPQL over the {@code GroupExpense} entity (017 research.md D8)

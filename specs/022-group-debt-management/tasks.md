@@ -91,6 +91,7 @@
 - [X] T035 [P] [US5] Probar que pago con validación → debt state → `PAYMENT_REPORTED`; admin confirma → `VERIFIED`; admin rechaza → vuelve a `PENDING`
 - [X] T036 [P] [US5] Probar que `PAID` y `VERIFIED` son equivalentes para cálculos de saldo (Q7 invariant)
 - [X] T037 [US5] Probar que deuda `OVERDUE` aún se puede pagar y sigue contando en saldo
+- [X] T063 [US5] Implementar job programado idempotente que pasa deudas `PENDING` a `OVERDUE` según `debtDueDays` del grupo
 
 ---
 ## Phase 8: User Story 6 - Registrar pago de deuda pendiente (Priority: P2)
@@ -111,9 +112,9 @@
 **Goal**: Verify that pending debts are listed with origin and detail  
 **Independent Test**: After registering expenses with different payers, pending debts list shows correct origin info
 
-- [ ] T043 [P] [US7] Implementar endpoint `GET /groups/{groupId}/debts/pending` que devuelva deudas con status `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED` u `OVERDUE`, igual que el cálculo de saldos
-- [ ] T044 [US7] Probar que deuda incluye origen: `expenseId`, `shareId`, `currency`, amount, paidAmount, outstanding
-- [ ] T045 [P] [US7] Probar que persona simulada aparece en listado de deudas pendientes con su nombre
+- [X] T043 [P] [US7] Implementar endpoint `GET /groups/{groupId}/debts/pending` que devuelva deudas con status `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED` u `OVERDUE`, igual que el cálculo de saldos
+- [X] T044 [US7] Probar que deuda incluye origen: `expenseId`, `shareId`, `currency`, amount, paidAmount, outstanding
+- [X] T045 [P] [US7] Probar que persona simulada aparece en listado de deudas pendientes con su nombre
 
 ---
 ## Phase 10: User Story 8 - Mantener historial de actividad del grupo (Priority: P3)
@@ -161,9 +162,9 @@
 | **FR-002** | Pending | T023-T026 | Definir reparto; tareas de US2 sin completar |
 | **FR-003** | Complete | T012-T016 | Saldos consistentes con `BalanceCalculator`, endpoint y cero-sum |
 | **FR-004** | Complete | T027-T031 | Liquidación con conjunto reducido de transferencias y solo lectura |
-| **FR-005** | Complete | T032-T037 | Gestión de estado de deuda; confirmación/rechazo de pagos y transiciones verificadas |
+| **FR-005** | Complete | T032-T037, T063 | Gestión de estado de deuda; confirmación/rechazo de pagos, transiciones verificadas y vencimiento programado |
 | **FR-006** | Complete | T038-T042 | Registrar pago; flujo de pago completo con validación, idempotencia, 409 y concurrencia |
-| **FR-007** | Pending | T043-T045 | Ver deudas pendientes; tareas de US7 sin completar |
+| **FR-007** | Complete | T043-T045 | Ver deudas pendientes; listado con origen, moneda y persona simulada |
 | **FR-008** | Pending | T046-T049, T061 | Historial de actividad; tareas de US8 sin completar |
 | **FR-009** | Pending | T050-T054 | Conversión multi-currency; tareas de US9 sin completar |
 | **FR-010** | Pending | T059 | Restricción de salida con saldo pendiente; T059 sin completar |

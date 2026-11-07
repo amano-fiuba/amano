@@ -147,7 +147,7 @@ New fields added in V18:
 - `PENDING`: reserved for a payment registered but not yet processed (not produced by the 018 flow)
 - `REPORTED`: full payment reported; awaiting an admin decision when the group requires validation
 - `CONFIRMED`: payment accepted and applied to the debt (no validation required, or admin confirmed under the 018 flow)
-- `REJECTED`: admin rejected the payment; the debt returns to `PENDING`/`OVERDUE`
+- `REJECTED`: admin rejected the payment; the debt returns to `PENDING`. If it was already overdue, the next execution of the overdue debt job (D7) moves it back to `OVERDUE`; the job never changes `PARTIALLY_PAID`. If a legacy 018 partial payment existed, the debt returns to `PARTIALLY_PAID` with the `paid_amount` it had before the rejected payment
 
 **Migration (V18)**:
 

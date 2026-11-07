@@ -1,10 +1,13 @@
 package com.amano.backend.groupexpense;
 
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,6 +34,42 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM Debt d WHERE d.id = :id")
     Optional<Debt> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * 022 T043: open debts of the group in which {@code userId} is the debtor
+     * or the creditor. The four states are exactly the ones that contribute to
+     * balances; PAID and VERIFIED are settled and never listed.
+     */
+    @Query("""
+            SELECT d FROM Debt d
+            WHERE d.groupId = :groupId
+              AND d.status IN (com.amano.backend.groupexpense.DebtStatus.PENDING,
+                  com.amano.backend.groupexpense.DebtStatus.PARTIALLY_PAID,
+                  com.amano.backend.groupexpense.DebtStatus.PAYMENT_REPORTED,
+                  com.amano.backend.groupexpense.DebtStatus.OVERDUE)
+              AND (d.debtorUserId = :userId OR d.creditorUserId = :userId)
+            ORDER BY d.id
+            """)
+    List<Debt> findOpenForUserInGroup(@Param("groupId") Long groupId, @Param("userId") Long userId);
+
+    /**
+     * 022 D7/T063: idempotent bulk transition PENDING → OVERDUE for the debts
+     * of one group whose origin expense is older than {@code before}. The
+     * {@code status = PENDING} predicate makes a second execution a no-op and
+     * keeps PARTIALLY_PAID, PAYMENT_REPORTED, PAID and VERIFIED untouched.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Debt d
+            SET d.status = com.amano.backend.groupexpense.DebtStatus.OVERDUE,
+                d.updatedAt = :now
+            WHERE d.status = com.amano.backend.groupexpense.DebtStatus.PENDING
+              AND d.groupId = :groupId
+              AND EXISTS (SELECT 1 FROM GroupExpense e
+                          WHERE e.id = d.expenseId AND e.expenseDate < :before)
+            """)
+    int markPendingOverdue(@Param("groupId") Long groupId, @Param("before") LocalDate before,
+            @Param("now") OffsetDateTime now);
 
     /** True when the user has an unsettled debt of the group as debtor OR creditor (FR-017). */
     @Query("""
