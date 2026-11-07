@@ -25,6 +25,7 @@
 | `tasaAplicada` | `BigDecimal` | Yes | Exchange rate applied | `precision=11, scale=6`; null if same currency |
 | `fechaCotizacion` | `LocalDate` | Yes | Date the rate was effective from | null if same currency |
 | `rateSource` | `String` | Yes | Identifier of the rate source (e.g., "BCRA") | null if same currency |
+| `splitMethod` | `SplitMethod` | No | How the expense was split: `EQUAL`, `CUSTOM` or `PERCENTAGE` | Default `EQUAL`; column `split_method` (V21) |
 
 **Relationships**:
 - `1:N` with `GroupExpenseShare` (shares/participants)
@@ -42,6 +43,12 @@
 - If the expense currency differs from the group currency and no quote is available, the
   expense is **rejected with 503 and not saved**: it is never registered using the original
   currency as a fallback
+- `CUSTOM` requires one `amount` per participant, all `> 0`, summing exactly the (converted)
+  total
+- `PERCENTAGE` requires one `percentage` per participant, all `> 0`, summing exactly `100`;
+  each non-payer share is floored to the cent and the payer absorbs the remainder (Q1)
+- A personal expense (no participant other than the payer) generates no debts and
+  `splitMethod` is not applied
 
 **Quote source (022 D8)**:
 - `ExchangeRateProvider` is implemented by `BcraExchangeRateClient` (US9) using the public
@@ -53,6 +60,43 @@
 - `rateSource = 'BCRA'` and `fechaCotizacion` is the date of the quote actually used, not
   the expense date.
 - Tests never call the real BCRA API: they use a double of `ExchangeRateProvider`.
+
+**Split method and rounding (022 D2)**:
+
+- `splitMethod` is persisted on `group_expenses` (V21) with default `EQUAL`, so the 017
+  payload and existing rows keep working unchanged.
+- `CUSTOM` shares are stored exactly as requested; their sum must equal the total.
+- `PERCENTAGE` shares are calculated as `total × percentage / 100` floored to the cent;
+  the payer's share is `total − sum(non-payer shares)`. The sum is always exactly the total.
+- Contract: `contracts/expense-split-and-edit.md` §1.
+
+```sql
+ALTER TABLE group_expenses
+    ADD COLUMN split_method VARCHAR(10) NOT NULL DEFAULT 'EQUAL';
+
+ALTER TABLE group_expenses
+    ADD CONSTRAINT ck_group_expenses_split_method
+    CHECK (split_method IN ('EQUAL', 'CUSTOM', 'PERCENTAGE'));
+```
+
+## Entity: GroupExpenseShare (existing, reused)
+
+**Source**: Existing entity `backend/src/main/java/com/amano/backend/groupexpense/GroupExpenseShare.java`
+
+| Field | Type | Nullable | Description | Constraints |
+|-------|------|----------|-------------|-------------|
+| `id` | `Long` | No | Primary key | `GenerationType.IDENTITY` |
+| `expenseId` | `Long` | No | Owning expense | FK to `group_expenses` |
+| `position` | `Integer` | No | Request order; in `EQUAL` without a participating payer, the remainder cents go one each to the first positions | `>= 0` |
+| `participantType` | `ParticipantType` | No | `REGISTERED` or `SIMULATED` | - |
+| `userId` | `Long` | Conditional | Registered participant | Null for `SIMULATED` |
+| `simulatedProfileId` | `Long` | Conditional | Simulated participant | Null for `REGISTERED` |
+| `name` | `String` | No | Display name at registration time | - |
+| `amount` | `BigDecimal` | No | Computed share in the expense currency | `precision=11, scale=2`; `> 0` |
+
+The persisted `amount` is always the computed share. The original custom amount or
+percentage is not required to be stored separately; `group_expenses.split_method` records
+how the shares were calculated.
 
 ## Entity: Deuda (Debt)
 
@@ -258,6 +302,8 @@ source to infer it from); `debt_due_days` is nullable and is added exactly once.
 7. **`PAID` and `VERIFIED` are equivalent for saldo calculations** per clarification Q7
 8. **New `isSettled()` semantics**: returns true for both `PAID` and `VERIFIED`; `PAYMENT_REPORTED` is not settled
 9. **Payer and creator are distinct**: any group member can register an expense paid by another member; `payerUserId` and `createdByUserId` are stored separately, debts are owed to the payer and both appear in the activity history (D11)
+10. **Split method added to GroupExpense**: `splitMethod` (`EQUAL`/`CUSTOM`/`PERCENTAGE`, default `EQUAL`) with V21; `CUSTOM` and `PERCENTAGE` shares always sum exactly the total (D2)
+11. **Personal expenses can be edited/deleted**: `PATCH`/`DELETE /api/groups/{groupId}/expenses/{expenseId}` operate only on expenses with no participant other than the payer; expenses with participants or debts are rejected with 409 (D9, Q4)
 
 ## Invariants Across All Entities
 
@@ -269,3 +315,5 @@ source to infer it from); `debt_due_days` is nullable and is added exactly once.
 - Simulated persons participate in calculations but have no account
 - **PAYMENT_REPORTED ≠ PAID for saldo calculations**: a debt in `PAYMENT_REPORTED` state still contributes `amount - paidAmount` to net balance (non-settled)
 - **OVERDUE debts still count as saldo**: a debt in OVERDUE state still appears in net balance calculations and can be paid
+- **Shares always sum exactly the expense total**: `EQUAL` and `PERCENTAGE` floor each non-payer share to the cent and give the remainder to the payer; `CUSTOM` requires an exact sum (Q1)
+- **Personal expenses generate no debts**: an expense with no participant other than the payer has no shares/debts and can be edited or deleted

@@ -62,7 +62,7 @@ Este plan **prevalece** sobre research.md, data-model.md, contracts/ y tasks.md 
 
 research.md describe el código existente, pero no lo prueba. Antes de implementar hay que confirmar cada punto; si alguno es falso, se corrige el plan:
 
-1. Existen `Debt`, `DebtStatus` (PENDING, PARTIALLY_PAID, PAID), `Payment` con `of()` e idempotencia, `EqualSplit` (partes iguales, personalizados y porcentajes) y `ActivityEventService`.
+1. Existen `Debt`, `DebtStatus` (PENDING, PARTIALLY_PAID, PAID), `Payment` con `of()` e idempotencia, `EqualSplit` (solo partes iguales; `CUSTOM` y `PERCENTAGE` son aditivos de la 022) y `ActivityEventService`.
 2. El grupo ya guarda **moneda principal** y la casilla "Pagos requieren validación" (015). Si falta la moneda principal, se agrega en migración.
 3. Cómo persiste el estado de deuda (texto o enum ordinal, y si hay restricción `CHECK`) y si existen filas `PARTIALLY_PAID`.
 4. Si existen gastos o deudas en una moneda distinta a la del grupo (no se pueden convertir retroactivamente sin tasa).
@@ -74,7 +74,7 @@ research.md describe el código existente, pero no lo prueba. Antes de implement
 
 **D1. Reutilizar antes que crear.** Las historias 1 y 2 (registrar gasto y reparto) y gran parte de la 6 (registrar pago) ya existen; las tareas deben ser extensiones puntuales (redondeo, conversión, estados), no reimplementaciones.
 
-**D2. Dinero y redondeo.** `BigDecimal` con escala 2, comparación con `compareTo`. En el reparto, cada parte de los demás participantes se redondea al centavo (`HALF_UP`) y el **pagador absorbe la diferencia** (clarificación Q1): su parte es total menos la suma de las demás. Los importes personalizados deben sumar exactamente el total y los porcentajes exactamente 100.
+**D2. Dinero, reparto y redondeo.** `BigDecimal` con escala 2, comparación con `compareTo`. El reparto admite `splitMethod`: `EQUAL` (por defecto, comportamiento de la 017), `CUSTOM` (importes por participante que suman exactamente el total) y `PERCENTAGE` (porcentajes por participante que suman exactamente 100, cada uno `> 0`). En `EQUAL` y `PERCENTAGE`, cada parte se calcula en centavos hacia abajo (piso) y el **pagador absorbe el resto** (clarificación Q1): su parte es el total menos la suma de las demás, de modo que ningún participante no pagador pague de más por redondeo. La misma regla produce 100,00 entre 3 → 33,33 / 33,33 / 33,34 y 0,05 entre 3 → 0,01 / 0,01 / 0,03 con el pagador. `CUSTOM` no redondea: exige suma exacta. La conversión de moneda se aplica una sola vez al total antes de repartir (D8). Contrato: `contracts/expense-split-and-edit.md`.
 
 **D3. Estados de deuda.** Se conservan los nombres en inglés del código: `PENDING` (Pendiente), `PARTIALLY_PAID` (Pago parcial, solo lectura), `PAYMENT_REPORTED` (Pago informado), `PAID` (Pagado), `VERIFIED` (Verificado), `OVERDUE` (Vencido). `PENDING`, `PARTIALLY_PAID` y `PAID` ya existen, por lo que no hace falta renombrar datos. `PARTIALLY_PAID` se conserva únicamente para poder leer deudas de la 018; la 022 nunca lo produce.
 
@@ -103,7 +103,7 @@ Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo p
 
 **D8. Cotizaciones.** `ExchangeRateProvider` es una interfaz de dominio, con `BcraExchangeRateClient` (infraestructura) detrás y una caché decoradora en memoria acotada, por (par, fecha). El cliente usa el `RestClient` de Spring, con timeouts y reintentos, sin dependencias nuevas. La API pública del BCRA, Estadísticas Cambiarias v1.0 (`/estadisticascambiarias/v1.0/Cotizaciones?fecha=YYYY-MM-DD` y `/Cotizaciones/{moneda}?fechadesde=...&fechahasta=...`), no requiere credenciales ni registro y devuelve la cotización de cada moneda contra el peso: USD y EUR contra ARS salen directo; USD↔EUR se calcula cruzando por ARS con `BigDecimal`, sin punto flotante. Si la fecha no tiene cotización (fin de semana o feriado), se usa la del último día hábil anterior, hasta 7 días hacia atrás; si no hay ninguna, el gasto se rechaza con 503 y **no se guarda**. Una cotización histórica no cambia, así que no hay TTL ni "tasa vieja". La conversión se aplica **una sola vez al total del gasto**; el reparto y las deudas se calculan sobre el monto convertido, en la moneda del grupo. En el gasto se guardan moneda y monto originales, monto convertido, tasa, fecha y fuente de la tasa: `rate_source = 'BCRA'` y `rate_date` con la fecha de la cotización efectivamente usada, no la del gasto. **No existe tasa por defecto ni carga manual de la tasa**: no se registra con la moneda original como alternativa. Misma moneda: tasa 1 y sin llamada externa.
 
-**D9. Gastos inmutables.** Un gasto con participantes además del pagador no se edita ni se elimina (Q4, 409 con mensaje). Un gasto personal (sin participantes) sí puede eliminarse.
+**D9. Edición y borrado de gastos.** Un gasto con participantes además del pagador es inmutable: `PATCH` responde 409 "No se permite editar un gasto que ya tiene participantes" y `DELETE` responde 409 "No se puede eliminar un gasto con deudas asociadas" (o "No se permite eliminar un gasto que ya tiene participantes" en el caso defensivo sin deudas). Un gasto personal (sin participantes además del pagador) se edita con `PATCH /api/groups/{groupId}/expenses/{expenseId}` (`amount`, `currency`, `date`, `description`; el pagador y los participantes no cambian) y se elimina con `DELETE /api/groups/{groupId}/expenses/{expenseId}` con `204`, solo si no tiene deudas. Los saldos son derivados (D4), así que no se recalcula ni reescribe ninguna tabla de saldos. Los endpoints son aditivos: la 017 no cambia de forma. Quién puede editar/borrar (creador, pagador o admin) queda como decisión pendiente. Contrato: `contracts/expense-split-and-edit.md` §2–§3.
 
 **D10. Integración con la 020.** `GroupService.leaveGroup` consulta a `BalanceQuery.hasOutstandingBalance(groupId, member)`: si el miembro figura como deudor o acreedor en una deuda pendiente de saldar, no puede abandonar (409 con motivo). El mensaje se agrega sin modificar los de 010.
 
@@ -138,7 +138,8 @@ specs/022-group-debt-management/
 ```text
 backend/src/main/java/com/amano/backend/groupexpense/
 ├── Debt.java, DebtStatus.java, GroupExpense.java   # modificados
-├── GroupExpenseService.java        # modificado: redondeo (D2), conversión (D8), inmutabilidad (D9)
+├── SplitMethod.java                # nuevo: EQUAL, CUSTOM, PERCENTAGE (D2)
+├── GroupExpenseService.java        # modificado: reparto (D2), conversión (D8), edición/borrado (D9)
 ├── balance/                        # nuevo, dominio puro
 │   ├── MemberRef.java, MemberBalance.java
 │   └── BalanceCalculator.java
@@ -161,7 +162,7 @@ backend/src/main/java/com/amano/backend/payment/
 backend/src/main/java/com/amano/backend/groups/
 └── Group.java, GroupService.java     # Group extendido; leaveGroup consulta saldo pendiente (D10)
 
-backend/src/main/resources/db/migration/    # V17, V18 y V19 nuevas
+backend/src/main/resources/db/migration/    # V17, V18, V19 y V21 nuevas (V20 ya integrada)
 backend/src/test/java/com/amano/backend/groupexpense/   # pruebas espejo
 
 frontend/src/
@@ -171,7 +172,7 @@ frontend/src/
 │   ├── RegisterPaymentModal.jsx, SettlementProposal.jsx
 │   ├── PaymentValidationList.jsx, ConvertedAmount.jsx
 │   └── debtStatusLabels.js         # etiquetas en español de los 5 estados
-└── (modificados) formulario y detalle de gasto, configuración de grupo (debtDueDays), aviso al abandonar grupo
+└── (modificados) formulario y detalle de gasto, selector de reparto (`EQUAL`/`CUSTOM`/`PERCENTAGE`), helpers `splitCustom.js`, configuración de grupo (debtDueDays), aviso al abandonar grupo
 ```
 
 **Structure Decision**: Se mantiene el monorepo existente (backend REST + frontend SPA); sin proyectos nuevos. El dominio nuevo vive en subpaquetes de `groupexpense`. Las rutas exactas de los archivos existentes se confirman en la verificación previa.
@@ -180,7 +181,9 @@ frontend/src/
 
 | Endpoint | Quién | Notas |
 |----------|-------|-------|
-| `POST /groups/{groupId}/expenses` | Miembro | Existente; la respuesta suma monto convertido, tasa y fuente |
+| `POST /groups/{groupId}/expenses` | Miembro | Existente; admite `splitMethod` (`EQUAL` por defecto, `CUSTOM`, `PERCENTAGE`) y la respuesta suma monto convertido, tasa, fuente y `splitMethod` |
+| `PATCH /groups/{groupId}/expenses/{expenseId}` | Miembro | Nuevo y aditivo; solo gastos personales (sin participantes además del pagador); 409 si tiene participantes |
+| `DELETE /groups/{groupId}/expenses/{expenseId}` | Miembro | Nuevo y aditivo; solo gastos personales sin deudas; 409 si tiene deudas |
 | `GET /groups/{groupId}/balances` | Miembro | Saldo neto por miembro |
 | `GET /groups/{groupId}/settlement-proposal` | Miembro | Solo lectura; reemplaza el `POST` con cuerpo del contrato actual |
 | `GET /groups/{groupId}/debts/pending` | Miembro | Mis deudas, con origen y detalle |
@@ -192,11 +195,12 @@ frontend/src/
 
 ## Migraciones
 
-Son tres migraciones nuevas, versionadas e inmutables una vez integradas:
+Son cuatro migraciones nuevas, versionadas e inmutables una vez integradas:
 
 1. **V17 — `groups`**: `primary_currency VARCHAR(3) NOT NULL DEFAULT 'ARS'` (los grupos existentes quedan en ARS; el valor es explícito y no se infiere de otra tabla) y `debt_due_days INTEGER NULL` (NULL = nunca vence; la columna se agrega una sola vez). Se agregan los `CHECK` de moneda y de `debt_due_days >= 0`.
 2. **V18 — `debts` y `payments`**: se elimina y recrea `ck_debts_status` con `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED`, `PAID`, `VERIFIED`, `OVERDUE`; se recrea `ck_debts_status_matches_paid` para que `PAYMENT_REPORTED` y `VERIFIED` no violen la restricción y para conservar las filas `PARTIALLY_PAID`; se recrean los índices parciales `ix_debts_open_*` excluyendo `PAID` y `VERIFIED`. Sobre `payments` se agregan por `ALTER TABLE` las columnas `status`, `decided_by_user_id`, `decided_at` y `legacy`; se rellenan las filas existentes con `status = 'CONFIRMED'` y `legacy = TRUE`; se crea el índice único parcial `uq_payments_active_debt ON payments (debt_id) WHERE legacy = FALSE AND status IN ('REPORTED', 'CONFIRMED')`.
 3. **V19 — `group_expenses`**: `converted_amount`, `exchange_rate` (escala 8), `rate_date` y `rate_source`; se rellena `converted_amount = amount`, `exchange_rate = 1`, `rate_date = expense_date` y `rate_source = 'SAME_CURRENCY'` donde la moneda del gasto coincide con la del grupo.
+4. **V21 — `group_expenses`**: `split_method VARCHAR(10) NOT NULL DEFAULT 'EQUAL'` con `CHECK (split_method IN ('EQUAL', 'CUSTOM', 'PERCENTAGE'))`; los gastos existentes quedan en `EQUAL`. No se edita V20 ni ninguna migración integrada.
 
 No se edita V13 ni V14 (ya integradas).
 
@@ -210,10 +214,10 @@ No se edita V13 ni V14 (ya integradas).
 
 ## Pruebas
 
-- **Unitarias (puras)**: `BalanceCalculator`, `SettlementPlanner`, redondeo del reparto y máquina de estados.
+- **Unitarias (puras)**: `BalanceCalculator`, `SettlementPlanner`, reparto `EQUAL`/`CUSTOM`/`PERCENTAGE` (suma exacta, piso al centavo y resto al pagador) y máquina de estados.
 - **Propiedades**, con JUnit 5 y generadores de semilla fija (se imprime la semilla al fallar): suma de saldos igual a cero; total transferido igual a la suma de saldos positivos; transferencias ≤ n-1; aplicar la propuesta deja todos los saldos en cero; las partes de un reparto suman el total; la propuesta no modifica deudas.
-- **Integración (Testcontainers)**: gasto → deudas → saldos; pago con y sin validación; confirmación y rechazo; **dos pagos concurrentes sobre la misma deuda dejan exactamente uno aplicado**; tarea de vencimiento ejecutada dos veces con el mismo resultado; abandono de grupo bloqueado por deuda; conversión con proveedor simulado y falla del proveedor.
-- **Frontend (Vitest)**: pestañas, modales de pago y validación, etiquetas de estado, monto convertido.
+- **Integración (Testcontainers)**: gasto → deudas → saldos; gasto `CUSTOM`/`PERCENTAGE` con shares que suman el total; edición de gasto personal y 409 con participantes; borrado de gasto personal con 204 y 409 con deudas; pago con y sin validación; confirmación y rechazo; **dos pagos concurrentes sobre la misma deuda dejan exactamente uno aplicado**; tarea de vencimiento ejecutada dos veces con el mismo resultado; abandono de grupo bloqueado por deuda; conversión con proveedor simulado y falla del proveedor.
+- **Frontend (Vitest)**: pestañas, modales de pago y validación, etiquetas de estado, monto convertido, selector de reparto y validación de sumas `CUSTOM`/`PERCENTAGE`.
 
 ## Reconciliación de artefactos (corregir antes de `/speckit.tasks`)
 
