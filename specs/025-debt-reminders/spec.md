@@ -49,7 +49,7 @@ Juan debe $ 3.333,33 en el grupo "Depto" y la deuda tiene fecha límite de pago.
 7. **Given** una deuda de un grupo sin días de vencimiento configurados (sin fecha límite), **When** se evalúan los recordatorios, **Then** esa deuda no genera recordatorio y no se reporta error.
 8. **Given** una deuda cuyo recordatorio ya fue enviado, **When** se vuelve a evaluar al día siguiente, **Then** no se envía un segundo correo por esa deuda.
 9. **Given** una deuda pendiente de un perfil simulado del grupo con correo cargado, **When** llega la fecha de envío, **Then** el perfil simulado recibe el recordatorio en ese correo.
-10. **Given** una deuda en "Pago informado" (grupo con validación de pagos) cuya fecha de envío llegó, **When** se generan los recordatorios, **Then** el deudor recibe el recordatorio porque su pago aún no fue verificado.
+10. **Given** una deuda en "Pago informado" (grupo con validación de pagos) cuya fecha de envío llegó, **When** se generan los recordatorios, **Then** el deudor recibe el recordatorio con la indicación de que su pago está informado y pendiente de verificación ("pagado a verificar").
 
 ---
 
@@ -122,7 +122,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **Miembro que sale del grupo o deuda cancelada antes del envío**: la salida o remoción con deudas sin saldar está bloqueada (017); si la deuda se salda (paga o verifica) antes del envío, el recordatorio se cancela. El dominio actual no tiene cancelación ni condonación de deudas, por lo que "deuda cancelada" se cubre con saldarla.
 - **Miembro sin correo válido o fallo de entrega**: el fallo queda registrado, no bloquea los demás recordatorios del grupo y no se reintenta (un único intento por deuda).
 - **Mensaje vacío o que excede la longitud máxima**: vacío → vuelve al mensaje predeterminado; más de 500 caracteres → rechazado al guardar con error de validación.
-- **Deuda en "Pago informado" al llegar la fecha de envío**: recibe el recordatorio (solo Pagado y Verificado excluyen); si el pago se verifica después del envío, no hay reenvío.
+- **Deuda en "Pago informado" al llegar la fecha de envío**: recibe el recordatorio (solo Pagado y Verificado excluyen), con la indicación "pagado a verificar"; si el pago se verifica después del envío, no hay reenvío.
 - **Perfil simulado con deuda**: recibe el recordatorio en el correo cargado por el Administrador; si el correo es inválido o la entrega falla, aplica la regla de fallo de entrega (queda registrado, sin reintento y sin bloquear los demás envíos).
 - **Gasto sin deudas pendientes al llegar la fecha de envío**: no se envía el aviso al pagador (ni recordatorios a los deudores).
 - **Gasto de un grupo sin días de vencimiento**: no genera recordatorios ni aviso al pagador.
@@ -147,7 +147,7 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - **FR-009**: Si la fecha de envío calculada ya pasó y la fecha límite aún no pasó, el recordatorio MUST enviarse en la evaluación siguiente; si la deuda ya está vencida, MUST NOT enviarse.
 - **FR-010**: MUST enviarse un único recordatorio por deuda según la configuración; el sistema MUST impedir reenvíos y duplicados para la misma deuda.
 - **FR-011**: No MUST enviarse recordatorio por deudas saldadas (Pagado o Verificado). Si la deuda se salda o se verifica antes de la fecha programada, el recordatorio MUST cancelarse.
-- **FR-012**: El correo MUST incluir la información suficiente para identificar la deuda y su grupo: nombre del grupo, concepto del gasto originario, monto y fecha límite de pago. El mensaje personalizado acompaña a esos datos; el mensaje predeterminado los incluye.
+- **FR-012**: El correo MUST incluir la información suficiente para identificar la deuda y su grupo: nombre del grupo, concepto del gasto originario, monto y fecha límite de pago. El mensaje personalizado acompaña a esos datos; el mensaje predeterminado los incluye. Si la deuda está en "Pago informado" al momento del envío, el correo MUST indicarlo (pago informado, pendiente de verificación, estilo "pagado a verificar") en lugar de solicitar el pago como si no existiera (aclaración del 2026-11-07).
 - **FR-013**: El envío de cada recordatorio MUST registrarse en el historial de actividad del grupo.
 - **FR-014**: Un fallo de entrega o un correo electrónico inválido MUST quedar registrado sin impedir el envío de los demás recordatorios, y MUST NOT reintentarse.
 
@@ -201,11 +201,12 @@ El Administrador del grupo escribe un mensaje personalizado en un campo de texto
 - El "si debe o no" del aviso al pagador refiere a las deudas pendientes del pagador en ese grupo (se informa el monto total pendiente); su parte del propio gasto quedó cubierta al pagarlo y nunca es una deuda.
 - El aviso al pagador usa un texto predeterminado propio; el mensaje personalizado de la configuración no le aplica.
 - El pagador de un gasto siempre es un miembro con cuenta (017: los perfiles simulados no pueden pagar), por lo que el aviso al pagador no tiene el caso del correo de un perfil simulado.
+- Para el aviso al pagador, las deudas en "Pago informado" cuentan como pendientes (no saldadas), igual que para los recordatorios: integran el monto total pendiente informado al pagador.
 
 ## Clarifications
 
 **Session 2026-11-07**
 
 - Q: ¿Los perfiles simulados (miembros sin cuenta) con deuda pendiente reciben el recordatorio por correo? → A: Sí. Todos los deudores con correo reciben el recordatorio, incluidos los perfiles simulados: el correo es la única vía por la que una persona simulada se entera de que debe, ya que no usa la aplicación. Un correo inválido o una entrega fallida siguen la regla general (se registra el fallo, sin reintento).
-- Q: ¿Una deuda con pago informado (reportado pero aún no verificado) recibe el recordatorio? → A: Sí (opción A). Solo las deudas saldadas (Pagado o Verificado) quedan excluidas; una deuda en "Pago informado" recibe el recordatorio hasta que se salde o verifique. Si se verifica después del envío, no hay reenvío.
+- Q: ¿Una deuda con pago informado (reportado pero aún no verificado) recibe el recordatorio? → A: Sí (opción A, refinada). En grupos sin validación de pagos, el pago pasa directo a Pagado y la deuda no recibe recordatorio. En grupos con validación, el pago debe estar Verificado para excluir el recordatorio; una deuda pagada pero no verificada ("Pago informado") recibe el correo igual, con una indicación del estilo "pagado a verificar" (pago informado, pendiente de verificación). Si se verifica después del envío, no hay reenvío.
 - Q: Pedido adicional sobre el pagador del gasto → A: Se agrega la US3. En la misma fecha de envío de los recordatorios de un gasto, el miembro que lo pagó recibe un aviso que indica cuánto falta para el vencimiento del gasto y si él también tiene deudas pendientes en el grupo (monto total) o no, según el caso. El aviso es único por gasto, usa un texto predeterminado propio y sigue las mismas reglas de fechas, cancelación y fallos de entrega que los recordatorios.

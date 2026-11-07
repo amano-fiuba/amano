@@ -33,6 +33,6 @@
 
 - 16/16 items passing. Ambas aclaraciones resueltas en la sesión del 2026-11-07:
   - FR-008 (perfiles simulados como destinatarios): sí reciben el recordatorio.
-  - FR-006 (deudas en "Pago informado"): reciben el recordatorio; solo Pagado y Verificado excluyen.
+  - FR-006/FR-012 (deudas en "Pago informado"): reciben el recordatorio; solo Pagado y Verificado excluyen. El correo indica "pagado a verificar" (pago informado, pendiente de verificación).
 - Alcance ampliado por pedido del 2026-11-07: US3 "Avisar al pagador que se acerca el vencimiento" (FR-016 a FR-018, SC-007), documentada también en la sección Clarifications de la spec.
 - Spec ready for `/speckit.clarify` or `/speckit.plan`
