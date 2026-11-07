@@ -20,25 +20,52 @@ public final class ExpenseSplit {
     private ExpenseSplit() {
     }
 
-    /** Shares exactly as requested, in participant order; their sum must equal {@code total}. */
-    public static List<BigDecimal> custom(BigDecimal total, List<BigDecimal> amounts) {
-        if (total == null || amounts == null || amounts.isEmpty()) {
+    /**
+     * {@code CUSTOM} shares. The {@code originalAmounts} are validated against
+     * {@code originalTotal} (their sum must match it exactly). The converted
+     * total is then distributed: every non-payer receives
+     * floor(convertedTotal * amount_i / originalTotal) in cents and the payer
+     * absorbs the remainder. When both totals are equal the parts are exactly
+     * the entered amounts.
+     */
+    public static List<BigDecimal> custom(BigDecimal convertedTotal, List<BigDecimal> originalAmounts,
+            BigDecimal originalTotal, int payerIndex) {
+        if (convertedTotal == null || originalAmounts == null || originalAmounts.isEmpty()
+                || originalTotal == null || originalTotal.signum() <= 0
+                || payerIndex < 0 || payerIndex >= originalAmounts.size()) {
             throw new IllegalArgumentException("Participantes inválidos para dividir el gasto");
         }
-        List<BigDecimal> shares = new ArrayList<>(amounts.size());
         BigDecimal sum = BigDecimal.ZERO;
-        for (BigDecimal amount : amounts) {
+        for (BigDecimal amount : originalAmounts) {
             if (amount == null || amount.signum() <= 0 || amount.stripTrailingZeros().scale() > 2) {
                 throw new IllegalArgumentException("Cada importe personalizado tiene que ser mayor que 0");
             }
-            BigDecimal share = amount.setScale(2);
-            shares.add(share);
-            sum = sum.add(share);
+            sum = sum.add(amount);
         }
-        if (sum.compareTo(total) != 0) {
+        if (sum.compareTo(originalTotal) != 0) {
             throw new IllegalArgumentException("Los importes personalizados deben sumar exactamente el total del gasto");
         }
-        return shares;
+
+        long convertedCents = convertedTotal.movePointRight(2).longValueExact();
+        long nonPayerCents = 0;
+        BigDecimal[] shares = new BigDecimal[originalAmounts.size()];
+        for (int position = 0; position < originalAmounts.size(); position++) {
+            if (position == payerIndex) {
+                continue;
+            }
+            BigDecimal exact = convertedTotal.multiply(originalAmounts.get(position))
+                    .divide(originalTotal, 10, RoundingMode.DOWN);
+            long cents = exact.movePointRight(2).longValue();
+            shares[position] = BigDecimal.valueOf(cents, 2);
+            nonPayerCents += cents;
+        }
+        shares[payerIndex] = BigDecimal.valueOf(convertedCents - nonPayerCents, 2);
+        return List.of(shares);
+    }
+
+    /** Backwards-compatible helper for the same-currency case. */
+    public static List<BigDecimal> custom(BigDecimal total, List<BigDecimal> amounts) {
+        return custom(total, amounts, total, 0);
     }
 
     /**

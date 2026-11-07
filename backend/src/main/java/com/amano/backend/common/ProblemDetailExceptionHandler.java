@@ -364,6 +364,16 @@ public class ProblemDetailExceptionHandler {
     }
 
     /** 022 D8/US9: BCRA exchange rate unavailable within the 7-day lookback window — 503. */
+    @ExceptionHandler(com.amano.backend.groupexpense.GroupExpenseConflictException.class)
+    public ProblemDetail handleGroupExpenseConflict(
+            com.amano.backend.groupexpense.GroupExpenseConflictException exception) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setTitle("Conflicto");
+        problem.setDetail(exception.getMessage());
+        problem.setProperty("code", exception.getCode());
+        return problem;
+    }
+
     @ExceptionHandler(com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException.class)
     public ProblemDetail handleExchangeRateUnavailable(
             com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException exception) {

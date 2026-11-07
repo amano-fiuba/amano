@@ -73,7 +73,7 @@ For `PERCENTAGE`, replace `amount` with `percentage` (for example `"30"`, `"60"`
 - `PERCENTAGE`: each percentage must be `> 0`; the sum of all percentages must be exactly `100`.
 - `PERCENTAGE`: the payer's percentage is validated (it must be `> 0` and part of the `100` sum) but is **not** used to compute the payer's amount. The payer's share is always `total - sum(non-payer shares)`, so the payer absorbs the rounding remainder.
 - Applying `amount`/`percentage` to `EQUAL`, or mixing both per-participant fields, is rejected.
-- Currency conversion (022 D8) is applied **once to the total** before splitting; `CUSTOM` and `PERCENTAGE` operate on the converted total, in the group currency.
+- Currency conversion (022 D8) is applied **once to the total** before splitting. `PERCENTAGE` and `EQUAL` operate on the converted total (group currency). `CUSTOM` is special: per-participant amounts are entered in the **original currency** of the expense and must sum exactly to the original `amount`; the server converts the total once and distributes the converted total so that each non-payer receives floor(convertedTotal * amount_i / originalTotal) in cents and the payer absorbs the remainder. Same currency: parts are exactly the entered amounts. Example: 50.00 USD at 18.50 -> 925.00 ARS with imports 25.00 + 25.00 -> 462.50 + 462.50.
 
 ### Rounding (Q1, applies to `PERCENTAGE`; `EQUAL` keeps the same rule)
 

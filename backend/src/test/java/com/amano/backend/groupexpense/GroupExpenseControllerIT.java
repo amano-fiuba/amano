@@ -525,17 +525,17 @@ class GroupExpenseControllerIT {
                 {"amount": "50.00", "currency": "USD", "date": "2026-01-15", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
-                   {"type": "REGISTERED", "userId": %d, "amount": "425.00"},
-                   {"type": "REGISTERED", "userId": %d, "amount": "500.00"}]}
+                   {"type": "REGISTERED", "userId": %d, "amount": "25.00"},
+                   {"type": "REGISTERED", "userId": %d, "amount": "25.00"}]}
                 """.formatted(ana, ana, juan);
 
         postExpense(anaSession, UUID.randomUUID().toString(), usd)
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.convertedAmount").value("925.00"))
                 .andExpect(jsonPath("$.splitMethod").value("CUSTOM"))
-                .andExpect(jsonPath("$.shares[0].amount").value("425.00"))
-                .andExpect(jsonPath("$.shares[1].amount").value("500.00"))
-                .andExpect(jsonPath("$.debts[0].amount").value("500.00"))
+                .andExpect(jsonPath("$.shares[0].amount").value("462.50"))
+                .andExpect(jsonPath("$.shares[1].amount").value("462.50"))
+                .andExpect(jsonPath("$.debts[0].amount").value("462.50"))
                 .andExpect(jsonPath("$.debts[0].currency").value("ARS"));
     }
 
@@ -565,9 +565,8 @@ class GroupExpenseControllerIT {
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         postExpense(anaSession, UUID.randomUUID().toString(), onlyPayer)
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.properties.fields.participants")
-                        .value("Elegí al menos un participante además de quien pagó"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.debts.length()").value(0));
 
         String outsiderParticipant = """
                 {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
@@ -578,8 +577,8 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.properties.fields.participants")
                         .value("Algún participante no pertenece al grupo"));
 
-        assertThat(count("group_expenses")).isZero();
-        assertThat(expenseEvents()).isZero();
+        assertThat(count("group_expenses")).isEqualTo(1);
+        assertThat(expenseEvents()).isEqualTo(1);
     }
 
     @Test

@@ -107,7 +107,7 @@ Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo p
 
 **D10. Integración con la 020.** `GroupService.leaveGroup` consulta a `BalanceQuery.hasOutstandingBalance(groupId, member)`: si el miembro figura como deudor o acreedor en una deuda pendiente de saldar, no puede abandonar (409 con motivo). El mensaje se agrega sin modificar los de 010.
 
-**D11. Gastos pagados por otro miembro.** Cualquier miembro activo del grupo puede registrar un gasto cuyo pagador sea otro miembro cuando la casilla `members_can_generate_expenses_for_others` del grupo está activa. La casilla se conserva como permiso por grupo (no se elimina) y su validación en el servidor sigue vigente: si está en `false`, el miembro recibe 403 con el mensaje "Solo podés registrar gastos pagados por vos". Los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración V22, la siguiente versión libre después de V21, que solo cambia el DEFAULT de la columna); los grupos existentes mantienen su valor. La validación de membresía también es del servidor: el pagador y todos los participantes deben ser miembros activos del grupo (los participantes también pueden ser personas simuladas del grupo). Se guardan por separado `createdByUserId` (quien registró) y `payerUserId` (quien pagó); las deudas se generan contra el pagador y el historial `EXPENSE_CREATED` muestra a ambos. El endpoint `POST /api/groups/{id}/expenses` ya acepta `payerUserId` distinto del principal autenticado y ya persiste ambos campos; falta cambiar el default de la casilla para grupos nuevos y agregar el pagador al historial.
+**D11. Gastos pagados por otro miembro.** Cualquier miembro activo del grupo puede registrar un gasto cuyo pagador sea otro miembro cuando la casilla `members_can_generate_expenses_for_others` del grupo está activa. La casilla se conserva como permiso por grupo (no se elimina) y su validación en el servidor sigue vigente: si está en `false`, el miembro recibe 403 con el mensaje "Solo podés registrar gastos pagados por vos". Los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración V23, la siguiente versión libre después de V22, que solo cambia el DEFAULT de la columna); los grupos existentes mantienen su valor. La validación de membresía también es del servidor: el pagador y todos los participantes deben ser miembros activos del grupo (los participantes también pueden ser personas simuladas del grupo). Se guardan por separado `createdByUserId` (quien registró) y `payerUserId` (quien pagó); las deudas se generan contra el pagador y el historial `EXPENSE_CREATED` muestra a ambos. El endpoint `POST /api/groups/{id}/expenses` ya acepta `payerUserId` distinto del principal autenticado y ya persiste ambos campos; falta cambiar el default de la casilla para grupos nuevos y agregar el pagador al historial.
 
 ## Decisiones pendientes (bloquean `/speckit.tasks`; resolver con `/speckit.clarify`)
 
@@ -162,7 +162,7 @@ backend/src/main/java/com/amano/backend/payment/
 backend/src/main/java/com/amano/backend/groups/
 └── Group.java, GroupService.java     # Group extendido; leaveGroup consulta saldo pendiente (D10)
 
-backend/src/main/resources/db/migration/    # V17, V18, V19, V20 y V21 nuevas (V22 para T060)
+backend/src/main/resources/db/migration/    # V17, V18, V19, V20, V21 y V22 nuevas (V23 para T060)
 backend/src/test/java/com/amano/backend/groupexpense/   # pruebas espejo
 
 frontend/src/
@@ -203,7 +203,7 @@ Son cinco migraciones nuevas, versionadas e inmutables una vez integradas:
 4. **V20 — `group_activity`**: se recrea el `CHECK` de `event_type` para admitir los eventos de pago, vencimiento y liquidación de US8 (`PAYMENT_REGISTERED`, `PAYMENT_CONFIRMED`, `PAYMENT_REJECTED`, `DEBT_OVERDUE`, `LIQUIDATION_PROPOSED`) sin perder los eventos existentes.
 5. **V21 — `group_expenses`**: `split_method VARCHAR(10) NOT NULL DEFAULT 'EQUAL'` con `CHECK (split_method IN ('EQUAL', 'CUSTOM', 'PERCENTAGE'))`; los gastos existentes quedan en `EQUAL`.
 
-T060 (default de `members_can_generate_expenses_for_others`) usará **V22**, la siguiente versión libre después de V21. No se edita ninguna migración ya integrada (tampoco V13 ni V14).
+T060 (default de `members_can_generate_expenses_for_others`) usará **V23**, la siguiente versión libre después de V22. No se edita ninguna migración ya integrada (tampoco V13 ni V14).
 
 ## Diseño del frontend
 

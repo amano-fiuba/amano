@@ -29,6 +29,8 @@ public class GroupActivity {
         PERMISSION_CHANGED,
         PHOTO_CHANGED,
         EXPENSE_CREATED,
+        EXPENSE_EDITED,
+        EXPENSE_DELETED,
         PAYMENT_MADE,
         PAYMENT_REGISTERED,
         PAYMENT_CONFIRMED,

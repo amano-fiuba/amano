@@ -350,10 +350,8 @@ class GroupExpenseServiceTest {
     }
 
     @Test
-    void atLeastOneParticipantOtherThanThePayerIsRequired() {
+    void atLeastOneParticipantIsRequired() {
         assertThat(fieldErrorsOf(request("10.00", ANA)))
-                .containsEntry("participants", GroupExpenseService.PARTICIPANTS_REQUIRED);
-        assertThat(fieldErrorsOf(request("10.00", ANA, registered(ANA))))
                 .containsEntry("participants", GroupExpenseService.PARTICIPANTS_REQUIRED);
     }
 

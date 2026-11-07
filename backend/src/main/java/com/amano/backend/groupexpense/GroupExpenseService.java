@@ -34,6 +34,7 @@ import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.ExpenseActivityDetails;
 import com.amano.backend.groups.Group;
 import com.amano.backend.groups.GroupMember;
+import com.amano.backend.groups.GroupActivity;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupNotFoundException;
 import com.amano.backend.groups.GroupPermissionChecker;
@@ -287,6 +288,122 @@ public class GroupExpenseService {
                 debtRepository.findByExpenseId(expense.getId()), caller, groupCurrency);
     }
 
+    public static final String EXPENSE_HAS_PARTICIPANTS = "No se permite editar un gasto que ya tiene participantes";
+    public static final String EXPENSE_HAS_DEBTS = "No se puede eliminar un gasto con deudas asociadas";
+    public static final String EXPENSE_EDIT_EMPTY = "Enviá al menos un campo para editar";
+    public static final String NOT_ALLOWED_TO_EDIT = "No podés editar este gasto";
+    public static final String NOT_ALLOWED_TO_DELETE = "No podés eliminar este gasto";
+
+    public GroupExpenseResponse updatePersonal(Long callerId, Long groupId, Long expenseId,
+            Map<String, String> fields) {
+        GroupMember caller = activeMembership(callerId, groupId);
+        GroupExpense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
+                .orElseThrow(() -> new GroupNotFoundException(EXPENSE_NOT_FOUND));
+
+        // permission
+        if (!caller.getId().getUserId().equals(expense.getCreatedByUserId())
+                && !caller.getId().getUserId().equals(expense.getPayerUserId())
+                && !GroupMember.ROLE_ADMIN.equals(caller.getRole())) {
+            throw new FieldValidationException(Map.of("permission", NOT_ALLOWED_TO_EDIT));
+        }
+
+        List<GroupExpenseShare> shares = shareRepository.findByExpenseIdOrderByPositionAsc(expense.getId());
+        List<Debt> debts = debtRepository.findByExpenseId(expense.getId());
+        if (shares.size() > 1 || !debts.isEmpty()) {
+            throw new GroupExpenseConflictException(EXPENSE_HAS_PARTICIPANTS, "EXPENSE_HAS_PARTICIPANTS");
+        }
+
+        if (fields == null || fields.isEmpty()) {
+            throw new FieldValidationException(Map.of("body", EXPENSE_EDIT_EMPTY));
+        }
+
+        // apply
+        BigDecimal newAmount = expense.getAmount();
+        Currency newCurrency = expense.getCurrency();
+        LocalDate newDate = expense.getExpenseDate();
+        String newDescription = expense.getDescription();
+
+        if (fields.containsKey("amount")) {
+            newAmount = ExpenseAmountNormalizer.normalize(fields.get("amount"));
+        }
+        if (fields.containsKey("currency")) {
+            newCurrency = Currency.valueOf(fields.get("currency"));
+        }
+        if (fields.containsKey("date")) {
+            newDate = LocalDate.parse(fields.get("date"));
+            String err = ExpenseDateValidator.validationError(newDate, null);
+            if (err != null) {
+                throw new FieldValidationException(Map.of("date", err));
+            }
+        }
+        if (fields.containsKey("description")) {
+            newDescription = ExpenseDescriptionNormalizer.normalize(fields.get("description"));
+        }
+
+        Currency groupCurrency = primaryCurrencyOf(groupId, newCurrency);
+        BigDecimal convertedAmount = newAmount;
+        BigDecimal exchangeRate = BigDecimal.ONE;
+        LocalDate rateDate = newDate;
+        String rateSource = "SAME_CURRENCY";
+        if (newCurrency != groupCurrency) {
+            ExchangeRateQuote quote = exchangeRateProvider.getQuote(newCurrency, groupCurrency, newDate);
+            if (quote == null) {
+                throw new com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException();
+            }
+            exchangeRate = quote.rate();
+            convertedAmount = newAmount.multiply(exchangeRate).setScale(2, RoundingMode.HALF_UP);
+            rateDate = quote.rateDate();
+            rateSource = quote.rateSource();
+        }
+
+        expense.setAmount(newAmount);
+        expense.setCurrency(newCurrency);
+        expense.setExpenseDate(newDate);
+        expense.setDescription(newDescription);
+        expense.setConvertedAmount(convertedAmount);
+        expense.setExchangeRate(exchangeRate);
+        expense.setRateDate(rateDate);
+        expense.setRateSource(rateSource);
+
+        GroupExpense saved = expenseRepository.save(expense);
+        shareRepository.deleteAll(shares);
+        GroupExpenseShare newShare = GroupExpenseShare.registered(
+                saved.getId(), 0, expense.getPayerUserId(),
+                caller.getName() == null ? "" : caller.getName(), convertedAmount);
+        shareRepository.save(newShare);
+        activityEventService.record(groupId, GroupActivity.GroupActivityType.EXPENSE_EDITED,
+                callerId, Map.of("expenseId", expenseId));
+        return toResponse(saved, shareRepository.findByExpenseIdOrderByPositionAsc(saved.getId()),
+                debtRepository.findByExpenseId(saved.getId()), caller, groupCurrency);
+    }
+
+    public void deletePersonal(Long callerId, Long groupId, Long expenseId) {
+        GroupMember caller = activeMembership(callerId, groupId);
+        GroupExpense expense = expenseRepository.findByIdAndGroupId(expenseId, groupId)
+                .orElseThrow(() -> new GroupNotFoundException(EXPENSE_NOT_FOUND));
+
+        if (!caller.getId().getUserId().equals(expense.getCreatedByUserId())
+                && !caller.getId().getUserId().equals(expense.getPayerUserId())
+                && !GroupMember.ROLE_ADMIN.equals(caller.getRole())) {
+            throw new FieldValidationException(Map.of("permission", NOT_ALLOWED_TO_DELETE));
+        }
+
+        List<Debt> debts = debtRepository.findByExpenseId(expense.getId());
+        if (!debts.isEmpty()) {
+            throw new GroupExpenseConflictException(EXPENSE_HAS_DEBTS, "EXPENSE_HAS_DEBTS");
+        }
+        List<GroupExpenseShare> shares = shareRepository.findByExpenseIdOrderByPositionAsc(expense.getId());
+        if (shares.size() > 1) {
+            throw new GroupExpenseConflictException("No se permite eliminar un gasto que ya tiene participantes",
+                    "EXPENSE_HAS_PARTICIPANTS");
+        }
+
+        shareRepository.deleteAll(shares);
+        expenseRepository.delete(expense);
+        activityEventService.record(groupId, GroupActivity.GroupActivityType.EXPENSE_DELETED,
+                callerId, Map.of("expenseId", expenseId));
+    }
+
     private Registration replay(GroupExpense existing, Long groupId, NormalizedExpense normalized,
             GroupMember caller) {
         List<GroupExpenseShare> shares = shareRepository.findByExpenseIdOrderByPositionAsc(existing.getId());
@@ -353,10 +470,11 @@ public class GroupExpenseService {
         return switch (normalized.splitMethod()) {
             case EQUAL -> EqualSplit.split(total, normalized.participants().size(), normalized.payerIndex());
             case CUSTOM -> {
-                if (sumOf(normalized.customAmounts()).compareTo(total) != 0) {
+                if (sumOf(normalized.customAmounts()).compareTo(normalized.amount()) != 0) {
                     throw new FieldValidationException(Map.of("participants", CUSTOM_SUM_INVALID));
                 }
-                yield ExpenseSplit.custom(total, normalized.customAmounts());
+                yield ExpenseSplit.custom(total, normalized.customAmounts(), normalized.amount(),
+                        normalized.payerIndex());
             }
             case PERCENTAGE -> {
                 if (sumOf(normalized.percentages()).compareTo(ONE_HUNDRED) != 0) {
@@ -378,7 +496,7 @@ public class GroupExpenseService {
             return null;
         }
         if (normalized.splitMethod() == SplitMethod.CUSTOM
-                && sumOf(normalized.customAmounts()).compareTo(total) != 0) {
+                && sumOf(normalized.customAmounts()).compareTo(normalized.amount()) != 0) {
             return null;
         }
         if (normalized.splitMethod() == SplitMethod.PERCENTAGE
@@ -619,10 +737,8 @@ public class GroupExpenseService {
             fieldErrors.put("participants", PARTICIPANTS_REPEATED);
             return null;
         }
-        if (resolved.stream().allMatch(one -> one.isUser(payer))) {
-            fieldErrors.put("participants", PARTICIPANTS_REQUIRED);
-            return null;
-        }
+        // A participant list made up solely of the payer is a personal expense:
+        // no debts are generated and splitMethod does not apply (022 T067).
         return resolved;
     }
 
