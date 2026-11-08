@@ -39,6 +39,10 @@ public class CreateGroupExpenseRequest {
     private Long payerUserId;
     private String splitMethod;
     private List<Participant> participants;
+    /** 027 FR-020: required 007 classification, validated by the service. */
+    private String category;
+    private String type;
+    private String paymentMethod;
 
     private final Map<String, Object> unknownProperties = new LinkedHashMap<>();
 
@@ -104,6 +108,30 @@ public class CreateGroupExpenseRequest {
 
     public void setParticipants(List<Participant> participants) {
         this.participants = participants;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(String paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 
     @JsonAnySetter

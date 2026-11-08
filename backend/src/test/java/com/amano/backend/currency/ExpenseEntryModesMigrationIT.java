@@ -18,15 +18,16 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import com.amano.backend.user.Currency;
 
 /**
- * 027 T017: V27 widens the currency CHECKs of expenses, group expenses, debts,
- * payments and preferences to the {@link Currency} catalog, and leaves the group
- * primary currency on ARS/USD/EUR.
+ * 027 T017/T046: V27 widens the currency CHECKs of expenses, group expenses,
+ * debts, payments and preferences to the {@link Currency} catalog (leaving the
+ * group primary currency on ARS/USD/EUR) and V28 adds the nullable 007
+ * classification to group expenses.
  */
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
 })
 @Testcontainers
-class CurrencyMigrationIT {
+class ExpenseEntryModesMigrationIT {
 
     @Container
     @ServiceConnection
@@ -71,6 +72,35 @@ class CurrencyMigrationIT {
 
         assertThatThrownBy(() -> jdbc.update(
                 "INSERT INTO user_currencies (user_id, currency_code) VALUES (?, 'XAU')", userId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    private long groupExpenseWith(String category, String type, String paymentMethod) {
+        Long userId = jdbc.queryForObject("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at)
+                VALUES ('Juan', ?, 'x', now()) RETURNING id
+                """, Long.class, "juan-" + System.nanoTime() + "@amano.dev");
+        Long groupId = jdbc.queryForObject("INSERT INTO groups (name) VALUES ('Depto') RETURNING id", Long.class);
+        return jdbc.queryForObject("""
+                INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
+                    expense_date, idempotency_key, category, expense_type, payment_method)
+                VALUES (?, ?, ?, 10.00, 'ARS', CURRENT_DATE, gen_random_uuid(), ?, ?, ?) RETURNING id
+                """, Long.class, groupId, userId, userId, category, type, paymentMethod);
+    }
+
+    @Test
+    void groupExpensesAcceptTheClassificationCatalogsAndNull() {
+        assertThat(groupExpenseWith("PETS", "RECURRING", "VIRTUAL_WALLET")).isPositive();
+        assertThat(groupExpenseWith(null, null, null)).isPositive();
+    }
+
+    @Test
+    void groupExpensesRejectValuesOutsideTheCatalogs() {
+        assertThatThrownBy(() -> groupExpenseWith("PARTY", "ONE_TIME", "CASH"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> groupExpenseWith("FOOD", "WEEKLY", "CASH"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> groupExpenseWith("FOOD", "ONE_TIME", "BITCOIN"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

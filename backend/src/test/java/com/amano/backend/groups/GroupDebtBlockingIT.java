@@ -128,7 +128,7 @@ class GroupDebtBlockingIT {
                 .header("Idempotency-Key", UUID.randomUUID().toString())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                        {"amount": "90.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                        {"amount": "90.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                          "participants": [{"type": "REGISTERED", "userId": %d},
                                           {"type": "REGISTERED", "userId": %d},
                                           {"type": "SIMULATED", "simulatedProfileId": %d}]}

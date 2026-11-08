@@ -7,6 +7,9 @@ import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.amano.backend.expense.ExpenseCategory;
+import com.amano.backend.expense.ExpenseType;
+import com.amano.backend.expense.PaymentMethod;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.CurrencyConversion;
 
@@ -82,6 +85,20 @@ public class GroupExpense {
     @Enumerated(EnumType.STRING)
     @Column(name = "split_method", nullable = false, length = 10)
     private SplitMethod splitMethod = SplitMethod.EQUAL;
+
+    /** 027 FR-020: 007 classification. Null only for expenses created before 027. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 20)
+    private ExpenseCategory category;
+
+    /** 027 FR-020: informative only; a RECURRING shared expense is never scheduled. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "expense_type", length = 20)
+    private ExpenseType expenseType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 20)
+    private PaymentMethod paymentMethod;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -193,6 +210,30 @@ public class GroupExpense {
 
     public void setSplitMethod(SplitMethod splitMethod) {
         this.splitMethod = splitMethod;
+    }
+
+    public ExpenseCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(ExpenseCategory category) {
+        this.category = category;
+    }
+
+    public ExpenseType getExpenseType() {
+        return expenseType;
+    }
+
+    public void setExpenseType(ExpenseType expenseType) {
+        this.expenseType = expenseType;
+    }
+
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
     }
 
     public OffsetDateTime getCreatedAt() {

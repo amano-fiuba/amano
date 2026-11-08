@@ -566,7 +566,12 @@ public class GroupService {
         summary.setLastActivityAt(lastActivity.getOrDefault(group.getId(), group.getCreatedAt()));
         summary.setMemberCount(activeMemberCount(group.getId()));
         groupMemberRepository.findByIdGroupIdAndIdUserId(group.getId(), userId)
-                .ifPresent(membership -> summary.setCurrentUserRole(membership.getRole()));
+                .ifPresent(membership -> {
+                    summary.setCurrentUserRole(membership.getRole());
+                    // 027 (FR-021): the "Gasto grupal" chooser greys out groups where it is not allowed.
+                    summary.setCanCreateExpenses(permissionChecker.canCreateExpenses(membership.getRole(),
+                            groupPermissionsRepository.findByGroupId(group.getId()).orElse(null)));
+                });
         return summary;
     }
 

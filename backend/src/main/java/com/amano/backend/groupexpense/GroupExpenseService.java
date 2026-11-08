@@ -23,6 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.expense.ExpenseClassification;
+import com.amano.backend.expense.ExpenseCategory;
+import com.amano.backend.expense.ExpenseType;
+import com.amano.backend.expense.PaymentMethod;
 import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.ExpenseDescriptionNormalizer;
@@ -159,7 +163,8 @@ public class GroupExpenseService {
 
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date, String description,
             Long payerUserId, String payerName, List<ResolvedParticipant> participants, int payerIndex,
-            SplitMethod splitMethod, List<BigDecimal> customAmounts, List<BigDecimal> percentages) {
+            SplitMethod splitMethod, List<BigDecimal> customAmounts, List<BigDecimal> percentages,
+            ExpenseClassification classification) {
     }
 
     /** Parsed values of the requested split; both lists are null when any participant is invalid. */
@@ -233,6 +238,9 @@ public class GroupExpenseService {
         expense.setRateDate(rateDate);
         expense.setRateSource(rateSource);
         expense.setSplitMethod(normalized.splitMethod());
+        expense.setCategory(normalized.classification().category());
+        expense.setExpenseType(normalized.classification().type());
+        expense.setPaymentMethod(normalized.classification().paymentMethod());
         expense.setExpenseDate(normalized.date());
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
@@ -383,6 +391,26 @@ public class GroupExpenseService {
         if (fields.containsKey("description")) {
             newDescription = ExpenseDescriptionNormalizer.normalize(fields.get("description"));
         }
+        // 027 FR-020: the classification can be edited too; each field only when sent.
+        Map<String, String> classificationErrors = new LinkedHashMap<>();
+        ExpenseCategory newCategory = fields.containsKey("category")
+                ? ExpenseClassification.parseCatalog(fields.get("category"), ExpenseCategory.class, "category",
+                        ExpenseClassification.CATEGORY_REQUIRED, ExpenseClassification.CATEGORY_INVALID,
+                        classificationErrors)
+                : expense.getCategory();
+        ExpenseType newType = fields.containsKey("type")
+                ? ExpenseClassification.parseCatalog(fields.get("type"), ExpenseType.class, "type",
+                        ExpenseClassification.TYPE_REQUIRED, ExpenseClassification.TYPE_INVALID,
+                        classificationErrors)
+                : expense.getExpenseType();
+        PaymentMethod newPaymentMethod = fields.containsKey("paymentMethod")
+                ? ExpenseClassification.parseCatalog(fields.get("paymentMethod"), PaymentMethod.class,
+                        "paymentMethod", ExpenseClassification.PAYMENT_REQUIRED,
+                        ExpenseClassification.PAYMENT_INVALID, classificationErrors)
+                : expense.getPaymentMethod();
+        if (!classificationErrors.isEmpty()) {
+            throw new FieldValidationException(classificationErrors);
+        }
 
         Currency groupCurrency = primaryCurrencyOf(groupId, newCurrency);
         BigDecimal convertedAmount = newAmount;
@@ -404,6 +432,9 @@ public class GroupExpenseService {
         expense.setCurrency(newCurrency);
         expense.setExpenseDate(newDate);
         expense.setDescription(newDescription);
+        expense.setCategory(newCategory);
+        expense.setExpenseType(newType);
+        expense.setPaymentMethod(newPaymentMethod);
         expense.setConvertedAmount(convertedAmount);
         expense.setExchangeRate(exchangeRate);
         expense.setRateDate(rateDate);
@@ -484,6 +515,9 @@ public class GroupExpenseService {
                 || !existing.getExpenseDate().equals(normalized.date())
                 || !Objects.equals(existing.getDescription(), normalized.description())
                 || !existing.getPayerUserId().equals(normalized.payerUserId())
+                || existing.getCategory() != normalized.classification().category()
+                || existing.getExpenseType() != normalized.classification().type()
+                || existing.getPaymentMethod() != normalized.classification().paymentMethod()
                 || shares.size() != normalized.participants().size()) {
             return false;
         }
@@ -593,6 +627,9 @@ public class GroupExpenseService {
         List<ResolvedParticipant> participants = resolveParticipants(groupId, request.getParticipants(),
                 payer, activeMemberNames, fieldErrors);
         SplitMethod splitMethod = parseSplitMethod(request.getSplitMethod(), fieldErrors);
+        // 027 FR-020: same catalogs and messages as a personal expense (007).
+        ExpenseClassification classification = ExpenseClassification.parse(request.getCategory(),
+                request.getType(), request.getPaymentMethod(), fieldErrors);
         int payerIndex = payerIndex(participants, payer);
         List<BigDecimal> customAmounts = null;
         List<BigDecimal> percentages = null;
@@ -641,7 +678,8 @@ public class GroupExpenseService {
 
         return new NormalizedExpense(ExpenseAmountNormalizer.normalize(request.getAmount()), currency, date,
                 ExpenseDescriptionNormalizer.normalize(request.getDescription()), payer,
-                activeMemberNames.get(payer), participants, payerIndex, splitMethod, customAmounts, percentages);
+                activeMemberNames.get(payer), participants, payerIndex, splitMethod, customAmounts, percentages,
+                classification);
     }
 
     private static SplitMethod parseSplitMethod(String raw, Map<String, String> fieldErrors) {
@@ -896,7 +934,10 @@ public class GroupExpenseService {
                 shareViews,
                 debtViews,
                 expense.getSplitMethod() == null ? SplitMethod.EQUAL.name()
-                        : expense.getSplitMethod().name());
+                        : expense.getSplitMethod().name(),
+                expense.getCategory() == null ? null : expense.getCategory().name(),
+                expense.getExpenseType() == null ? null : expense.getExpenseType().name(),
+                expense.getPaymentMethod() == null ? null : expense.getPaymentMethod().name());
     }
 
     /**

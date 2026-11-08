@@ -109,7 +109,7 @@ class GroupBalanceControllerIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"amount": "10000.00", "currency": "ARS", "date": "%s", "description": "Súper",
-                         "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                         "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                          "participants": [
                            {"type": "REGISTERED", "userId": %d},
                            {"type": "REGISTERED", "userId": %d},

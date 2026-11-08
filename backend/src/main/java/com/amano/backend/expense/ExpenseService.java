@@ -41,16 +41,10 @@ public class ExpenseService {
     private static final String CURRENCY_REQUIRED = "La moneda es obligatoria";
     private static final String CURRENCY_INVALID = "La moneda no es válida";
     private static final String DATE_FORMAT = "La fecha debe tener el formato aaaa-mm-dd";
-    private static final String CATEGORY_REQUIRED = "La categoría es obligatoria";
-    private static final String CATEGORY_INVALID = "La categoría no es válida";
-    private static final String TYPE_REQUIRED = "El tipo de gasto es obligatorio";
-    private static final String TYPE_INVALID = "El tipo de gasto no es válido";
     private static final String FREQUENCY_REQUIRED =
             "La frecuencia es obligatoria para un gasto recurrente";
     private static final String FREQUENCY_INVALID = "La frecuencia no es válida";
     private static final String FREQUENCY_NOT_ALLOWED = "Un gasto único no puede tener frecuencia";
-    private static final String PAYMENT_REQUIRED = "El medio de pago es obligatorio";
-    private static final String PAYMENT_INVALID = "El medio de pago no es válido";
     private static final String RESERVED_PROPERTY = "No se permite informar este campo";
 
     /** Fields of future shared-expense models that must never select the owner (FR-005/FR-006). */
@@ -164,16 +158,16 @@ public class ExpenseService {
         if (amountError != null) {
             fieldErrors.put("amount", amountError);
         }
-        Currency currency = parseCatalog(request.getCurrency(), Currency.class, "currency",
+        Currency currency = ExpenseClassification.parseCatalog(request.getCurrency(), Currency.class, "currency",
                 CURRENCY_REQUIRED, CURRENCY_INVALID, fieldErrors);
         LocalDate date = parseDate(request.getDate(), request.getDeviceTimeZone(), fieldErrors);
-        ExpenseCategory category = parseCatalog(request.getCategory(), ExpenseCategory.class,
-                "category", CATEGORY_REQUIRED, CATEGORY_INVALID, fieldErrors);
-        ExpenseType type = parseCatalog(request.getType(), ExpenseType.class, "type",
-                TYPE_REQUIRED, TYPE_INVALID, fieldErrors);
+        ExpenseCategory category = ExpenseClassification.parseCatalog(request.getCategory(), ExpenseCategory.class,
+                "category", ExpenseClassification.CATEGORY_REQUIRED, ExpenseClassification.CATEGORY_INVALID, fieldErrors);
+        ExpenseType type = ExpenseClassification.parseCatalog(request.getType(), ExpenseType.class, "type",
+                ExpenseClassification.TYPE_REQUIRED, ExpenseClassification.TYPE_INVALID, fieldErrors);
         RecurrenceFrequency frequency = parseFrequency(request.getFrequency(), type, fieldErrors);
-        PaymentMethod paymentMethod = parseCatalog(request.getPaymentMethod(), PaymentMethod.class,
-                "paymentMethod", PAYMENT_REQUIRED, PAYMENT_INVALID, fieldErrors);
+        PaymentMethod paymentMethod = ExpenseClassification.parseCatalog(request.getPaymentMethod(), PaymentMethod.class,
+                "paymentMethod", ExpenseClassification.PAYMENT_REQUIRED, ExpenseClassification.PAYMENT_INVALID, fieldErrors);
         String descriptionError = ExpenseDescriptionNormalizer.validationError(
                 request.getDescription());
         if (descriptionError != null) {
@@ -231,21 +225,6 @@ public class ExpenseService {
         }
         catch (DateTimeException | NullPointerException exception) {
             return LocalDate.now(ZoneOffset.UTC);
-        }
-    }
-
-    private static <E extends Enum<E>> E parseCatalog(String raw, Class<E> type, String field,
-            String requiredMessage, String invalidMessage, Map<String, String> fieldErrors) {
-        if (raw == null || raw.isBlank()) {
-            fieldErrors.put(field, requiredMessage);
-            return null;
-        }
-        try {
-            return Enum.valueOf(type, raw);
-        }
-        catch (IllegalArgumentException exception) {
-            fieldErrors.put(field, invalidMessage);
-            return null;
         }
     }
 
