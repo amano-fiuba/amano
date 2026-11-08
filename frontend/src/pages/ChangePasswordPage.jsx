@@ -6,7 +6,7 @@
 // texto claro salvo el botón Mostrar/Ocultar del formulario (FR-008 de 001).
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   UPDATE_NETWORK_ERROR_MESSAGE,
   updatePassword,
@@ -19,6 +19,7 @@ import {
 } from '../validation/registerValidation'
 
 export default function ChangePasswordPage() {
+  const navigate = useNavigate()
   const {
     handleSubmit,
     watch,
@@ -76,6 +77,11 @@ export default function ChangePasswordPage() {
 
   return (
     <main className="page">
+      <nav className="group-page__back">
+        <Link to="/profile">
+          <span aria-hidden="true">←</span> Mi perfil
+        </Link>
+      </nav>
       <h1>Cambiar contraseña</h1>
       {formError && (
         <p role="alert" data-testid="form-error">
@@ -114,15 +120,17 @@ export default function ChangePasswordPage() {
           })}
         />
 
-        {/* FR-011: deshabilitado durante el envío; rehabilitado ante errores. */}
-        <button type="submit" disabled={isSubmitting}>
-          Guardar nueva contraseña
-        </button>
+        {/* Cancelar a la izquierda y Guardar a la derecha. FR-011: Guardar
+            deshabilitado durante el envío; rehabilitado ante errores. */}
+        <div className="form-actions form-actions--split">
+          <button type="button" onClick={() => navigate('/profile')}>
+            Cancelar
+          </button>
+          <button type="submit" disabled={isSubmitting}>
+            Guardar
+          </button>
+        </div>
       </form>
-
-      <p>
-        <Link to="/profile">Volver a Mi perfil</Link>
-      </p>
     </main>
   )
 }

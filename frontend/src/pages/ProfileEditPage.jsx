@@ -63,7 +63,7 @@ export default function ProfileEditPage() {
   const [avatarError, setAvatarError] = useState('')
   // US3 (FR-015/FR-016 enmendadas): el avatar es un cambio PENDIENTE del
   // guardado — ni la subida ni la eliminación contactan al backend al instante
-  // (Cancelar cambios puede descartarlas); se aplican al presionar Guardar.
+  // (Cancelar puede descartarlas); se aplican al presionar Guardar.
   const [avatarPendiente, setAvatarPendiente] = useState(null)
   const [eliminarPendiente, setEliminarPendiente] = useState(false)
   const [avatarPendienteUrl, setAvatarPendienteUrl] = useState('')
@@ -214,7 +214,7 @@ export default function ProfileEditPage() {
     setAvatarError('')
     // Validación en vivo igual que en el registro (FR-010/FR-013 de 001):
     // tamaño primero, luego magic bytes reales. Se retiene pendiente: no hay
-    // llamada al backend hasta "Guardar cambios".
+    // llamada al backend hasta "Guardar".
     if (file.size > AVATAR_MAX_BYTES) {
       setAvatarError(AVATAR_SIZE_MESSAGE)
       return
@@ -358,12 +358,10 @@ export default function ProfileEditPage() {
           ))}
         </fieldset>
 
-        {/* FR-011 enmendada: Guardar solo cuando hay cambios pendientes;
-            siempre deshabilitado durante el envío. */}
-        <div className="form-actions">
-          <button type="submit" disabled={!canSave || isSubmitting}>
-            Guardar cambios
-          </button>
+        {/* Cancelar a la izquierda y Guardar a la derecha. FR-011 enmendada:
+            Guardar solo cuando hay cambios pendientes; siempre deshabilitado
+            durante el envío. */}
+        <div className="form-actions form-actions--split">
           {/* Vuelve a la visualización de 002 sin guardar nada (FR-008);
               siempre habilitado y descarta avatar pendiente. */}
           <button
@@ -378,7 +376,10 @@ export default function ProfileEditPage() {
               navigate('/profile')
             }}
           >
-            Cancelar cambios
+            Cancelar
+          </button>
+          <button type="submit" disabled={!canSave || isSubmitting}>
+            Guardar
           </button>
         </div>
       </form>

@@ -346,6 +346,11 @@ ul {
 
 // FR-011 enmendada de 005: "Guardar cambios" se ve deshabilitado (gris, cursor
 // bloqueado) mientras no haya modificaciones pendientes por confirmar.
+// Cancelar en el borde izquierdo y la acción principal en el derecho.
+.form-actions--split {
+  justify-content: space-between;
+}
+
 .form-actions button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

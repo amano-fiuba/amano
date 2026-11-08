@@ -71,7 +71,7 @@ describe('ChangePasswordPage (US2)', () => {
     renderPassword()
 
     await completar(user)
-    await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     await waitFor(() => {
       expect(updatePassword).toHaveBeenCalledTimes(1)
@@ -98,7 +98,7 @@ describe('ChangePasswordPage (US2)', () => {
     renderPassword()
 
     await completar(user)
-    await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     await waitFor(() => {
       expect(updatePassword).toHaveBeenCalledTimes(1)
@@ -130,7 +130,7 @@ describe('ChangePasswordPage (US2)', () => {
     const confirmar = screen.getByLabelText('Confirmar nueva contraseña')
     await user.clear(confirmar)
     await user.type(confirmar, 'Otra#Distinta')
-    await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     expect(await screen.findByText(/las contraseñas no coinciden/i)).toBeInTheDocument()
     expect(updatePassword).not.toHaveBeenCalled()
@@ -142,7 +142,7 @@ describe('ChangePasswordPage (US2)', () => {
     renderPassword()
 
     await completar(user)
-    await user.click(screen.getByRole('button', { name: /guardar nueva contraseña/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     expect(await screen.findByText(/no se pudo completar la actualización/i))
       .toBeInTheDocument()
@@ -179,5 +179,41 @@ describe('ChangePasswordPage (US2)', () => {
     expect(
       await screen.findByRole('heading', { name: /iniciar sesión/i }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('ChangePasswordPage: navegación de vuelta', () => {
+  function renderWithProfile() {
+    return render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/profile/password']}>
+          <Routes>
+            <Route path="/profile/password" element={<ChangePasswordPage />} />
+            <Route path="/profile" element={<p>Pantalla de perfil</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+  }
+
+  it('muestra "← Mi perfil" arriba en lugar de "Volver a Mi perfil"', () => {
+    renderWithProfile()
+
+    expect(screen.getByRole('link', { name: /Mi perfil/ })).toHaveAttribute('href', '/profile')
+    expect(screen.queryByText('Volver a Mi perfil')).not.toBeInTheDocument()
+  })
+
+  it('Cancelar, a la izquierda de Guardar, vuelve a Mi perfil sin llamar a la API', async () => {
+    const user = userEvent.setup()
+    renderWithProfile()
+
+    const cancelar = screen.getByRole('button', { name: 'Cancelar' })
+    const guardar = screen.getByRole('button', { name: /^guardar$/i })
+    expect(cancelar.compareDocumentPosition(guardar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.click(cancelar)
+
+    expect(await screen.findByText('Pantalla de perfil')).toBeInTheDocument()
+    expect(updatePassword).not.toHaveBeenCalled()
   })
 })

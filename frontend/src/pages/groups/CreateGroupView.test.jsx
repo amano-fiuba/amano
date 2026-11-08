@@ -14,7 +14,7 @@ vi.mock('../../auth/AuthContext', () => ({ useAuth: () => ({ setUser: vi.fn() })
 
 import { listFriends } from '../../api/friendsClient'
 import { createGroup } from '../../api/groupsClient'
-import CreateGroupView, { MEMBER_REQUIRED_MESSAGE } from './CreateGroupView'
+import CreateGroupView from './CreateGroupView'
 
 const ANA = { id: 1, firstName: 'Ana', lastName: 'Pérez', email: 'ana@example.com', avatarUrl: null }
 const BRUNO = { id: 2, firstName: 'Bruno', lastName: null, email: 'bruno@example.com', avatarUrl: null }
@@ -25,6 +25,7 @@ function renderView() {
       <Routes>
         <Route path="/groups/new" element={<CreateGroupView />} />
         <Route path="/groups/:id" element={<p>Pantalla del grupo</p>} />
+        <Route path="/groups" element={<p>Mis grupos</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -42,7 +43,7 @@ function typeProfile(name, email) {
   fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: email } })
 }
 
-const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Crear grupo' }))
+const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Crear' }))
 
 beforeEach(() => {
   createGroup.mockReset()
@@ -59,25 +60,31 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     expect(screen.queryByLabelText('Correo del amigo')).not.toBeInTheDocument()
   })
 
-  it('valida el nombre antes de llamar a la API', async () => {
+  it('Crear queda deshabilitado sin nombre aunque haya personas elegidas', async () => {
     renderView()
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
 
-    submit()
-
-    expect(await screen.findByText(/El nombre del grupo es obligatorio/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled()
     expect(createGroup).not.toHaveBeenCalled()
   })
 
-  it('exige al menos una persona', async () => {
+  it('Crear queda deshabilitado con nombre pero sin ninguna persona', async () => {
     renderView()
     await screen.findByRole('checkbox', { name: /Ana Pérez/ })
     typeName('Solo yo')
 
-    submit()
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled()
+  })
 
-    expect(await screen.findByTestId('member-error')).toHaveTextContent(MEMBER_REQUIRED_MESSAGE)
-    expect(createGroup).not.toHaveBeenCalled()
+  it('Crear se habilita con nombre y un perfil simulado completo aunque no esté agregado', async () => {
+    renderView()
+    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    typeName('Con invitado')
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled()
+
+    typeProfile('Invitado', 'invitado@example.com')
+
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeEnabled()
   })
 
   it('crea el grupo con varios amigos y abre el grupo', async () => {
@@ -202,5 +209,19 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     submit()
 
     expect(await screen.findByTestId('member-error')).toHaveTextContent(/No se pudo conectar/)
+  })
+
+  it('Cancelar vuelve a Mis grupos sin crear nada, y queda a la izquierda de Crear', async () => {
+    renderView()
+    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+
+    const cancelar = screen.getByRole('button', { name: 'Cancelar' })
+    const crear = screen.getByRole('button', { name: 'Crear' })
+    expect(cancelar.compareDocumentPosition(crear) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    fireEvent.click(cancelar)
+
+    expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
+    expect(createGroup).not.toHaveBeenCalled()
   })
 })

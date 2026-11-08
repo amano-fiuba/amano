@@ -111,6 +111,10 @@ export default function CreateGroupView() {
   }
 
   const memberCount = friends.length + simulated.length
+  // Crear se habilita con los obligatorios completos: nombre y al menos una
+  // persona (elegida o el perfil simulado que se está escribiendo).
+  const canCreate =
+    fields.name.trim() !== '' && (memberCount > 0 || Boolean(readDraft().profile))
 
   return (
     <main className="page create-group">
@@ -195,7 +199,15 @@ export default function CreateGroupView() {
           )}
         </fieldset>
 
-        <SubmitButton loading={saving}>Crear grupo</SubmitButton>
+        {/* Cancelar a la izquierda y Crear a la derecha. */}
+        <div className="form-actions form-actions--split">
+          <button type="button" disabled={saving} onClick={() => navigate('/groups')}>
+            Cancelar
+          </button>
+          <SubmitButton loading={saving} disabled={!canCreate}>
+            Crear
+          </SubmitButton>
+        </div>
       </form>
     </main>
   )
