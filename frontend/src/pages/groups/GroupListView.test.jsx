@@ -189,6 +189,14 @@ describe('GroupListView (T029/T031 read view)', () => {
       expect(names()).toEqual(['Viaje a Mendoza', 'Departamento', 'Árbol de Navidad'])
     })
 
+    it('arranca con el término de ?q= (desde "Ver más" de la barra)', async () => {
+      listGroups.mockResolvedValue({ ok: true, groups: GROUPS })
+      renderView('/groups?q=arbol')
+
+      expect(await screen.findByRole('searchbox', { name: 'Buscar en Mis grupos' })).toHaveValue('arbol')
+      expect(names()).toEqual(['Árbol de Navidad'])
+    })
+
     it('sin grupos no muestra el buscador', async () => {
       listGroups.mockResolvedValue({ ok: true, groups: [] })
       renderView()

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { listGroups, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
 import {
   GROUP_SORT_OPTIONS,
@@ -31,7 +31,9 @@ function roleLabel(role) {
 export default function GroupListView() {
   const [groups, setGroups] = useState(null)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
+  // `?q=` llega desde "Ver más" del buscador de la barra.
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [order, setOrder] = useState('recent')
 
   useEffect(() => {

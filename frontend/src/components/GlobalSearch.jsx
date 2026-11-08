@@ -10,7 +10,8 @@ export const NO_RESULTS_MESSAGE = 'Sin resultados'
 
 const MIN_LENGTH = 2
 const DEBOUNCE_MS = 300
-const MAX_RESULTS = 5
+// Hasta 3 por sección; si hay más, "Ver más" lleva a la pantalla completa.
+const MAX_RESULTS = 3
 const DEFAULT_AVATAR = '/avatar-default.png'
 
 function normalize(text) {
@@ -57,12 +58,11 @@ export default function GlobalSearch() {
     }
   }, [trimmed, isSearchable])
 
-  const matchingGroups = useMemo(() => {
+  const allMatchingGroups = useMemo(() => {
     const needle = normalize(trimmed)
-    return groups
-      .filter((group) => normalize(group.name).includes(needle))
-      .slice(0, MAX_RESULTS)
+    return groups.filter((group) => normalize(group.name).includes(needle))
   }, [groups, trimmed])
+  const matchingGroups = allMatchingGroups.slice(0, MAX_RESULTS)
 
   const handleFocus = async () => {
     setIsOpen(true)
@@ -78,6 +78,7 @@ export default function GlobalSearch() {
   }
 
   const peopleUrl = `/users/search?q=${encodeURIComponent(trimmed)}`
+  const groupsUrl = `/groups?q=${encodeURIComponent(trimmed)}`
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -89,7 +90,8 @@ export default function GlobalSearch() {
 
   // Only the answer of the current term counts; anything else is still loading.
   const current = peopleSearch?.term === trimmed ? peopleSearch : null
-  const people = current?.users.slice(0, MAX_RESULTS) ?? []
+  const allPeople = current?.users ?? []
+  const people = allPeople.slice(0, MAX_RESULTS)
   const isEmpty = current?.ok && people.length === 0 && matchingGroups.length === 0
 
   return (
@@ -132,6 +134,15 @@ export default function GlobalSearch() {
                   </li>
                 ))}
               </ul>
+              {allPeople.length > MAX_RESULTS && (
+                <Link
+                  className="global-search__more"
+                  to={peopleUrl}
+                  onClick={reset}
+                >
+                  Ver más en personas
+                </Link>
+              )}
             </>
           )}
 
@@ -165,6 +176,15 @@ export default function GlobalSearch() {
                   </li>
                 ))}
               </ul>
+              {allMatchingGroups.length > MAX_RESULTS && (
+                <Link
+                  className="global-search__more"
+                  to={groupsUrl}
+                  onClick={reset}
+                >
+                  Ver más en grupos
+                </Link>
+              )}
             </>
           )}
         </div>
