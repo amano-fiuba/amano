@@ -39,8 +39,13 @@ public class GroupExpense {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "group_id", nullable = false)
+    /** Null for an expense with a friend (027 US4); then {@link #friendUserId} is set. */
+    @Column(name = "group_id")
     private Long groupId;
+
+    /** 027 US4: the other participant of an expense with a friend; null for group expenses. */
+    @Column(name = "friend_user_id")
+    private Long friendUserId;
 
     /** Who registered it, always the session principal (actor of the history event). */
     @Column(name = "created_by_user_id", nullable = false)
@@ -210,6 +215,19 @@ public class GroupExpense {
 
     public void setSplitMethod(SplitMethod splitMethod) {
         this.splitMethod = splitMethod;
+    }
+
+    public Long getFriendUserId() {
+        return friendUserId;
+    }
+
+    public void setFriendUserId(Long friendUserId) {
+        this.friendUserId = friendUserId;
+    }
+
+    /** 027 US4: an expense with a friend, outside any group. */
+    public boolean isDirect() {
+        return groupId == null;
     }
 
     public ExpenseCategory getCategory() {

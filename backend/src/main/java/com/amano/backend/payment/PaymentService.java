@@ -97,6 +97,10 @@ public class PaymentService {
         // The FIRST read takes the lock: a managed Debt read earlier without it
         // would be returned stale by the locking query (plan.md §Flujo, paso 1).
         Debt debt = debtRepository.findByIdForUpdate(request.getDebtId()).orElseThrow(DebtNotFoundException::new);
+        // 027 US4: settling a direct debt (expense with a friend) is out of scope.
+        if (debt.getGroupId() == null) {
+            throw new DebtNotFoundException();
+        }
         GroupMember caller = activeMembership(callerId, debt.getGroupId());
         if (!permissionChecker.canRegisterPayment(caller.getRole(), callerId, debt.getDebtorUserId(),
                 debt.getCreditorUserId())) {

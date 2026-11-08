@@ -121,4 +121,18 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
               AND d.debtorSimulatedProfileId = :profileId
             """)
     boolean existsOpenForSimulatedProfile(@Param("groupId") Long groupId, @Param("profileId") Long profileId);
+
+    /**
+     * 027 US4 / 016: true when {@code a} and {@code b} have an unsettled direct debt
+     * (an expense with a friend, {@code groupId} null) in either direction.
+     */
+    @Query("""
+            SELECT COUNT(d) > 0 FROM Debt d
+            WHERE d.groupId IS NULL
+              AND d.status NOT IN (com.amano.backend.groupexpense.DebtStatus.PAID,
+                  com.amano.backend.groupexpense.DebtStatus.VERIFIED)
+              AND ((d.debtorUserId = :a AND d.creditorUserId = :b)
+                OR (d.debtorUserId = :b AND d.creditorUserId = :a))
+            """)
+    boolean existsOpenDirectBetween(@Param("a") Long a, @Param("b") Long b);
 }
