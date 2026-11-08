@@ -84,6 +84,11 @@ export default function GroupInfoView() {
               <div className="group-hero__text">
                 <h1>{group.name}</h1>
                 <GroupDescriptionPanel description={group.description ?? null} />
+                {group.primaryCurrency && (
+                  <p className="group-hero__meta" data-testid="group-currency">
+                    Moneda: {group.primaryCurrency}
+                  </p>
+                )}
                 <p className="group-hero__meta" data-testid="group-role">
                   {memberCountLabel(group.memberCount)}
                   <span aria-hidden="true">·</span>
@@ -93,10 +98,19 @@ export default function GroupInfoView() {
                   </span>
                 </p>
               </div>
+
             </div>
             {/* Acciones arriba a la derecha y "Salir" en la esquina inferior derecha. */}
             <div className="group-hero__side">
             <div className="group-hero__actions">
+
+                           <Link
+                className="group-action"
+                to={`/groups/${id}/debts`}
+                data-testid="group-debts-link"
+              >
+                Deudas y saldos
+              </Link>
               {/* Como Configuración: la cabecera no cambia, el botón pasa a
                   "Cerrar" y el formulario se abre en un panel debajo. */}
               {canEditGroupData && (

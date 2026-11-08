@@ -91,6 +91,15 @@ public class Debt {
      * (it needs its id) and must not belong to the payer.
      */
     public static Debt pendingFor(GroupExpense expense, GroupExpenseShare share) {
+        return pendingFor(expense, share, expense.getCurrency());
+    }
+
+    /**
+     * New {@code PENDING} debt of the participant of {@code share} towards the
+     * payer of {@code expense}, expressed in {@code debtCurrency} (022 D8: the
+     * group's primary currency once the expense total is converted).
+     */
+    public static Debt pendingFor(GroupExpense expense, GroupExpenseShare share, Currency debtCurrency) {
         if (share.isOf(expense.getPayerUserId())) {
             throw new IllegalArgumentException("La parte del pagador no genera deuda");
         }
@@ -103,7 +112,7 @@ public class Debt {
         debt.debtorSimulatedProfileId = share.getSimulatedProfileId();
         debt.debtorName = share.getParticipantName();
         debt.creditorUserId = expense.getPayerUserId();
-        debt.currency = expense.getCurrency();
+        debt.currency = debtCurrency != null ? debtCurrency : expense.getCurrency();
         debt.amount = share.getAmount();
         debt.paidAmount = BigDecimal.ZERO.setScale(2);
         debt.status = DebtStatus.PENDING;
@@ -111,23 +120,78 @@ public class Debt {
     }
 
     /**
-     * Applies a payment (used by 018): {@code 0 < payment <= outstanding}, at most
-     * two decimals. Moves PENDING → PARTIALLY_PAID → PAID or PENDING → PAID; a
-     * PAID debt or an invalid amount is rejected without changes (FR-012).
+     * Applies a confirmed payment, partial or total (018 flow and 022 groups
+     * that do not require validation): {@code 0 < payment <= outstanding}, at
+     * most two decimals. The amount is added to {@code paidAmount} at once and
+     * the status follows it: {@code PARTIALLY_PAID} while a balance remains,
+     * {@code PAID} when it reaches zero (an {@code OVERDUE} debt that receives a
+     * partial payment also becomes {@code PARTIALLY_PAID}, 022 D3). A debt that
+     * is not payable ({@code PAYMENT_REPORTED}, {@code PAID}, {@code VERIFIED})
+     * or an invalid amount is rejected without changes (FR-012).
      */
     public void applyPayment(BigDecimal payment) {
-        if (status == DebtStatus.PAID) {
+        if (!status.isPayable()) {
             throw new IllegalStateException("La deuda ya está pagada");
         }
+        requireValidAmount(payment);
+        BigDecimal newPaid = paidAmount.add(payment).setScale(2);
+        status = DebtStatus.of(amount, newPaid);
+        paidAmount = newPaid;
+    }
+
+    /**
+     * Reports a payment that waits for an administrator (022 D6, groups that
+     * require validation): the debt becomes {@code PAYMENT_REPORTED} and
+     * {@code paidAmount} is NOT touched, so the debt is still not settled and
+     * keeps contributing {@link #getOutstanding()} to the balances (D4) until the
+     * payment is confirmed. The same validation as {@link #applyPayment} applies,
+     * and a debt that already waits for a decision or is settled is rejected.
+     */
+    public void reportPayment(BigDecimal payment) {
+        if (!status.isPayable()) {
+            throw new IllegalStateException("La deuda ya tiene un pago registrado");
+        }
+        requireValidAmount(payment);
+        status = DebtStatus.PAYMENT_REPORTED;
+    }
+
+    /**
+     * 022 US5: an administrator confirmed the reported payment. The amount of
+     * that payment is ADDED to {@code paidAmount} (never set to the debt amount)
+     * and the status follows the balance: {@code VERIFIED} when nothing is left
+     * (equivalent to {@code PAID} for balances), {@code PARTIALLY_PAID} otherwise.
+     */
+    public void confirmReportedPayment(BigDecimal payment) {
+        if (status != DebtStatus.PAYMENT_REPORTED) {
+            throw new IllegalStateException("La deuda no tiene un pago pendiente de validación");
+        }
+        requireValidAmount(payment);
+        BigDecimal newPaid = paidAmount.add(payment).setScale(2);
+        paidAmount = newPaid;
+        status = newPaid.compareTo(amount) == 0 ? DebtStatus.VERIFIED : DebtStatus.PARTIALLY_PAID;
+    }
+
+    /**
+     * 022 US5: an administrator rejected the reported payment. Reporting never
+     * changed {@code paidAmount}, so the status simply follows it again:
+     * {@code PENDING} when nothing was paid, {@code PARTIALLY_PAID} when earlier
+     * payments exist. A debt that had been overdue returns as {@code PENDING}
+     * and the overdue job (D7) marks it again on its next run.
+     */
+    public void rejectReportedPayment() {
+        if (status != DebtStatus.PAYMENT_REPORTED) {
+            throw new IllegalStateException("La deuda no tiene un pago pendiente de validación");
+        }
+        status = DebtStatus.of(amount, paidAmount);
+    }
+
+    private void requireValidAmount(BigDecimal payment) {
         if (payment == null || payment.signum() <= 0 || payment.stripTrailingZeros().scale() > 2) {
             throw new IllegalArgumentException("El monto del pago no es válido");
         }
         if (payment.compareTo(getOutstanding()) > 0) {
             throw new IllegalArgumentException("El pago supera el saldo de la deuda");
         }
-        BigDecimal newPaid = paidAmount.add(payment).setScale(2);
-        status = DebtStatus.of(amount, newPaid);
-        paidAmount = newPaid;
     }
 
     /** Amount still to pay: {@code amount - paidAmount}. */

@@ -109,6 +109,7 @@ export function SearchIcon() {
   )
 }
 
+
 // Reloj con flecha hacia atrás: "Historial de actividad".
 export function HistoryIcon() {
   return (
@@ -141,6 +142,18 @@ export function ExitIcon() {
       <path d="M13 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7" />
       <path d="M10 12h11" />
       <path d="m17 8 4 4-4 4" />
+     </Icon>
+  )
+}
+
+// Billete: marca a quien pagó un gasto.
+export function PaidIcon() {
+  return (
+    <Icon>
+      <rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M6 9.5v.01M18 14.5v.01" />
+
     </Icon>
   )
 }

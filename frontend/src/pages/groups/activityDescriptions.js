@@ -31,8 +31,23 @@ export const ACTIVITY_FILTERS = [
   { value: 'ALL', label: 'Toda la actividad', eventTypes: [] },
   { value: 'ADDED', label: 'Altas', eventTypes: ['MEMBER_ADDED'] },
   { value: 'REMOVED', label: 'Bajas', eventTypes: ['MEMBER_REMOVED', 'MEMBER_LEFT'] },
-  { value: 'EXPENSES', label: 'Gastos', eventTypes: ['EXPENSE_CREATED'] },
-  { value: 'PAYMENTS', label: 'Pagos', eventTypes: ['PAYMENT_MADE'] },
+  {
+    value: 'EXPENSES',
+    label: 'Gastos',
+    eventTypes: ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'EXPENSE_DELETED'],
+  },
+  {
+    value: 'PAYMENTS',
+    label: 'Pagos',
+    eventTypes: [
+      'PAYMENT_MADE',
+      'PAYMENT_REGISTERED',
+      'PAYMENT_CONFIRMED',
+      'PAYMENT_REJECTED',
+      'DEBT_OVERDUE',
+      'LIQUIDATION_PROPOSED',
+    ],
+  },
   { value: 'SETTINGS', label: 'Cambios del grupo', eventTypes: ['PERMISSION_CHANGED', 'PHOTO_CHANGED'] },
 ]
 
@@ -76,12 +91,29 @@ function memberRemoved(details) {
   return `quitó a ${name} del grupo`
 }
 
-function expenseCreated(details) {
+function expenseCreated(details, actor) {
   const money = formatMoney(details.amount, details.currency)
   let sentence = money ? `registró un gasto de ${money}` : 'registró un gasto'
   const description = text(details.description)
   if (description) sentence += ` «${description}»`
+  const payerName = text(details.payerName)
+  if (payerName) {
+    const differentPayer =
+      (details.payerUserId != null && actor?.id != null && details.payerUserId !== actor.id)
+      || (actor && payerName !== actorName(actor))
+    sentence += differentPayer ? ` pagado por ${payerName}` : ` (pagó ${payerName})`
+  }
   return sentence
+}
+
+function expenseEdited(details) {
+  const description = text(details.description)
+  return description ? `editó el gasto «${description}»` : 'editó un gasto'
+}
+
+function expenseDeleted(details) {
+  const description = text(details.description)
+  return description ? `eliminó el gasto «${description}»` : 'eliminó un gasto'
 }
 
 function paymentMade(details) {
@@ -94,6 +126,45 @@ function paymentMade(details) {
   return sentence
 }
 
+function paymentConfirmed(details) {
+  const money = formatMoney(details.amount, details.currency)
+  let sentence = money ? `confirmó el pago de ${money}` : 'confirmó un pago'
+  const from = text(details.fromName)
+  const to = text(details.toName)
+  if (from) sentence += ` de ${from}`
+  if (to) sentence += ` a ${to}`
+  return sentence
+}
+
+function paymentRejected(details) {
+  const money = formatMoney(details.amount, details.currency)
+  let sentence = money ? `rechazó el pago de ${money}` : 'rechazó un pago'
+  const from = text(details.fromName)
+  const to = text(details.toName)
+  if (from) sentence += ` de ${from}`
+  if (to) sentence += ` a ${to}`
+  return sentence
+}
+
+function debtOverdue(details) {
+  const money = formatMoney(details.amount, details.currency)
+  let sentence = money ? `venció la deuda de ${money}` : 'venció una deuda'
+  const from = text(details.fromName)
+  const to = text(details.toName)
+  if (from) sentence += ` de ${from}`
+  if (to) sentence += ` con ${to}`
+  return sentence
+}
+
+function liquidationProposed(details) {
+  const count = Number(details.transferCount)
+  if (Number.isInteger(count) && count > 0) {
+    const word = count === 1 ? 'transferencia' : 'transferencias'
+    return `generó una propuesta de liquidación (${count} ${word})`
+  }
+  return 'generó una propuesta de liquidación'
+}
+
 const DESCRIBERS = {
   MEMBER_ADDED: memberAdded,
   MEMBER_REMOVED: memberRemoved,
@@ -101,16 +172,59 @@ const DESCRIBERS = {
   PERMISSION_CHANGED: () => 'cambió los permisos del grupo',
   PHOTO_CHANGED: () => 'cambió la foto del grupo',
   EXPENSE_CREATED: expenseCreated,
+  EXPENSE_EDITED: expenseEdited,
+  EXPENSE_DELETED: expenseDeleted,
   PAYMENT_MADE: paymentMade,
+  PAYMENT_REGISTERED: paymentMade,
+  PAYMENT_CONFIRMED: paymentConfirmed,
+  PAYMENT_REJECTED: paymentRejected,
+  DEBT_OVERDUE: debtOverdue,
+  LIQUIDATION_PROPOSED: liquidationProposed,
+}
+
+// Eventos que abren el detalle del gasto: el gasto mismo (017, 022 edición) y sus
+// pagos y deudas (018 FR-022; 022 US8). EXPENSE_DELETED nunca enlaza.
+const LINKS_TO_EXPENSE = [
+  'EXPENSE_CREATED',
+  'EXPENSE_EDITED',
+  'PAYMENT_MADE',
+  'PAYMENT_REGISTERED',
+  'PAYMENT_CONFIRMED',
+  'PAYMENT_REJECTED',
+  'DEBT_OVERDUE',
+]
+
+/** Ids (texto) de los gastos que tienen un EXPENSE_DELETED entre las entradas. */
+export function deletedExpenseIds(entries) {
+  const ids = new Set()
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    if (entry?.eventType === 'EXPENSE_DELETED' && entry.details?.expenseId != null) {
+      ids.add(String(entry.details.expenseId))
+    }
+  }
+  return ids
+}
+
+/**
+ * Id del gasto al que enlaza la entrada, o null: solo los tipos con gasto
+ * asociado que traen `expenseId`, y nunca si las entradas cargadas muestran que
+ * ese gasto se borró (`deleted`, de deletedExpenseIds). Los eventos viejos sin
+ * `expenseId` no enlazan.
+ */
+export function expenseLinkId(entry, deleted = new Set()) {
+  const id = entry?.details?.expenseId
+  if (id == null || !LINKS_TO_EXPENSE.includes(entry.eventType)) return null
+  return deleted.has(String(id)) ? null : id
 }
 
 // FR-014: { actor, text } para una entrada del historial.
 export function describeActivity(entry) {
   const details = entry?.details && typeof entry.details === 'object' ? entry.details : {}
   const describe = DESCRIBERS[entry?.eventType]
+  const actor = entry?.eventType === 'DEBT_OVERDUE' && !entry?.actor ? 'Sistema' : actorName(entry?.actor)
   return {
-    actor: actorName(entry?.actor),
-    text: describe ? describe(details) : 'realizó una acción en el grupo',
+    actor,
+    text: describe ? describe(details, entry?.actor) : 'realizó una acción en el grupo',
   }
 }
 

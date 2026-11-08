@@ -33,6 +33,10 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:?Falta MAIL_USERNAME en .env}
       MAIL_PASSWORD: ${MAIL_PASSWORD:?Falta MAIL_PASSWORD en .env}
       APP_BASE_URL: ${APP_BASE_URL:?Falta APP_BASE_URL en .env}
+      # Cotizaciones (feature 022): API pública del BCRA, sin credenciales.
+      BCRA_BASE_URL: ${BCRA_BASE_URL:-https://api.bcra.gob.ar}
+      # Job de vencimiento de deudas (feature 022, D7): cron de 6 campos.
+      OVERDUE_CRON: "${OVERDUE_CRON:-0 30 0 * * *}"
     depends_on:
       db:
         condition: service_healthy

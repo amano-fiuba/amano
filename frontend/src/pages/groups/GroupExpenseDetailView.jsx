@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
+import { getGroup } from '../../api/groupsClient'
 import {
+  GROUP_EXPENSE_DELETE_ERROR_MESSAGE,
   GROUP_EXPENSE_LOAD_ERROR_MESSAGE,
+  deleteGroupExpense,
   getGroupExpense,
 } from '../../api/groupExpensesClient'
+import { useSnackbar } from '../../components/Snackbar'
 import ExpenseDebtList from '../../components/groups/ExpenseDebtList'
 import { formatAmount, formatIsoDate } from '../../validation/expenseFormat'
 
 export const EXPENSE_NOT_FOUND_MESSAGE = 'No existe el gasto solicitado o no sos miembro del grupo'
+export const DELETE_SUCCESS_MESSAGE = 'Gasto eliminado'
+export const DELETE_CONFIRM_MESSAGE =
+  '¿Seguro que querés eliminar este gasto? Esta acción no se puede deshacer.'
 
 // Detail of a group expense with its shares and debts (specs/017-debt-states,
 // US3, FR-020/FR-023/FR-025). Names are the copies stored with the expense, so
@@ -17,8 +24,27 @@ export default function GroupExpenseDetailView() {
   const { id, expenseId } = useParams()
   const auth = useAuth()
   const setUser = auth?.setUser
+  const currentUserId = auth?.user?.id ?? null
+  const navigate = useNavigate()
+  const showSnackbar = useSnackbar()
+  const [role, setRole] = useState(null)
+  const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [retryToken, setRetryToken] = useState(0)
   const [state, setState] = useState({ status: 'loading', expense: null, error: '' })
+
+  // The caller's role only decides whether to offer edit/delete (T077); the
+  // backend decides anyway, so a failure here just hides the actions for admins.
+  useEffect(() => {
+    let cancelled = false
+    getGroup(id).then((result) => {
+      if (!cancelled) setRole(result.ok ? result.group?.currentUserRole ?? null : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [id])
 
   useEffect(() => {
     let cancelled = false
@@ -46,6 +72,36 @@ export default function GroupExpenseDetailView() {
 
   const { status, expense, error, retryable } = state
   const shares = Array.isArray(expense?.shares) ? expense.shares : []
+  // 022 T077: only a personal expense (one share, no debts) can be edited or deleted,
+  // by who registered it, its payer or an admin.
+  const isPersonal = shares.length <= 1 && (expense?.debts?.length ?? 0) === 0
+  const canManage =
+    isPersonal &&
+    (role === 'ADMIN' ||
+      (currentUserId != null &&
+        (expense?.createdBy?.userId === currentUserId || expense?.payer?.userId === currentUserId)))
+
+  async function confirmDelete() {
+    setDeleting(true)
+    setDeleteError('')
+    const result = await deleteGroupExpense(id, expenseId)
+    setDeleting(false)
+    if (result.ok) {
+      showSnackbar?.(DELETE_SUCCESS_MESSAGE)
+      navigate(`/groups/${id}`)
+      return
+    }
+    if (result.status === 401) {
+      setUser?.(null)
+      return
+    }
+    setConfirming(false)
+    setDeleteError(
+      result.network
+        ? GROUP_EXPENSE_DELETE_ERROR_MESSAGE
+        : result.detail || (result.status === 404 ? EXPENSE_NOT_FOUND_MESSAGE : GROUP_EXPENSE_DELETE_ERROR_MESSAGE),
+    )
+  }
 
   return (
     <main className="page group-page group-expense">
@@ -88,6 +144,51 @@ export default function GroupExpenseDetailView() {
               {formatIsoDate(expense.date)} · Pagó {expense.payer?.name ?? 'alguien'}
             </p>
           </header>
+
+          {canManage && (
+            <section className="group-card group-expense__actions" aria-label="Acciones del gasto">
+              <Link to={`/groups/${id}/expenses/${expenseId}/edit`} className="group-action">
+                Editar gasto
+              </Link>
+              <button
+                type="button"
+                className="group-action"
+                disabled={deleting}
+                onClick={() => {
+                  setDeleteError('')
+                  setConfirming(true)
+                }}
+              >
+                Eliminar gasto
+              </button>
+              {deleteError && (
+                <p role="alert" data-testid="group-expense-delete-error">
+                  {deleteError}
+                </p>
+              )}
+              {confirming && (
+                <div
+                  role="dialog"
+                  className="group-confirm"
+                  aria-label="Eliminar gasto"
+                  data-testid="delete-expense-dialog"
+                >
+                  <p>{DELETE_CONFIRM_MESSAGE}</p>
+                  <button type="button" className="group-action" disabled={deleting} onClick={confirmDelete}>
+                    Sí, eliminar
+                  </button>{' '}
+                  <button
+                    type="button"
+                    className="group-action"
+                    disabled={deleting}
+                    onClick={() => setConfirming(false)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
 
           <section className="group-card" aria-label="Partes del gasto">
             <h3>División</h3>

@@ -7,6 +7,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -18,7 +20,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 /**
  * 017 T025 (US2): the real {@link DebtPort} answers from the {@code debts}
  * table (research.md D7, FR-017/FR-018). A user is blocked by any unsettled
- * debt (PENDING or PARTIALLY_PAID) of THAT group, as debtor or creditor; a
+ * debt (PENDING, PARTIALLY_PAID, PAYMENT_REPORTED or OVERDUE) of THAT group, as debtor or creditor; a
  * simulated profile, as debtor. PAID debts and other groups never count, and
  * users and profiles are never mixed even when they share the numeric id.
  */
@@ -137,6 +139,38 @@ class LedgerDebtPortIT {
 
         assertThat(debtPort.hasPendingDebtsForUser(groupId, juan)).isTrue();
         assertThat(debtPort.hasPendingDebtsForUser(groupId, ana)).isTrue();
+    }
+
+    /** 022 T059: the four unsettled states block the debtor and the creditor alike. */
+    @ParameterizedTest
+    @ValueSource(strings = { "PENDING", "PARTIALLY_PAID", "PAYMENT_REPORTED", "OVERDUE" })
+    void t059EveryUnsettledStateBlocksTheDebtorAndTheCreditor(String status) {
+        userDebt(groupId, expenseId, juan, ana, "PARTIALLY_PAID".equals(status) ? "20.00" : "0", status);
+
+        assertThat(debtPort.hasPendingDebtsForUser(groupId, juan)).as("debtor in %s", status).isTrue();
+        assertThat(debtPort.hasPendingDebtsForUser(groupId, ana)).as("creditor in %s", status).isTrue();
+        assertThat(debtPort.hasPendingDebtsForUser(groupId, pedro)).as("uninvolved in %s", status).isFalse();
+    }
+
+    /** 022 T059: a reported or overdue debt of a simulated profile blocks its removal too. */
+    @ParameterizedTest
+    @ValueSource(strings = { "PAYMENT_REPORTED", "OVERDUE" })
+    void t059AReportedOrOverdueDebtOfASimulatedProfileBlocksItsRemoval(String status) {
+        profileDebt(abuela, "0", status);
+
+        assertThat(debtPort.hasPendingDebtsForSimulatedProfile(groupId, abuela)).isTrue();
+    }
+
+    /** 022 T059: PAID and VERIFIED are settled and never block either side. */
+    @ParameterizedTest
+    @ValueSource(strings = { "PAID", "VERIFIED" })
+    void t059SettledStatesDoNotBlockAnyone(String status) {
+        userDebt(groupId, expenseId, juan, ana, "50.00", status);
+        profileDebt(abuela, "50.00", status);
+
+        assertThat(debtPort.hasPendingDebtsForUser(groupId, juan)).as("debtor in %s", status).isFalse();
+        assertThat(debtPort.hasPendingDebtsForUser(groupId, ana)).as("creditor in %s", status).isFalse();
+        assertThat(debtPort.hasPendingDebtsForSimulatedProfile(groupId, abuela)).isFalse();
     }
 
     @Test

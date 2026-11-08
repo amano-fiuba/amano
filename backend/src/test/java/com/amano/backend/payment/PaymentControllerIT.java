@@ -201,6 +201,103 @@ class PaymentControllerIT {
         assertThat(s.payments(s.juanDebt)).isZero();
     }
 
+    // ---- 022 T085: the inherited endpoint follows the group's "Pagos requiere validación" ----
+
+    private static final String AWAITING =
+            "Esta deuda ya tiene un pago esperando validación: esperá a que un administrador lo decida";
+
+    @Test
+    void withValidationTheInheritedEndpointReportsThePaymentAndAnAdminDecidesIt() throws Exception {
+        s.requireValidation();
+
+        String body = s.pay(s.juanSession, s.juanDebt, "1000.00")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("REPORTED"))
+                .andExpect(jsonPath("$.debt.status").value("PAYMENT_REPORTED"))
+                .andExpect(jsonPath("$.debt.paidAmount").value("0.00"))
+                .andExpect(jsonPath("$.debt.outstanding").value("3333.33"))
+                .andExpect(jsonPath("$.debt.canRegisterPayment").value(false))
+                .andReturn().getResponse().getContentAsString();
+        long paymentId = objectMapper.readTree(body).get("id").asLong();
+
+        var row = jdbc.queryForMap("SELECT status, legacy FROM payments WHERE id = ?", paymentId);
+        assertThat(row.get("status")).isEqualTo("REPORTED");
+        assertThat(row.get("legacy")).isEqualTo(true); // origin marker only
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("0.00");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-3333.33");
+
+        // The administrator sees it in the queue and decides it like any other reported payment.
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/payments/pending-validation").cookie(s.anaSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].paymentId").value(paymentId))
+                .andExpect(jsonPath("$[0].amount").value(1000.0));
+        s.confirmPayment(s.anaSession, paymentId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("1000.00");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-2333.33");
+
+        long second = objectMapper.readTree(s.pay(s.juanSession, s.juanDebt, "500.00")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        s.rejectPayment(s.anaSession, second)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void whileAPaymentWaitsForValidationBothEndpointsAnswer409WithTheVoseoMessage() throws Exception {
+        s.requireValidation();
+        s.pay(s.juanSession, s.juanDebt, "1000.00").andExpect(status().isCreated());
+
+        s.pay(s.anaSession, s.juanDebt, "100.00")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(AWAITING))
+                .andExpect(jsonPath("$.properties.code").value("DEBT_ALREADY_HAS_PAYMENT"));
+        s.registerFull(s.anaSession, s.juanDebt, "100.00")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(AWAITING));
+
+        assertThat(s.payments(s.juanDebt)).isEqualTo(1);
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAYMENT_REPORTED");
+    }
+
+    @Test
+    void theSameKeyReplaysAReportedPaymentOfTheInheritedEndpoint() throws Exception {
+        s.requireValidation();
+        String key = UUID.randomUUID().toString();
+        String first = s.pay(s.juanSession, key, "{\"debtId\": %d, \"amount\": \"1000.00\", \"date\": \"%s\"}"
+                .formatted(s.juanDebt, PaymentScenario.EXPENSE_DATE))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+
+        s.pay(s.juanSession, key, "{\"debtId\": %d, \"amount\": \"1000.00\", \"date\": \"%s\"}"
+                .formatted(s.juanDebt, PaymentScenario.EXPENSE_DATE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(objectMapper.readTree(first).get("id").asLong()))
+                .andExpect(jsonPath("$.status").value("REPORTED"));
+        assertThat(s.payments(s.juanDebt)).isEqualTo(1);
+    }
+
+    @Test
+    void paymentsAlreadyStoredByTheInheritedFlowAreNotTouchedByTheNewRules() throws Exception {
+        // A payment made before the group asked for validation (legacy, CONFIRMED).
+        s.pay(s.juanSession, s.juanDebt, "1000.00").andExpect(status().isCreated());
+        var before = jdbc.queryForMap(
+                "SELECT id, status, legacy, amount, payment_date, decided_by_user_id FROM payments WHERE debt_id = ?",
+                s.juanDebt);
+
+        s.requireValidation();
+        long reported = objectMapper.readTree(s.pay(s.juanSession, s.juanDebt, "1000.00")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString()).get("id").asLong();
+        s.confirmPayment(s.anaSession, reported).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForMap(
+                "SELECT id, status, legacy, amount, payment_date, decided_by_user_id FROM payments WHERE id = ?",
+                before.get("id"))).isEqualTo(before);
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("2000.00");
+        assertThat(s.payments(s.juanDebt)).isEqualTo(2);
+    }
+
     @Test
     void aPaidDebtAnswers409() throws Exception {
         s.pay(s.juanSession, s.juanDebt, "3333.33").andExpect(status().isCreated());

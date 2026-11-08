@@ -242,7 +242,7 @@ class GroupSettingsServiceTest {
     }
 
     @Test
-    void groupCreationSeedsPermissionsWithAllCasillasFalse() {
+    void groupCreationSeedsPermissionsWithExpensesForOthersTrueAndTheRestFalse() {
         com.amano.backend.groups.dto.CreateGroupRequest.MemberInput member =
                 new com.amano.backend.groups.dto.CreateGroupRequest.MemberInput();
         member.setMemberType("REGISTERED");
@@ -266,7 +266,8 @@ class GroupSettingsServiceTest {
         assertThat(saved.getValue().isMembersCannotInvite()).isFalse();
         assertThat(saved.getValue().isMembersCanEditGroupData()).isFalse();
         assertThat(saved.getValue().isMembersCanManageSimulatedProfiles()).isFalse();
-        assertThat(saved.getValue().isMembersCanGenerateExpensesForOthers()).isFalse();
+        // 022 T060: new groups start with expenses-for-others enabled
+        assertThat(saved.getValue().isMembersCanGenerateExpensesForOthers()).isTrue();
         assertThat(saved.getValue().isPaymentsRequireValidation()).isFalse();
     }
 }

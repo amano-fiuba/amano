@@ -5,9 +5,11 @@ import static com.amano.backend.payment.PaymentFixtures.ANA;
 import static com.amano.backend.payment.PaymentFixtures.GROUP_ID;
 import static com.amano.backend.payment.PaymentFixtures.JUAN;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -41,8 +43,30 @@ class PaymentTest {
         assertThat(payment.getCurrency()).isEqualTo(Currency.ARS);
         assertThat(payment.getPaymentDate()).isEqualTo(LocalDate.of(2026, 11, 5));
         assertThat(payment.getIdempotencyKey()).isEqualTo(KEY);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+        assertThat(payment.isLegacy()).isFalse();
+        assertThat(payment.getDecidedByUserId()).isNull();
+        assertThat(payment.getDecidedAt()).isNull();
         assertThat(payment.getId()).isNull();
         assertThat(payment.getCreatedAt()).isNull();
+    }
+
+    @Test
+    void theLegacyFlagCanBeSetExplicitly() {
+        Payment payment = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
+                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true);
+
+        assertThat(payment.isLegacy()).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+    }
+
+    @Test
+    void theStateCanBeReportedForThe022FullPaymentFlow() {
+        Payment payment = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("3333.33"),
+                LocalDate.of(2026, 11, 7), ANA, "Ana López", KEY, false, PaymentStatus.REPORTED);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REPORTED);
+        assertThat(payment.isLegacy()).isFalse();
     }
 
     @Test
@@ -54,5 +78,58 @@ class PaymentTest {
         assertThat(payment.getPayerUserId()).isNull();
         assertThat(payment.getPayerSimulatedProfileId()).isEqualTo(ABUELA);
         assertThat(payment.getPayerName()).isEqualTo("Abuela");
+    }
+
+    @Test
+    void aReportedPaymentCanBeConfirmedWithTheAdministratorAndInstant() {
+        Payment payment = reported();
+        OffsetDateTime at = OffsetDateTime.parse("2026-11-07T12:30:00-03:00");
+
+        payment.confirmBy(ANA, at);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+        assertThat(payment.getDecidedByUserId()).isEqualTo(ANA);
+        assertThat(payment.getDecidedAt()).isEqualTo(at);
+    }
+
+    @Test
+    void aReportedPaymentCanBeRejectedWithTheAdministratorAndInstant() {
+        Payment payment = reported();
+        OffsetDateTime at = OffsetDateTime.parse("2026-11-07T12:30:00-03:00");
+
+        payment.rejectBy(ANA, at);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REJECTED);
+        assertThat(payment.getDecidedByUserId()).isEqualTo(ANA);
+        assertThat(payment.getDecidedAt()).isEqualTo(at);
+    }
+
+    /**
+     * Rewritten for partial payments (022 T085): {@code legacy} is only an origin marker now, so a
+     * REPORTED payment written by the inherited 018 flow is decided like any other; what still
+     * blocks a decision is the status.
+     */
+    @Test
+    void onlyReportedPaymentsAcceptADecisionWhateverTheirOrigin() {
+        Payment confirmed = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("3333.33"),
+                LocalDate.of(2026, 11, 7), ANA, "Ana López", KEY, false, PaymentStatus.CONFIRMED);
+        Payment legacyConfirmed = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
+                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true, PaymentStatus.CONFIRMED);
+        OffsetDateTime at = OffsetDateTime.parse("2026-11-07T12:30:00-03:00");
+
+        assertThatThrownBy(() -> confirmed.confirmBy(ANA, at)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> legacyConfirmed.rejectBy(ANA, at)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> reported().confirmBy(null, at)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> reported().confirmBy(ANA, null)).isInstanceOf(IllegalArgumentException.class);
+
+        Payment legacyReported = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
+                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true, PaymentStatus.REPORTED);
+        legacyReported.confirmBy(ANA, at);
+        assertThat(legacyReported.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
+    }
+
+    private static Payment reported() {
+        return Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("3333.33"),
+                LocalDate.of(2026, 11, 7), ANA, "Ana López", KEY, false, PaymentStatus.REPORTED);
     }
 }

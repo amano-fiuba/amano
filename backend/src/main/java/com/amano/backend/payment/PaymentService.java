@@ -18,12 +18,14 @@ import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.groupexpense.Debt;
-import com.amano.backend.groupexpense.DebtRepository;
 import com.amano.backend.groupexpense.DebtStatus;
+import com.amano.backend.groupexpense.DebtRepository;
 import com.amano.backend.groupexpense.GroupExpense;
 import com.amano.backend.groupexpense.GroupExpenseRepository;
 import com.amano.backend.groupexpense.GroupExpenseResponse;
 import com.amano.backend.groups.ActivityEventService;
+import com.amano.backend.groups.GroupPermissions;
+import com.amano.backend.groups.GroupPermissionsRepository;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupPermissionChecker;
@@ -34,11 +36,13 @@ import com.amano.backend.user.UserRepository;
 
 /**
  * Registration of a payment of a group debt (018 US1, plan.md §Flujo del
- * backend). Payer, receiver, group and currency are copied from the debt
- * (D3). The debt is read once, with a pessimistic lock, before any other check
- * (D5), moved only through {@link Debt#applyPayment} (017) and
- * persisted by Hibernate dirty checking. The payment, the debt update and the
- * PAYMENT_MADE history event are written in ONE transaction (FR-010).
+ * backend), aligned with the 022 rules (partial payments, D3/D6). Payer,
+ * receiver, group and currency are copied from the debt (D3). The debt is read
+ * once, with a pessimistic lock, before any other check (D5). Without the
+ * group's "Pagos requiere validación" the payment is CONFIRMED and goes through
+ * {@link Debt#applyPayment}; with it the payment is REPORTED and the debt only
+ * becomes PAYMENT_REPORTED ({@link Debt#reportPayment}). The payment, the debt
+ * update and the history event are written in ONE transaction (FR-010).
  */
 @Service
 public class PaymentService {
@@ -58,11 +62,12 @@ public class PaymentService {
     private final GroupPermissionChecker permissionChecker;
     private final UserRepository userRepository;
     private final ActivityEventService activityEventService;
+    private final GroupPermissionsRepository groupPermissionsRepository;
 
     public PaymentService(DebtRepository debtRepository, PaymentRepository paymentRepository,
             GroupExpenseRepository expenseRepository, GroupMemberRepository groupMemberRepository,
             GroupPermissionChecker permissionChecker, UserRepository userRepository,
-            ActivityEventService activityEventService) {
+            ActivityEventService activityEventService, GroupPermissionsRepository groupPermissionsRepository) {
         this.debtRepository = debtRepository;
         this.paymentRepository = paymentRepository;
         this.expenseRepository = expenseRepository;
@@ -70,6 +75,7 @@ public class PaymentService {
         this.permissionChecker = permissionChecker;
         this.userRepository = userRepository;
         this.activityEventService = activityEventService;
+        this.groupPermissionsRepository = groupPermissionsRepository;
     }
 
     /** Result of a registration: the representation plus whether a payment was inserted. */
@@ -104,22 +110,48 @@ public class PaymentService {
             return replay(existing.get(), normalized, caller);
         }
 
-        if (debt.getStatus() == DebtStatus.PAID) {
+        if (debt.getStatus().isSettled()) {
             throw new DebtAlreadyPaidException();
+        }
+        if (debt.getStatus() == DebtStatus.PAYMENT_REPORTED) {
+            // 022 D6: only one payment waits for validation at a time.
+            throw DebtAlreadyHasPaymentException.awaitingValidation();
         }
         if (normalized.amount().compareTo(debt.getOutstanding()) > 0) {
             throw new FieldValidationException(
                     Map.of("amount", EXCEEDS_OUTSTANDING.formatted(argentine(debt.getOutstanding()))));
         }
 
-        debt.applyPayment(normalized.amount());
+        // 022: the inherited flow follows the same rules as the new one, including the group's
+        // "Pagos requiere validación" setting.
+        boolean requiresValidation = groupPermissionsRepository.findByGroupId(debt.getGroupId())
+                .map(GroupPermissions::isPaymentsRequireValidation)
+                .orElse(false);
+        String debtStatusBefore = debt.getStatus().name();
+        if (requiresValidation) {
+            debt.reportPayment(normalized.amount());
+        }
+        else {
+            debt.applyPayment(normalized.amount());
+        }
         String receiverName = nameOf(debt.getCreditorUserId());
+        // legacy is just the origin marker "written by the inherited 018 endpoint"; it takes no part
+        // in any index or decision (V25), so a REPORTED payment of this flow is decided like any other.
         Payment payment = paymentRepository.save(Payment.of(debt, normalized.amount(), normalized.date(),
-                callerId, receiverName, idempotencyKey));
+                callerId, receiverName, idempotencyKey, true,
+                requiresValidation ? PaymentStatus.REPORTED : PaymentStatus.CONFIRMED));
 
-        activityEventService.recordPaymentMade(debt.getGroupId(), callerId, new PaymentActivityDetails(
-                payment.getId(), payment.getAmount(), payment.getCurrency().name(), payment.getPayerName(),
-                payment.getReceiverName(), debt.getExpenseId(), debt.getId()));
+        if (requiresValidation) {
+            activityEventService.recordPaymentRegistered(debt.getGroupId(), callerId, new PaymentActivityDetails(
+                    payment.getId(), payment.getAmount(), payment.getCurrency().name(), payment.getPayerName(),
+                    payment.getReceiverName(), debt.getExpenseId(), debt.getId(),
+                    debtStatusBefore, debt.getStatus().name()));
+        }
+        else {
+            activityEventService.recordPaymentMade(debt.getGroupId(), callerId, new PaymentActivityDetails(
+                    payment.getId(), payment.getAmount(), payment.getCurrency().name(), payment.getPayerName(),
+                    payment.getReceiverName(), debt.getExpenseId(), debt.getId()));
+        }
 
         return new Registration(toResponse(payment, debt, caller), true);
     }
@@ -208,7 +240,7 @@ public class PaymentService {
     }
 
     private PaymentResponse toResponse(Payment payment, Debt debt, GroupMember caller) {
-        boolean canPay = debt.getStatus() != DebtStatus.PAID
+        boolean canPay = debt.getStatus().isPayable()
                 && permissionChecker.canRegisterPayment(caller.getRole(), caller.getId().getUserId(),
                         debt.getDebtorUserId(), debt.getCreditorUserId());
         return new PaymentResponse(payment.getId(), payment.getGroupId(), debt.getExpenseId(), payment.getDebtId(),
@@ -220,7 +252,8 @@ public class PaymentService {
                 new GroupExpenseResponse.Person(payment.getRegisteredByUserId(),
                         nameOf(payment.getRegisteredByUserId())),
                 payment.getCreatedAt(),
-                GroupExpenseResponse.DebtView.of(debt, nameOf(debt.getCreditorUserId()), canPay));
+                GroupExpenseResponse.DebtView.of(debt, nameOf(debt.getCreditorUserId()), canPay),
+                payment.getStatus().name());
     }
 
     /** Current visible name of a user (014 D4), falling back to the email as 017 does. */

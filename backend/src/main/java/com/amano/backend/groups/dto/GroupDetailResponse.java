@@ -27,6 +27,15 @@ public class GroupDetailResponse {
     private long expensesCount;
     private boolean lastMember;
     private boolean lastAdmin;
+    private String primaryCurrency;
+    private Integer debtDueDays;
+
+    /** 022 T078: days until a pending debt is overdue; null = never. */
+    public Integer getDebtDueDays() { return debtDueDays; }
+    public void setDebtDueDays(Integer debtDueDays) { this.debtDueDays = debtDueDays; }
+
+    public String getPrimaryCurrency() { return primaryCurrency; }
+    public void setPrimaryCurrency(String primaryCurrency) { this.primaryCurrency = primaryCurrency; }
 
     /** True when the caller is an ADMIN and the only active admin of the group. */
     @JsonProperty("isLastAdmin")

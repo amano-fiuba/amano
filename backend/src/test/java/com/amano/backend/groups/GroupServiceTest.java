@@ -132,7 +132,7 @@ class GroupServiceTest {
         assertThat(permissions.getValue().isMembersCannotInvite()).isFalse();
         assertThat(permissions.getValue().isMembersCanEditGroupData()).isFalse();
         assertThat(permissions.getValue().isMembersCanManageSimulatedProfiles()).isFalse();
-        assertThat(permissions.getValue().isMembersCanGenerateExpensesForOthers()).isFalse();
+        assertThat(permissions.getValue().isMembersCanGenerateExpensesForOthers()).isTrue();
         assertThat(permissions.getValue().isPaymentsRequireValidation()).isFalse();
 
         // 014 FR-002: the alta of the initial member is recorded, marked atCreation

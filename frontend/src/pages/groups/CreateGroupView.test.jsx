@@ -100,6 +100,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     await waitFor(() => expect(createGroup).toHaveBeenCalledWith({
       name: 'Viaje',
       description: '',
+      primaryCurrency: 'ARS',
       members: [
         { memberType: 'REGISTERED', identifier: 'ana@example.com' },
         { memberType: 'REGISTERED', identifier: 'bruno@example.com' },
@@ -123,6 +124,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     await waitFor(() => expect(createGroup).toHaveBeenCalledWith({
       name: 'Mixto',
       description: '',
+      primaryCurrency: 'ARS',
       members: [
         { memberType: 'REGISTERED', identifier: 'ana@example.com' },
         { memberType: 'SIMULATED', identifier: 'invitado@example.com', name: 'Invitado' },
@@ -229,6 +231,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     expect(await screen.findByTestId('member-error')).toHaveTextContent(/No se pudo conectar/)
   })
 
+
   it('Cancelar vuelve a Mis grupos sin crear nada, y queda a la izquierda de Crear', async () => {
     renderView()
     await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
@@ -241,5 +244,57 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
 
     expect(await screen.findByText('Mis grupos')).toBeInTheDocument()
     expect(createGroup).not.toHaveBeenCalled()
+})
+  // 022 T068: moneda principal del grupo
+  it('muestra el selector de moneda principal con ARS, USD y EUR y ARS por defecto', async () => {
+    renderView()
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
+
+    const select = screen.getByLabelText('Moneda principal')
+    expect(select).toHaveValue('ARS')
+    expect(Array.from(select.options).map((option) => option.value)).toEqual(['ARS', 'USD', 'EUR'])
+  })
+
+  it('envía la moneda elegida al crear el grupo', async () => {
+    createGroup.mockResolvedValue({ ok: true, group: { id: 50, name: 'Euro trip' } })
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+    fireEvent.change(screen.getByLabelText('Moneda principal'), { target: { value: 'EUR' } })
+    typeName('Euro trip')
+    submit()
+
+    await waitFor(() => expect(createGroup).toHaveBeenCalledTimes(1))
+    expect(createGroup.mock.calls[0][0]).toMatchObject({ name: 'Euro trip', primaryCurrency: 'EUR' })
+    await screen.findByText('Pantalla del grupo')
+  })
+
+  it('sin tocar el selector envía ARS', async () => {
+    createGroup.mockResolvedValue({ ok: true, group: { id: 51, name: 'Local' } })
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+    typeName('Local')
+    submit()
+
+    await waitFor(() => expect(createGroup).toHaveBeenCalledTimes(1))
+    expect(createGroup.mock.calls[0][0].primaryCurrency).toBe('ARS')
+  })
+
+  it('muestra junto al selector el error de moneda que informe el servidor', async () => {
+    createGroup.mockResolvedValue({
+      ok: false,
+      status: 400,
+      fields: { primaryCurrency: 'La moneda no es válida' },
+    })
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+    typeName('Rara')
+    submit()
+
+    expect(await screen.findByText('La moneda no es válida')).toBeInTheDocument()
+    expect(screen.getByLabelText('Moneda principal')).toHaveAttribute('aria-invalid', 'true')
+
   })
 })
