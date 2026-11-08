@@ -282,4 +282,175 @@ class GroupSettlementControllerIT {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Necesitas iniciar sesión para continuar"));
     }
+
+    private long createGroupWithMembers(String name, String secondEmail, String thirdEmail) throws Exception {
+        String created = mockMvc.perform(post("/api/groups").cookie(anaSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\": \"" + name + "\", \"member\": {\"memberType\": \"REGISTERED\","
+                        + " \"identifier\": \"" + secondEmail + "\"}}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long gid = objectMapper.readTree(created).get("id").asLong();
+        if (thirdEmail != null) {
+            mockMvc.perform(post("/api/groups/" + gid + "/members").cookie(anaSession)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"memberType\": \"REGISTERED\", \"identifier\": \"" + thirdEmail + "\"}"))
+                    .andExpect(status().isCreated());
+        }
+        return gid;
+    }
+
+    private void insertDirectDebt(long gid, long debtorId, String debtorName, long creditorId,
+            String amount, String paidAmount, String status, String currency) {
+        long expenseId = jdbc.queryForObject("""
+                INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
+                    expense_date, description, idempotency_key)
+                VALUES (?, ?, ?, ?::numeric, ?, ?, 'Gasto directo', gen_random_uuid())
+                RETURNING id
+                """, Long.class, gid, creditorId, creditorId, amount, currency,
+                java.sql.Date.valueOf(EXPENSE_DATE));
+        long shareId = jdbc.queryForObject("""
+                INSERT INTO group_expense_shares (expense_id, position, participant_type, user_id,
+                    participant_name, amount)
+                VALUES (?, 0, 'REGISTERED', ?, ?, ?::numeric)
+                RETURNING id
+                """, Long.class, expenseId, debtorId, debtorName, amount);
+        jdbc.update("""
+                INSERT INTO debts (group_id, expense_id, share_id, debtor_type, debtor_user_id, debtor_name,
+                    creditor_user_id, currency, amount, paid_amount, status)
+                VALUES (?, ?, ?, 'REGISTERED', ?, ?, ?, ?, ?::numeric, ?::numeric, ?)
+                """, gid, expenseId, shareId, debtorId, debtorName, creditorId, currency,
+                amount, paidAmount, status);
+    }
+
+    private JsonNode proposalForGroup(long gid, Cookie session) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/groups/" + gid + "/settlement-proposal").cookie(session))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private JsonNode pendingDebtsForGroup(long gid, Cookie session) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/groups/" + gid + "/debts/pending").cookie(session))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    /**
+     * T086 (a), (c), (e), (h): cross-debts between two members (multiple debts in
+     * both directions and a confirmed partial payment) are compensated in the
+     * proposal using the outstanding balance, while the original debts remain
+     * untouched and {@code GET /debts/pending} still lists them gross.
+     */
+    @Test
+    void t086CrossDebtsBetweenTwoMembersCompensateInProposalWhilePendingDebtsStayGross() throws Exception {
+        int n = SEQUENCE.incrementAndGet() + (int) (System.nanoTime() % 100000);
+        String juanEmail = jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, juan);
+        long pairGroup = createGroupWithMembers("Par " + n, juanEmail, null);
+
+        // Ana owes Juan 60 + 40 (= 100), Juan owes Ana 30 + 20 (= 50)
+        insertDirectDebt(pairGroup, ana, "Ana López", juan, "60.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(pairGroup, ana, "Ana López", juan, "40.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(pairGroup, juan, "Juan Pérez", ana, "30.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(pairGroup, juan, "Juan Pérez", ana, "20.00", "0.00", "PENDING", "ARS");
+
+        JsonNode body = proposalForGroup(pairGroup, anaSession);
+        JsonNode ars = currency(body, "ARS");
+        assertThat(ars.get("transfers")).hasSize(1);
+        JsonNode onlyTransfer = ars.get("transfers").get(0);
+        assertThat(onlyTransfer.get("fromMemberId").asLong()).isEqualTo(ana);
+        assertThat(onlyTransfer.get("toMemberId").asLong()).isEqualTo(juan);
+        assertThat(amount(onlyTransfer, "amount")).isEqualByComparingTo("50.00");
+        assertThat(ars.get("summary").get("transferCount").asInt()).isEqualTo(1);
+        assertThat(amount(ars.get("summary"), "totalTransferred")).isEqualByComparingTo("50.00");
+        assertThat(amount(ars.get("summary"), "totalNetBalances")).isEqualByComparingTo("50.00");
+
+        // (h) Original debts are unchanged and GET /debts/pending still returns all 4 gross debts
+        JsonNode pending = pendingDebtsForGroup(pairGroup, anaSession);
+        assertThat(pending).hasSize(4);
+        BigDecimal grossOutstandingSum = BigDecimal.ZERO;
+        for (JsonNode debt : pending) {
+            grossOutstandingSum = grossOutstandingSum.add(amount(debt, "outstanding"));
+        }
+        assertThat(grossOutstandingSum).isEqualByComparingTo("150.00");
+
+        // (e) Confirmed partial payment of 15.00 on Ana's 60.00 debt reduces outstanding to 45.00,
+        // so Ana now owes 45 + 40 = 85 vs Juan's 50 → compensated transfer becomes 35.00
+        jdbc.update("""
+                UPDATE debts SET paid_amount = 15.00, status = 'PARTIALLY_PAID'
+                WHERE group_id = ? AND debtor_user_id = ? AND amount = 60.00
+                """, pairGroup, ana);
+        JsonNode afterPartial = currency(proposalForGroup(pairGroup, anaSession), "ARS");
+        assertThat(afterPartial.get("transfers")).hasSize(1);
+        assertThat(amount(afterPartial.get("transfers").get(0), "amount")).isEqualByComparingTo("35.00");
+    }
+
+    /**
+     * T086 (b): when cross-debts between two members cancel out exactly (100 vs 100),
+     * the proposal emits no transfers for that currency.
+     */
+    @Test
+    void t086EqualCrossDebtsBetweenTwoMembersProduceEmptyProposal() throws Exception {
+        int n = SEQUENCE.incrementAndGet() + (int) (System.nanoTime() % 100000);
+        String juanEmail = jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, juan);
+        long pairGroup = createGroupWithMembers("Empate " + n, juanEmail, null);
+
+        insertDirectDebt(pairGroup, ana, "Ana López", juan, "100.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(pairGroup, juan, "Juan Pérez", ana, "100.00", "0.00", "PENDING", "ARS");
+
+        JsonNode body = proposalForGroup(pairGroup, anaSession);
+        assertThat(body.get("proposals")).isEmpty();
+        assertThat(pendingDebtsForGroup(pairGroup, anaSession)).hasSize(2);
+    }
+
+    /**
+     * T086 (g): two groups with the same members (Ana = A, Juan = B, Carla = C).
+     * Group 1: A owes B 100, B owes A 50 → proposal is A → B 50.00.
+     * Group 2: C owes A 40, B owes A 25, A owes C 20 → proposal is B → A 25.00 and C → A 20.00.
+     * Debts are never compensated across groups.
+     */
+    @Test
+    void t086TwoGroupsWithTheSameMembersNeverCompensateDebtsAcrossGroups() throws Exception {
+        int n = SEQUENCE.incrementAndGet() + (int) (System.nanoTime() % 100000);
+        String carlaEmail = "carla" + n + "@settlement.dev";
+        long carla = user("Carla", "Gómez", carlaEmail);
+        jdbc.update("""
+                INSERT INTO friendship_requests (sender_id, recipient_id, status, responded_at)
+                VALUES (?, ?, 'ACCEPTED', now())
+                """, ana, carla);
+        String juanEmail = jdbc.queryForObject("SELECT email FROM users WHERE id = ?", String.class, juan);
+
+        long group1 = createGroupWithMembers("Grupo 1 " + n, juanEmail, carlaEmail);
+        long group2 = createGroupWithMembers("Grupo 2 " + n, juanEmail, carlaEmail);
+
+        // Group 1: A (ana) owes B (juan) 100, B owes A 50
+        insertDirectDebt(group1, ana, "Ana López", juan, "100.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(group1, juan, "Juan Pérez", ana, "50.00", "0.00", "PENDING", "ARS");
+
+        // Group 2: C (carla) owes A (ana) 40, B (juan) owes A 25, A owes C 20
+        insertDirectDebt(group2, carla, "Carla Gómez", ana, "40.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(group2, juan, "Juan Pérez", ana, "25.00", "0.00", "PENDING", "ARS");
+        insertDirectDebt(group2, ana, "Ana López", carla, "20.00", "0.00", "PENDING", "ARS");
+
+        JsonNode g1Ars = currency(proposalForGroup(group1, anaSession), "ARS");
+        assertThat(g1Ars.get("transfers")).hasSize(1);
+        JsonNode aToB = transfer(g1Ars, ana, "REGISTERED");
+        assertThat(aToB.get("toMemberId").asLong()).isEqualTo(juan);
+        assertThat(amount(aToB, "amount")).isEqualByComparingTo("50.00");
+        assertThat(g1Ars.get("summary").get("transferCount").asInt()).isEqualTo(1);
+        assertThat(amount(g1Ars.get("summary"), "totalTransferred")).isEqualByComparingTo("50.00");
+
+        JsonNode g2Ars = currency(proposalForGroup(group2, anaSession), "ARS");
+        assertThat(g2Ars.get("transfers")).hasSize(2);
+        JsonNode bToA = transfer(g2Ars, juan, "REGISTERED");
+        assertThat(bToA.get("toMemberId").asLong()).isEqualTo(ana);
+        assertThat(amount(bToA, "amount")).isEqualByComparingTo("25.00");
+        JsonNode cToA = transfer(g2Ars, carla, "REGISTERED");
+        assertThat(cToA.get("toMemberId").asLong()).isEqualTo(ana);
+        assertThat(amount(cToA, "amount")).isEqualByComparingTo("20.00");
+        assertThat(g2Ars.get("summary").get("transferCount").asInt()).isEqualTo(2);
+        assertThat(amount(g2Ars.get("summary"), "totalTransferred")).isEqualByComparingTo("45.00");
+        assertThat(amount(g2Ars.get("summary"), "totalNetBalances")).isEqualByComparingTo("45.00");
+    }
 }
