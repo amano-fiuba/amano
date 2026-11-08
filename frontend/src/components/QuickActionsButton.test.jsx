@@ -8,6 +8,9 @@ const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
 vi.mock('../auth/AuthContext', () => ({ useAuth }))
 
+const { listGroups } = vi.hoisted(() => ({ listGroups: vi.fn() }))
+vi.mock('../api/groupsClient', async (importOriginal) => ({ ...(await importOriginal()), listGroups }))
+
 function renderButton() {
   return render(
     <MemoryRouter initialEntries={['/']}>
@@ -15,6 +18,7 @@ function renderButton() {
         <Route path="/" element={<QuickActionsButton />} />
         <Route path="/expenses/new" element={<p>Pantalla de gasto personal</p>} />
         <Route path="/groups/new" element={<p>Pantalla de crear grupo</p>} />
+        <Route path="/groups/:id/expenses/new" element={<p>Nuevo gasto del grupo</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -106,9 +110,9 @@ describe('QuickActionsButton: submenú "Registrar gasto" (027, US1)', () => {
       'href',
       '/expenses/new',
     )
-    // US3 y US4 todavía no están integradas: sus opciones no se muestran (FR-001).
+    expect(screen.getByRole('menuitem', { name: 'Gasto grupal' })).toBeInTheDocument()
+    // US4 todavía no está integrada: su opción no se muestra (FR-001).
     expect(screen.queryByRole('menuitem', { name: 'Gasto con amigo' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Gasto grupal' })).not.toBeInTheDocument()
   })
 
   it('un segundo clic sobre "Registrar gasto" cierra el submenú', async () => {
@@ -265,5 +269,37 @@ describe('QuickActionsButton: submenú "Registrar gasto" (027, US1)', () => {
 
     expect(screen.getByRole('menuitem', { name: 'Crear grupo' })).toBeInTheDocument()
     expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
+  })
+})
+
+describe('QuickActionsButton: "Gasto grupal" (027, US3)', () => {
+  it('cierra el menú, pide el grupo y lleva a su nuevo gasto', async () => {
+    listGroups.mockResolvedValue({ ok: true, groups: [{ id: 3, name: 'Depto', memberCount: 2, canCreateExpenses: true }] })
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+    await user.click(screen.getByRole('menuitem', { name: 'Gasto grupal' }))
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '¿En qué grupo?' })).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('link', { name: /Depto/ }))
+
+    expect(screen.getByText('Nuevo gasto del grupo')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('cancelar el selector vuelve sin navegar', async () => {
+    listGroups.mockResolvedValue({ ok: true, groups: [] })
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+    await user.click(screen.getByRole('menuitem', { name: 'Gasto grupal' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Nuevo gasto del grupo')).not.toBeInTheDocument()
   })
 })

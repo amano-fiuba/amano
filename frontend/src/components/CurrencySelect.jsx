@@ -64,9 +64,6 @@ export default function CurrencySelect({
             {currencyLabel(code)}
           </option>
         ))}
-        <option disabled value="" aria-hidden="true">
-          ──────────
-        </option>
         <option value={MORE_VALUE}>{MORE_CURRENCIES_LABEL}</option>
       </select>
       {error && (

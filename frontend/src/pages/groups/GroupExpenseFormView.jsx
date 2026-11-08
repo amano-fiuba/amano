@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
 import { getGroup, getMembers, getExchangeQuote } from '../../api/groupsClient'
@@ -13,12 +13,14 @@ import {
 import TextField from '../../components/TextField'
 import { PaidIcon } from '../../components/NavIcons'
 import SelectField from '../../components/SelectField'
+import DatePickerField from '../../components/DatePickerField'
+import CurrencySelect from '../../components/CurrencySelect'
 import SubmitButton from '../../components/SubmitButton'
 import { REST_IN_ORDER_NOTE, REST_TO_PAYER_NOTE } from '../../components/groups/ExpenseSharePreview'
 import ConvertedAmount from '../../components/debts/ConvertedAmount'
 import { useSnackbar } from '../../components/Snackbar'
 import useCurrentDate, { deviceTimeZone } from '../../hooks/useCurrentDate'
-import { CURRENCY_OPTIONS } from '../../validation/expenseCatalog'
+import { CATEGORY_OPTIONS, PAYMENT_METHOD_OPTIONS, TYPE_OPTIONS } from '../../validation/expenseCatalog'
 import {
   DATE_FUTURE,
   normalizeDescription,
@@ -78,12 +80,25 @@ export const EDIT_NOT_PERSONAL_MESSAGE = 'No se permite editar un gasto que ya t
 export const EDIT_NOT_ALLOWED_MESSAGE = 'No podés editar este gasto'
 export const EXPENSE_GONE_MESSAGE = 'No existe el gasto solicitado o no sos miembro del grupo'
 
-const SERVER_FIELDS = ['amount', 'currency', 'date', 'description']
+const SERVER_FIELDS = ['amount', 'currency', 'date', 'description', 'category', 'type', 'paymentMethod']
+
+// 027 (FR-020): the 007 classification, with the personal-expense messages.
+const REQUIRED_SELECT_MESSAGES = {
+  category: 'La categoría es obligatoria',
+  type: 'El tipo de gasto es obligatorio',
+  paymentMethod: 'El medio de pago es obligatorio',
+}
+// Required on creation; an edition of an older expense may leave them empty.
+const requiredSelect = (field, isEdit) => (value) =>
+  value || isEdit ? true : REQUIRED_SELECT_MESSAGES[field]
 
 // "Nuevo gasto" of a group (specs/017-debt-states, US3; plan.md §Diseño del
 // frontend): amount, currency, date, description, payer and participants, with
 // the live preview of the equal split. One Idempotency-Key per save operation,
 // kept across network failures (same rule as ExpenseForm of 007).
+// 027 US3: calendar date, the user's currencies plus "Ver más", category, type
+// and payment method, a Cancelar / Guardar gasto footer and, on wide screens, a
+// height set by the left column with a scrollable split panel (FR-020..FR-024).
 export default function GroupExpenseFormView() {
   const { id, expenseId } = useParams()
   const isEdit = Boolean(expenseId)
@@ -122,7 +137,15 @@ export default function GroupExpenseFormView() {
     formState: { errors, isSubmitting },
   } = useForm({
     mode: 'onBlur',
-    defaultValues: { amount: '', currency: 'ARS', date: today, description: '' },
+    defaultValues: {
+      amount: '',
+      currency: 'ARS',
+      date: today,
+      description: '',
+      category: '',
+      type: '',
+      paymentMethod: '',
+    },
   })
   const amountValue = useWatch({ control, name: 'amount' })
   const currencyValue = useWatch({ control, name: 'currency' })
@@ -164,6 +187,10 @@ export default function GroupExpenseFormView() {
           currency: expense.currency,
           date: formatIsoDate(expense.date),
           description: expense.description ?? '',
+          // Expenses created before 027 have no classification.
+          category: expense.category ?? '',
+          type: expense.type ?? '',
+          paymentMethod: expense.paymentMethod ?? '',
         })
       } else {
         // 022: the expense currency starts as the group's currency.
@@ -193,6 +220,11 @@ export default function GroupExpenseFormView() {
     else if (!mayEdit) editBlocked = EDIT_NOT_ALLOWED_MESSAGE
   }
   const { canCreateExpenses, canExpenseForOthers } = expensePermissions(group)
+  // 027 (FR-011): the group currency and the user's own currencies come first.
+  const preferredCurrencies = [
+    group?.primaryCurrency || 'ARS',
+    ...(Array.isArray(auth?.user?.currencies) ? auth.user.currencies : []),
+  ]
   // The split panel shows first names only; when two members share one, both
   // keep their full name so they can be told apart.
   const firstNames = members.map((member) => member.name.trim().split(/\s+/)[0])
@@ -408,6 +440,9 @@ export default function GroupExpenseFormView() {
     if (values.currency !== expense.currency) changes.currency = values.currency
     if (date.ok && date.iso !== expense.date) changes.date = date.iso
     if (description !== (expense.description ?? '')) changes.description = description
+    for (const field of ['category', 'type', 'paymentMethod']) {
+      if (values[field] && values[field] !== (expense[field] ?? '')) changes[field] = values[field]
+    }
     if (Object.keys(changes).length === 0) {
       setFormError(EDIT_NOTHING_MESSAGE)
       return
@@ -470,6 +505,9 @@ export default function GroupExpenseFormView() {
       currency: values.currency,
       date: date.ok ? date.iso : values.date,
       deviceTimeZone: deviceTimeZone(),
+      category: values.category,
+      type: values.type,
+      paymentMethod: values.paymentMethod,
       payerUserId: userIdOf(payerKey),
       splitMethod: method,
       participants: orderedSelection.map((key) => {
@@ -576,7 +614,11 @@ export default function GroupExpenseFormView() {
       )}
 
       {load.status === 'ready' && (isEdit ? !editBlocked : canCreateExpenses) && (
-        <form className="group-expense__form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form
+          className={`group-expense__form${isEdit ? '' : ' group-expense__form--fixed'}`}
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           {formError && (
             <p role="alert" className="group-expense__form-error" data-testid="group-expense-error">
               {formError}
@@ -596,21 +638,27 @@ export default function GroupExpenseFormView() {
                 },
               })}
             />
-            <SelectField
-              label="Moneda"
-              options={CURRENCY_OPTIONS}
-              error={errors.currency?.message}
-              {...register('currency', {
-                validate: (value) => (value ? true : 'La moneda es obligatoria'),
-              })}
+            <Controller
+              name="currency"
+              control={control}
+              rules={{ validate: (value) => (value ? true : 'La moneda es obligatoria') }}
+              render={({ field }) => (
+                <CurrencySelect {...field} preferred={preferredCurrencies} error={errors.currency?.message} />
+              )}
             />
 
-            <TextField
-              label="Fecha"
-              placeholder="dd/mm/aaaa"
-              autoComplete="off"
-              error={errors.date?.message}
-              {...register('date', { validate: validateDate })}
+            <Controller
+              name="date"
+              control={control}
+              rules={{ validate: validateDate }}
+              render={({ field }) => (
+                <DatePickerField
+                  {...field}
+                  label="Fecha"
+                  max={todayIso ?? undefined}
+                  error={errors.date?.message}
+                />
+              )}
             />
 
             <div className="group-expense__quote" aria-live="polite" data-testid="quote-preview">
@@ -631,6 +679,27 @@ export default function GroupExpenseFormView() {
               )}
               {quoteStatus === 'error' && <p>{QUOTE_ERROR_MESSAGE}</p>}
             </div>
+
+            <SelectField
+              label="Categoría"
+              options={CATEGORY_OPTIONS}
+              error={errors.category?.message}
+              {...register('category', { validate: requiredSelect('category', isEdit) })}
+            />
+
+            <SelectField
+              label="Tipo de gasto"
+              options={TYPE_OPTIONS}
+              error={errors.type?.message}
+              {...register('type', { validate: requiredSelect('type', isEdit) })}
+            />
+
+            <SelectField
+              label="Medio de pago"
+              options={PAYMENT_METHOD_OPTIONS}
+              error={errors.paymentMethod?.message}
+              {...register('paymentMethod', { validate: requiredSelect('paymentMethod', isEdit) })}
+            />
 
             <TextField
               label="Descripción"
@@ -865,7 +934,14 @@ export default function GroupExpenseFormView() {
             </section>
           )}
 
-          <div className="group-expense__actions">
+          <div className="group-expense__actions expense-actions">
+            <button
+              type="button"
+              className="expense-actions__cancel"
+              onClick={() => navigate(isEdit ? `/groups/${id}/expenses/${expenseId}` : `/groups/${id}`)}
+            >
+              Cancelar
+            </button>
             <SubmitButton
               loading={isSubmitting}
               loadingLabel="Guardando…"

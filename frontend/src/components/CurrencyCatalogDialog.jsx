@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { listCurrencies } from '../api/currencyClient'
 import { currencyLabel } from '../validation/expenseCatalog'
 import { normalizeText } from '../validation/normalizeText'
-import './CurrencyCatalogDialog.scss'
+import './ChoiceDialog.scss'
 
 export const CATALOG_TITLE = 'Elegir otra moneda'
 export const CATALOG_ERROR_MESSAGE =
@@ -60,12 +60,12 @@ export default function CurrencyCatalogDialog({ initialCode = null, onSelect, on
 
   // Portal: rendered inside a form field it would inherit the field's input styles.
   return createPortal(
-    <div className="currency-dialog__backdrop">
+    <div className="choice-dialog__backdrop">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="currency-dialog"
+        className="choice-dialog"
         onKeyDown={handleKeyDown}
       >
         <h3 id={titleId}>{CATALOG_TITLE}</h3>
@@ -82,25 +82,25 @@ export default function CurrencyCatalogDialog({ initialCode = null, onSelect, on
         </div>
 
         {state.status === 'loading' && (
-          <p role="status" className="currency-dialog__status">
+          <p role="status" className="choice-dialog__status">
             Cargando monedas…
           </p>
         )}
         {state.status === 'error' && (
-          <div className="currency-dialog__status">
+          <div className="choice-dialog__status">
             <p role="alert">{CATALOG_ERROR_MESSAGE}</p>
-            <button type="button" className="currency-dialog__retry" onClick={retry}>
+            <button type="button" className="choice-dialog__retry" onClick={retry}>
               Reintentar
             </button>
           </div>
         )}
         {state.status === 'ready' && visible.length === 0 && (
-          <p className="currency-dialog__status">{CATALOG_EMPTY_MESSAGE}</p>
+          <p className="choice-dialog__status">{CATALOG_EMPTY_MESSAGE}</p>
         )}
         {state.status === 'ready' && visible.length > 0 && (
-          <div role="radiogroup" aria-label="Monedas del BCRA" className="currency-dialog__list">
+          <div role="radiogroup" aria-label="Monedas del BCRA" className="choice-dialog__list">
             {visible.map((entry) => (
-              <label key={entry.code} className={chosen === entry.code ? 'currency-dialog__option is-chosen' : 'currency-dialog__option'}>
+              <label key={entry.code} className={chosen === entry.code ? 'choice-dialog__option is-chosen' : 'choice-dialog__option'}>
                 <input
                   type="radio"
                   name={`${titleId}-currency`}
@@ -109,15 +109,15 @@ export default function CurrencyCatalogDialog({ initialCode = null, onSelect, on
                   onChange={() => setChosen(entry.code)}
                   aria-label={`${currencyLabel(entry.code, entry.bcraName)} (${entry.code})`}
                 />
-                <span className="currency-dialog__name" aria-hidden="true">{currencyLabel(entry.code, entry.bcraName)}</span>
-                <span className="currency-dialog__code" aria-hidden="true">{entry.code}</span>
+                <span className="choice-dialog__name" aria-hidden="true">{currencyLabel(entry.code, entry.bcraName)}</span>
+                <span className="choice-dialog__code" aria-hidden="true">{entry.code}</span>
               </label>
             ))}
           </div>
         )}
 
-        <div className="currency-dialog__actions">
-          <button type="button" className="currency-dialog__cancel" onClick={onClose}>
+        <div className="choice-dialog__actions">
+          <button type="button" className="choice-dialog__cancel" onClick={onClose}>
             Cancelar
           </button>
           <button type="button" disabled={!chosen} onClick={() => onSelect(chosen)}>

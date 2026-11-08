@@ -41,7 +41,7 @@ describe('CurrencySelect (027, FR-011 a FR-013)', () => {
   it('lista las preferidas, después "Ver más…"', () => {
     render(<Harness preferred={['USD', 'ARS']} initial="USD" />)
 
-    expect(optionTexts()).toEqual(['Dólar estadounidense', 'Peso argentino', '──────────', 'Ver más…'])
+    expect(optionTexts()).toEqual(['Dólar estadounidense', 'Peso argentino', 'Ver más…'])
     expect(screen.getByLabelText('Moneda')).toHaveValue('USD')
   })
 
@@ -54,7 +54,7 @@ describe('CurrencySelect (027, FR-011 a FR-013)', () => {
   it('suma la moneda actual si no es preferida e ignora códigos no soportados', () => {
     render(<Harness preferred={['ARS', 'XAU']} initial="GBP" />)
 
-    expect(optionTexts()).toEqual(['Peso argentino', 'Libra esterlina', '──────────', 'Ver más…'])
+    expect(optionTexts()).toEqual(['Peso argentino', 'Libra esterlina', 'Ver más…'])
   })
 
   it('cambiar entre las propias llama a onChange', async () => {
@@ -84,7 +84,7 @@ describe('CurrencySelect (027, FR-011 a FR-013)', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(onChange).toHaveBeenCalledWith('BRL')
     expect(screen.getByLabelText('Moneda')).toHaveValue('BRL')
-    expect(optionTexts()).toEqual(['Peso argentino', 'Real brasileño', '──────────', 'Ver más…'])
+    expect(optionTexts()).toEqual(['Peso argentino', 'Real brasileño', 'Ver más…'])
 
     // Volver a ARS mantiene a BRL como opción elegida antes.
     await user.selectOptions(screen.getByLabelText('Moneda'), 'ARS')

@@ -31,7 +31,7 @@ Al guardar, cada flujo vuelve a donde estaba: personal → `/`, grupo → `/grou
 
 ## `GroupChooserDialog` (nuevo)
 
-Modal con los grupos activos del usuario (`groupsClient` existente), buscador y lista de una sola selección. Sin grupos: "Todavía no formás parte de ningún grupo" + enlace "Crear grupo". Al elegir → `/groups/:id/expenses/new`.
+Modal "¿En qué grupo?" con los grupos activos del usuario (`listGroups`) y buscador. Cada grupo se muestra como en "Mis grupos": foto (o inicial), nombre, cantidad de miembros y la flecha "›"; tocarlo lleva a `/groups/:id/expenses/new`. Un grupo con `canCreateExpenses = false` queda grisado, sin flecha ni enlace, con "No podés registrar gastos en este grupo". Sin grupos: "Todavía no formás parte de ningún grupo" + enlace "Crear grupo". Solo hay botón "Cancelar".
 
 ## `FriendChooserDialog` (nuevo)
 
@@ -60,7 +60,7 @@ Fecha
 
 ## `CurrencySelect` + `CurrencyCatalogDialog` (nuevos)
 
-- Opciones: preferidas del usuario (orden de perfil; ARS si no hay) → moneda actual si no es preferida → separador → "Ver más…".
+- Opciones: preferidas del usuario (orden de perfil; ARS si no hay) → moneda actual si no es preferida → "Ver más…" (sin separador).
 - "Ver más…" no cambia el valor: abre el diálogo; al confirmar, la moneda elegida se agrega como opción temporal y queda seleccionada; al cancelar, se mantiene la anterior.
 - Diálogo: buscador (código o nombre, sin acentos), lista con radio, estados *Cargando*, *Error + Reintentar* (`503`) y *Sin resultados*.
 - En grupos, elegir una moneda ≠ moneda del grupo dispara la vista previa de cotización de 022 como hoy.

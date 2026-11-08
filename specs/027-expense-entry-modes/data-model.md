@@ -67,7 +67,7 @@ Estados: los mismos de 022, pero en esta spec una deuda directa solo nace en `PE
 
 ## Migración
 
-Una migración nueva `V27__expense_entry_modes.sql` (verificar que el número siga libre al integrar con las ramas de 025/026):
+Una migración por historia (una migración aplicada no se edita): `V27__expense_entry_modes.sql` (US2: punto 1), `V28__group_expense_classification.sql` (US3: columnas de clasificación del punto 2) y `V29__friend_expenses.sql` (US4: resto del punto 2 y punto 3). Verificar que los números sigan libres al integrar con las ramas de 025/026:
 
 1. `DROP CONSTRAINT` + `ADD CONSTRAINT` de moneda en `expenses`, `group_expenses`, `debts`, `payments`, `user_currencies`.
 2. `group_expenses`: `ALTER COLUMN group_id DROP NOT NULL`, columnas `friend_user_id`, `category`, `expense_type`, `payment_method` con sus `CHECK` y FK; `CHECK ck_group_expenses_context ((group_id IS NULL) <> (friend_user_id IS NULL))`; índice parcial.

@@ -1,5 +1,6 @@
-// Diálogo "Ver más" monedas (027, FR-012), con el mismo aspecto que los demás diálogos.
-.currency-dialog__backdrop {
+// Diálogos de elección (027): "Ver más" monedas, elegir grupo y elegir amigo.
+// Lista con buscador y scroll propio; mismo aspecto que los demás diálogos.
+.choice-dialog__backdrop {
   position: fixed;
   inset: 0;
   z-index: 40;
@@ -10,7 +11,7 @@
   background: color-mix(in srgb, var(--color-texto) 45%, transparent);
 }
 
-.currency-dialog {
+.choice-dialog {
   display: flex;
   flex-direction: column;
   width: min(26rem, 100%);
@@ -32,7 +33,7 @@
   }
 }
 
-.currency-dialog__status {
+.choice-dialog__status {
   margin: 0.5rem 0;
   color: var(--color-texto-suave);
 
@@ -41,7 +42,7 @@
   }
 }
 
-.currency-dialog__list {
+.choice-dialog__list {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -54,7 +55,7 @@
   border-bottom: 1px solid var(--color-borde);
 }
 
-.currency-dialog__option {
+.choice-dialog__option {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -80,12 +81,12 @@
   }
 }
 
-.currency-dialog__name {
+.choice-dialog__name {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.currency-dialog__code {
+.choice-dialog__code {
   flex: none;
   color: var(--color-texto-suave);
   font-size: 0.85rem;
@@ -93,15 +94,44 @@
   letter-spacing: 0.03em;
 }
 
-.currency-dialog__actions {
+.choice-dialog__actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.6rem;
   margin-top: 1rem;
 }
 
-.currency-dialog__cancel {
+.choice-dialog__cancel {
   border: 1px solid var(--color-borde);
   color: var(--color-texto);
   background: transparent;
+}
+
+// Selector de grupo (027, FR-021): filas como las de "Mis grupos".
+.choice-dialog__list.group-chooser__list {
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.5rem 0.25rem;
+  list-style: none;
+}
+
+.group-chooser__row {
+  padding: 0.65rem 0.85rem;
+
+  .group-row__mark {
+    width: 2.6rem;
+    height: 2.6rem;
+  }
+
+  // Sin permiso para registrar gastos: grisado, sin flecha y sin hover.
+  &.is-disabled {
+    opacity: 0.55;
+    filter: grayscale(1);
+    cursor: not-allowed;
+
+    &:hover {
+      border-color: var(--color-borde);
+      background: var(--color-fondo);
+    }
+  }
 }

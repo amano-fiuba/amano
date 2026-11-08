@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { useDismiss } from '../hooks/useDismiss'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import GroupChooserDialog from './GroupChooserDialog'
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -19,7 +20,7 @@ const EXPENSE_LABEL = 'Registrar gasto'
 const EXPENSE_OPTIONS = [
   { key: 'personal', label: 'Gasto personal', Icon: PersonIcon, to: '/expenses/new', enabled: true },
   { key: 'friend', label: 'Gasto con amigo', Icon: FriendIcon, enabled: false },
-  { key: 'group', label: 'Gasto grupal', Icon: GroupsIcon, enabled: false },
+  { key: 'group', label: 'Gasto grupal', Icon: GroupsIcon, enabled: true },
 ]
 
 const MOBILE_QUERY = '(max-width: 767px)'
@@ -61,6 +62,8 @@ export default function QuickActionsButton() {
   const { user } = useAuth() ?? {}
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmenuOpen, setIsSubmenuOpen] = useState(false)
+  // Option whose chooser dialog is open ("group"); it outlives the menu.
+  const [chooser, setChooser] = useState(null)
   const isMobile = useMediaQuery(MOBILE_QUERY)
   const containerRef = useRef(null)
   const triggerRef = useRef(null)
@@ -181,10 +184,25 @@ export default function QuickActionsButton() {
 
   const expenseOptions = EXPENSE_OPTIONS.filter((option) => option.enabled).map((option) => (
     <li key={option.key} role="none">
-      <Link to={option.to} role="menuitem" className="quick-actions__item" onClick={close}>
-        <option.Icon />
-        <span>{option.label}</span>
-      </Link>
+      {option.to ? (
+        <Link to={option.to} role="menuitem" className="quick-actions__item" onClick={close}>
+          <option.Icon />
+          <span>{option.label}</span>
+        </Link>
+      ) : (
+        <button
+          type="button"
+          role="menuitem"
+          className="quick-actions__item"
+          onClick={() => {
+            close()
+            setChooser(option.key)
+          }}
+        >
+          <option.Icon />
+          <span>{option.label}</span>
+        </button>
+      )}
     </li>
   ))
 
@@ -283,6 +301,7 @@ export default function QuickActionsButton() {
       >
         <PlusIcon />
       </button>
+      {chooser === 'group' && <GroupChooserDialog onClose={() => setChooser(null)} />}
     </div>
   )
 }

@@ -20,6 +20,10 @@ Respuesta (`GroupExpenseResponse`) suma `category`, `type`, `paymentMethod` (pue
 
 `PATCH` de gasto personal (022 T077): acepta además `category`, `type` y `paymentMethod`.
 
+## `GET /api/groups` (modificado, aditivo)
+
+Cada elemento suma `canCreateExpenses` (boolean): si el usuario puede registrar gastos en ese grupo ahora (ADMIN siempre; MEMBER salvo "los miembros no pueden generar gastos"). Lo calcula `GroupPermissionChecker`, el mismo que decide el alta; el selector "¿En qué grupo?" lo usa para grisar los grupos donde no se puede.
+
 ## `POST /api/users/me/friends/{friendId}/expenses` (nuevo)
 
 Registra un gasto compartido entre el usuario autenticado y un amigo.
