@@ -14,6 +14,7 @@ import {
 } from '../validation/expenseCatalog'
 import { formatAmount, formatIsoDate } from '../validation/expenseFormat'
 import { useSnackbar } from '../components/Snackbar'
+import HomeLink from '../components/HomeLink'
 
 // Exact messages of specs/009-pause-recurring-expense (FR-012..FR-014), exported
 // for the tests.
@@ -124,6 +125,7 @@ export default function RecurringExpensesPage() {
 
   return (
     <main className="page recurring-page">
+      <HomeLink />
       <h1>Gastos recurrentes</h1>
 
       {error && (

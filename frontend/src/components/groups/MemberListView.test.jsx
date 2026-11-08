@@ -31,6 +31,18 @@ async function openActions(key) {
 }
 
 describe('MemberListView (T079/T077, US6)', () => {
+  it('el menú de acciones se fija a la pantalla y se cierra al scrollear la lista', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await openActions('user-15')
+    const remove = screen.getByRole('button', { name: 'Eliminar miembro' })
+    expect(remove.closest('.member-menu__panel')).toHaveClass('member-menu__panel--fixed')
+
+    fireEvent.scroll(screen.getByRole('list'))
+    expect(screen.queryByRole('button', { name: 'Eliminar miembro' })).not.toBeInTheDocument()
+  })
+
   it('renderiza a todos los miembros activos con perfil simulado incluido', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 
@@ -203,7 +215,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     const row = await screen.findByTestId('member-row-sim-33')
     await openActions('sim-33')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar perfil simulado' }))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
 
     await waitFor(() => expect(screen.queryByText('Juan Simulado')).not.toBeInTheDocument())
     expect(removeSimulatedProfile).toHaveBeenCalledWith(3, 33)
@@ -224,7 +236,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     const row = await screen.findByTestId('member-row-user-15')
     await openActions('user-15')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar miembro' }))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
 
     await waitFor(() => expect(screen.queryByText('Carla Gómez')).not.toBeInTheDocument())
     expect(removeMember).toHaveBeenCalledWith(3, 15)

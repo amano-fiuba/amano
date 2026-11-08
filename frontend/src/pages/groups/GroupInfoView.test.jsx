@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 
+vi.mock('../../api/friendsClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  listFriends: vi.fn().mockResolvedValue({ ok: true, friends: [] }),
+}))
 vi.mock('../../api/groupsClient', async (importOriginal) => ({
   ...await importOriginal(),
   getGroup: vi.fn(),
@@ -9,9 +13,10 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
   getMembers: vi.fn(),
   addMember: vi.fn(),
   getActivity: vi.fn(),
+  updateGroup: vi.fn(),
 }))
 
-import { addMember, getActivity, getGroup, getMembers, leaveGroup } from '../../api/groupsClient'
+import { addMember, getActivity, getGroup, getMembers, leaveGroup, updateGroup } from '../../api/groupsClient'
 import GroupInfoView from './GroupInfoView'
 import { AuthProvider } from '../../auth/AuthContext'
 
@@ -99,7 +104,9 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    const links = await screen.findAllByRole('link', { name: 'Ver gasto' })
+    // La pantalla monta varias tarjetas con sus propias consultas: en máquinas
+    // lentas tarda más que el segundo por defecto de findAll.
+    const links = await screen.findAllByRole('link', { name: 'Ver gasto' }, { timeout: 5000 })
     expect(links[0]).toHaveAttribute('href', '/groups/3/expenses/44')
     expect(getActivity).toHaveBeenCalledWith('3', expect.objectContaining({ eventTypes: ['EXPENSE_CREATED'] }))
     expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/groups/3/history')
@@ -145,7 +152,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Salir' }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(/Se abandonó el grupo/i)
@@ -159,7 +166,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Salir' }))
 
     expect(
       await screen.findByText(
@@ -173,13 +180,47 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    fireEvent.click(await screen.findByRole('button', { name: /^Agregar miembro$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Configuración del grupo/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Agregar miembro$/i }))
 
-    expect(screen.getByTestId('add-member-panel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cerrar ajustes' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /Agregar amigos a/ })).toBeInTheDocument()
+    const closeSettings = screen.getByRole('button', { name: 'Cerrar configuración' })
+    expect(closeSettings).toHaveTextContent(/^Cerrar$/)
     // fix 2026-11-04: no manual refresh button anymore
     expect(screen.queryByRole('button', { name: /Actualizar lista/i })).not.toBeInTheDocument()
+  })
+
+  it('Editar abre el formulario debajo sin ocultar la cabecera y pasa a "Cerrar"', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    expect(screen.getByRole('heading', { level: 1, name: GROUP.name })).toBeInTheDocument()
+    expect(screen.getByTestId('edit-panel')).toBeInTheDocument()
+    const closeEdit = screen.getByRole('button', { name: 'Cerrar edición' })
+    expect(closeEdit).toHaveTextContent(/^Cerrar$/)
+
+    fireEvent.click(closeEdit)
+
+    expect(screen.queryByTestId('edit-panel')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+  })
+
+  it('al guardar la configuración se cierra sola y vuelve a consultar el grupo', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+    updateGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }))
+    expect(screen.getByRole('heading', { name: 'Permisos de los miembros' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() => expect(screen.queryAllByTestId('permissions-panel')).toHaveLength(0))
+    expect(screen.getByRole('button', { name: 'Configuración' })).toBeInTheDocument()
+    await waitFor(() => expect(getGroup).toHaveBeenCalledTimes(2))
   })
 
   it('tras agregar un miembro actualiza la lista y el contador sin recargar (fix 2026-11-04)', async () => {
@@ -187,7 +228,8 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
       .mockResolvedValueOnce({ ok: true, group: GROUP })
       .mockResolvedValueOnce({ ok: true, group: { ...GROUP, memberCount: 5 } })
     getMembers
-      .mockResolvedValueOnce({ ok: true, members: [] })
+      .mockResolvedValueOnce({ ok: true, members: [] }) // lista de miembros
+      .mockResolvedValueOnce({ ok: true, members: [] }) // el modal, para marcar "Agregado"
       .mockResolvedValueOnce({
         ok: true,
         members: [{ userId: null, simulatedProfileId: 9, name: 'Abuela', avatar: null, role: 'MEMBER' }],
@@ -197,14 +239,14 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     renderView()
 
     fireEvent.click(await screen.findByRole('button', { name: /^Agregar miembro$/i }))
-    fireEvent.click(screen.getByRole('radio', { name: /Perfil simulado/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar perfil simulado' }))
     fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
     fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
+    fireEvent.click(within(screen.getByTestId('simulated-form')).getByRole('button', { name: 'Agregar perfil simulado' }))
 
     expect(await screen.findByText('Abuela')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByTestId('group-role')).toHaveTextContent('5 miembros'))
-    expect(getMembers).toHaveBeenCalledTimes(2)
+    expect(getMembers).toHaveBeenCalledTimes(3)
     expect(getGroup).toHaveBeenCalledTimes(2)
   })
 
@@ -214,7 +256,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     renderView()
 
     await waitFor(() => expect(screen.getByTestId('members-list')).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: /Configuración del grupo/i }))
+    expect(screen.queryByRole('button', { name: 'Configuración' }))
       .not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Agregar miembro$/i })).not.toBeInTheDocument()
   })

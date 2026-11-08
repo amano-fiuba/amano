@@ -16,7 +16,7 @@
   border-left: 0.3rem solid var(--color-oliva);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
-  box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-sombra) 22%, transparent);
   color: var(--color-texto);
   animation: snackbar-in 180ms ease-out;
 

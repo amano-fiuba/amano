@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { AuthProvider } from '../auth/AuthContext'
 import ProtectedRoute from '../auth/ProtectedRoute'
+import { SnackbarProvider } from './Snackbar'
 import FriendsList, {
   DELETE_SUCCESS_MESSAGE,
+  NO_FRIEND_MATCHES_MESSAGE,
   NOT_FRIEND_MESSAGE,
   NO_FRIENDS_MESSAGE,
 } from './FriendsList'
@@ -56,20 +58,22 @@ afterEach(() => {
 function ui(reloadKey = 0) {
   return (
     <AuthProvider>
-      <MemoryRouter initialEntries={['/friends']}>
-        <Routes>
-          <Route
-            path="/friends"
-            element={
-              <ProtectedRoute>
-                <FriendsList reloadKey={reloadKey} />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/login" element={<div>PANTALLA LOGIN</div>} />
-          <Route path="/users/search" element={<div>PANTALLA BUSCADOR</div>} />
-        </Routes>
-      </MemoryRouter>
+      <SnackbarProvider>
+        <MemoryRouter initialEntries={['/friends']}>
+          <Routes>
+            <Route
+              path="/friends"
+              element={
+                <ProtectedRoute>
+                  <FriendsList reloadKey={reloadKey} />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/login" element={<div>PANTALLA LOGIN</div>} />
+            <Route path="/users/search" element={<div>PANTALLA BUSCADOR</div>} />
+          </Routes>
+        </MemoryRouter>
+      </SnackbarProvider>
     </AuthProvider>
   )
 }
@@ -92,6 +96,90 @@ describe('FriendsList (feature 013)', () => {
     })
 
     expect(screen.queryByText('Cargando amigos…')).not.toBeInTheDocument()
+  })
+
+  it('el buscador va debajo del título y filtra amigos por nombre o mail', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA, BRUNO] })
+    const user = userEvent.setup()
+    render(ui())
+
+    const search = await screen.findByRole('searchbox', { name: 'Buscar en Mis amigos' })
+    expect(search).toHaveAttribute('placeholder', 'Buscá por nombre o mail')
+    const title = screen.getByRole('heading', { name: 'Mis amigos' })
+    const list = screen.getByRole('list', { name: 'Lista de amigos' })
+    expect(title.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(search.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.type(search, 'perez')
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(list).getByText('Ana Pérez')).toBeInTheDocument()
+
+    await user.clear(search)
+    await user.type(search, 'bruno@')
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(list).getByText('Bruno')).toBeInTheDocument()
+    // El contador sigue mostrando el total, no los filtrados.
+    expect(screen.getByText('2 amigos')).toBeInTheDocument()
+  })
+
+  it('ordena por nombre (A–Z por defecto, o Z–A) y por fecha más reciente o más antigua', async () => {
+    const CARLA = {
+      id: 20,
+      firstName: 'Carla',
+      lastName: 'Gómez',
+      email: 'carla@example.com',
+      friendsSince: '2026-11-05T15:00:00Z',
+    }
+    // El backend los manda en orden alfabético (013 FR-005).
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA, BRUNO, CARLA] })
+    const user = userEvent.setup()
+    render(ui())
+
+    const names = () =>
+      within(screen.getByRole('list', { name: 'Lista de amigos' }))
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('strong').textContent)
+
+    const sort = await screen.findByRole('combobox', { name: 'Ordenar Mis amigos' })
+    expect(sort).toHaveValue('name')
+    expect(names()).toEqual(['Ana Pérez', 'Bruno', 'Carla Gómez'])
+
+    await user.selectOptions(sort, 'Nombre (Z–A)')
+    expect(names()).toEqual(['Carla Gómez', 'Bruno', 'Ana Pérez'])
+
+    await user.selectOptions(sort, 'Fecha: más recientes')
+    expect(names()).toEqual(['Carla Gómez', 'Ana Pérez', 'Bruno'])
+
+    await user.selectOptions(sort, 'Fecha: más antiguos')
+    expect(names()).toEqual(['Bruno', 'Ana Pérez', 'Carla Gómez'])
+
+    // El orden se combina con el buscador.
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar en Mis amigos' }), 'example')
+    expect(names()).toEqual(['Bruno', 'Ana Pérez', 'Carla Gómez'])
+    await user.selectOptions(sort, 'Nombre (A–Z)')
+    expect(names()).toEqual(['Ana Pérez', 'Bruno', 'Carla Gómez'])
+  })
+
+  it('sin coincidencias avisa y no muestra la lista', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA, BRUNO] })
+    const user = userEvent.setup()
+    render(ui())
+
+    await user.type(await screen.findByRole('searchbox', { name: 'Buscar en Mis amigos' }), 'zzz')
+    expect(screen.getByText(NO_FRIEND_MATCHES_MESSAGE)).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Lista de amigos' })).not.toBeInTheDocument()
+
+    // Sugiere buscar entre todos los usuarios, con lo que se escribió.
+    await user.click(screen.getByRole('link', { name: 'Buscar usuarios' }))
+    expect(screen.getByText('PANTALLA BUSCADOR')).toBeInTheDocument()
+  })
+
+  it('sin amigos no muestra el buscador', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [] })
+    render(ui())
+
+    expect(await screen.findByText(/Buscar usuarios/)).toBeInTheDocument()
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
   it('US1: lista cada amigo con nombre, correo, avatar por defecto y "Amigos desde"', async () => {
@@ -265,14 +353,16 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    // Texto visible corto ("Eliminar"); el nombre accesible dice a quién.
+    expect(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' })).toHaveTextContent(/^Eliminar$/)
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
 
     expect(friendsClient.checkFriendDeletion).toHaveBeenCalledWith(12)
     expect(screen.getByRole('dialog', { name: 'Eliminar amigo' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
 
-    expect(await screen.findByText(DELETE_SUCCESS_MESSAGE)).toBeInTheDocument()
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(DELETE_SUCCESS_MESSAGE)
     expect(friendsClient.deleteFriend).toHaveBeenCalledWith(12)
     expect(screen.queryByTestId('friend-12')).not.toBeInTheDocument()
     expect(screen.getByText(NO_FRIENDS_MESSAGE)).toBeInTheDocument()
@@ -285,8 +375,8 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
-    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(friendsClient.deleteFriend).not.toHaveBeenCalled()
@@ -304,7 +394,7 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
 
     expect(await screen.findByText(/tenés una deuda pendiente/)).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -323,7 +413,7 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
 
     expect(await screen.findByText(/tenés una deuda pendiente/)).toBeInTheDocument()
@@ -344,7 +434,7 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
 
     expect(await screen.findByText(NOT_FRIEND_MESSAGE)).toBeInTheDocument()
@@ -360,7 +450,7 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
     await user.click(screen.getByRole('button', { name: 'Eliminar' }))
 
     expect(
@@ -378,7 +468,7 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
 
     expect(await screen.findByText('PANTALLA LOGIN')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -391,7 +481,7 @@ describe('FriendsList (feature 013)', () => {
     render(ui())
 
     const card = await screen.findByTestId('friend-12')
-    await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
+    await user.click(within(card).getByRole('button', { name: 'Eliminar a Ana Pérez' }))
 
     expect(
       await screen.findByText('No se pudo eliminar al amigo. Intentá nuevamente'),

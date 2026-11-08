@@ -37,8 +37,8 @@ describe('FriendPicker (spec 023 US5)', () => {
     listFriends.mockResolvedValue({ ok: true, friends: [JOSE, ANA] })
     const { container } = render(<Harness />)
 
-    expect(await screen.findByRole('checkbox', { name: /José Pérez/ })).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: /ana@example.com/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Agregar a José Pérez' })).toBeInTheDocument()
+    expect(screen.getByText('ana@example.com')).toBeInTheDocument()
     const sources = [...container.querySelectorAll('img')].map((img) => img.getAttribute('src'))
     expect(sources).toEqual(['/api/users/1/avatar', '/avatar-default.png'])
   })
@@ -47,26 +47,15 @@ describe('FriendPicker (spec 023 US5)', () => {
     listFriends.mockResolvedValue({ ok: true, friends: [JOSE, ANA] })
     render(<Harness />)
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Agregar a Ana/ }))
     fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: 'JOSE' } })
 
-    expect(screen.getByRole('checkbox', { name: /José Pérez/ })).toBeInTheDocument()
-    expect(screen.queryByRole('checkbox', { name: /Ana/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Agregar a José Pérez' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Agregar a Ana/ })).not.toBeInTheDocument()
     expect(screen.getByTestId('selected')).toHaveTextContent('2')
 
     fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: '' } })
-    expect(screen.getByRole('checkbox', { name: /Ana/ })).toBeChecked()
-  })
-
-  it('destildar quita a la persona de la selección', async () => {
-    listFriends.mockResolvedValue({ ok: true, friends: [ANA] })
-    render(<Harness />)
-
-    const checkbox = await screen.findByRole('checkbox', { name: /Ana/ })
-    fireEvent.click(checkbox)
-    fireEvent.click(checkbox)
-
-    expect(screen.getByTestId('selected')).toBeEmptyDOMElement()
+    expect(screen.getByText('Agregado')).toBeInTheDocument()
   })
 
   it('avisa si el filtro no encuentra a nadie', async () => {
@@ -93,7 +82,7 @@ describe('FriendPicker (spec 023 US5)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
 
-    expect(await screen.findByRole('checkbox', { name: /Ana/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Agregar a Ana/ })).toBeInTheDocument()
   })
 
   it('una sesión vencida cierra la sesión', async () => {

@@ -115,7 +115,7 @@ button.app-header__action {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
-  box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-sombra) 22%, transparent);
   color: var(--color-texto);
 
   h2 {
@@ -253,6 +253,23 @@ button.app-header__action {
     color: var(--color-texto-suave);
     font-weight: 400;
   }
+
+  // "Ver más": link al pie de cada sección, alineado a la derecha.
+  .global-search__more {
+    display: block;
+    width: fit-content;
+    margin: 0.1rem 0 0.3rem auto;
+    padding: 0.3rem 0.4rem;
+    color: var(--color-acento-oscuro);
+    font-size: 0.85rem;
+    font-weight: 700;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--color-acento-oscuro);
+      text-decoration: underline;
+    }
+  }
 }
 
 .quick-actions {
@@ -278,7 +295,7 @@ button.quick-actions__toggle {
   border-radius: 50%;
   background: var(--color-barra);
   color: #fff;
-  box-shadow: 0 8px 20px rgb(15 30 50 / 32%);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-sombra) 32%, transparent);
 
   &:hover {
     background: var(--color-barra);
@@ -304,7 +321,7 @@ button.quick-actions__toggle {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
-  box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-sombra) 22%, transparent);
   list-style: none;
 }
 

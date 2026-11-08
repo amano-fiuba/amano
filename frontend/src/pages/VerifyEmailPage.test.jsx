@@ -3,18 +3,23 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VerifyEmailPage, {
   INVALID_LINK_MESSAGE,
+  VERIFIED_MESSAGE,
   USED_LINK_MESSAGE,
 } from './VerifyEmailPage'
 
 // The page only needs setUser from the session store (T029 contract).
-const { setUser } = vi.hoisted(() => ({ setUser: vi.fn() }))
+const { setUser, showSnackbar } = vi.hoisted(() => ({
+  setUser: vi.fn(),
+  showSnackbar: vi.fn(),
+}))
+vi.mock('../components/Snackbar', () => ({ useSnackbar: () => showSnackbar }))
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ user: null, setUser, loading: false }),
 }))
 
 // US2 contract (task T029, TDD: written BEFORE the implementation): a valid
-// token signs the user in and lands on /groups (primer paso tras el registro,
-// specs/010-groups-management); 400 shows the exact invalid message (FR-008);
+// token signs the user in and lands on the main screen (specs/015-main-screen)
+// with a "Cuenta verificada" snackbar; 400 shows the exact invalid message (FR-008);
 // 409 the already-used one (FR-007); 410 is routed to the expired screen
 // (FR-006); a missing token is invalid too.
 const PROFILE = { id: 7, firstName: 'Ana', email: 'ana.perez@example.com' }
@@ -22,6 +27,7 @@ const PROFILE = { id: 7, firstName: 'Ana', email: 'ana.perez@example.com' }
 beforeEach(() => {
   vi.unstubAllGlobals()
   setUser.mockClear()
+  showSnackbar.mockClear()
 })
 
 afterEach(() => {
@@ -46,20 +52,21 @@ function renderPage(initialEntry) {
         <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/verify-email/expired" element={<div>PANTALLA EXPIRADO</div>} />
         <Route path="/dashboard" element={<div>DASHBOARD</div>} />
-        <Route path="/groups" element={<div>GRUPOS</div>} />
+        <Route path="/" element={<div>INICIO</div>} />
       </Routes>
     </MemoryRouter>,
   )
 }
 
 describe('VerifyEmailPage (T029)', () => {
-  it('token válido: setUser con el perfil y navegación a /groups con bienvenida verificada', async () => {
+  it('token válido: setUser con el perfil y snackbar "Cuenta verificada" y navegación a la pantalla principal', async () => {
     stubFetch(200, PROFILE)
 
     renderPage('/verify-email?token=token-valido')
 
-    expect(await screen.findByText('GRUPOS')).toBeInTheDocument()
+    expect(await screen.findByText('INICIO')).toBeInTheDocument()
     expect(setUser).toHaveBeenCalledWith(PROFILE)
+    expect(showSnackbar).toHaveBeenCalledWith(VERIFIED_MESSAGE)
     expect(globalThis.fetch).toHaveBeenCalledWith(
       '/api/auth/verify-email',
       expect.objectContaining({ method: 'POST', credentials: 'include' }),

@@ -7,6 +7,7 @@ import ProtectedRoute from '../auth/ProtectedRoute'
 import FriendsPage, {
   ACCEPTED_MESSAGE,
   NO_PENDING_REQUESTS_MESSAGE,
+  NO_REQUEST_MATCHES_MESSAGE,
   REJECTED_MESSAGE,
 } from './FriendsPage'
 
@@ -75,6 +76,41 @@ function renderPage() {
   )
 }
 
+describe('FriendsPage: buscador de solicitudes', () => {
+  it('va debajo del título y filtra solo las solicitudes por nombre o mail', async () => {
+    friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [ANA, JUAN] })
+    const user = userEvent.setup()
+    renderPage()
+
+    const search = await screen.findByRole('searchbox', { name: 'Buscar en Solicitudes pendientes' })
+    expect(search).toHaveAttribute('placeholder', 'Buscá por nombre o mail')
+    const title = screen.getByRole('heading', { name: 'Solicitudes pendientes' })
+    expect(title.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.type(search, 'juan@')
+    const list = screen.getByRole('list', { name: 'Solicitudes pendientes' })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+    expect(within(list).getByText('Juan')).toBeInTheDocument()
+
+    await user.clear(search)
+    await user.type(search, 'zzz')
+    expect(screen.getByText(NO_REQUEST_MATCHES_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveAttribute(
+      'href',
+      '/users/search?q=zzz',
+    )
+    expect(screen.queryByRole('list', { name: 'Solicitudes pendientes' })).not.toBeInTheDocument()
+  })
+
+  it('sin solicitudes no muestra el buscador', async () => {
+    friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [] })
+    renderPage()
+
+    expect(await screen.findByText(NO_PENDING_REQUESTS_MESSAGE)).toBeInTheDocument()
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
+})
+
 describe('FriendsPage (feature 011, US3)', () => {
   it('muestra el título y el estado de carga mientras consulta', async () => {
     let resolveList
@@ -86,7 +122,7 @@ describe('FriendsPage (feature 011, US3)', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Amigos' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Solicitudes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Solicitudes pendientes' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Cargando solicitudes…')
 
     await act(async () => {
@@ -96,7 +132,7 @@ describe('FriendsPage (feature 011, US3)', () => {
     expect(screen.queryByText('Cargando solicitudes…')).not.toBeInTheDocument()
   })
 
-  it('lista las solicitudes recibidas con nombre, correo, avatar por defecto y estado Pendiente', async () => {
+  it('lista las solicitudes recibidas con nombre, correo, avatar por defecto, sin la etiqueta redundante "Pendiente"', async () => {
     friendsClient.listReceivedFriendshipRequests.mockResolvedValue({
       ok: true,
       requests: [ANA, JUAN],
@@ -109,7 +145,8 @@ describe('FriendsPage (feature 011, US3)', () => {
     expect(screen.getByText('Juan')).toBeInTheDocument()
     expect(screen.queryByText(/null/)).not.toBeInTheDocument()
     expect(screen.getByText('2 pendientes')).toBeInTheDocument()
-    expect(screen.getAllByText('Pendiente')).toHaveLength(2)
+    // La sección ya se llama "Solicitudes pendientes": no se repite por tarjeta.
+    expect(screen.queryByText('Pendiente')).not.toBeInTheDocument()
 
     const list = screen.getByRole('list', { name: 'Solicitudes pendientes' })
     const avatars = list.querySelectorAll('img')
@@ -346,12 +383,12 @@ describe('FriendsPage (feature 012, responder solicitudes)', () => {
 describe('FriendsPage + lista de amigos (feature 013, US3)', () => {
   const reloadKey = () => screen.getByTestId('friends-list').dataset.reloadKey
 
-  it('renderiza "Mis amigos" antes de "Solicitudes"', async () => {
+  it('renderiza "Mis amigos" antes de "Solicitudes pendientes"', async () => {
     friendsClient.listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [] })
     renderPage()
 
     const list = await screen.findByTestId('friends-list')
-    const requests = screen.getByRole('heading', { name: 'Solicitudes' })
+    const requests = screen.getByRole('heading', { name: 'Solicitudes pendientes' })
     expect(
       list.compareDocumentPosition(requests) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()

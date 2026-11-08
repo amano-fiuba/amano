@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
 import { leaveGroup, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
 import LeaveGroupModal from './LeaveGroupModal'
+import { ExitIcon } from '../NavIcons'
 import { useSnackbar } from '../Snackbar'
 
 /**
- * Leave group (010 US5, spec 020): opens a modal before POST
+ * Leave group (010 US5, spec 020): the "Salir" button opens a modal before POST
  * /api/groups/{id}/leave. The mode comes from the flags of the group detail,
  * but the server always rules: rejection motives are shown in the modal. On
  * success the user goes to the groups list (FR-015). The last member leaves
@@ -48,9 +49,9 @@ export default function LeaveGroupPanel({ groupId, isLastAdmin = false, isLastMe
   }
 
   return (
-    <section data-testid="leave-group">
-      <button type="button" className="group-danger" onClick={openModal}>
-        Abandonar grupo
+    <section className="leave-group" data-testid="leave-group">
+      <button type="button" className="group-action group-action--danger" onClick={openModal}>
+        <ExitIcon /> Salir
       </button>
       {open && (
         <LeaveGroupModal

@@ -162,7 +162,7 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     renderEdit()
 
     await editarCompletamente(user)
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     await waitFor(() => {
       expect(updateProfile).toHaveBeenCalledTimes(1)
@@ -194,7 +194,7 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     renderEdit()
 
     await editarCompletamente(user)
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     expect(await screen.findByText(/el nombre debe tener entre 2 y 50 caracteres/i))
       .toBeInTheDocument()
@@ -213,7 +213,7 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     renderEdit()
 
     await editarCompletamente(user)
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     expect(await screen.findByText(/no se pudo completar la actualización/i))
       .toBeInTheDocument()
@@ -221,14 +221,14 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
-  it('el botón Cancelar cambios regresa a la visualización sin guardar nada (FR-008)', async () => {
+  it('el botón Cancelar regresa a la visualización sin guardar nada (FR-008)', async () => {
     const user = userEvent.setup()
     stubSesion(PERFIL_COMPLETO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
     await editarCompletamente(user)
-    await user.click(screen.getByRole('button', { name: /cancelar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }))
 
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateProfile).not.toHaveBeenCalled()
@@ -236,12 +236,12 @@ describe('ProfileEditPage (US1: guardar, validar, cancelar)', () => {
     expect(screen.queryByTestId('snackbar')).not.toBeInTheDocument()
   })
 
-  it('no existe el botón "Volver atrás" (reemplazado por "Cancelar cambios")', async () => {
+  it('no existe el botón "Volver atrás" (reemplazado por "Cancelar")', async () => {
     stubSesion(PERFIL_COMPLETO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
-    expect(await screen.findByRole('button', { name: /cancelar cambios/i })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^cancelar$/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /volver atrás/i })).not.toBeInTheDocument()
   })
 })
@@ -252,8 +252,8 @@ describe('ProfileEditPage (US1: estado del botón Guardar, FR-011 enmendada, T02
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
-    expect(await screen.findByRole('button', { name: /guardar cambios/i })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /cancelar cambios/i })).toBeEnabled()
+    expect(await screen.findByRole('button', { name: /^guardar$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^cancelar$/i })).toBeEnabled()
   })
 
   it('modificar un campo habilita Guardar; volver al valor original lo deshabilita', async () => {
@@ -262,7 +262,7 @@ describe('ProfileEditPage (US1: estado del botón Guardar, FR-011 enmendada, T02
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
-    const guardar = await screen.findByRole('button', { name: /guardar cambios/i })
+    const guardar = await screen.findByRole('button', { name: /^guardar$/i })
     expect(guardar).toBeDisabled()
 
     const nombre = screen.getByLabelText('Nombre')
@@ -281,7 +281,7 @@ describe('ProfileEditPage (US1: estado del botón Guardar, FR-011 enmendada, T02
     me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
     renderEdit()
 
-    const guardar = await screen.findByRole('button', { name: /guardar cambios/i })
+    const guardar = await screen.findByRole('button', { name: /^guardar$/i })
     const euro = screen.getByRole('checkbox', { name: /euro/i })
 
     await user.click(euro)
@@ -327,7 +327,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
       expect(preview.getAttribute('src')).toMatch(/^blob:/)
     })
     expect(updateAvatar).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /guardar cambios/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /^guardar$/i })).toBeEnabled()
   })
 
   it('Guardar con avatar pendiente llama updateAvatar y vuelve a la visualización con el aviso one-shot', async () => {
@@ -342,7 +342,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     renderEdit()
 
     await user.upload(await screen.findByLabelText(/avatar:/i), pngFile())
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     await waitFor(() => {
       expect(updateAvatar).toHaveBeenCalledTimes(1)
@@ -360,7 +360,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     renderEdit()
 
     await user.upload(await screen.findByLabelText(/avatar:/i), pngFile())
-    await user.click(screen.getByRole('button', { name: /cancelar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }))
 
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateAvatar).not.toHaveBeenCalled()
@@ -384,7 +384,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     expect(screen.getByRole('button', { name: /eliminar avatar/i })).toBeDisabled()
     expect(deleteAvatar).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
     await waitFor(() => {
       expect(deleteAvatar).toHaveBeenCalledTimes(1)
     })
@@ -400,7 +400,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     renderEdit()
 
     await user.click(await screen.findByRole('button', { name: /eliminar avatar/i }))
-    await user.click(screen.getByRole('button', { name: /cancelar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }))
 
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(deleteAvatar).not.toHaveBeenCalled()
@@ -426,7 +426,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
         .toMatch(/^blob:/)
     })
 
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
     await waitFor(() => {
       expect(updateAvatar).toHaveBeenCalledTimes(1)
     })
@@ -454,7 +454,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
       .toBe('/avatar-default.png')
     expect(screen.getByRole('button', { name: /eliminar avatar/i })).toBeDisabled()
 
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
     await waitFor(() => {
       expect(deleteAvatar).toHaveBeenCalledTimes(1)
     })
@@ -470,7 +470,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     renderEdit()
 
     await user.click(await screen.findByRole('button', { name: /eliminar avatar/i }))
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     expect(await screen.findByText(/no se pudo completar la actualización/i))
       .toBeInTheDocument()
@@ -492,7 +492,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     // El preview sigue con el avatar vigente (nada pendiente).
     expect(screen.getByRole('img', { name: /avatar de ana/i }).getAttribute('src'))
       .toBe('/api/users/7/avatar?v=3')
-    expect(screen.getByRole('button', { name: /guardar cambios/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^guardar$/i })).toBeDisabled()
 
     const bytes = new Uint8Array(2 * 1024 * 1024 + 1)
     bytes.set([0x89, 0x50, 0x4e, 0x47], 0)
@@ -511,7 +511,7 @@ describe('ProfileEditPage (US3: avatar pendiente hasta Guardar, FR-015/FR-016 en
     const nombre = await screen.findByLabelText('Nombre')
     await user.clear(nombre)
     await user.type(nombre, 'Anabel')
-    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await user.click(screen.getByRole('button', { name: /^guardar$/i }))
 
     expect(await screen.findByText('Pantalla de visualización')).toBeInTheDocument()
     expect(updateProfile).toHaveBeenCalledTimes(1)

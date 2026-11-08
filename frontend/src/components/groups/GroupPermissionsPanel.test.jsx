@@ -59,6 +59,24 @@ describe('GroupPermissionsPanel (T036/T040)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/Permisos actualizados/i)
   })
 
+  it('al guardar con éxito avisa con onSaved; si falla, no', async () => {
+    const onSaved = vi.fn()
+    updateGroup
+      .mockResolvedValueOnce({ ok: false, status: 403, detail: 'No podés editar los ajustes de este grupo' })
+      .mockResolvedValueOnce({ ok: true, group: { ...GROUP, permissions: BASE_PERMISSIONS } })
+
+    render(
+      <GroupPermissionsPanel group={GROUP} permissions={{ ...BASE_PERMISSIONS }} onSaved={onSaved} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/i }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(onSaved).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /Guardar/i }))
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1))
+  })
+
   it('muestra el motivo del rechazo cuando el guardado falla', async () => {
     updateGroup.mockResolvedValue({
       ok: false,

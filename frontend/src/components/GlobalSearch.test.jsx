@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -173,6 +173,56 @@ describe('GlobalSearch (015, US3)', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(screen.queryByText('Ana Cordero')).not.toBeInTheDocument()
+  })
+
+  describe('hasta 3 por sección y "Ver más"', () => {
+    const person = (id) => ({ id, firstName: `Persona${id}`, lastName: null, email: `p${id}@example.com` })
+    const group = (id) => ({ id, name: `Grupo viaje ${id}`, memberCount: 2 })
+    const results = () => screen.getByRole('region', { name: 'Resultados de la búsqueda' })
+
+    it('con 3 o menos muestra todos y no muestra "Ver más"', async () => {
+      searchUsers.mockResolvedValue({ ok: true, users: [person(1), person(2), person(3)] })
+      listGroups.mockResolvedValue({ ok: true, groups: [group(1), group(2), group(3)] })
+      const user = userEvent.setup()
+      renderSearch()
+
+      await user.type(input(), 'viaje')
+      expect(await screen.findByText('Persona3')).toBeInTheDocument()
+      expect(within(results()).getAllByRole('listitem')).toHaveLength(6)
+      expect(screen.queryByRole('link', { name: /Ver más/ })).not.toBeInTheDocument()
+    })
+
+    it('con más de 3 personas muestra 3 y "Ver más" lleva al buscador de usuarios', async () => {
+      searchUsers.mockResolvedValue({ ok: true, users: [person(1), person(2), person(3), person(4)] })
+      listGroups.mockResolvedValue({ ok: true, groups: [] })
+      const user = userEvent.setup()
+      renderSearch()
+
+      await user.type(input(), 'per')
+      expect(await screen.findByText('Persona3')).toBeInTheDocument()
+      expect(screen.queryByText('Persona4')).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Ver más en grupos' })).not.toBeInTheDocument()
+
+      const more = screen.getByRole('link', { name: 'Ver más en personas' })
+      await user.click(more)
+      expect(screen.getByTestId('location')).toHaveTextContent('/users/search?q=per')
+      expect(input()).toHaveValue('')
+    })
+
+    it('con más de 3 grupos muestra 3 y "Ver más" lleva a Mis grupos con el término', async () => {
+      searchUsers.mockResolvedValue({ ok: true, users: [] })
+      listGroups.mockResolvedValue({ ok: true, groups: [group(1), group(2), group(3), group(4)] })
+      const user = userEvent.setup()
+      renderSearch()
+
+      await user.type(input(), 'viaje')
+      expect(await screen.findByText('Grupo viaje 3')).toBeInTheDocument()
+      expect(screen.queryByText('Grupo viaje 4')).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Ver más en personas' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('link', { name: 'Ver más en grupos' }))
+      expect(screen.getByTestId('location')).toHaveTextContent('/groups?q=viaje')
+    })
   })
 
   it('se cierra con Escape', async () => {

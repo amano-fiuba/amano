@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDismiss } from '../../hooks/useDismiss'
 
 /**
@@ -12,8 +12,33 @@ export default function MemberActionsMenu({ memberName, testId, children }) {
   const containerRef = useRef(null)
   const triggerRef = useRef(null)
 
+  const [position, setPosition] = useState(null)
+
   const close = useCallback(() => setIsOpen(false), [])
   useDismiss(containerRef, isOpen, close)
+
+  // La lista de miembros scrollea: un panel `absolute` quedaría recortado por
+  // ella. Se fija a la pantalla, bajo el botón, y se cierra si algo scrollea
+  // (dejaría de estar alineado con su fila).
+  useEffect(() => {
+    if (!isOpen) return undefined
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [isOpen, close])
+
+  function toggle() {
+    if (!isOpen) {
+      const rect = triggerRef.current?.getBoundingClientRect()
+      setPosition(
+        rect ? { top: rect.bottom + 4, right: window.innerWidth - rect.right } : null,
+      )
+    }
+    setIsOpen(!isOpen)
+  }
 
   function handleKeyDown(event) {
     if (event.key === 'Escape') {
@@ -30,11 +55,18 @@ export default function MemberActionsMenu({ memberName, testId, children }) {
         aria-label={`Acciones de ${memberName}`}
         aria-expanded={isOpen}
         data-testid={testId}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggle}
       >
         <span aria-hidden="true">⋯</span>
       </button>
-      {isOpen && <div className="member-menu__panel">{children(close)}</div>}
+      {isOpen && (
+        <div
+          className={position ? 'member-menu__panel member-menu__panel--fixed' : 'member-menu__panel'}
+          style={position ?? undefined}
+        >
+          {children(close)}
+        </div>
+      )}
     </div>
   )
 }

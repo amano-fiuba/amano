@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router'
 
@@ -8,7 +9,7 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
 }))
 
 import { listGroups } from '../../api/groupsClient'
-import GroupListView from './GroupListView'
+import GroupListView, { NO_GROUP_MATCHES_MESSAGE } from './GroupListView'
 
 beforeEach(() => {
   listGroups.mockReset()
@@ -36,35 +37,6 @@ function group(id, overrides = {}) {
 }
 
 describe('GroupListView (T029/T031 read view)', () => {
-  it('muestra la bienvenida de cuenta verificada cuando llega con state verifiedWelcome', async () => {
-    listGroups.mockResolvedValue({ ok: true, groups: [] })
-
-    render(
-      <MemoryRouter
-        initialEntries={[
-          { pathname: '/groups', state: { verifiedWelcome: true } },
-        ]}
-      >
-        <GroupListView />
-      </MemoryRouter>,
-    )
-
-    expect(
-      await screen.findByTestId('groups-verified-welcome'),
-    ).toBeInTheDocument()
-  })
-
-  it('no muestra la bienvenida sin state de verificación', async () => {
-    listGroups.mockResolvedValue({ ok: true, groups: [] })
-
-    renderView()
-
-    await screen.findByTestId('groups-empty')
-    expect(
-      screen.queryByTestId('groups-verified-welcome'),
-    ).not.toBeInTheDocument()
-  })
-
   it('renderiza los grupos con foto, nombre y rol del usuario', async () => {
     listGroups.mockResolvedValue({
       ok: true,
@@ -166,5 +138,71 @@ describe('GroupListView (T029/T031 read view)', () => {
       'href',
       '/groups/new',
     )
+  })
+
+  describe('buscador y orden', () => {
+    const GROUPS = [
+      group(1, { name: 'Viaje a Mendoza', lastActivityAt: '2026-11-03T12:00:00Z' }),
+      group(2, { name: 'Árbol de Navidad', lastActivityAt: '2026-11-07T12:00:00Z' }),
+      group(3, { name: 'Departamento', lastActivityAt: '2026-10-20T12:00:00Z' }),
+    ]
+    const names = () =>
+      within(screen.getByTestId('groups-list'))
+        .getAllByRole('listitem')
+        .map((item) => item.querySelector('strong').textContent)
+
+    it('filtra por nombre sin distinguir mayúsculas ni tildes', async () => {
+      listGroups.mockResolvedValue({ ok: true, groups: GROUPS })
+      const user = userEvent.setup()
+      renderView()
+
+      const search = await screen.findByRole('searchbox', { name: 'Buscar en Mis grupos' })
+      expect(search).toHaveAttribute('placeholder', 'Buscá por nombre')
+
+      await user.type(search, 'arbol')
+      expect(names()).toEqual(['Árbol de Navidad'])
+      // El contador sigue mostrando el total.
+      expect(screen.getByTestId('groups-count')).toHaveTextContent('3 grupos')
+
+      await user.clear(search)
+      await user.type(search, 'zzz')
+      expect(screen.getByText(NO_GROUP_MATCHES_MESSAGE)).toBeInTheDocument()
+      expect(screen.queryByTestId('groups-list')).not.toBeInTheDocument()
+    })
+
+    it('ordena por actividad (por defecto la más reciente) o por nombre', async () => {
+      listGroups.mockResolvedValue({ ok: true, groups: GROUPS })
+      const user = userEvent.setup()
+      renderView()
+
+      const sort = await screen.findByRole('combobox', { name: 'Ordenar Mis grupos' })
+      expect(sort).toHaveValue('recent')
+      expect(names()).toEqual(['Árbol de Navidad', 'Viaje a Mendoza', 'Departamento'])
+
+      await user.selectOptions(sort, 'Actividad: más antigua')
+      expect(names()).toEqual(['Departamento', 'Viaje a Mendoza', 'Árbol de Navidad'])
+
+      await user.selectOptions(sort, 'Nombre (A–Z)')
+      expect(names()).toEqual(['Árbol de Navidad', 'Departamento', 'Viaje a Mendoza'])
+
+      await user.selectOptions(sort, 'Nombre (Z–A)')
+      expect(names()).toEqual(['Viaje a Mendoza', 'Departamento', 'Árbol de Navidad'])
+    })
+
+    it('arranca con el término de ?q= (desde "Ver más" de la barra)', async () => {
+      listGroups.mockResolvedValue({ ok: true, groups: GROUPS })
+      renderView('/groups?q=arbol')
+
+      expect(await screen.findByRole('searchbox', { name: 'Buscar en Mis grupos' })).toHaveValue('arbol')
+      expect(names()).toEqual(['Árbol de Navidad'])
+    })
+
+    it('sin grupos no muestra el buscador', async () => {
+      listGroups.mockResolvedValue({ ok: true, groups: [] })
+      renderView()
+
+      expect(await screen.findByTestId('groups-empty')).toBeInTheDocument()
+      expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    })
   })
 })
