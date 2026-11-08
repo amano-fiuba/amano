@@ -6,8 +6,9 @@ export const REST_IN_ORDER_NOTE = 'Los centavos que sobran se reparten en el ord
 
 // Preview of the equal split before saving (specs/017-debt-states, FR-022).
 // `shares` is the output of splitEqually ([{ key, cents, amount }] or null);
-// `names` maps each key to its visible name.
-export default function ExpenseSharePreview({ shares, names, payerKey }) {
+// `names` maps each key to its visible name. `showNote={false}` hides the note
+// about the leftover cents (it only applies to the equal split).
+export default function ExpenseSharePreview({ shares, names, payerKey, showNote = true }) {
   if (!Array.isArray(shares) || shares.length === 0) {
     return (
       <p className="group-expense__preview-empty" data-testid="share-preview-empty">
@@ -31,7 +32,7 @@ export default function ExpenseSharePreview({ shares, names, payerKey }) {
           </li>
         ))}
       </ul>
-      {uneven && (
+      {uneven && showNote && (
         <p className="group-expense__preview-note">
           {payerParticipates ? REST_TO_PAYER_NOTE : REST_IN_ORDER_NOTE}
         </p>

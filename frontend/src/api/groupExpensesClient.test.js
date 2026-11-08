@@ -3,7 +3,12 @@ import {
   GROUP_EXPENSE_LOAD_ERROR_MESSAGE,
   GROUP_EXPENSE_NETWORK_ERROR_MESSAGE,
   createGroupExpense,
+  deleteGroupExpense,
+  getGroupBalances,
   getGroupExpense,
+  getPendingDebts,
+  getSettlementProposal,
+  updateGroupExpense,
 } from './groupExpensesClient'
 
 // 017 T033: client of contracts/group-expenses-api.md.
@@ -124,3 +129,110 @@ describe('getGroupExpense (017)', () => {
     expect(await getGroupExpense(3, 12)).toEqual({ ok: false, network: true })
   })
 })
+
+describe('updateGroupExpense (022 T077)', () => {
+  it('200 manda PATCH con solo los campos que cambian y devuelve el gasto', async () => {
+    const fetchMock = respond(200, EXPENSE)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await updateGroupExpense(3, 12, { amount: '150.00' })
+
+    expect(result).toEqual({ ok: true, expense: EXPENSE })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/groups/3/expenses/12')
+    expect(init).toMatchObject({ method: 'PATCH', credentials: 'include' })
+    expect(init.headers['Content-Type']).toBe('application/json')
+    expect(init.body).toBe(JSON.stringify({ amount: '150.00' }))
+  })
+
+  it('400, 403, 404 y 409 devuelven estado, detalle, código y campos', async () => {
+    vi.stubGlobal('fetch', respond(409, {
+      detail: 'No se permite editar un gasto que ya tiene participantes',
+      properties: { code: 'EXPENSE_HAS_PARTICIPANTS' },
+    }))
+    expect(await updateGroupExpense(3, 12, { amount: '1.00' })).toEqual({
+      ok: false,
+      status: 409,
+      detail: 'No se permite editar un gasto que ya tiene participantes',
+      fields: {},
+      code: 'EXPENSE_HAS_PARTICIPANTS',
+    })
+
+    vi.stubGlobal('fetch', respond(400, { detail: 'x', properties: { fields: { body: 'Enviá al menos un campo para editar' } } }))
+    expect((await updateGroupExpense(3, 12, {})).fields).toEqual({ body: 'Enviá al menos un campo para editar' })
+
+    vi.stubGlobal('fetch', respond(403, { detail: 'No podés editar este gasto' }))
+    expect((await updateGroupExpense(3, 12, { amount: '1.00' })).status).toBe(403)
+  })
+
+  it('503 conserva el mensaje del servidor; otros 5xx y la red se tratan como red', async () => {
+    vi.stubGlobal('fetch', respond(503, { detail: 'No se pudo obtener la cotización; reintente después' }))
+    expect(await updateGroupExpense(3, 12, { currency: 'USD' })).toMatchObject({
+      ok: false,
+      status: 503,
+      detail: 'No se pudo obtener la cotización; reintente después',
+    })
+
+    vi.stubGlobal('fetch', respond(500, {}))
+    expect(await updateGroupExpense(3, 12, { amount: '1.00' })).toEqual({ ok: false, network: true })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await updateGroupExpense(3, 12, { amount: '1.00' })).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('deleteGroupExpense (022 T077)', () => {
+  it('204 devuelve ok y manda DELETE con la cookie', async () => {
+    const fetchMock = respond(204, null)
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await deleteGroupExpense(3, 12)).toEqual({ ok: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/groups/3/expenses/12')
+    expect(init).toMatchObject({ method: 'DELETE', credentials: 'include' })
+  })
+
+  it('409 y 403 devuelven el mensaje del servidor', async () => {
+    vi.stubGlobal('fetch', respond(409, { detail: 'No se puede eliminar un gasto con deudas asociadas' }))
+    expect(await deleteGroupExpense(3, 12)).toMatchObject({
+      ok: false,
+      status: 409,
+      detail: 'No se puede eliminar un gasto con deudas asociadas',
+    })
+    vi.stubGlobal('fetch', respond(403, { detail: 'No podés eliminar este gasto' }))
+    expect((await deleteGroupExpense(3, 12)).status).toBe(403)
+  })
+
+  it('5xx y errores de red se tratan como red', async () => {
+    vi.stubGlobal('fetch', respond(500, {}))
+    expect(await deleteGroupExpense(3, 12)).toEqual({ ok: false, network: true })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await deleteGroupExpense(3, 12)).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('lecturas de deudas, saldos y liquidación (022 T074)', () => {
+  it.each([
+    ['getPendingDebts', getPendingDebts, '/api/groups/3/debts/pending'],
+    ['getGroupBalances', getGroupBalances, '/api/groups/3/balances'],
+    ['getSettlementProposal', getSettlementProposal, '/api/groups/3/settlement-proposal'],
+  ])('%s hace GET con la cookie y devuelve { ok, data }', async (_name, read, url) => {
+    const fetchMock = respond(200, [{ debtId: 1 }])
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await read(3)).toEqual({ ok: true, data: [{ debtId: 1 }] })
+    expect(fetchMock.mock.calls[0][0]).toBe(url)
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'include' })
+  })
+
+  it('404 y 401 devuelven el estado; 5xx y la red se tratan como red', async () => {
+    vi.stubGlobal('fetch', respond(404, { detail: 'No existe el grupo solicitado o no sos miembro' }))
+    expect(await getPendingDebts(3)).toMatchObject({ ok: false, status: 404 })
+    vi.stubGlobal('fetch', respond(401, {}))
+    expect((await getGroupBalances(3)).status).toBe(401)
+    vi.stubGlobal('fetch', respond(500, {}))
+    expect(await getSettlementProposal(3)).toEqual({ ok: false, network: true })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await getPendingDebts(3)).toEqual({ ok: false, network: true })
+  })
+})
+

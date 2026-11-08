@@ -3,7 +3,9 @@ import {
   ACTIVITY_FILTERS,
   actorName,
   dayKey,
+  deletedExpenseIds,
   describeActivity,
+  expenseLinkId,
   formatDay,
   formatMoney,
   formatTime,
@@ -170,5 +172,75 @@ describe('agrupación por día (014 FR-015)', () => {
     ])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMOVED').eventTypes)
       .toEqual(['MEMBER_REMOVED', 'MEMBER_LEFT'])
+    // 022 T076: los filtros incluyen los eventos nuevos
+    expect(ACTIVITY_FILTERS.find((option) => option.value === 'EXPENSES').eventTypes)
+      .toEqual(['EXPENSE_CREATED', 'EXPENSE_EDITED', 'EXPENSE_DELETED'])
+    expect(ACTIVITY_FILTERS.find((option) => option.value === 'PAYMENTS').eventTypes).toEqual([
+      'PAYMENT_MADE', 'PAYMENT_REGISTERED', 'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED',
+      'DEBT_OVERDUE', 'LIQUIDATION_PROPOSED',
+    ])
+  })
+})
+
+describe('describeActivity: edición y borrado de gastos y eventos viejos (022 T076)', () => {
+  it('describe EXPENSE_EDITED y EXPENSE_DELETED, con o sin descripción', () => {
+    expect(phrase('EXPENSE_EDITED', { expenseId: 12 })).toBe('Ana López editó un gasto')
+    expect(phrase('EXPENSE_EDITED', { expenseId: 12, description: 'Súper' }))
+      .toBe('Ana López editó el gasto «Súper»')
+    expect(phrase('EXPENSE_DELETED', { expenseId: 12 })).toBe('Ana López eliminó un gasto')
+    expect(phrase('EXPENSE_DELETED', { expenseId: 12, description: 'Súper' }))
+      .toBe('Ana López eliminó el gasto «Súper»')
+  })
+
+  it('los eventos nuevos sin detalles ni actor no rompen la frase', () => {
+    expect(describeActivity({ eventType: 'EXPENSE_EDITED' })).toEqual({ actor: 'Alguien', text: 'editó un gasto' })
+    expect(describeActivity({ eventType: 'EXPENSE_DELETED', details: null }))
+      .toEqual({ actor: 'Alguien', text: 'eliminó un gasto' })
+  })
+
+  it('DEBT_OVERDUE sin actor se atribuye al Sistema y con actor conserva el nombre', () => {
+    expect(describeActivity({ eventType: 'DEBT_OVERDUE', actor: null, details: {} }))
+      .toEqual({ actor: 'Sistema', text: 'venció una deuda' })
+    expect(describeActivity({ eventType: 'DEBT_OVERDUE', actor: ANA, details: {} }).actor).toBe('Ana López')
+  })
+
+  it('un evento viejo sin los campos nuevos y un tipo desconocido siguen mostrándose', () => {
+    expect(phrase('EXPENSE_CREATED', { amount: '10.00', currency: 'ARS' })).toMatch(/^Ana López registró un gasto de .*10,00$/)
+    expect(phrase('PAYMENT_MADE', { amount: '500', currency: 'ARS' })).toContain('registró un pago de')
+    expect(phrase('EVENTO_DEL_FUTURO', { x: 1 })).toBe('Ana López realizó una acción en el grupo')
+    expect(describeActivity(undefined)).toEqual({ actor: 'Alguien', text: 'realizó una acción en el grupo' })
+  })
+})
+
+describe('expenseLinkId / deletedExpenseIds (022 T076)', () => {
+  const entry = (eventType, details) => ({ eventType, details })
+
+  it('enlaza los eventos con gasto asociado que traen expenseId', () => {
+    for (const type of ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'PAYMENT_MADE', 'PAYMENT_REGISTERED',
+      'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED', 'DEBT_OVERDUE']) {
+      expect(expenseLinkId(entry(type, { expenseId: 12 }))).toBe(12)
+    }
+  })
+
+  it('no enlaza EXPENSE_DELETED, tipos sin gasto ni eventos viejos sin expenseId', () => {
+    expect(expenseLinkId(entry('EXPENSE_DELETED', { expenseId: 12 }))).toBeNull()
+    expect(expenseLinkId(entry('LIQUIDATION_PROPOSED', { expenseId: 12 }))).toBeNull()
+    expect(expenseLinkId(entry('MEMBER_ADDED', { expenseId: 12 }))).toBeNull()
+    expect(expenseLinkId(entry('EXPENSE_CREATED', { amount: '10.00' }))).toBeNull()
+    expect(expenseLinkId(entry('EXPENSE_CREATED'))).toBeNull()
+    expect(expenseLinkId(undefined)).toBeNull()
+  })
+
+  it('no enlaza los gastos que las entradas cargadas muestran como borrados', () => {
+    const entries = [
+      entry('EXPENSE_DELETED', { expenseId: 12 }),
+      entry('EXPENSE_EDITED', { expenseId: 12 }),
+      entry('EXPENSE_CREATED', { expenseId: 12 }),
+      entry('EXPENSE_CREATED', { expenseId: 13 }),
+    ]
+    const deleted = deletedExpenseIds(entries)
+    expect([...deleted]).toEqual(['12'])
+    expect(entries.map((item) => expenseLinkId(item, deleted))).toEqual([null, null, null, 13])
+    expect(deletedExpenseIds(undefined).size).toBe(0)
   })
 })

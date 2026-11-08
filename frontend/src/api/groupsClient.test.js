@@ -13,6 +13,7 @@ import {
   leaveGroup,
   grantAdminRole,
   revokeAdminRole,
+  getExchangeQuote,
   GROUPS_NETWORK_ERROR_MESSAGE,
 } from './groupsClient'
 
@@ -40,6 +41,38 @@ describe('groupsClient', () => {
     expect(url).toBe('/api/groups')
     expect(init.method).toBe('POST')
     expect(init.body).toBe(JSON.stringify({ name: 'Trip', member: { memberType: 'SIMULATED' } }))
+  })
+
+  it('createGroup manda primaryCurrency en el cuerpo (022 T068)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 1, primaryCurrency: 'USD' }, 201))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await createGroup({ name: 'Trip', primaryCurrency: 'USD', members: [] })
+
+    expect(result.ok).toBe(true)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ primaryCurrency: 'USD' })
+  })
+
+  it('getExchangeQuote pide GET /exchange-quote con moneda y fecha y devuelve { ok, quote } (022 T069)', async () => {
+    const quote = { rate: 1250.5, rateDate: '2026-01-16', rateSource: 'BCRA', groupCurrency: 'ARS' }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(quote))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getExchangeQuote(3, 'USD', '2026-01-18')
+
+    expect(result).toEqual({ ok: true, quote })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/groups/3/exchange-quote?currency=USD&date=2026-01-18')
+    expect(init).toMatchObject({ method: 'GET', credentials: 'include' })
+  })
+
+  it('getExchangeQuote devuelve estado y detalle en errores HTTP, y network sin conexión', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ detail: 'Sin cotización' }, 503)))
+    expect(await getExchangeQuote(3, 'USD', '2026-01-18'))
+      .toEqual({ ok: false, status: 503, detail: 'Sin cotización' })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await getExchangeQuote(3, 'USD', '2026-01-18')).toEqual({ ok: false, network: true })
   })
 
   it('createGroup mapea los fields del ProblemDetail en 400', async () => {

@@ -1025,3 +1025,75 @@
     transition: none;
   }
 }
+
+/* Debts and payments screen (specs/022-group-debt-management, T074/T075). */
+.group-expense__status--reported { font-style: italic; }
+.group-expense__status--overdue { font-weight: 700; }
+.group-expense__status--verified { font-weight: 600; }
+
+.group-debts__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.group-debts__tabs [role='tab'][aria-selected='true'] {
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.group-debts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.group-debts__list > li,
+.group-debts__debt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+}
+
+.group-debts__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.group-debts__debt .group-confirm {
+  flex-basis: 100%;
+}
+
+.group-debts__state,
+.group-debts__note {
+  margin: 0.5rem 0;
+}
+
+.group-debts__error {
+  margin: 0 0 0.75rem;
+}
+
+/* Narrow screens: the tabs collapse into a vertical list. */
+@media (max-width: 600px) {
+  .group-debts__tabs {
+    flex-direction: column;
+  }
+
+  .group-debts__tabs [role='tab'] {
+    width: 100%;
+    text-align: left;
+  }
+
+  .group-debts__list > li,
+  .group-debts__debt {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

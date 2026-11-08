@@ -82,3 +82,96 @@ export async function getGroupExpense(groupId, expenseId) {
     return { ok: false, network: true }
   }
 }
+
+export const GROUP_EXPENSE_UPDATE_ERROR_MESSAGE =
+  'No se pudo guardar el gasto. Intentá nuevamente'
+export const GROUP_EXPENSE_DELETE_ERROR_MESSAGE =
+  'No se pudo eliminar el gasto. Intentá nuevamente'
+
+// 5xx are "network" failures, except 503: for PATCH it is the missing exchange
+// quote and carries the server's message in voseo (022 D8).
+function isNetworkFailure(response) {
+  return response.status >= 500 && response.status !== 503
+}
+
+/**
+ * PATCH /api/groups/{id}/expenses/{expenseId} (022 T077, personal expenses):
+ * `fields` holds only what changes (amount, currency, date, description).
+ * Returns { ok: true, expense }, { ok: false, status, detail, fields, code }
+ * for 4xx and 503, or { ok: false, network: true }.
+ */
+export async function updateGroupExpense(groupId, expenseId, fields) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/expenses/${expenseId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    })
+    if (response.ok) {
+      return { ok: true, expense: await response.json() }
+    }
+    if (isNetworkFailure(response)) {
+      return { ok: false, network: true }
+    }
+    return failure(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * DELETE /api/groups/{id}/expenses/{expenseId} (022 T077): { ok: true } on 204,
+ * a failure as above on 4xx (409 with debts, 403, 404), or { network: true }.
+ */
+export async function deleteGroupExpense(groupId, expenseId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/expenses/${expenseId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    if (response.ok) {
+      return { ok: true }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return failure(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+export const GROUP_DEBTS_LOAD_ERROR_MESSAGE =
+  'No se pudo cargar esta información. Intentá nuevamente'
+
+async function getJson(url) {
+  try {
+    const response = await fetch(url, { method: 'GET', credentials: 'include' })
+    if (response.ok) {
+      return { ok: true, data: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return failure(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/** GET /api/groups/{id}/debts/pending (022 T043): the caller's open debts → { ok, data: [...] }. */
+export function getPendingDebts(groupId) {
+  return getJson(`/api/groups/${groupId}/debts/pending`)
+}
+
+/** GET /api/groups/{id}/balances (022 T012): balances by currency → { ok, data }. */
+export function getGroupBalances(groupId) {
+  return getJson(`/api/groups/${groupId}/balances`)
+}
+
+/** GET /api/groups/{id}/settlement-proposal (022 T027, read-only) → { ok, data }. */
+export function getSettlementProposal(groupId) {
+  return getJson(`/api/groups/${groupId}/settlement-proposal`)
+}
+

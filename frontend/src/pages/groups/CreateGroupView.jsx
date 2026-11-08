@@ -4,8 +4,10 @@ import { GROUPS_NETWORK_ERROR_MESSAGE, createGroup } from '../../api/groupsClien
 
 import FriendPicker from '../../components/groups/FriendPicker'
 import { useSnackbar } from '../../components/Snackbar'
+import SelectField from '../../components/SelectField'
 import SubmitButton from '../../components/SubmitButton'
 import TextField from '../../components/TextField'
+import { CURRENCY_OPTIONS } from '../../validation/expenseCatalog'
 
 // Exact messages of the UI contract; exported for the tests.
 export const NAME_REQUIRED_MESSAGE = 'El nombre del grupo es obligatorio'
@@ -35,7 +37,7 @@ export default function CreateGroupView() {
   const navigate = useNavigate()
   const [saving, setSaving] = useState(false)
 
-  const [fields, setFields] = useState({ name: '', description: '' })
+  const [fields, setFields] = useState({ name: '', description: '', primaryCurrency: 'ARS' })
   const [errors, setErrors] = useState({})
 
   const [friends, setFriends] = useState([])
@@ -89,6 +91,7 @@ export default function CreateGroupView() {
     const result = await createGroup({
       name: fields.name.trim(),
       description: fields.description.trim(),
+      primaryCurrency: fields.primaryCurrency,
       members: [
         ...friends.map((friend) => ({ memberType: 'REGISTERED', identifier: friend.email })),
         ...profiles.map(({ name, email }) => ({
@@ -105,8 +108,8 @@ export default function CreateGroupView() {
     } else if (result.network) {
       setErrors({ member: GROUPS_NETWORK_ERROR_MESSAGE })
     } else {
-      const { name, member, identifier } = result.fields ?? {}
-      setErrors({ name, member: member || identifier })
+      const { name, member, identifier, primaryCurrency } = result.fields ?? {}
+      setErrors({ name, member: member || identifier, primaryCurrency })
     }
   }
 
@@ -129,6 +132,14 @@ export default function CreateGroupView() {
           value={fields.description}
           onChange={(event) => setFields((prev) => ({ ...prev, description: event.target.value }))}
           error={errors.description}
+        />
+        <SelectField
+          label="Moneda principal"
+          options={CURRENCY_OPTIONS}
+          placeholder={null}
+          value={fields.primaryCurrency}
+          onChange={(event) => setFields((prev) => ({ ...prev, primaryCurrency: event.target.value }))}
+          error={errors.primaryCurrency}
         />
 
         <fieldset className="create-group__members">

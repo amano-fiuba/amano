@@ -56,6 +56,32 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     expect(screen.getByTestId('group-role')).toHaveTextContent(/Administrador/)
   })
 
+  it('muestra la moneda principal del grupo (022 T068)', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: { ...GROUP, primaryCurrency: 'USD' } })
+
+    renderView()
+
+    expect(await screen.findByTestId('group-currency')).toHaveTextContent('Moneda: USD')
+  })
+
+  it('enlaza a la pantalla de deudas y saldos (022 T074)', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    expect(await screen.findByTestId('group-debts-link')).toHaveAttribute('href', '/groups/3/debts')
+    expect(screen.getByTestId('group-debts-link')).toHaveTextContent('Deudas y saldos')
+  })
+
+  it('sin moneda en la respuesta no muestra la línea de moneda', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    await screen.findByText('Departamento 2026')
+    expect(screen.queryByTestId('group-currency')).not.toBeInTheDocument()
+  })
+
   it('muestra la actividad reciente y los últimos gastos con su enlace', async () => {
     getGroup.mockResolvedValue({ ok: true, group: { ...GROUP, expensesCount: 1 } })
     getActivity.mockResolvedValue({
