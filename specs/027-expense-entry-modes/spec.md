@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-08
 
-**Status**: Draft
+**Status**: Implementada en la rama `feat/modales-pagos` (US1–US4), pendiente de prueba manual y revisión
 
 **Input**: User description: "Al presionar 'Registrar un gasto' en el frontpage se abre un submenú (estilo 'Insertar > Elementos de creación' de Google Docs) con 3 opciones: Gasto personal, Gasto con amigo y Gasto grupal. El gasto personal reutiliza el modal actual con correcciones (calendario para la fecha, monedas del usuario + 'Ver más' con monedas del BCRA, rango inicio/fin para gastos frecuentes, botones Cancelar/Guardar, fondo celeste sobre blanco, sin 'Gasto compartido'). El gasto grupal agrega tipo de gasto, medio de pago y categoría, iguala el tamaño de las filas de los tres modos de reparto y fija la altura del modal según la columna izquierda, con el panel derecho scrolleable. El gasto con amigo primero pide elegir un amigo y luego reutiliza el formulario grupal."
 
@@ -20,7 +20,7 @@ Sigue la costumbre del repo (018, 021, 023, 024): las specs anteriores no se edi
 | 007 | Campo fecha | Campo de fecha nativo del navegador | Campo con ícono de calendario que abre un mini calendario navegable por meses (FR-010) |
 | 007 / 002 / 022 | Moneda | Solo ARS, USD y EUR | Primero las monedas del usuario y luego "Ver más" con el catálogo del BCRA; se acepta cualquier moneda del catálogo, también en gastos de grupo (FR-011 a FR-014) |
 | 016 | Deuda directa | El módulo de deudas entre amigos no existe; nunca hay deudas directas | Un gasto con amigo genera una deuda directa que bloquea eliminar la amistad (FR-032) |
-| 007 | Formulario | Una columna, sin "Cancelar" y sin el fondo de los formularios de grupo | Panel celeste sobre fondo blanco, "Cancelar" abajo a la izquierda y "Guardar gasto" abajo a la derecha (FR-018, FR-019) |
+| 007 | Formulario | Una columna, sin "Cancelar" y sin el fondo de los formularios de grupo | Panel celeste sobre fondo blanco, "Cancelar" abajo a la izquierda y "Guardar" abajo a la derecha (FR-018, FR-019) |
 | 017 / 022 / 024 | Gasto de grupo | Sin categoría, tipo de gasto ni medio de pago | Se agregan los tres campos (FR-020) |
 | 024 | Panel de reparto | Las filas de cada modo tienen alturas distintas y el panel crece sin límite | Filas de igual altura en los tres modos; altura del formulario fijada por la columna izquierda y panel derecho scrolleable (FR-022 a FR-024) |
 
@@ -55,7 +55,7 @@ El usuario registra un gasto propio en un formulario con el mismo estilo que el 
 
 **Acceptance Scenarios**:
 
-1. **Given** el formulario de gasto personal abierto, **When** se muestra, **Then** tiene un panel celeste sobre fondo blanco (igual que el de grupos), no muestra el interruptor "Gasto compartido" ni el panel de reparto, y muestra "Cancelar" abajo a la izquierda y "Guardar gasto" abajo a la derecha.
+1. **Given** el formulario de gasto personal abierto, **When** se muestra, **Then** tiene un panel celeste sobre fondo blanco (igual que el de grupos), no muestra el interruptor "Gasto compartido" ni el panel de reparto, y muestra "Cancelar" abajo a la izquierda y "Guardar" abajo a la derecha.
 2. **Given** el campo Fecha, **When** el usuario presiona el ícono de calendario a la derecha del campo, **Then** se abre un mini calendario en el mes de la fecha cargada, con flechas para ir al mes anterior y al siguiente; al elegir un día, el campo toma esa fecha y el calendario se cierra.
 3. **Given** el selector de Moneda, **When** el usuario lo abre, **Then** ve primero sus monedas preferidas y al final la opción "Ver más".
 4. **Given** el usuario elige "Ver más", **When** se abre el modal de monedas, **Then** puede buscar por código o nombre en el catálogo de monedas del BCRA, elegir una y volver al formulario con esa moneda seleccionada.
@@ -131,8 +131,10 @@ El usuario elige "Gasto con amigo", selecciona un único amigo de su lista y com
 
 **Gasto personal**
 
+- **FR-035**: Cuando la moneda elegida en el formulario de gasto personal no es ARS y el monto y la fecha son válidos, el formulario MUST mostrar una vista previa del monto estimado en pesos con la cotización oficial del BCRA de esa fecha, como el formulario de grupos (022). Es solo informativa: el gasto personal se guarda en su moneda, sin convertir. Si la cotización no está disponible, se avisa y el guardado no se bloquea. *(Agregado el 2026-11-08 a pedido del usuario.)*
+- **FR-036**: En el alta de los tres formularios (personal, grupal y con amigo), "Guardar" MUST abrir un resumen final del gasto (monto, moneda, fecha, clasificación, descripción y, en grupo o con amigo, con quién, quién pagó, el reparto y la parte de cada uno) con "Confirmar" y "Volver"; el gasto se guarda solo al confirmar y "Volver" conserva lo cargado. La edición de un gasto de grupo no lo usa. *(Agregado el 2026-11-08 a pedido del usuario.)*
 - **FR-018**: El formulario de gasto personal MUST usar el mismo estilo que el de grupos: panel celeste sobre fondo blanco.
-- **FR-019**: El formulario de gasto personal MUST mostrar "Cancelar" abajo a la izquierda y "Guardar gasto" abajo a la derecha, y MUST NOT mostrar el interruptor "Gasto compartido" ni el panel de reparto. "Cancelar" con datos cargados MUST pedir confirmación.
+- **FR-019**: El formulario de gasto personal MUST mostrar "Cancelar" abajo a la izquierda y "Guardar" abajo a la derecha, y MUST NOT mostrar el interruptor "Gasto compartido" ni el panel de reparto. "Cancelar" con datos cargados MUST pedir confirmación.
 
 **Gasto grupal**
 
@@ -140,7 +142,7 @@ El usuario elige "Gasto con amigo", selecciona un único amigo de su lista y com
 - **FR-021**: Al elegir "Gasto grupal" desde el submenú, el sistema MUST pedir primero el grupo entre los grupos activos del usuario. Desde la pantalla de un grupo, el formulario MUST abrirse con ese grupo sin preguntar.
 - **FR-022**: Cada fila de miembro del panel de reparto MUST ocupar la misma altura en "Partes iguales", "Personalizado" y "Porcentajes".
 - **FR-023**: En escritorio, la altura del formulario MUST estar dada por la columna izquierda (datos del gasto); el panel derecho MUST ocupar como máximo esa altura y scrollear internamente si su contenido la supera.
-- **FR-024**: Los botones "Cancelar" y "Guardar gasto" MUST seguir visibles aunque el panel derecho scrollee.
+- **FR-024**: Los botones "Cancelar" y "Guardar" MUST seguir visibles aunque el panel derecho scrollee.
 
 **Gasto con amigo**
 

@@ -74,11 +74,11 @@ Fecha
 │ │ Monto / Moneda / Fecha / Categoría / Tipo /   │ │
 │ │ [Frecuencia] / Medio de pago / Descripción    │ │
 │ └───────────────────────────────────────────────┘ │
-│ [Cancelar]                        [Guardar gasto] │
+│ [Cancelar]                              [Guardar] │
 └───────────────────────────────────────────────────┘
 ```
 
-Sin interruptor "Gasto compartido" ni panel de reparto. "Cancelar" con el formulario `isDirty` → `confirm` ("¿Descartar el gasto? Se perderán los datos cargados").
+Sin interruptor "Gasto compartido" ni panel de reparto. Con una moneda distinta de ARS y monto y fecha válidos, debajo de la fecha aparece "Monto estimado: $ 100,00 USD ≈ $ 154.550,00 ARS" con el aviso "Estimación con la cotización oficial del BCRA. El gasto se guarda en su moneda." (FR-035, `GET /api/currencies/quote`, debounce 400 ms); si falla, un aviso que no bloquea el guardado. "Cancelar" con el formulario `isDirty` → `confirm` ("¿Descartar el gasto? Se perderán los datos cargados").
 
 ## `SharedExpenseForm` (grupo y amigo)
 
@@ -93,10 +93,16 @@ Sin interruptor "Gasto compartido" ni panel de reparto. "Cancelar" con el formul
 │ Descripción            │ │ └──────────────────────────┘ │
 │ ¿Quién pagó?           │ │                              │
 └────────────────────────┘ └──────────────────────────────┘
-[Cancelar]                                  [Guardar gasto]
+[Cancelar]                                        [Guardar]
 ```
 
 - La altura de la grilla la fija la columna izquierda; el panel derecho tiene `min-height: 0` y la lista de filas `overflow-y: auto`.
 - Fila de miembro de altura igual en los tres métodos (variable CSS `--split-row-height`).
 - En modo amigo: sin interruptor "Gasto compartido", participantes fijos (usuario y amigo, ambos tildados y no destildables en "Partes iguales"), pagador elegible entre los dos, sin vista previa de cotización.
 - Móvil (`< 768px`): columnas apiladas, sin altura máxima.
+
+## `ExpenseSummaryDialog` (nuevo, FR-036)
+
+"Guardar" en el alta de cualquiera de los tres formularios abre "Confirmá el gasto": filas etiqueta/valor (Grupo o Con, Monto, Estimado en la otra moneda si hay cotización, Moneda, Fecha, Categoría, Tipo de gasto, Frecuencia si es recurrente, Medio de pago, Descripción, ¿Quién pagó?, Reparto) y, si se reparte, "Parte de cada uno". "Confirmar" (enfocado al abrir) guarda; "Volver" o Escape cierran sin guardar y sin perder lo cargado. Mientras guarda, ambos botones quedan deshabilitados.
+
+En "¿En qué grupo?", el aviso "No podés registrar gastos en este grupo" va en su propio renglón, debajo de la cantidad de miembros.

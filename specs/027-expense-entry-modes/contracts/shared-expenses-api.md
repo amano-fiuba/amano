@@ -16,7 +16,7 @@ Cuerpo: el de 017/022 más tres propiedades **obligatorias**:
 
 **Compatibilidad**: es un cambio que exige los campos nuevos. El único cliente es el frontend del repo, que se actualiza en el mismo release (Principio VII). Se documenta en el PR.
 
-Respuesta (`GroupExpenseResponse`) suma `category`, `type`, `paymentMethod` (pueden ser `null` en gastos anteriores a 027) y `friend` (`null` en gastos de grupo).
+Respuesta (`GroupExpenseResponse`) suma `category`, `type`, `paymentMethod` (pueden ser `null` en gastos anteriores a 027) y `friend` (`null` en gastos de grupo). En un gasto con amigo, `debts[].canRegisterPayment` es siempre `false` (saldar deudas directas queda fuera de esta spec).
 
 `PATCH` de gasto personal (022 T077): acepta además `category`, `type` y `paymentMethod`.
 
@@ -56,9 +56,9 @@ Reglas (además de las de monto, fecha, descripción, moneda y reparto de 007/02
 
 | Regla | Error |
 |---|---|
-| `friendId` no es amigo del usuario (incluye que haya dejado de serlo, FR-033) | `404` neutral "No existe el amigo solicitado" |
-| `payerUserId` distinto del usuario y del amigo | `400` en `payerUserId` |
-| `participants` distinto de exactamente {usuario, amigo}, o con `SIMULATED` | `400` en `participants` |
+| `friendId` no es amigo del usuario, no existe o es el propio usuario (incluye que haya dejado de serlo, FR-033) | `404` neutral de 016: "No sos amigo de ese usuario" |
+| `payerUserId` distinto del usuario y del amigo | `400` en `payerUserId`: "Quien pagó tiene que ser vos o tu amigo" |
+| `participants` distinto de exactamente {usuario, amigo}, o con `SIMULATED` | `400` en `participants`: "El gasto se comparte entre vos y tu amigo: los dos tienen que ser los únicos participantes" |
 | `category`, `type`, `paymentMethod` | Igual que en grupos |
 
 Moneda: **no hay conversión**. La deuda queda en la moneda del gasto; la respuesta trae `rateSource = "SAME_CURRENCY"`, `exchangeRate = "1"` y `convertedAmount = amount`.
@@ -70,7 +70,7 @@ Efecto: se crea el gasto (`groupId = null`, `friend` = el amigo), sus dos partes
 `GroupExpenseResponse` con `groupId: null` y:
 
 ```json
-"friend": { "id": 12, "firstName": "Manu", "lastName": "Pato", "avatarUrl": "..." }
+"friend": { "userId": 12, "name": "Manu Pato" }
 ```
 
 `Location: /api/users/me/friends/{friendId}/expenses/{expenseId}`.

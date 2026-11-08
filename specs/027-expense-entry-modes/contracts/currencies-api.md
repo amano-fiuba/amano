@@ -36,6 +36,14 @@ Orden: alfabético por `code`. Solo entran monedas que estén a la vez en `Maest
 
 Caché: en memoria, 24 h. Un catálogo vencido se sigue sirviendo si el BCRA falla al refrescarlo.
 
+## `GET /api/currencies/quote?currency=&date=` (nuevo, FR-035)
+
+Vista previa de cotización a pesos para el gasto personal (no hay grupo). Misma lógica, validaciones y errores que `GET /api/groups/{id}/exchange-quote` de 022, con destino fijo ARS.
+
+- **Autenticación**: cookie `amano_auth`. Sin sesión → `401`.
+- **Respuesta `200`**: `{ "rate": 281.63495900, "rateDate": "2026-11-05", "rateSource": "BCRA", "groupCurrency": "ARS" }`. Con `currency = ARS`: `rate = 1` y `rateSource = SAME_CURRENCY`, sin llamar al BCRA. (`groupCurrency` conserva el nombre del contrato de 022: es la moneda destino.)
+- **Errores**: `400` en `currency` (falta o fuera del catálogo) o `date` (formato o fecha futura); `503 EXCHANGE_RATE_UNAVAILABLE` si no hay cotización.
+
 ## Campos `currency` en endpoints existentes (cambio aditivo)
 
 Desde 027, los siguientes campos aceptan cualquier `code` del catálogo (32 monedas), no solo ARS, USD y EUR:
