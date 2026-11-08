@@ -11,6 +11,7 @@ import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import ListSearch from '../../components/ListSearch'
 import { normalizeSearch } from '../../utils/personSearch'
 import './groups.scss'
+import HomeLink from '../../components/HomeLink'
 
 function groupCountLabel(count) {
   return count === 1 ? '1 grupo' : `${count} grupos`
@@ -58,6 +59,7 @@ export default function GroupListView() {
     <main className="page groups-page">
       <header className="groups-page__header">
         <div>
+          <HomeLink />
           <h1>Mis grupos</h1>
           {groups?.length > 0 && (
             <p className="groups-page__count" data-testid="groups-count">

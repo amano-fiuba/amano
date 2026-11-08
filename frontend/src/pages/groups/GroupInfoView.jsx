@@ -7,7 +7,7 @@ import GroupDescriptionPanel from '../../components/groups/GroupDescriptionPanel
 import MemberListView from '../../components/groups/MemberListView'
 import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupEditForm from '../../components/groups/GroupEditForm'
-import { GroupSettingsIcon, HistoryIcon, PencilIcon } from '../../components/NavIcons'
+import { GroupSettingsIcon, PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
@@ -110,13 +110,6 @@ export default function GroupInfoView() {
             {/* Acciones arriba a la derecha y "Salir" en la esquina inferior derecha. */}
             <div className="group-hero__side">
             <div className="group-hero__actions">
-              <Link
-                className="group-action"
-                to={`/groups/${id}/history`}
-                data-testid="group-history-link"
-              >
-                <HistoryIcon /> Historial de actividad
-              </Link>
               {canEditGroupData && !editing && (
                 <button
                   type="button"

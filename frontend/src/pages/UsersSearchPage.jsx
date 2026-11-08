@@ -5,6 +5,7 @@ import { SEARCH_NETWORK_ERROR_MESSAGE, searchUsers } from '../api/usersClient'
 import { SEND_NETWORK_ERROR_MESSAGE, sendFriendshipRequest } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
 import { useSnackbar } from '../components/Snackbar'
+import HomeLink from '../components/HomeLink'
 
 // Exact messages of the spec (FR-009, FR-016, FR-017), exported for the tests.
 export const TOO_SHORT_MESSAGE = 'Ingresá al menos 2 caracteres para buscar'
@@ -278,6 +279,7 @@ function UsersSearch({ initialTerm }) {
   return (
     <main className="page users-search-page">
       <header className="users-search-page__header">
+        <HomeLink />
         <h1>Buscar usuarios</h1>
         <p className="users-search-page__lead">
           Encontrá personas por su nombre, apellido o correo electrónico.

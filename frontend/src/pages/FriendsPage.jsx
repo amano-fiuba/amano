@@ -10,6 +10,7 @@ import FriendsList from '../components/FriendsList'
 import ListSearch, { ListSearchNoMatches } from '../components/ListSearch'
 import { useSnackbar } from '../components/Snackbar'
 import { filterPeople, fullName } from '../utils/personSearch'
+import HomeLink from '../components/HomeLink'
 
 // Exact messages of the spec (FR-013), exported for the tests.
 export const NO_PENDING_REQUESTS_MESSAGE = 'No tenés solicitudes de amistad pendientes'
@@ -117,6 +118,7 @@ export default function FriendsPage() {
   return (
     <main className="friends-page">
       <header className="friends-page__header">
+        <HomeLink />
         <h1>Amigos</h1>
         <p className="friends-page__lead">
           Consultá tus amigos y revisá las solicitudes de amistad que recibiste.

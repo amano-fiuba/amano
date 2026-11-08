@@ -1627,3 +1627,11 @@ fieldset {
     position: static;
   }
 }
+
+// Enlace "Ir a Pantalla principal" sobre el título de cada sección.
+.home-link {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
