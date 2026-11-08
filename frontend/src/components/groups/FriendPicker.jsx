@@ -3,24 +3,9 @@ import { Link } from 'react-router'
 import { FRIENDS_NETWORK_ERROR_MESSAGE, listFriends } from '../../api/friendsClient'
 import { useAuth } from '../../auth/AuthContext'
 import { NO_FRIENDS_MESSAGE } from '../FriendsList'
+import { filterPeople, fullName } from '../../utils/personSearch'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
-
-function fullName(friend) {
-  return friend.lastName ? `${friend.firstName} ${friend.lastName}` : friend.firstName
-}
-
-// Lowercase and without accents, so "jose" finds "José".
-function normalize(text) {
-  return (text ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-}
-
-function matches(friend, term) {
-  return [fullName(friend), friend.email].some((value) => normalize(value).includes(term))
-}
 
 /**
  * Friends list with checkboxes (spec 023 FR-023, FR-024, FR-027). The filter
@@ -90,8 +75,7 @@ export default function FriendPicker({ selected, onChange }) {
     )
   }
 
-  const term = normalize(filter.trim())
-  const visible = friends.filter((friend) => matches(friend, term))
+  const visible = filterPeople(friends, filter)
 
   return (
     <div className="friend-picker">

@@ -897,18 +897,150 @@ fieldset {
   }
 }
 
-.friends-page h1 {
-  margin-bottom: 0.4rem;
+// Pantalla de Amigos: tarjetas separadas como la pantalla principal.
+//   [               Amigos               ]
+//   [ Mis amigos ] [ Solicitudes pendientes ]
+// En pantallas angostas las tarjetas se apilan (amigos arriba).
+.friends-page {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  width: calc(100% - 2rem);
+  max-width: 64rem;
+  margin: 1.25rem auto 5.5rem;
+}
+
+.friends-page__header,
+.friends-page .friends-list,
+.friends-page .friends-requests {
+  min-width: 0;
+  margin: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+}
+
+.friends-page__header {
+  h1 {
+    margin: 0 0 0.4rem;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
 }
 
 .friends-page__lead {
-  max-width: 42ch;
-  margin: 0 0 1.5rem;
+  max-width: 60ch;
+  margin: 0;
   font-size: 0.95rem;
 }
 
-.friends-requests {
-  margin-top: 0.5rem;
+.friends-page__columns {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .friends-page__columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// Buscador de cada tarjeta (ListSearch), justo debajo del título. Si lleva un
+// selector de orden al lado, en pantallas angostas el selector baja de línea.
+.list-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+}
+
+.list-search__sort {
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: -2px;
+  }
+}
+
+.list-search__input {
+  display: block;
+  flex: 1 1 12rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+  font-size: 0.9rem;
+
+  &::placeholder {
+    color: var(--color-texto-suave);
+  }
+
+  // Hacia adentro: el contenedor recorta lo que sobresale (ver abajo).
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: -2px;
+  }
+}
+
+// Scroll dentro de cada tarjeta: con dos columnas, cada lista muestra unas cinco
+// personas (la siguiente asoma, así se nota que hay más) y el resto se scrollea.
+// En pantallas bajas el tope pasa a ser el 60% del alto para que la tarjeta
+// entre en pantalla. En una sola columna (celular) no hay scroll interno: se
+// scrollea la página, que es más cómodo con el dedo.
+// El buscador reserva el mismo hueco de barra que la lista (overflow hidden +
+// scrollbar-gutter), así buscador y tarjetas miden siempre lo mismo, con o sin
+// scroll y sea cual sea el ancho de la barra del navegador.
+@media (min-width: 960px) {
+  .friends-page .friends-requests__list,
+  .friends-page .list-search {
+    padding-right: 0.35rem;
+    scrollbar-gutter: stable;
+  }
+
+  .friends-page .friends-requests__list {
+    max-height: min(27rem, 60vh);
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .friends-page .list-search {
+    overflow-y: hidden;
+  }
+}
+
+// En la columna de solicitudes conviven dos botones: la identidad cede antes
+// de mandarlos a una segunda línea (solo pasa en pantallas muy angostas).
+.friends-requests .friend-request-card__identity {
+  flex-basis: 8rem;
+}
+
+@media (max-width: 420px) {
+  .friends-page {
+    width: calc(100% - 1rem);
+    margin-top: 1rem;
+  }
+
+  .friends-page__header,
+  .friends-page .friends-list,
+  .friends-page .friends-requests {
+    padding: 1rem;
+  }
 }
 
 // ---- Mis amigos (specs/013-friends-list) ----
@@ -934,18 +1066,19 @@ fieldset {
   font-weight: 700;
 }
 
+// "Amigos desde …": tercera línea de la identidad, debajo del correo.
 .friend-card__since {
-  flex: 0 0 auto;
-  margin-left: auto;
   color: var(--color-texto-suave);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 // Delete action of each friend (feature 016): outlined danger button that
-// leaves the card visible while the deletion is in progress.
+// leaves the card visible while the deletion is in progress. Sits at the right
+// of the card, where "Amigos desde" used to be.
 .friend-card__actions {
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .friend-card__delete {
@@ -969,7 +1102,8 @@ fieldset {
 }
 
 // Base de todos los modales de confirmación (ConfirmModal). La "×" es la única
-// forma de cancelar; Confirmar es naranja. Sus estilos de tecla viven en
+// forma de cancelar; Confirmar es rojo, porque confirma una acción destructiva
+// (023 FR-002). Sus estilos de tecla viven en
 // detalles.scss.
 .confirm-modal__backdrop {
   position: fixed;
@@ -1050,33 +1184,22 @@ fieldset {
 
 .confirm-modal__confirm {
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--color-naranja);
+  border: 1px solid var(--color-error);
   border-radius: var(--radio-control);
-  background: var(--color-naranja);
-  color: var(--color-sobre-naranja);
+  background: var(--color-error);
+  color: var(--color-superficie);
   font-size: 0.85rem;
   font-weight: 700;
 
   &:hover:enabled {
-    border-color: color-mix(in srgb, var(--color-naranja) 85%, black);
-    background: color-mix(in srgb, var(--color-naranja) 85%, black);
-    color: var(--color-sobre-naranja);
+    border-color: color-mix(in srgb, var(--color-error) 80%, black);
+    background: color-mix(in srgb, var(--color-error) 80%, black);
+    color: var(--color-superficie);
   }
 
   &:disabled {
     cursor: not-allowed;
     opacity: 0.65;
-  }
-}
-
-@media (max-width: 480px) {
-  .friend-card {
-    flex-wrap: wrap;
-  }
-
-  .friend-card__since {
-    width: 100%;
-    margin-left: 3.4rem;
   }
 }
 
@@ -1220,21 +1343,12 @@ fieldset {
   }
 }
 
-.friend-request-card__status {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  color: var(--color-acento-oscuro);
-  background: color-mix(in srgb, var(--color-acento) 14%, transparent);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-// Response actions of each pending request (feature 012, FR-012).
+// Response actions of each pending request (feature 012, FR-012): a la
+// derecha de la tarjeta, en la misma línea que el nombre.
 .friend-request-card__actions {
   display: flex;
   flex: 0 0 auto;
+  margin-left: auto;
   gap: 0.4rem;
 
   button {

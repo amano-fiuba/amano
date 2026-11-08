@@ -9,10 +9,40 @@ import {
 } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
 import DeleteFriendDialog from './DeleteFriendDialog'
+import ListSearch, { ListSearchNoMatches } from './ListSearch'
+import { filterPeople, fullName } from '../utils/personSearch'
+import { useSnackbar } from './Snackbar'
 
 // Exact messages of the spec (FR-007/FR-008 of 013, FR-026..FR-028 of 016),
 // exported for the tests.
 export const NO_FRIENDS_MESSAGE = 'Todavía no tenés amigos'
+// Orden de "Mis amigos". El alfabético es el de la spec (013 FR-005) y el del
+// backend; los de fecha usan "Amigos desde" (sin fecha, al final).
+const FRIEND_SORT_OPTIONS = [
+  { code: 'name', label: 'Nombre (A–Z)' },
+  { code: 'name-desc', label: 'Nombre (Z–A)' },
+  { code: 'recent', label: 'Fecha: más recientes' },
+  { code: 'oldest', label: 'Fecha: más antiguos' },
+]
+
+function sortFriends(friends, order) {
+  if (order === 'name') return friends
+  // Z–A es exactamente el inverso del alfabético que ya manda el backend.
+  if (order === 'name-desc') return [...friends].reverse()
+  const direction = order === 'recent' ? -1 : 1
+  const time = (friend) => (friend.friendsSince ? Date.parse(friend.friendsSince) : null)
+  // sort es estable: con la misma fecha se mantiene el orden alfabético.
+  return [...friends].sort((a, b) => {
+    const ta = time(a)
+    const tb = time(b)
+    if (ta === tb) return 0
+    if (ta === null) return 1
+    if (tb === null) return -1
+    return (ta - tb) * direction
+  })
+}
+
+export const NO_FRIEND_MATCHES_MESSAGE = 'Ningún amigo coincide con tu búsqueda'
 export const DELETE_SUCCESS_MESSAGE = 'Amigo eliminado correctamente'
 export const NOT_FRIEND_MESSAGE = 'No sos amigo de ese usuario'
 
@@ -27,10 +57,6 @@ const FRIENDS_SINCE_FORMAT = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'America/Argentina/Buenos_Aires',
 })
 
-function fullName(friend) {
-  return friend.lastName ? `${friend.firstName} ${friend.lastName}` : friend.firstName
-}
-
 function friendsSince(value) {
   if (!value) return null
   const date = new Date(value)
@@ -38,16 +64,19 @@ function friendsSince(value) {
 }
 
 // "Mis amigos" section of the "Amigos" screen (feature 013) with the
-// "Eliminar amigo" action of feature 016. Owns its own loading/list/empty/error
+// "Eliminar" (amigo) action of feature 016. Owns its own loading/list/empty/error
 // state, independent from "Solicitudes" (FR-010 of 013). Changing `reloadKey`
 // queries the list again; a stale response never overwrites a newer one.
 export default function FriendsList({ reloadKey = 0 }) {
   const { setUser } = useAuth()
+  const showSnackbar = useSnackbar()
   const [friends, setFriends] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
   const [retryToken, setRetryToken] = useState(0)
   const [notice, setNotice] = useState(null)
+  const [search, setSearch] = useState('')
+  const [order, setOrder] = useState('name')
   const [checkingId, setCheckingId] = useState(null)
   const [deleteCandidate, setDeleteCandidate] = useState(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -134,7 +163,7 @@ export default function FriendsList({ reloadKey = 0 }) {
     if (result.ok) {
       removeFriend(deleteCandidate.id)
       setDeleteCandidate(null)
-      setNotice({ kind: 'success', message: DELETE_SUCCESS_MESSAGE })
+      showSnackbar(DELETE_SUCCESS_MESSAGE)
       return
     }
     if (result.network) {
@@ -166,6 +195,7 @@ export default function FriendsList({ reloadKey = 0 }) {
   }
 
   const showList = !isLoading && !error
+  const visibleFriends = sortFriends(filterPeople(friends, search), order)
 
   return (
     <section className="friends-list" aria-labelledby="friends-list-title">
@@ -177,6 +207,23 @@ export default function FriendsList({ reloadKey = 0 }) {
           </span>
         )}
       </div>
+
+      {showList && friends.length > 0 && (
+        <ListSearch label="Buscar en Mis amigos" value={search} onChange={setSearch}>
+          <select
+            className="list-search__sort"
+            aria-label="Ordenar Mis amigos"
+            value={order}
+            onChange={(event) => setOrder(event.target.value)}
+          >
+            {FRIEND_SORT_OPTIONS.map(({ code, label }) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </ListSearch>
+      )}
 
       {showList && notice && (
         <p
@@ -220,9 +267,13 @@ export default function FriendsList({ reloadKey = 0 }) {
         </div>
       )}
 
-      {showList && friends.length > 0 && (
+      {showList && friends.length > 0 && visibleFriends.length === 0 && (
+        <ListSearchNoMatches message={NO_FRIEND_MATCHES_MESSAGE} query={search} />
+      )}
+
+      {showList && visibleFriends.length > 0 && (
         <ul className="friends-requests__list" aria-label="Lista de amigos">
-          {friends.map((friend) => {
+          {visibleFriends.map((friend) => {
             const since = friendsSince(friend.friendsSince)
             const isChecking = checkingId === friend.id
             return (
@@ -241,16 +292,17 @@ export default function FriendsList({ reloadKey = 0 }) {
                 <div className="friend-request-card__identity">
                   <strong>{fullName(friend)}</strong>
                   <span>{friend.email}</span>
+                  {since && <span className="friend-card__since">Amigos desde {since}</span>}
                 </div>
-                {since && <span className="friend-card__since">Amigos desde {since}</span>}
                 <div className="friend-card__actions">
                   <button
                     type="button"
                     className="friend-card__delete"
+                    aria-label={`Eliminar a ${fullName(friend)}`}
                     disabled={isChecking || isDeleting}
                     onClick={() => handleDeleteRequest(friend)}
                   >
-                    {isChecking ? 'Verificando…' : 'Eliminar amigo'}
+                    {isChecking ? 'Verificando…' : 'Eliminar'}
                   </button>
                 </div>
               </li>
