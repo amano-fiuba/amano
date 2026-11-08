@@ -1,6 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import SubmitButton from '../components/SubmitButton'
 import TextField from '../components/TextField'
 import { SEARCH_NETWORK_ERROR_MESSAGE, searchUsers } from '../api/usersClient'
 import { SEND_NETWORK_ERROR_MESSAGE, sendFriendshipRequest } from '../api/friendsClient'
@@ -13,6 +12,8 @@ export const NO_RESULTS_MESSAGE = 'No se encontraron usuarios'
 export const FRIENDSHIP_REQUEST_SENT_MESSAGE = 'Solicitud de amistad enviada'
 
 const MIN_LENGTH = 2
+// Pausa antes de buscar mientras se escribe (igual que el buscador de la barra).
+const DEBOUNCE_MS = 300
 const DEFAULT_AVATAR = '/avatar-default.png'
 
 function fullName(user) {
@@ -127,9 +128,12 @@ function UsersIcon() {
   )
 }
 
-// User search screen (feature 008). Searches only on submit (button or Enter,
-// FR-001b). Outcomes:
-//  - < 2 chars after trimming → notice, no request (FR-004)
+// User search screen (feature 008). Searches while typing, after a short
+// pause, once the term has 2+ characters (replaces the "Buscar" button of
+// 008 FR-001b). Enter searches right away. Outcomes:
+//  - < 2 chars after trimming → while typing, nothing (the hint already says
+//    "Mínimo 2 caracteres."); on Enter, the notice of FR-004/FR-017
+//  - empty term → back to the initial state
 //  - 200 → list (or "No se encontraron usuarios")
 //  - 400 → the server's field message
 //  - 401 → session cleared; ProtectedRoute sends the user to /login
@@ -147,6 +151,10 @@ function UsersSearch({ initialTerm }) {
   const [sentIds, setSentIds] = useState([])
   const [sendError, setSendError] = useState('')
   const latestRequest = useRef(0)
+  // Term already searched with Enter: the pending search-as-you-type for that
+  // same term is skipped (no duplicate request, and the too-short notice of
+  // Enter is not cleared a moment later).
+  const submittedTerm = useRef(null)
 
   const showError = (text, title) => {
     setNotice({ kind: 'error', text, title })
@@ -240,21 +248,32 @@ function UsersSearch({ initialTerm }) {
 
   const handleSubmit = (event) => {
     event.preventDefault()
+    submittedTerm.current = term
     runSearch(term)
   }
 
-  // The global search of the top bar arrives with ?q= (specs/015-main-screen, FR-006).
-  const searchInitialTerm = useEffectEvent(() => {
-    runSearch(initialTerm)
+  // Search as you type. Also covers the ?q= of the top bar's global search
+  // (specs/015-main-screen, FR-006): the first run uses the initial term.
+  const searchTypedTerm = useEffectEvent((typed) => {
+    if (submittedTerm.current === typed) {
+      return
+    }
+    const trimmed = typed.trim()
+    if (trimmed.length >= MIN_LENGTH) {
+      runSearch(typed)
+      return
+    }
+    // Too short or empty: drop any in-flight answer and show the initial state.
+    latestRequest.current += 1
+    setIsSearching(false)
+    setResults([])
+    setNotice(null)
   })
 
   useEffect(() => {
-    if (!initialTerm) {
-      return undefined
-    }
-    const timer = setTimeout(searchInitialTerm)
+    const timer = setTimeout(() => searchTypedTerm(term), DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [initialTerm])
+  }, [term])
 
   return (
     <main className="page users-search-page">
@@ -274,26 +293,21 @@ function UsersSearch({ initialTerm }) {
       >
         <div className="users-search-form__row">
           <TextField
-            label="Nombre, apellido o email"
+            label="Buscar usuarios"
+            hideLabel
             type="search"
+            placeholder="Buscá por nombre, apellido o correo"
             autoComplete="off"
             enterKeyHint="search"
             leadingIcon={<SearchIcon />}
             value={term}
-            onChange={(event) => setTerm(event.target.value)}
+            onChange={(event) => {
+              submittedTerm.current = null
+              setTerm(event.target.value)
+            }}
           />
-          <SubmitButton
-            className="users-search-form__submit"
-            loading={isSearching}
-            loadingLabel="Buscando…"
-          >
-            <SearchIcon />
-            Buscar
-          </SubmitButton>
         </div>
-        <p className="users-search-form__hint">
-          Buscá por nombre, apellido o correo. Mínimo 2 caracteres.
-        </p>
+        <p className="users-search-form__hint">Mínimo 2 caracteres.</p>
       </form>
 
       {isSearching && (

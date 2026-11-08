@@ -640,12 +640,6 @@ fieldset {
   }
 }
 
-.users-search-form__submit {
-  flex: 0 0 auto;
-  padding-block: 0.6rem;
-  white-space: nowrap;
-}
-
 .users-search-form__hint {
   margin: 0.45rem 0 0;
   color: var(--color-texto-suave);
@@ -877,10 +871,6 @@ fieldset {
   .users-search-form__row {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .users-search-form__submit {
-    justify-content: center;
   }
 
   .user-card {
