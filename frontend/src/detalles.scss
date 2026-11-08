@@ -2,8 +2,8 @@
 // colores del logo. El azul sigue siendo la base; el naranja marca interacción.
 // Se importa después de los estilos de cada pantalla.
 
-$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete";
-$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout, .delete-friend-dialog__cancel";
+$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete, .confirm-modal__close";
+$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout";
 $primarios: "button:not(#{$quietos}, #{$secundarios}), .buttonLink, .home-cta:not(.home-cta--secondary)";
 $tiempo: 120ms;
 
@@ -66,12 +66,12 @@ $tiempo: 120ms;
   }
 }
 
-.group-confirm__danger,
-.delete-friend-dialog__confirm {
-  --tecla-borde: var(--tecla-borde-error);
-  --tecla-borde-hover: var(--tecla-borde-error);
-  --tecla-pulsada: var(--color-error);
-  --tecla-pulsada-texto: var(--color-superficie);
+// Confirmar de ConfirmModal: tecla naranja (los colores base están en index.scss).
+.confirm-modal__confirm {
+  --tecla-borde: color-mix(in srgb, var(--color-naranja) 62%, black);
+  --tecla-borde-hover: var(--tecla-borde);
+  --tecla-pulsada: var(--color-naranja-claro);
+  --tecla-pulsada-texto: var(--color-sobre-naranja);
 }
 
 #{$secundarios} {

@@ -19,15 +19,15 @@ beforeEach(() => {
 })
 
 describe('RemoveMemberDialog (T062/T057)', () => {
-  it('se muestra como modal y Cancelar o Escape lo cierran', () => {
+  it('se muestra como modal, sin Cancelar: la equis o Escape lo cierran', () => {
     const onClose = vi.fn()
     render(<RemoveMemberDialog groupId={42} member={MEMBER} onClose={onClose} />)
 
     expect(screen.getByRole('dialog', { name: /Eliminar miembro/i })).toHaveAttribute('aria-modal', 'true')
-    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }))
+    expect(screen.queryByRole('button', { name: /Cancelar/i })).not.toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: /Cerrar/i }))
-    expect(onClose).toHaveBeenCalledTimes(3)
+    expect(onClose).toHaveBeenCalledTimes(2)
     expect(removeMember).not.toHaveBeenCalled()
   })
 

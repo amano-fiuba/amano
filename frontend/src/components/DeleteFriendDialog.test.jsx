@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import DeleteFriendDialog, {
-  DELETE_CANCEL_LABEL,
   DELETE_CONFIRM_LABEL,
   DELETE_DIALOG_TITLE,
   DELETING_LABEL,
@@ -20,7 +19,8 @@ describe('DeleteFriendDialog (feature 016)', () => {
     expect(
       screen.getByText('¿Querés eliminar a Ana Pérez de tus amigos?'),
     ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: DELETE_CANCEL_LABEL })).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toHaveFocus()
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: DELETE_CONFIRM_LABEL })).toBeInTheDocument()
   })
 
@@ -36,13 +36,13 @@ describe('DeleteFriendDialog (feature 016)', () => {
     expect(screen.getByText('¿Querés eliminar a Bruno de tus amigos?')).toBeInTheDocument()
   })
 
-  it('cancelar llama a onCancel y no a onConfirm', async () => {
+  it('la equis llama a onCancel y no a onConfirm', async () => {
     const onCancel = vi.fn()
     const onConfirm = vi.fn()
     const user = userEvent.setup()
     render(<DeleteFriendDialog friend={ANA} onCancel={onCancel} onConfirm={onConfirm} />)
 
-    await user.click(screen.getByRole('button', { name: DELETE_CANCEL_LABEL }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
 
     expect(onCancel).toHaveBeenCalledTimes(1)
     expect(onConfirm).not.toHaveBeenCalled()
@@ -64,7 +64,7 @@ describe('DeleteFriendDialog (feature 016)', () => {
     )
 
     expect(screen.getByRole('button', { name: DELETING_LABEL })).toBeDisabled()
-    expect(screen.getByRole('button', { name: DELETE_CANCEL_LABEL })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Cerrar' })).toBeDisabled()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onCancel).not.toHaveBeenCalled()

@@ -224,34 +224,6 @@
   flex: 1 1 100%;
 }
 
-.leave-group-modal {
-  position: relative;
-}
-
-.leave-group-modal__close {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-texto-suave);
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover:enabled {
-    background: var(--color-fondo);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-  }
-}
-
 // Botones del módulo: la acción secundaria y la destructiva.
 .group-action svg {
   flex: 0 0 auto;
@@ -288,39 +260,6 @@
   &:hover {
     background: color-mix(in srgb, var(--color-error) 12%, transparent);
     color: var(--color-error);
-  }
-}
-
-// Confirmaciones en línea (abandonar el grupo, eliminar un miembro).
-.group-confirm {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-control);
-  background: var(--color-fondo);
-  text-align: left;
-
-  p {
-    flex: 1 0 100%;
-    margin: 0;
-    font-size: 0.875rem;
-  }
-}
-
-.group-confirm__danger {
-  border-color: var(--color-error);
-  padding: 0.5rem 0.8rem;
-  background: var(--color-error);
-  color: var(--color-superficie);
-  font-size: 0.875rem;
-
-  &:hover {
-    border-color: var(--color-error);
-    background: var(--color-error);
-    filter: brightness(0.9);
   }
 }
 

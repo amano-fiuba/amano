@@ -968,8 +968,10 @@ fieldset {
   }
 }
 
-// Confirmation dialog for deleting a friend (feature 016, FR-004..FR-006).
-.delete-friend-dialog__backdrop {
+// Base de todos los modales de confirmación (ConfirmModal). La "×" es la única
+// forma de cancelar; Confirmar es naranja. Sus estilos de tecla viven en
+// detalles.scss.
+.confirm-modal__backdrop {
   position: fixed;
   inset: 0;
   z-index: 20;
@@ -980,7 +982,8 @@ fieldset {
   background: color-mix(in srgb, var(--color-texto) 45%, transparent);
 }
 
-.delete-friend-dialog {
+.confirm-modal {
+  position: relative;
   width: min(24rem, 100%);
   padding: 1.25rem;
   border: 1px solid var(--color-borde);
@@ -989,7 +992,7 @@ fieldset {
   box-shadow: 0 18px 45px color-mix(in srgb, var(--color-texto) 25%, transparent);
 
   h3 {
-    margin: 0 0 0.5rem;
+    margin: 0 2.25rem 0.5rem 0;
     font-size: 1.1rem;
   }
 
@@ -999,48 +1002,70 @@ fieldset {
   }
 }
 
-.delete-friend-dialog__error {
+.confirm-modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radio-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-texto-suave);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease;
+
+  // Sin fondo ni círculo: solo la "×" se pinta de naranja (claro y oscuro).
+  &:hover:enabled,
+  &:active:enabled {
+    background: transparent;
+    color: var(--color-naranja);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-naranja);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.confirm-modal__error {
   margin-top: 0.75rem !important;
   color: var(--color-error);
 }
 
-.delete-friend-dialog__actions {
+.confirm-modal__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
   margin-top: 1.25rem;
+}
 
-  button {
-    padding: 0.5rem 0.9rem;
-    border-radius: var(--radio-control);
-    font-size: 0.85rem;
-    font-weight: 700;
+.confirm-modal__confirm {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--color-naranja);
+  border-radius: var(--radio-control);
+  background: var(--color-naranja);
+  color: var(--color-sobre-naranja);
+  font-size: 0.85rem;
+  font-weight: 700;
+
+  &:hover:enabled {
+    border-color: color-mix(in srgb, var(--color-naranja) 85%, black);
+    background: color-mix(in srgb, var(--color-naranja) 85%, black);
+    color: var(--color-sobre-naranja);
   }
 
-  button:disabled {
+  &:disabled {
     cursor: not-allowed;
     opacity: 0.65;
-  }
-}
-
-.delete-friend-dialog__cancel {
-  border: 1px solid var(--color-borde);
-  color: var(--color-texto);
-  background: transparent;
-
-  &:hover:enabled {
-    background: var(--color-fondo);
-  }
-}
-
-.delete-friend-dialog__confirm {
-  border: 1px solid var(--color-error);
-  color: var(--color-superficie);
-  background: var(--color-error);
-
-  &:hover:enabled {
-    border-color: color-mix(in srgb, var(--color-error) 80%, black);
-    background: color-mix(in srgb, var(--color-error) 80%, black);
   }
 }
 

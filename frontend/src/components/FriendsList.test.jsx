@@ -286,7 +286,7 @@ describe('FriendsList (feature 013)', () => {
 
     const card = await screen.findByTestId('friend-12')
     await user.click(within(card).getByRole('button', { name: 'Eliminar amigo' }))
-    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(friendsClient.deleteFriend).not.toHaveBeenCalled()
