@@ -125,6 +125,27 @@ class ReminderSettingsIT {
     }
 
     @Test
+    void aCustomMessageIsStoredTrimmedAndABlankOneBecomesNull() throws Exception {
+        mockMvc.perform(put("/api/groups/{id}/reminder-settings", groupId)
+                        .cookie(session(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("message", "  Pagá cuando puedas  "))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Pagá cuando puedas"));
+
+        mockMvc.perform(put("/api/groups/{id}/reminder-settings", groupId)
+                        .cookie(session(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("message", "   "))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(nullValue()));
+
+        mockMvc.perform(get("/api/groups/{id}/reminder-settings", groupId).cookie(session(adminId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value(nullValue()));
+    }
+
+    @Test
     void aMessageLongerThan500CharactersIsRejected() throws Exception {
         mockMvc.perform(put("/api/groups/{id}/reminder-settings", groupId)
                         .cookie(session(adminId))

@@ -67,6 +67,24 @@ describe('GroupReminderSettingsPanel (T024/T035)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/Recordatorios actualizados/i)
   })
 
+  it('guarda un mensaje en blanco y lo muestra vacío al recargar', async () => {
+    getReminderSettings.mockResolvedValue({ ok: true, settings: { ...SETTINGS, message: 'Hola' } })
+    updateReminderSettings.mockResolvedValue({ ok: true, settings: { ...SETTINGS, message: null } })
+
+    renderPanel()
+    const textarea = await screen.findByLabelText('Mensaje personalizado (opcional)')
+    expect(textarea).toHaveValue('Hola')
+
+    fireEvent.change(textarea, { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: /Guardar recordatorios/i }))
+
+    await waitFor(() => expect(updateReminderSettings).toHaveBeenCalledWith(42, {
+      sendDays: 5,
+      message: '   ',
+    }))
+    await waitFor(() => expect(textarea).toHaveValue(''))
+  })
+
   it('muestra el error de validación del backend junto al campo', async () => {
     updateReminderSettings.mockResolvedValue({
       ok: false,

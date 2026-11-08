@@ -207,6 +207,47 @@ class ReminderDebtFlowIT {
     }
 
     @Test
+    void aCustomMessageAccompaniesTheDebtData() throws Exception {
+        long creditorId = user("Ana", "López");
+        long debtorId = user("Juan", "Pérez");
+        long groupId = group("Grupo Amigos", 30, null);
+        jdbc.update("UPDATE groups SET reminder_message = ? WHERE id = ?", "Te esperamos", groupId);
+        long expenseId = expense(groupId, creditorId, "2026-10-21", "Súper", "100.00");
+        debt(groupId, expenseId, debtorId, creditorId, "PENDING", "100.00", "0.00");
+
+        job.runReminders();
+
+        assertThat(greenMail.waitForIncomingEmail(5_000, 2)).isTrue();
+        String body = decodedBody(messagesWithSubject("Recordatorio de deuda - Grupo Amigos").get(0));
+        assertThat(body)
+                .contains("Te esperamos")
+                .contains("Grupo: Grupo Amigos")
+                .contains("Concepto: Súper")
+                .contains("Monto: 100.00 ARS")
+                .contains("Fecha límite: 20/11/2026");
+    }
+
+    @Test
+    void aSentMailKeepsItsSnapshotWhenTheMessageChanges() throws Exception {
+        long creditorId = user("Ana", "López");
+        long debtorId = user("Juan", "Pérez");
+        long groupId = group("Grupo Amigos", 30, null);
+        long expenseId = expense(groupId, creditorId, "2026-10-21", "Súper", "100.00");
+        debt(groupId, expenseId, debtorId, creditorId, "PENDING", "100.00", "0.00");
+
+        job.runReminders();
+        assertThat(greenMail.waitForIncomingEmail(5_000, 2)).isTrue();
+        String sentBody = decodedBody(messagesWithSubject("Recordatorio de deuda - Grupo Amigos").get(0));
+
+        jdbc.update("UPDATE groups SET reminder_message = 'Otro mensaje' WHERE id = ?", groupId);
+        job.runReminders();
+
+        List<MimeMessage> debtMails = messagesWithSubject("Recordatorio de deuda - Grupo Amigos");
+        assertThat(debtMails).hasSize(1);
+        assertThat(decodedBody(debtMails.get(0))).isEqualTo(sentBody);
+    }
+
+    @Test
     void theScheduledAnnotationUsesTheBuenosAiresZoneAndRunsAfterOverdue() throws Exception {
         var scheduled = ReminderJob.class.getMethod("runReminders")
                 .getAnnotation(org.springframework.scheduling.annotation.Scheduled.class);

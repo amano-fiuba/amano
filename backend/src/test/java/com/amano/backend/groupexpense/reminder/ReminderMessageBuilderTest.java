@@ -66,6 +66,14 @@ class ReminderMessageBuilderTest {
     }
 
     @Test
+    void blankCustomMessageFallsBackToTheDefaultBody() {
+        ReminderMessageBuilder.Mail mail = debtMail("Súper", DebtStatus.PENDING, "   ");
+        assertThat(mail.body())
+                .contains("Hola Juan Pérez:")
+                .doesNotContain("Grupo: Grupo Amigos");
+    }
+
+    @Test
     void customMessageKeepsThePaymentReportedLegend() {
         ReminderMessageBuilder.Mail mail = debtMail("Súper", DebtStatus.PAYMENT_REPORTED, "Te esperamos");
         assertThat(mail.body()).contains("Te esperamos").contains("pagado a verificar");

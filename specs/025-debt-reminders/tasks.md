@@ -133,13 +133,13 @@ description: "Task list for Recordatorios automáticos de deudas pendientes"
 
 ### Tests for User Story 4 (escribir primero, verificar que FALLAN)
 
-- [ ] T034 [P] [US4] Ampliar backend/src/test/java/com/amano/backend/groupexpense/reminder/ReminderMessageBuilderTest.java, ReminderDebtFlowIT.java y ReminderSettingsIT.java: correo con mensaje personalizado seguido del bloque de datos (el mensaje acompaña, no reemplaza); mensaje en blanco → `message = null` y correo predeterminado; `PAYMENT_REPORTED` conserva la leyenda también con mensaje personalizado; los correos ya `SENT` no cambian cuando se modifica el mensaje
-- [ ] T035 [P] [US4] Ampliar frontend/src/components/groups/GroupReminderSettingsPanel.test.jsx: campo de texto de hasta 500 caracteres con contador y ayuda "Si lo dejás vacío, se usa el mensaje predeterminado"; guardar un mensaje lo persiste; quedar en blanco al guardar y recargar muestra valor vacío; error de validación del backend mostrado en el formulario
+- [x] T034 [P] [US4] Ampliar backend/src/test/java/com/amano/backend/groupexpense/reminder/ReminderMessageBuilderTest.java, ReminderDebtFlowIT.java y ReminderSettingsIT.java: correo con mensaje personalizado seguido del bloque de datos (el mensaje acompaña, no reemplaza); mensaje en blanco → `message = null` y correo predeterminado; `PAYMENT_REPORTED` conserva la leyenda también con mensaje personalizado; los correos ya `SENT` no cambian cuando se modifica el mensaje
+- [x] T035 [P] [US4] Ampliar frontend/src/components/groups/GroupReminderSettingsPanel.test.jsx: campo de texto de hasta 500 caracteres con contador y ayuda "Si lo dejás vacío, se usa el mensaje predeterminado"; guardar un mensaje lo persiste; quedar en blanco al guardar y recargar muestra valor vacío; error de validación del backend mostrado en el formulario
 
 ### Implementation for User Story 4
 
-- [ ] T036 [US4] Extender ReminderMessageBuilder.java con la variante de mensaje personalizado que cubre T034 (los datos de identificación siempre presentes); depender de T034
-- [ ] T037 [US4] Completar frontend/src/components/groups/GroupReminderSettingsPanel.jsx con el textarea del mensaje, contador de caracteres y manejo de errores; depender de T027 y T035
+- [x] T036 [US4] Extender ReminderMessageBuilder.java con la variante de mensaje personalizado que cubre T034 (los datos de identificación siempre presentes); depender de T034
+- [x] T037 [US4] Completar frontend/src/components/groups/GroupReminderSettingsPanel.jsx con el textarea del mensaje, contador de caracteres y manejo de errores; depender de T027 y T035
 
 **Checkpoint**: Las cuatro historias completas e independientemente verificables
 
