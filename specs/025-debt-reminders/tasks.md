@@ -149,8 +149,8 @@ description: "Task list for Recordatorios automáticos de deudas pendientes"
 
 **Purpose**: Verificaciones obligatorias, validación de punta a punta y preparación del PR
 
-- [ ] T038 Ejecutar `mvn -B verify` en backend/ con Docker disponible: pruebas en verde, cobertura JaCoCo ≥ 85 % y correr también `mvn -B test -Dtest='*Reminder*Test'` y `mvn -B verify -Dit.test='*Reminder*IT'` para acotar la feature; depender de todas las historias
-- [ ] T039 [P] Ejecutar `npm ci && npm run lint && npm run test:coverage && npm run build` en frontend/: cobertura Vitest ≥ 85 % y build exitoso
+- [x] T038 Ejecutar `mvn -B verify` en backend/ con Docker disponible: pruebas en verde, cobertura JaCoCo ≥ 85 % y correr también `mvn -B test -Dtest='*Reminder*Test'` y `mvn -B verify -Dit.test='*Reminder*IT'` para acotar la feature; depender de todas las historias
+- [x] T039 [P] Ejecutar `npm ci && npm run lint && npm run test:coverage && npm run build` en frontend/: cobertura Vitest ≥ 85 % y build exitoso
 - [ ] T040 Ejecutar la validación de specs/025-debt-reminders/quickstart.md: entorno con Docker Compose, datos de prueba (grupo con `debtDueDays`, gasto pagado por Ana con Juan y un perfil simulado a 5 días del vencimiento), `REMINDERS_CRON` cada minuto, casos límite manuales de la sección 2.6 y verificación de la sección 3 del frontend; depender de T038 y T039
 - [ ] T041 Revisión final: commits convencionales en español por unidad coherente, `git diff` sin artefactos de depuración ni información sensible, contratos REST aditivos confirmados contra backend/src/main/java/com/amano/backend/groups/GroupController.java y el nuevo controlador de settings, y preparar el PR a `sprint-n` según la constitución (principios XII y XIII)
 
