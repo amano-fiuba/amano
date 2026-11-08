@@ -31,6 +31,18 @@ async function openActions(key) {
 }
 
 describe('MemberListView (T079/T077, US6)', () => {
+  it('el menú de acciones se fija a la pantalla y se cierra al scrollear la lista', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await openActions('user-15')
+    const remove = screen.getByRole('button', { name: 'Eliminar miembro' })
+    expect(remove.closest('.member-menu__panel')).toHaveClass('member-menu__panel--fixed')
+
+    fireEvent.scroll(screen.getByRole('list'))
+    expect(screen.queryByRole('button', { name: 'Eliminar miembro' })).not.toBeInTheDocument()
+  })
+
   it('renderiza a todos los miembros activos con perfil simulado incluido', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 

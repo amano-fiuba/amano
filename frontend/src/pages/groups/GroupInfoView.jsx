@@ -147,7 +147,14 @@ export default function GroupInfoView() {
             </div>
             {showPermissions && (
               <div className="group-admin-panel" data-testid="permissions-panel">
-                <GroupPermissionsPanel group={group} permissions={group.permissions ?? {}} />
+                <GroupPermissionsPanel
+                  group={group}
+                  permissions={group.permissions ?? {}}
+                  onSaved={() => {
+                    setShowPermissions(false)
+                    refreshGroup()
+                  }}
+                />
               </div>
             )}
           </header>
@@ -161,22 +168,13 @@ export default function GroupInfoView() {
                 <button
                   type="button"
                   className="group-action"
-                  aria-expanded={showAddMember}
-                  onClick={() => { setShowAddMember(!showAddMember) }}
+                  aria-haspopup="dialog"
+                  onClick={() => setShowAddMember(true)}
                 >
-                  {showAddMember ? 'Cerrar' : 'Agregar miembro'}
+                  Agregar miembro
                 </button>
               )}
             </div>
-            {showAddMember && (
-              <div className="group-admin-panel" data-testid="add-member-panel">
-                <AddMemberView
-                  group={group}
-                  permissions={group.permissions ?? {}}
-                  onAdded={handleMemberAdded}
-                />
-              </div>
-            )}
             <MemberListView
               groupId={Number(id)}
               currentUserId={user?.id ?? null}
@@ -203,6 +201,14 @@ export default function GroupInfoView() {
           </section>
           </div>
 
+          {showAddMember && (
+            <AddMemberView
+              group={group}
+              permissions={group.permissions ?? {}}
+              onAdded={handleMemberAdded}
+              onClose={() => setShowAddMember(false)}
+            />
+          )}
         </>
       )}
     </main>

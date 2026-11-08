@@ -1136,6 +1136,10 @@ fieldset {
   }
 }
 
+.confirm-modal--wide {
+  width: min(32rem, 100%);
+}
+
 .confirm-modal__close {
   position: absolute;
   top: 0.6rem;

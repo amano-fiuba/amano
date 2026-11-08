@@ -371,9 +371,13 @@
 
 .group-hero__identity {
   display: flex;
+  // Ocupa el espacio libre: si midiera solo su contenido, un texto corto
+  // (rol "Miembro") mandaba el nombre debajo de la foto.
+  flex: 1 1 20rem;
   flex-wrap: wrap;
   align-items: center;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .group-hero__text {
@@ -412,14 +416,13 @@
   gap: 0.6rem;
 }
 
-// Columna derecha del encabezado: las acciones arriba y "Salir" abajo a la
-// derecha, aunque la identidad del grupo sea más alta.
+// Columna derecha del encabezado: las acciones que correspondan según el rol y
+// la configuración (historial, editar, configuración) y "Salir" debajo, a la
+// derecha, siempre a la misma distancia.
 .group-hero__side {
   display: flex;
   flex-direction: column;
-  align-self: stretch;
   align-items: flex-end;
-  justify-content: space-between;
   gap: 0.6rem;
   margin-left: auto;
 }
@@ -570,52 +573,136 @@
   }
 }
 
-.add-member__types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 1.25rem;
-  margin-bottom: 0.75rem;
-}
-
-.add-member__search {
+// Modal "Agregar amigos a {grupo}" (AddMemberView).
+.add-members {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.4rem 0.5rem;
-  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
 
-  > label,
-  > p,
-  > .add-member__result {
-    grid-column: 1 / -1;
+  .list-search {
+    margin-bottom: 0.6rem;
   }
 }
 
-.add-member__simulated {
-  display: grid;
-  gap: 0.4rem;
-  justify-items: start;
+.add-members__status {
+  margin: 0;
+  padding: 0.5rem 0;
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
 
   button {
     margin-top: 0.5rem;
   }
 }
 
-.add-member__result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem 0.75rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--color-borde);
-  font-size: 0.875rem;
+// Unas cuatro o cinco filas y el resto se scrollea.
+.add-members__list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: min(20rem, 50vh);
+  margin: 0;
+  padding: 0 0.35rem 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
 
-  span {
-    min-width: 0;
-    overflow-wrap: anywhere;
+.add-members__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-superficie);
+
+  img {
+    flex: 0 0 auto;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-superficie-fuerte);
+  }
+
+  .group-action {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  // Ya es miembro: fila sombreada, sin acción.
+  &.is-member {
+    background: var(--color-superficie-fuerte);
+    opacity: 0.8;
   }
 }
 
+.add-members__identity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+}
+
+.add-members__added {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.add-members__simulated {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-borde);
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .text-button {
+    display: inline;
+    font-weight: 700;
+  }
+
+  form {
+    display: grid;
+    gap: 0.4rem;
+    justify-items: start;
+
+    label {
+      font-size: 0.85rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--color-borde);
+      border-radius: var(--radio-control);
+      background: var(--color-fondo);
+      color: var(--color-texto);
+      font: inherit;
+    }
+
+    button {
+      margin-top: 0.5rem;
+    }
+  }
+}
 
 .member-rows {
   display: grid;
@@ -623,6 +710,19 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+// Con las tres columnas, la lista de miembros scrollea dentro de su tarjeta
+// (unos cinco miembros, o el 60 % del alto si la pantalla es baja). Apiladas
+// (≤ 960px) se scrollea la página, como en Amigos.
+@media (min-width: 961px) {
+  .group-board .member-rows {
+    max-height: min(27rem, 60vh);
+    padding-right: 0.35rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
 }
 
 .member-row {
@@ -700,6 +800,13 @@
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
   box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+}
+
+// Fijado a la pantalla (MemberActionsMenu calcula top/right desde el botón),
+// para que no lo recorte la lista de miembros con scroll.
+.member-menu__panel--fixed {
+  position: fixed;
+  z-index: 20;
 }
 
 .member-menu__item {

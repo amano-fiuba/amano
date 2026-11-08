@@ -8,6 +8,9 @@ import { useEffect, useId, useRef } from 'react'
  *
  * - Sin `onConfirm` el modal es solo informativo: queda la "×" para cerrar.
  * - Con `busy` no se puede cerrar ni confirmar (hay una solicitud en curso).
+ * - `wide` lo ensancha para contenidos con listas (agregar amigos a un grupo);
+ *   ahí `describedByBody={false}` evita que el lector de pantalla lea toda la
+ *   lista como descripción del diálogo.
  */
 export default function ConfirmModal({
   title,
@@ -20,6 +23,8 @@ export default function ConfirmModal({
   busyConfirmLabel,
   testId,
   errorTestId,
+  wide = false,
+  describedByBody = true,
 }) {
   const closeRef = useRef(null)
   const titleId = useId()
@@ -45,8 +50,8 @@ export default function ConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={messageId}
-        className="confirm-modal"
+        aria-describedby={describedByBody ? messageId : undefined}
+        className={wide ? 'confirm-modal confirm-modal--wide' : 'confirm-modal'}
         data-testid={testId}
       >
         <button

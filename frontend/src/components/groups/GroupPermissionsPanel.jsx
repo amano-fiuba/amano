@@ -11,7 +11,9 @@ const CHECKBOXES = [
   { key: 'paymentsRequireValidation', label: 'Los pagos requieren validación' },
 ]
 
-export default function GroupPermissionsPanel({ group, permissions }) {
+// `onSaved` lets the group screen close the panel and re-fetch the group after
+// a successful save, like the edit form does.
+export default function GroupPermissionsPanel({ group, permissions, onSaved }) {
   const showSnackbar = useSnackbar()
   const [values, setValues] = useState({ ...permissions })
   const [saving, setSaving] = useState(false)
@@ -28,6 +30,9 @@ export default function GroupPermissionsPanel({ group, permissions }) {
     if (result.ok) {
       setValues({ ...values, ...(result.group?.permissions ?? {}) })
       showSnackbar('Permisos actualizados')
+      setSaving(false)
+      onSaved?.()
+      return
     } else if (result.network) {
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else {
