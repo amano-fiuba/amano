@@ -119,7 +119,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Salir' }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(/Se abandonó el grupo/i)
@@ -133,7 +133,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Salir' }))
 
     expect(
       await screen.findByText(
@@ -148,10 +148,11 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     renderView()
 
     fireEvent.click(await screen.findByRole('button', { name: /^Agregar miembro$/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Configuración del grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
 
     expect(screen.getByTestId('add-member-panel')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cerrar ajustes' })).toBeInTheDocument()
+    const closeSettings = screen.getByRole('button', { name: 'Cerrar configuración' })
+    expect(closeSettings).toHaveTextContent(/^Cerrar$/)
     // fix 2026-11-04: no manual refresh button anymore
     expect(screen.queryByRole('button', { name: /Actualizar lista/i })).not.toBeInTheDocument()
   })
@@ -188,7 +189,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     renderView()
 
     await waitFor(() => expect(screen.getByTestId('members-list')).toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: /Configuración del grupo/i }))
+    expect(screen.queryByRole('button', { name: 'Configuración' }))
       .not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Agregar miembro$/i })).not.toBeInTheDocument()
   })

@@ -44,7 +44,7 @@ describe('LeaveGroupModal (spec 020)', () => {
   it('es un diálogo con nombre accesible y toma el foco al abrir', () => {
     renderModal()
 
-    expect(screen.getByRole('dialog', { name: 'Abandonar el grupo' })).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByRole('dialog', { name: 'Salir del grupo' })).toHaveAttribute('aria-modal', 'true')
     expect(screen.getByRole('button', { name: 'Cerrar' })).toHaveFocus()
   })
 

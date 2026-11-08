@@ -1,12 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { listGroups, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
-import { byLatestActivity, formatActivityDate, memberCountLabel } from './groupDisplay'
+import {
+  GROUP_SORT_OPTIONS,
+  formatActivityDate,
+  memberCountLabel,
+  sortGroups,
+} from './groupDisplay'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
+import ListSearch from '../../components/ListSearch'
+import { normalizeSearch } from '../../utils/personSearch'
 import './groups.scss'
 
 function groupCountLabel(count) {
   return count === 1 ? '1 grupo' : `${count} grupos`
+}
+
+export const NO_GROUP_MATCHES_MESSAGE = 'Ningún grupo coincide con tu búsqueda'
+
+function filterGroups(groups, query) {
+  const term = normalizeSearch(query.trim())
+  if (!term) return groups
+  return groups.filter((group) => normalizeSearch(group.name).includes(term))
 }
 
 function roleLabel(role) {
@@ -16,13 +31,15 @@ function roleLabel(role) {
 export default function GroupListView() {
   const [groups, setGroups] = useState(null)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [order, setOrder] = useState('recent')
 
   useEffect(() => {
     let cancelled = false
     listGroups().then((result) => {
       if (cancelled) return
       if (result.ok) {
-        setGroups(byLatestActivity(result.groups))
+        setGroups(result.groups)
       } else {
         setError(GROUPS_NETWORK_ERROR_MESSAGE)
       }
@@ -33,6 +50,7 @@ export default function GroupListView() {
   }, [])
 
   const isEmpty = groups?.length === 0
+  const visibleGroups = groups ? sortGroups(filterGroups(groups, search), order) : []
 
   return (
     <main className="page groups-page">
@@ -66,8 +84,34 @@ export default function GroupListView() {
         </div>
       )}
       {groups?.length > 0 && (
+        <ListSearch
+          label="Buscar en Mis grupos"
+          placeholder="Buscá por nombre"
+          value={search}
+          onChange={setSearch}
+        >
+          <select
+            className="list-search__sort"
+            aria-label="Ordenar Mis grupos"
+            value={order}
+            onChange={(event) => setOrder(event.target.value)}
+          >
+            {GROUP_SORT_OPTIONS.map(({ code, label }) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </ListSearch>
+      )}
+      {groups?.length > 0 && visibleGroups.length === 0 && (
+        <p className="groups-page__no-matches" role="status">
+          {NO_GROUP_MATCHES_MESSAGE}
+        </p>
+      )}
+      {visibleGroups.length > 0 && (
         <ul className="group-rows" data-testid="groups-list">
-          {groups.map((group) => (
+          {visibleGroups.map((group) => (
             <li key={group.id}>
               <Link className="group-row" to={`/groups/${group.id}`}>
                 {group.photo ? (

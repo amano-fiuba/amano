@@ -7,7 +7,7 @@ import GroupDescriptionPanel from '../../components/groups/GroupDescriptionPanel
 import MemberListView from '../../components/groups/MemberListView'
 import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupEditForm from '../../components/groups/GroupEditForm'
-import { PencilIcon } from '../../components/NavIcons'
+import { GroupSettingsIcon, HistoryIcon, PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
@@ -107,13 +107,15 @@ export default function GroupInfoView() {
                 </>
               )}
             </div>
+            {/* Acciones arriba a la derecha y "Salir" en la esquina inferior derecha. */}
+            <div className="group-hero__side">
             <div className="group-hero__actions">
               <Link
                 className="group-action"
                 to={`/groups/${id}/history`}
                 data-testid="group-history-link"
               >
-                Historial de actividad
+                <HistoryIcon /> Historial de actividad
               </Link>
               {canEditGroupData && !editing && (
                 <button
@@ -130,11 +132,18 @@ export default function GroupInfoView() {
                   type="button"
                   className="group-action"
                   aria-expanded={showPermissions}
+                  aria-label={showPermissions ? 'Cerrar configuración' : undefined}
                   onClick={() => { setShowPermissions(!showPermissions) }}
                 >
-                  {showPermissions ? 'Cerrar ajustes' : 'Configuración del grupo'}
+                  {showPermissions ? 'Cerrar' : <><GroupSettingsIcon /> Configuración</>}
                 </button>
               )}
+            </div>
+            <LeaveGroupPanel
+              groupId={Number(id)}
+              isLastAdmin={Boolean(group.isLastAdmin)}
+              isLastMember={Boolean(group.isLastMember)}
+            />
             </div>
             {showPermissions && (
               <div className="group-admin-panel" data-testid="permissions-panel">
@@ -194,13 +203,6 @@ export default function GroupInfoView() {
           </section>
           </div>
 
-          <footer className="group-detail__footer">
-            <LeaveGroupPanel
-              groupId={Number(id)}
-              isLastAdmin={Boolean(group.isLastAdmin)}
-              isLastMember={Boolean(group.isLastMember)}
-            />
-          </footer>
         </>
       )}
     </main>

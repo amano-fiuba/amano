@@ -14,7 +14,7 @@ const MESSAGES = {
 export default function LeaveGroupModal({ mode, busy = false, error = '', onConfirm, onClose }) {
   return (
     <ConfirmModal
-      title="Abandonar el grupo"
+      title="Salir del grupo"
       busy={busy}
       error={error}
       onClose={onClose}

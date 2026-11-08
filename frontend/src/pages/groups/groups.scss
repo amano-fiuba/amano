@@ -5,6 +5,13 @@
   max-width: 760px;
 }
 
+.groups-page__no-matches {
+  margin: 0;
+  padding: 1rem 0;
+  color: var(--color-texto-suave);
+  text-align: center;
+}
+
 .groups-page__header {
   display: flex;
   flex-wrap: wrap;
@@ -250,17 +257,11 @@
   }
 }
 
-.group-danger {
-  border-color: transparent;
-  padding: 0.5rem 0.8rem;
-  background: transparent;
+// Variante destructiva de .group-action ("Salir"): mismo recuadro, letras y
+// hover en rojo (el hover naranja queda para las acciones no destructivas).
+.group-action--danger {
+  border-color: color-mix(in srgb, var(--color-error) 55%, var(--color-borde));
   color: var(--color-error);
-  font-size: 0.875rem;
-
-  &:hover {
-    background: color-mix(in srgb, var(--color-error) 12%, transparent);
-    color: var(--color-error);
-  }
 }
 
 // Detalle de un grupo.
@@ -407,7 +408,26 @@
 .group-hero__actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.6rem;
+}
+
+// Columna derecha del encabezado: las acciones arriba y "Salir" abajo a la
+// derecha, aunque la identidad del grupo sea más alta.
+.group-hero__side {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+.leave-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 // La sección no genera caja: así un error de la foto ocupa todo el ancho del
@@ -596,16 +616,6 @@
   }
 }
 
-.group-detail__footer {
-  display: flex;
-  justify-content: flex-end;
-
-  section {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-  }
-}
 
 .member-rows {
   display: grid;
@@ -723,10 +733,6 @@
   .member-row__body {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .group-detail__footer {
-    justify-content: stretch;
   }
 
   .group-row__chevron {

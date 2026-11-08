@@ -29,9 +29,9 @@ describe('LeaveGroupPanel (T068/T065)', () => {
   it('muestra la confirmación cuando el usuario no es el último admin', () => {
     renderPanel({ isLastAdmin: false })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
 
-    expect(screen.getByRole('dialog', { name: /Abandonar el grupo/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Salir del grupo' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Confirmar/i })).toBeInTheDocument()
     expect(leaveGroup).not.toHaveBeenCalled()
   })
@@ -39,7 +39,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
   it('si el usuario es último admin muestra la guía de asignar otro admin y no sale', async () => {
     renderPanel({ isLastAdmin: true })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
 
     expect(
       await screen.findByText(/Sos el último administrador: asigná otro administrador antes de salir/i),
@@ -52,7 +52,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
 
     renderPanel({ isLastAdmin: false })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     await waitFor(() => expect(leaveGroup).toHaveBeenCalledWith(42))
@@ -69,7 +69,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
 
     renderPanel({ isLastAdmin: false })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/saldos pendientes/i)
@@ -80,7 +80,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
 
     renderPanel({ isLastAdmin: true, isLastMember: true })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
     expect(
       screen.getByText('Sos el último miembro: si confirmas, el grupo se eliminará'),
     ).toBeInTheDocument()
@@ -96,7 +96,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
   it('como único admin con otros miembros no ofrece salir y Cerrar no llama a la API', () => {
     renderPanel({ isLastAdmin: true })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
 
     expect(screen.queryByRole('button', { name: /Confirmar/i })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
@@ -109,7 +109,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
     leaveGroup.mockReturnValue(new Promise((r) => { resolve = r }))
     renderPanel({})
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
     const confirm = screen.getByRole('button', { name: /Confirmar/i })
     fireEvent.click(confirm)
     fireEvent.click(confirm)
@@ -125,7 +125,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
       .mockResolvedValueOnce({ ok: true, groupLeft: true })
     renderPanel({})
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/No se pudo conectar/i)
@@ -137,7 +137,7 @@ describe('LeaveGroupPanel (T068/T065)', () => {
     leaveGroup.mockResolvedValue({ ok: true, groupLeft: true, groupDeleted: false })
     renderPanel({ isLastMember: true })
 
-    fireEvent.click(screen.getByRole('button', { name: /Abandonar grupo/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Salir' }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByRole('status')).toHaveTextContent(/Se abandonó el grupo/i)

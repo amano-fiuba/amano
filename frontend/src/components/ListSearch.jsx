@@ -7,7 +7,13 @@ export const LIST_SEARCH_PLACEHOLDER = 'Buscá por nombre o mail'
  * justo debajo del título; el filtrado lo hace quien lo usa (filterPeople).
  * `label` nombra al campo para lectores de pantalla ("Buscar en Mis amigos").
  */
-export default function ListSearch({ label, value, onChange, children }) {
+export default function ListSearch({
+  label,
+  value,
+  onChange,
+  placeholder = LIST_SEARCH_PLACEHOLDER,
+  children,
+}) {
   // The wrapper reserves the same scrollbar gutter as the list below, so the
   // input and the cards always have the same width. `children` go next to the
   // input (e.g. the sort selector of Mis amigos).
@@ -17,7 +23,7 @@ export default function ListSearch({ label, value, onChange, children }) {
         type="search"
         className="list-search__input"
         aria-label={label}
-        placeholder={LIST_SEARCH_PLACEHOLDER}
+        placeholder={placeholder}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

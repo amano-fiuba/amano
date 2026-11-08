@@ -108,3 +108,39 @@ export function SearchIcon() {
     </Icon>
   )
 }
+
+// Reloj con flecha hacia atrás: "Historial de actividad".
+export function HistoryIcon() {
+  return (
+    <Icon>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l4 2" />
+    </Icon>
+  )
+}
+
+// Dos engranajes chicos: la configuración de un grupo, distinta del engranaje
+// único de "Ajustes" de la barra.
+export function GroupSettingsIcon() {
+  return (
+    <Icon>
+      <circle cx="8.5" cy="8.5" r="3.3" />
+      <circle cx="8.5" cy="8.5" r="1" />
+      <path d="M11.8 8.5h1.7M10.8 10.8l1.2 1.2M8.5 11.8v1.7M6.2 10.8 5 12M5.2 8.5H3.5M6.2 6.2 5 5M8.5 5.2V3.5M10.8 6.2 12 5" />
+      <circle cx="16.5" cy="16" r="2.4" />
+      <path d="m18.7 16.9 1.4.6M17.4 18.2l.6 1.4M15.6 18.2l-.6 1.4M14.3 16.9l-1.4.6M14.3 15.1l-1.4-.6M15.6 13.8l-.6-1.4M17.4 13.8l.6-1.4M18.7 15.1l1.4-.6" />
+    </Icon>
+  )
+}
+
+// Puerta con una flecha que sale: "Salir" del grupo.
+export function ExitIcon() {
+  return (
+    <Icon>
+      <path d="M13 4H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h7" />
+      <path d="M10 12h11" />
+      <path d="m17 8 4 4-4 4" />
+    </Icon>
+  )
+}

@@ -2,7 +2,7 @@
 // colores del logo. El azul sigue siendo la base; el naranja marca interacción.
 // Se importa después de los estilos de cada pantalla.
 
-$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete, .confirm-modal__close";
+$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete, .confirm-modal__close";
 $secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout";
 $primarios: "button:not(#{$quietos}, #{$secundarios}), .buttonLink, .home-cta:not(.home-cta--secondary)";
 $tiempo: 120ms;
@@ -101,6 +101,23 @@ $tiempo: 120ms;
   &:disabled {
     box-shadow: none;
     transform: none;
+  }
+}
+
+// "Salir" del grupo: secundario destructivo, con borde, sombra y presionado en
+// rojo en vez de naranja (023 FR-002).
+.group-action.group-action--danger {
+  &:hover:not(:disabled) {
+    border-color: var(--color-error);
+    box-shadow: 0 4px 0 var(--color-error);
+    color: var(--color-error);
+  }
+
+  &:active:not(:disabled) {
+    border-color: var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 18%, var(--color-superficie));
+    box-shadow: 0 0 0 var(--color-error);
+    color: var(--color-error);
   }
 }
 
