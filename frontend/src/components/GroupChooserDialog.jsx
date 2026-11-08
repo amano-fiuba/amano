@@ -116,10 +116,8 @@ export default function GroupChooserDialog({ onClose }) {
                   )}
                   <span className="group-row__body">
                     <strong>{group.name}</strong>
-                    <small>
-                      {memberCountLabel(group.memberCount ?? 0)}
-                      {!allowed && ` · ${CANNOT_CREATE_IN_GROUP}`}
-                    </small>
+                    <small>{memberCountLabel(group.memberCount ?? 0)}</small>
+                    {!allowed && <small className="group-chooser__blocked">{CANNOT_CREATE_IN_GROUP}</small>}
                   </span>
                 </>
               )

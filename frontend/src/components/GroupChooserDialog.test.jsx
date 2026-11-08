@@ -61,7 +61,9 @@ describe('GroupChooserDialog (027, FR-021)', () => {
     const row = screen.getByText('Consorcio').closest('.group-chooser__row')
     expect(row).toHaveAttribute('aria-disabled', 'true')
     expect(row).toHaveClass('is-disabled')
-    expect(within(row).getByText(`12 miembros · ${CANNOT_CREATE_IN_GROUP}`)).toBeInTheDocument()
+    // Members and the reason go on separate lines.
+    expect(within(row).getByText('12 miembros')).toBeInTheDocument()
+    expect(within(row).getByText(CANNOT_CREATE_IN_GROUP)).toHaveClass('group-chooser__blocked')
     expect(row).not.toHaveTextContent('›')
   })
 

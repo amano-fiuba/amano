@@ -24,3 +24,21 @@ export async function listCurrencies() {
     return { ok: false, network: true }
   }
 }
+
+/**
+ * 027 FR-035: GET /api/currencies/quote, preview of an amount in pesos for the
+ * personal expense. Same shape as getExchangeQuote of groupsClient:
+ * { ok: true, quote } or { ok: false, status } / { ok: false, network: true }.
+ */
+export async function getCurrencyQuote(currency, date) {
+  try {
+    const params = new URLSearchParams({ currency, date })
+    const response = await fetch(`/api/currencies/quote?${params.toString()}`, { credentials: 'include' })
+    if (!response.ok) {
+      return { ok: false, status: response.status }
+    }
+    return { ok: true, quote: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}

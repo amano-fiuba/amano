@@ -4,6 +4,11 @@ import TextField from './TextField'
 import SelectField from './SelectField'
 import DatePickerField from './DatePickerField'
 import CurrencySelect from './CurrencySelect'
+import ConvertedAmount from './debts/ConvertedAmount'
+import ExpenseSummaryDialog from './ExpenseSummaryDialog'
+import { formatAmount } from '../validation/expenseFormat'
+import { getCurrencyQuote } from '../api/currencyClient'
+import { convertAmount } from '../pages/groups/convertPreview'
 import { useSnackbar } from './Snackbar'
 import {
   EXPENSE_NETWORK_ERROR_MESSAGE,
@@ -14,6 +19,8 @@ import {
   FREQUENCY_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   TYPE_OPTIONS,
+  currencyLabel,
+  labelOf,
 } from '../validation/expenseCatalog'
 import {
   DATE_FUTURE,
@@ -31,6 +38,12 @@ export const EXPENSE_SESSION_EXPIRED_MESSAGE =
   'Tu sesión expiró. Iniciá sesión nuevamente.'
 // 027 (FR-019): leaving with loaded data asks first.
 export const EXPENSE_DISCARD_CONFIRM = '¿Descartar el gasto? Se perderán los datos cargados'
+// 027 (FR-035): estimated amount in pesos for an expense in another currency.
+export const PERSONAL_QUOTE_LOADING = 'Calculando la cotización…'
+export const PERSONAL_QUOTE_NOTE = 'Estimación con la cotización oficial del BCRA. El gasto se guarda en su moneda.'
+export const PERSONAL_QUOTE_ERROR =
+  'No pudimos obtener la cotización en este momento. Podés guardar el gasto igual.'
+export const PERSONAL_QUOTE_DEBOUNCE_MS = 400
 
 const REQUIRED_SELECT_MESSAGES = {
   currency: 'La moneda es obligatoria',
@@ -63,7 +76,8 @@ const FIELD_NAMES = [
  * which is only sent for recurring expenses (FR-001/FR-002).
  * Feature 027 (FR-010, FR-011, FR-018, FR-019): calendar date field, the user's
  * currencies plus "Ver más" (BCRA catalog), group-like card surface and a
- * Cancelar / Guardar gasto footer. Never a shared-expense panel.
+ * Cancelar / Guardar footer. Never a shared-expense panel. "Guardar" opens a final
+ * summary; the expense is saved only after "Confirmar".
  */
 export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredCurrencies = [], onCancel }) {
   const {
@@ -90,11 +104,19 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredC
   })
   const selectedType = useWatch({ control, name: 'type' })
   const isRecurring = selectedType === 'RECURRING'
+  const currencyValue = useWatch({ control, name: 'currency' })
+  const amountValue = useWatch({ control, name: 'amount' })
+  const dateValue = useWatch({ control, name: 'date' })
+  // Last answer of the quote, tagged with the request it belongs to.
+  const [quote, setQuote] = useState({ key: null, status: 'idle', converted: null })
 
   const showSnackbar = useSnackbar()
   const [idempotencyKey, setIdempotencyKey] = useState(null)
   const [formError, setFormError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
+  // Validated payload waiting for "Confirmar" in the summary, with its rows.
+  const [pending, setPending] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   // The preloaded date follows midnight only while the user has not edited it.
   useEffect(() => {
@@ -124,6 +146,36 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredC
   }
 
   const todayIso = parseArgentineDate(today).iso
+
+  // 027 (FR-035): like the group form (022 T070), a valid amount and date in a
+  // currency other than ARS show an estimate in pesos. It never blocks the submit
+  // and nothing of it is saved.
+  const quoteAmount = parseArgentineAmount(amountValue)
+  const quoteDate = parseArgentineDate(dateValue)
+  const quoteKey =
+    Boolean(currencyValue) && currencyValue !== 'ARS' && quoteAmount.ok && quoteDate.ok &&
+    (todayIso == null || quoteDate.iso <= todayIso)
+      ? `${currencyValue}|${quoteDate.iso}|${quoteAmount.canonical}`
+      : null
+
+  useEffect(() => {
+    if (quoteKey === null) return undefined
+    const [currency, date, amount] = quoteKey.split('|')
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const result = await getCurrencyQuote(currency, date)
+      if (cancelled) return
+      const converted = result.ok ? convertAmount(amount, result.quote?.rate) : null
+      setQuote({ key: quoteKey, status: converted === null ? 'error' : 'ready', converted })
+    }, PERSONAL_QUOTE_DEBOUNCE_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [quoteKey])
+
+  // An answer for another request (stale inputs) counts as "still loading".
+  const quoteStatus = quoteKey === null ? 'idle' : quote.key === quoteKey ? quote.status : 'loading'
   const validateDate = (value) => {
     const date = parseArgentineDate(value)
     if (!date.ok) {
@@ -168,6 +220,34 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredC
       payload.frequency = values.frequency
     }
 
+    const rows = [
+      { label: 'Monto', value: `$ ${formatAmount(payload.amount)} ${payload.currency}` },
+      ...(payload.currency !== 'ARS' && quoteStatus === 'ready'
+        ? [{ label: 'Estimado en pesos', value: `$ ${formatAmount(quote.converted)} ARS` }]
+        : []),
+      { label: 'Moneda', value: currencyLabel(payload.currency) },
+      { label: 'Fecha', value: values.date },
+      { label: 'Categoría', value: labelOf(CATEGORY_OPTIONS, payload.category) },
+      { label: 'Tipo de gasto', value: labelOf(TYPE_OPTIONS, payload.type) },
+      ...(payload.frequency ? [{ label: 'Frecuencia', value: labelOf(FREQUENCY_OPTIONS, payload.frequency) }] : []),
+      { label: 'Medio de pago', value: labelOf(PAYMENT_METHOD_OPTIONS, payload.paymentMethod) },
+      ...(payload.description ? [{ label: 'Descripción', value: payload.description }] : []),
+    ]
+    setPending({ payload, rows })
+  }
+
+  const confirmSave = async () => {
+    const { payload } = pending
+    setSaving(true)
+    try {
+      await save(payload)
+    } finally {
+      setSaving(false)
+      setPending(null)
+    }
+  }
+
+  const save = async (payload) => {
     // One key per save operation: kept on any failure, renewed on success.
     const key = idempotencyKey ?? crypto.randomUUID()
     if (idempotencyKey === null) {
@@ -264,6 +344,25 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredC
           )}
         />
 
+        <div className="group-expense__quote" aria-live="polite" data-testid="personal-quote">
+          {quoteStatus === 'loading' && <p>{PERSONAL_QUOTE_LOADING}</p>}
+          {quoteStatus === 'ready' && (
+            <>
+              <p>
+                Monto estimado:{' '}
+                <ConvertedAmount
+                  amount={quoteAmount.canonical}
+                  currency={currencyValue}
+                  convertedAmount={quote.converted}
+                  convertedCurrency="ARS"
+                />
+              </p>
+              <p className="group-expense__quote-note">{PERSONAL_QUOTE_NOTE}</p>
+            </>
+          )}
+          {quoteStatus === 'error' && <p>{PERSONAL_QUOTE_ERROR}</p>}
+        </div>
+
         <SelectField
           label="Categoría"
           options={CATEGORY_OPTIONS}
@@ -317,10 +416,18 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredC
         <button type="button" className="expense-actions__cancel" onClick={handleCancel}>
           Cancelar
         </button>
-        <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Guardando…' : 'Guardar gasto'}
+        <button type="submit" disabled={isSubmitting || saving}>
+          {isSubmitting || saving ? 'Guardando…' : 'Guardar'}
         </button>
       </div>
+      {pending && (
+        <ExpenseSummaryDialog
+          rows={pending.rows}
+          confirming={saving}
+          onConfirm={confirmSave}
+          onCancel={() => setPending(null)}
+        />
+      )}
     </form>
   )
 }

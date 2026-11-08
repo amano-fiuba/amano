@@ -8,7 +8,8 @@ const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
 vi.mock('../auth/AuthContext', () => ({ useAuth }))
 
-const { listGroups } = vi.hoisted(() => ({ listGroups: vi.fn() }))
+const { listGroups, listFriends } = vi.hoisted(() => ({ listGroups: vi.fn(), listFriends: vi.fn() }))
+vi.mock('../api/friendsClient', async (importOriginal) => ({ ...(await importOriginal()), listFriends }))
 vi.mock('../api/groupsClient', async (importOriginal) => ({ ...(await importOriginal()), listGroups }))
 
 function renderButton() {
@@ -19,6 +20,7 @@ function renderButton() {
         <Route path="/expenses/new" element={<p>Pantalla de gasto personal</p>} />
         <Route path="/groups/new" element={<p>Pantalla de crear grupo</p>} />
         <Route path="/groups/:id/expenses/new" element={<p>Nuevo gasto del grupo</p>} />
+        <Route path="/friends/:friendId/expenses/new" element={<p>Nuevo gasto con amigo</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -111,8 +113,11 @@ describe('QuickActionsButton: submenú "Registrar gasto" (027, US1)', () => {
       '/expenses/new',
     )
     expect(screen.getByRole('menuitem', { name: 'Gasto grupal' })).toBeInTheDocument()
-    // US4 todavía no está integrada: su opción no se muestra (FR-001).
-    expect(screen.queryByRole('menuitem', { name: 'Gasto con amigo' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Gasto con amigo' })).toBeInTheDocument()
+    // Orden de FR-001: personal, con amigo, grupal.
+    expect(
+      screen.getAllByRole('menuitem').map((item) => item.textContent).filter((text) => text.startsWith('Gasto ')),
+    ).toEqual(['Gasto personal', 'Gasto con amigo', 'Gasto grupal'])
   })
 
   it('un segundo clic sobre "Registrar gasto" cierra el submenú', async () => {
@@ -301,5 +306,27 @@ describe('QuickActionsButton: "Gasto grupal" (027, US3)', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.queryByText('Nuevo gasto del grupo')).not.toBeInTheDocument()
+  })
+})
+
+describe('QuickActionsButton: "Gasto con amigo" (027, US4)', () => {
+  it('cierra el menú, pide el amigo y lleva a su formulario', async () => {
+    listFriends.mockResolvedValue({
+      ok: true,
+      friends: [{ id: 15, firstName: 'Juan', lastName: 'Pérez', email: 'juan@example.com', avatarUrl: null }],
+    })
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+    await user.click(screen.getByRole('menuitem', { name: 'Gasto con amigo' }))
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '¿Con qué amigo?' })).toBeInTheDocument()
+
+    await user.click(await screen.findByRole('link', { name: /Juan Pérez/ }))
+
+    expect(screen.getByText('Nuevo gasto con amigo')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { useDismiss } from '../hooks/useDismiss'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import FriendChooserDialog from './FriendChooserDialog'
 import GroupChooserDialog from './GroupChooserDialog'
 import {
   ChevronLeftIcon,
@@ -15,11 +16,11 @@ import {
 
 const EXPENSE_LABEL = 'Registrar gasto'
 
-// specs/027-expense-entry-modes, FR-001: each option shows up once its flow is
-// integrated (US3 enables "Gasto grupal", US4 "Gasto con amigo").
+// specs/027-expense-entry-modes, FR-001: the three ways to register an expense.
+// "Gasto con amigo" and "Gasto grupal" open a chooser before the form.
 const EXPENSE_OPTIONS = [
   { key: 'personal', label: 'Gasto personal', Icon: PersonIcon, to: '/expenses/new', enabled: true },
-  { key: 'friend', label: 'Gasto con amigo', Icon: FriendIcon, enabled: false },
+  { key: 'friend', label: 'Gasto con amigo', Icon: FriendIcon, enabled: true },
   { key: 'group', label: 'Gasto grupal', Icon: GroupsIcon, enabled: true },
 ]
 
@@ -62,7 +63,7 @@ export default function QuickActionsButton() {
   const { user } = useAuth() ?? {}
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmenuOpen, setIsSubmenuOpen] = useState(false)
-  // Option whose chooser dialog is open ("group"); it outlives the menu.
+  // Option whose chooser dialog is open ("friend" or "group"); it outlives the menu.
   const [chooser, setChooser] = useState(null)
   const isMobile = useMediaQuery(MOBILE_QUERY)
   const containerRef = useRef(null)
@@ -302,6 +303,7 @@ export default function QuickActionsButton() {
         <PlusIcon />
       </button>
       {chooser === 'group' && <GroupChooserDialog onClose={() => setChooser(null)} />}
+      {chooser === 'friend' && <FriendChooserDialog onClose={() => setChooser(null)} />}
     </div>
   )
 }

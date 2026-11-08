@@ -63,7 +63,7 @@ describe('NewExpensePage (T027/T031)', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent(PROFILE_FALLBACK_NOTICE)
     expect(screen.getByLabelText('Moneda')).toHaveValue('ARS')
-    expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument()
   })
 
   it('actualiza la fecha al cruzar la medianoche solo si no fue modificada (US1-12)', async () => {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { listCurrencies } from './currencyClient'
+import { getCurrencyQuote, listCurrencies } from './currencyClient'
 
 function response({ ok = false, status = 200, body = {} } = {}) {
   return { ok, status, json: () => Promise.resolve(body) }
@@ -46,5 +46,26 @@ describe('listCurrencies (027, T030)', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 401 })))
 
     expect(await listCurrencies()).toEqual({ ok: false, status: 401 })
+  })
+})
+
+describe('getCurrencyQuote (027, FR-035)', () => {
+  it('pide la cotización a pesos con moneda y fecha', async () => {
+    const quote = { rate: 281.634959, rateDate: '2026-11-05', rateSource: 'BCRA', groupCurrency: 'ARS' }
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: quote }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await getCurrencyQuote('BRL', '2026-11-05')).toEqual({ ok: true, quote })
+    expect(fetchMock).toHaveBeenCalledWith('/api/currencies/quote?currency=BRL&date=2026-11-05', {
+      credentials: 'include',
+    })
+  })
+
+  it('un error devuelve su estado y una falla de red se informa como tal', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 503 })))
+    expect(await getCurrencyQuote('BRL', '2026-11-05')).toEqual({ ok: false, status: 503 })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await getCurrencyQuote('BRL', '2026-11-05')).toEqual({ ok: false, network: true })
   })
 })

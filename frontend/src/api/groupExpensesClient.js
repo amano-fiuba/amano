@@ -175,3 +175,30 @@ export function getSettlementProposal(groupId) {
   return getJson(`/api/groups/${groupId}/settlement-proposal`)
 }
 
+
+/**
+ * 027 US4: POST /api/users/me/friends/{friendId}/expenses, an expense shared with
+ * a friend. Same results as createGroupExpense; a stranger is a 404.
+ */
+export async function createFriendExpense(friendId, payload, idempotencyKey) {
+  try {
+    const response = await fetch(`/api/users/me/friends/${friendId}/expenses`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(payload),
+    })
+    if (response.ok) {
+      return { ok: true, expense: await response.json(), created: response.status === 201 }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return failure(response)
+  } catch {
+    return { ok: false, network: true }
+  }
+}
