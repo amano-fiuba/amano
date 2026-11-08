@@ -966,65 +966,72 @@
   }
 }
 
-.friend-picker__list {
-  display: grid;
-  gap: 0.35rem;
-  max-height: 15rem;
+// Fichas de las personas elegidas en Crear grupo (amigos y perfiles simulados):
+// siempre visibles aunque la lista esté filtrada; la ✕ deshace la elección.
+.people-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
   list-style: none;
 }
 
-.friend-picker__row {
-  display: flex;
+.people-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-control);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-
-  &:hover {
-    border-color: var(--color-naranja);
-  }
-
-  &.is-selected {
-    background: var(--color-superficie-fuerte);
-    border-color: var(--color-acento);
-  }
-
-  input {
-    flex: 0 0 auto;
-    width: 1.1rem;
-    height: 1.1rem;
-    margin: 0;
-    accent-color: var(--color-acento);
-  }
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.2rem 0.25rem 0.2rem 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--color-acento) 45%, var(--color-borde));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-acento) 12%, var(--color-superficie));
+  font-size: 0.85rem;
+  font-weight: 600;
 
   img {
     flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
     border-radius: 50%;
     object-fit: cover;
   }
-}
 
-.friend-picker__identity {
-  display: grid;
-  min-width: 0;
-
-  strong,
-  span {
+  > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  span {
+  button {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    box-shadow: none;
     color: var(--color-texto-suave);
-    font-size: 0.82rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: color-mix(in srgb, var(--color-error) 14%, transparent);
+      color: var(--color-error);
+    }
   }
+}
+
+// Perfil simulado: borde punteado, para distinguirlo de un amigo.
+.people-chip--simulated {
+  border-style: dashed;
+  background: var(--color-superficie);
 }
 
 .friend-picker__status {
@@ -1032,24 +1039,6 @@
   gap: 0.5rem;
   margin: 0;
   color: var(--color-texto-suave);
-}
-
-.create-group__profiles {
-  display: grid;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--color-borde);
-    border-radius: var(--radio-control);
-  }
 }
 
 .create-group__simulated {
@@ -1068,8 +1057,3 @@
   color: var(--color-error);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .friend-picker__row {
-    transition: none;
-  }
-}

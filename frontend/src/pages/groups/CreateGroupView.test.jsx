@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -55,14 +55,14 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
   it('no pide escribir el correo de un amigo', async () => {
     renderView()
 
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
 
     expect(screen.queryByLabelText('Correo del amigo')).not.toBeInTheDocument()
   })
 
   it('Crear queda deshabilitado sin nombre aunque haya personas elegidas', async () => {
     renderView()
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
 
     expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled()
     expect(createGroup).not.toHaveBeenCalled()
@@ -70,7 +70,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
 
   it('Crear queda deshabilitado con nombre pero sin ninguna persona', async () => {
     renderView()
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
     typeName('Solo yo')
 
     expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled()
@@ -78,7 +78,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
 
   it('Crear se habilita con nombre y un perfil simulado completo aunque no esté agregado', async () => {
     renderView()
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
     typeName('Con invitado')
     expect(screen.getByRole('button', { name: 'Crear' })).toBeDisabled()
 
@@ -91,8 +91,8 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     createGroup.mockResolvedValue({ ok: true, group: { id: 42, name: 'Viaje' } })
     renderView()
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /Bruno/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar a Bruno' }))
     expect(screen.getByTestId('member-count')).toHaveTextContent('2 personas elegidas')
     typeName('Viaje')
     submit()
@@ -113,7 +113,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     createGroup.mockResolvedValue({ ok: true, group: { id: 43, name: 'Mixto' } })
     renderView()
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
     typeProfile('Invitado', 'invitado@example.com')
     fireEvent.click(screen.getByRole('button', { name: 'Agregar perfil' }))
     expect(screen.getByTestId('member-count')).toHaveTextContent('2 personas elegidas')
@@ -148,7 +148,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     createGroup.mockResolvedValue({ ok: true, group: { id: 45, name: 'Depto' } })
     renderView()
 
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
     typeProfile('Abuela', 'abuela@example.com')
     typeName('Depto')
     submit()
@@ -161,7 +161,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
   it('un perfil incompleto frena la creación', async () => {
     renderView()
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
     typeProfile('Abuela', '')
     typeName('Depto')
     submit()
@@ -172,7 +172,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
 
   it('rechaza un correo de perfil repetido y permite quitar un perfil', async () => {
     renderView()
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
 
     typeProfile('Abuela', 'abuela@example.com')
     fireEvent.click(screen.getByRole('button', { name: 'Agregar perfil' }))
@@ -184,6 +184,24 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     expect(screen.getByTestId('member-count')).toHaveTextContent('0 personas elegidas')
   })
 
+  it('muestra amigos y perfiles simulados juntos en fichas, que se quitan con la ✕', async () => {
+    renderView()
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
+    typeProfile('Abuela', 'abuela@example.com')
+    fireEvent.click(screen.getByRole('button', { name: 'Agregar perfil' }))
+
+    const chips = screen.getByRole('list', { name: 'Personas elegidas' })
+    expect(within(chips).getByText('Ana Pérez')).toBeInTheDocument()
+    expect(within(chips).getByText('Abuela')).toBeInTheDocument()
+
+    // La ficha sigue aunque el filtro saque a Ana de la lista.
+    fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: 'bruno' } })
+    expect(within(chips).getByText('Ana Pérez')).toBeInTheDocument()
+
+    fireEvent.click(within(chips).getByRole('button', { name: 'Quitar a Ana Pérez' }))
+    expect(screen.getByTestId('member-count')).toHaveTextContent('1 persona elegida')
+  })
+
   it('muestra el rechazo del servidor y no abre ningún grupo', async () => {
     createGroup.mockResolvedValue({
       ok: false,
@@ -192,7 +210,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     })
     renderView()
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
     typeName('Viaje')
     submit()
 
@@ -204,7 +222,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
     createGroup.mockResolvedValue({ ok: false, network: true })
     renderView()
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: /Ana Pérez/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Ana Pérez' }))
     typeName('Viaje')
     submit()
 
@@ -213,7 +231,7 @@ describe('CreateGroupView (010 T031, 023 US5)', () => {
 
   it('Cancelar vuelve a Mis grupos sin crear nada, y queda a la izquierda de Crear', async () => {
     renderView()
-    await screen.findByRole('checkbox', { name: /Ana Pérez/ })
+    await screen.findByRole('button', { name: 'Agregar a Ana Pérez' })
 
     const cancelar = screen.getByRole('button', { name: 'Cancelar' })
     const crear = screen.getByRole('button', { name: 'Crear' })
