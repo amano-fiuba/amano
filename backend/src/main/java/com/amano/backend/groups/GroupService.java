@@ -24,6 +24,7 @@ import com.amano.backend.groups.dto.UpdateGroupRequest;
 import com.amano.backend.groups.port.DebtPort;
 import com.amano.backend.groups.port.FriendshipPort;
 import com.amano.backend.user.User;
+import com.amano.backend.user.Currency;
 import com.amano.backend.user.UserAvatar;
 import com.amano.backend.user.UserAvatarRepository;
 import com.amano.backend.user.UserRepository;
@@ -36,6 +37,12 @@ import com.amano.backend.user.UserRepository;
  */
 @Service
 public class GroupService {
+
+    static final int MAX_DEBT_DUE_DAYS = 3650;
+    static final String DEBT_DUE_DAYS_INVALID =
+            "Los días para el vencimiento tienen que ser un número entero entre 0 y " + MAX_DEBT_DUE_DAYS;
+    static final String DEBT_DUE_DAYS_ADMIN_ONLY =
+            "Solo un administrador puede configurar el vencimiento de las deudas";
 
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -116,6 +123,15 @@ public class GroupService {
         Group group = new Group();
         group.setName(name);
         group.setDescription(trimOrNull(request.getDescription()));
+        Currency currency = Currency.ARS;
+        if (request.getPrimaryCurrency() != null && !request.getPrimaryCurrency().isBlank()) {
+            try {
+                currency = Currency.valueOf(request.getPrimaryCurrency().trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
+            }
+        }
+        group.setPrimaryCurrency(currency);
         Group savedGroup = groupRepository.save(group);
 
         groupMemberRepository.save(new GroupMember(creatorId, savedGroup.getId(), GroupMember.ROLE_ADMIN));
@@ -188,6 +204,7 @@ public class GroupService {
     private static GroupPermissions defaultPermissions(Long groupId) {
         GroupPermissions permissions = new GroupPermissions();
         permissions.setGroupId(groupId);
+        permissions.setMembersCanGenerateExpensesForOthers(true);
         return permissions;
     }
 
@@ -215,6 +232,7 @@ public class GroupService {
                 creator.getLastName(), creator.getEmail()));
         response.setMembersCount(membersCount);
         response.setCreatorRole(GroupMember.ROLE_ADMIN);
+        response.setPrimaryCurrency(group.getPrimaryCurrency() == null ? null : group.getPrimaryCurrency().name());
         return response;
     }
 
@@ -286,6 +304,16 @@ public class GroupService {
             }
         }
 
+        if (request.isDebtDueDaysPresent()) {
+            if (!GroupMember.ROLE_ADMIN.equals(membership.getRole())) {
+                throw new GroupPermissionDeniedException(DEBT_DUE_DAYS_ADMIN_ONLY);
+            }
+            Integer days = request.getDebtDueDays();
+            if (days != null && (days < 0 || days > MAX_DEBT_DUE_DAYS)) {
+                throw new FieldValidationException(Map.of("debtDueDays", DEBT_DUE_DAYS_INVALID));
+            }
+            group.setDebtDueDays(days);
+        }
         if (request.getDescription() != null) {
             group.setDescription(trimOrNull(request.getDescription()));
         }
@@ -555,6 +583,8 @@ public class GroupService {
         detail.setPermissions(groupPermissionsRepository.findByGroupId(group.getId()).orElse(null));
         detail.setLastActivity(null); // history events come with later stories (T021 hook points)
         detail.setExpensesCount(groupRepository.countGroupExpenses(group.getId())); // 017 FR-027
+        detail.setPrimaryCurrency(group.getPrimaryCurrency() == null ? null : group.getPrimaryCurrency().name());
+        detail.setDebtDueDays(group.getDebtDueDays());
         return detail;
     }
 

@@ -15,10 +15,14 @@ import { parseArgentineAmount, parseArgentineDate } from '../../validation/expen
 import { validatePaymentAmount, validatePaymentDate } from './paymentValidation'
 import './groups.scss'
 
-// Fixed texts of the screen (specs/018-register-payment, US3), exported for tests.
+// Fixed texts of the screen (specs/018-register-payment, US3; 022 T085), exported for tests.
 export const PAYMENT_SUCCESS_MESSAGE = 'Pago registrado'
+export const PAYMENT_REPORTED_MESSAGE =
+  'Pago informado: queda esperando que un administrador lo confirme'
 export const DEBT_NOT_FOUND_MESSAGE = 'No existe la deuda solicitada o no sos miembro del grupo'
 export const DEBT_ALREADY_PAID_MESSAGE = 'La deuda ya está pagada'
+export const DEBT_AWAITING_VALIDATION_MESSAGE =
+  'Esta deuda ya tiene un pago esperando validación: esperá a que un administrador lo decida'
 export const CANNOT_PAY_MESSAGE = 'No podés registrar pagos de esta deuda'
 export const PAYMENT_REUSED_KEY_MESSAGE =
   'Ya se registró un pago con estos datos. Volvé al gasto para ver el estado actual'
@@ -43,6 +47,7 @@ export default function RegisterPaymentView() {
   const [idempotencyKey, setIdempotencyKey] = useState(null)
   const [formError, setFormError] = useState('')
   const [paidMeanwhile, setPaidMeanwhile] = useState(false)
+  const [conflictMessage, setConflictMessage] = useState('')
 
   const {
     register,
@@ -111,7 +116,11 @@ export default function RegisterPaymentView() {
 
     if (result.ok) {
       setIdempotencyKey(null)
-      showSnackbar?.(PAYMENT_SUCCESS_MESSAGE)
+      const message =
+        result.payment?.status === 'REPORTED'
+          ? PAYMENT_REPORTED_MESSAGE
+          : PAYMENT_SUCCESS_MESSAGE
+      showSnackbar?.(message)
       navigate(expensePath)
       return
     }
@@ -126,6 +135,7 @@ export default function RegisterPaymentView() {
     // A rejected payload is a finished operation: the next confirm gets a new key.
     setIdempotencyKey(null)
     if (result.status === 409) {
+      setConflictMessage(result.detail || DEBT_ALREADY_PAID_MESSAGE)
       setPaidMeanwhile(true)
       return
     }
@@ -156,9 +166,15 @@ export default function RegisterPaymentView() {
       Volver al gasto
     </Link>
   )
-  const blocked = debt && (paidMeanwhile || debt.status === 'PAID' || !debt.canRegisterPayment)
-  const blockedMessage =
-    paidMeanwhile || debt?.status === 'PAID' ? DEBT_ALREADY_PAID_MESSAGE : CANNOT_PAY_MESSAGE
+  const blocked =
+    debt && (paidMeanwhile || debt.status === 'PAID' || debt.status === 'VERIFIED' || !debt.canRegisterPayment)
+  const blockedMessage = paidMeanwhile
+    ? conflictMessage || DEBT_ALREADY_PAID_MESSAGE
+    : debt?.status === 'PAID' || debt?.status === 'VERIFIED'
+      ? DEBT_ALREADY_PAID_MESSAGE
+      : debt?.status === 'PAYMENT_REPORTED'
+        ? DEBT_AWAITING_VALIDATION_MESSAGE
+        : CANNOT_PAY_MESSAGE
 
   return (
     <main className="page group-page group-payment">

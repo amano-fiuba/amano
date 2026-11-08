@@ -251,4 +251,26 @@ class GroupExpenseMigrationIT {
 
         assertThat(definitions).hasSize(3).allSatisfy(definition -> assertThat(definition).contains("WHERE"));
     }
+
+    @Test
+    void theSplitMethodDefaultsToEqualAndOnlyAcceptsTheThreeKnownValues() {
+        assertThat(jdbc.queryForObject("SELECT split_method FROM group_expenses WHERE id = ?",
+                String.class, expenseId)).isEqualTo("EQUAL");
+
+        jdbc.update("UPDATE group_expenses SET split_method = 'CUSTOM' WHERE id = ?", expenseId);
+        jdbc.update("UPDATE group_expenses SET split_method = 'PERCENTAGE' WHERE id = ?", expenseId);
+        assertThatThrownBy(() -> jdbc.update(
+                "UPDATE group_expenses SET split_method = 'HALF' WHERE id = ?", expenseId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void v23DefaultMembersCanGenerateExpensesForOthersIsTrue() {
+        String colDefault = jdbc.queryForObject("""
+                SELECT column_default FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'group_permissions'
+                  AND column_name = 'members_can_generate_expenses_for_others'
+                """, String.class);
+        assertThat(colDefault).containsIgnoringCase("true");
+    }
 }

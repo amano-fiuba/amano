@@ -13,6 +13,8 @@ import com.amano.backend.user.CurrencyConversion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -59,6 +61,27 @@ public class GroupExpense {
 
     @Column(name = "idempotency_key", nullable = false)
     private UUID idempotencyKey;
+
+    /** 022 D8: amount converted to the group currency (null until converted). */
+    @Column(name = "converted_amount", precision = 11, scale = 2)
+    private BigDecimal convertedAmount;
+
+    /** 022 D8: rate applied from the expense currency to the group currency. */
+    @Column(name = "exchange_rate", precision = 18, scale = 8)
+    private BigDecimal exchangeRate;
+
+    /** 022 D8: date of the historical quote. */
+    @Column(name = "rate_date")
+    private LocalDate rateDate;
+
+    /** 022 D8: source of the quote (for example {@code BCRA}). */
+    @Column(name = "rate_source", length = 40)
+    private String rateSource;
+
+    /** 022 D2/T066: how the expense was split. Existing and omitted payloads stay EQUAL. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "split_method", nullable = false, length = 10)
+    private SplitMethod splitMethod = SplitMethod.EQUAL;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -130,6 +153,46 @@ public class GroupExpense {
 
     public void setIdempotencyKey(UUID idempotencyKey) {
         this.idempotencyKey = idempotencyKey;
+    }
+
+    public BigDecimal getConvertedAmount() {
+        return convertedAmount;
+    }
+
+    public void setConvertedAmount(BigDecimal convertedAmount) {
+        this.convertedAmount = convertedAmount;
+    }
+
+    public BigDecimal getExchangeRate() {
+        return exchangeRate;
+    }
+
+    public void setExchangeRate(BigDecimal exchangeRate) {
+        this.exchangeRate = exchangeRate;
+    }
+
+    public LocalDate getRateDate() {
+        return rateDate;
+    }
+
+    public void setRateDate(LocalDate rateDate) {
+        this.rateDate = rateDate;
+    }
+
+    public String getRateSource() {
+        return rateSource;
+    }
+
+    public void setRateSource(String rateSource) {
+        this.rateSource = rateSource;
+    }
+
+    public SplitMethod getSplitMethod() {
+        return splitMethod;
+    }
+
+    public void setSplitMethod(SplitMethod splitMethod) {
+        this.splitMethod = splitMethod;
     }
 
     public OffsetDateTime getCreatedAt() {

@@ -117,6 +117,14 @@ public class GroupPermissionChecker {
     }
 
     /**
+     * 022 US5: confirming or rejecting a reported payment. ADMIN-only, with no
+     * casilla: validation is the administrator's responsibility.
+     */
+    public boolean canDecidePayments(String callerRole) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    /**
      * 018 (plan.md D2, FR-004): registering a payment of a debt. ADMIN always;
      * otherwise only the debtor (when registered) or the creditor of the debt.
      */

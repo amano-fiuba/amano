@@ -53,7 +53,8 @@ class PaymentControllerTest {
     }
 
     private static PaymentResponse payment(long id) {
-        return new PaymentResponse(id, 3L, 12L, 31L, "1000.00", "ARS", "2026-11-05", null, null, null, null, null);
+        return new PaymentResponse(id, 3L, 12L, 31L, "1000.00", "ARS", "2026-11-05", null, null, null, null, null,
+                "CONFIRMED");
     }
 
     @Test

@@ -44,12 +44,15 @@ final class PaymentScenario {
 
     private final MockMvc mockMvc;
     private final JdbcTemplate jdbc;
+    private final ObjectMapper objectMapper;
 
     PaymentScenario(MockMvc mockMvc, JdbcTemplate jdbc, JwtService jwtService, ObjectMapper objectMapper)
             throws Exception {
         this.mockMvc = mockMvc;
         this.jdbc = jdbc;
-        int n = SEQUENCE.incrementAndGet() + (int) (System.nanoTime() % 100000);
+        this.objectMapper = objectMapper;
+        // Unique per scenario: the counter alone is unique within the JVM, the clock keeps it unique across runs.
+        String n = SEQUENCE.incrementAndGet() + "t" + System.nanoTime();
         ana = user(jdbc, "Ana", "López", "ana" + n + "@payments.dev");
         juan = user(jdbc, "Juan", "Pérez", "juan" + n + "@payments.dev");
         carla = user(jdbc, "Carla", "Gómez", "carla" + n + "@payments.dev");
@@ -130,17 +133,107 @@ final class PaymentScenario {
         return pay(session, UUID.randomUUID().toString(), body(debtId, amount, EXPENSE_DATE));
     }
 
+    static String fullBody(String amount, String idempotencyKey) {
+        return """
+                {"amount": "%s", "idempotencyKey": "%s"}
+                """.formatted(amount, idempotencyKey);
+    }
+
+    /** 022 US6: full payment through the group debt endpoint. */
+    ResultActions registerFull(Cookie session, long debtId, String amount, String key) throws Exception {
+        var request = post("/api/groups/" + groupId + "/debts/" + debtId + "/payments")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(fullBody(amount, key));
+        if (session != null) {
+            request.cookie(session);
+        }
+        return mockMvc.perform(request);
+    }
+
+    ResultActions registerFull(Cookie session, long debtId, String amount) throws Exception {
+        return registerFull(session, debtId, amount, UUID.randomUUID().toString());
+    }
+
+    /** 022 US5: registers a payment with validation and returns its id. */
+    long registerReported(Cookie session, long debtId, String amount) throws Exception {
+        String body = registerFull(session, debtId, amount)
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).get("paymentId").asLong();
+    }
+
+    /** 022 US5: administrator confirmation of a reported payment. */
+    ResultActions confirmPayment(Cookie session, long paymentId) throws Exception {
+        return decidePayment(session, paymentId, "confirm");
+    }
+
+    /** 022 US5: administrator rejection of a reported payment. */
+    ResultActions rejectPayment(Cookie session, long paymentId) throws Exception {
+        return decidePayment(session, paymentId, "reject");
+    }
+
+    private ResultActions decidePayment(Cookie session, long paymentId, String action) throws Exception {
+        var request = post("/api/groups/" + groupId + "/payments/" + paymentId + "/" + action);
+        if (session != null) {
+            request.cookie(session);
+        }
+        return mockMvc.perform(request);
+    }
+
+    /** Promotes an existing active member to ADMIN for the decision tests. */
+    void makeAdmin(long userId) {
+        jdbc.update("UPDATE group_members SET role = 'ADMIN' WHERE group_id = ? AND user_id = ?", groupId, userId);
+    }
+
     String statusOf(long debtId) {
         return jdbc.queryForObject("SELECT status FROM debts WHERE id = ?", String.class, debtId);
     }
 
     int paymentEvents() {
         return jdbc.queryForObject(
-                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = 'PAYMENT_MADE'",
+                "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type IN ('PAYMENT_MADE', 'PAYMENT_REGISTERED')",
                 Integer.class, groupId);
     }
 
     int payments(long debtId) {
         return jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE debt_id = ?", Integer.class, debtId);
+    }
+
+    int activePayments(long debtId) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = FALSE", Integer.class, debtId);
+    }
+
+    /** Paid amount stored in the debt. */
+    java.math.BigDecimal paidAmount(long debtId) {
+        return jdbc.queryForObject("SELECT paid_amount FROM debts WHERE id = ?", java.math.BigDecimal.class, debtId);
+    }
+
+    /** Net balance (ARS) of a registered member according to GET /balances, read by Ana. */
+    java.math.BigDecimal netBalanceOf(long userId) throws Exception {
+        String body = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/groups/" + groupId + "/balances").cookie(anaSession))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var currencies = objectMapper.readTree(body).get("currencies");
+        java.math.BigDecimal sum = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal result = java.math.BigDecimal.ZERO;
+        for (var currency : currencies) {
+            for (var member : currency.get("balances")) {
+                java.math.BigDecimal net = new java.math.BigDecimal(member.get("netBalance").asString());
+                sum = sum.add(net);
+                if ("REGISTERED".equals(member.get("memberType").asString())
+                        && member.get("memberId").asLong() == userId) {
+                    result = net;
+                }
+            }
+        }
+        if (sum.signum() != 0) {
+            throw new AssertionError("The balances of the group do not add up to zero: " + sum);
+        }
+        return result;
+    }
+
+    void requireValidation() {
+        jdbc.update("UPDATE group_permissions SET payments_require_validation = TRUE WHERE group_id = ?", groupId);
     }
 }

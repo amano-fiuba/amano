@@ -19,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -126,7 +127,8 @@ class GroupSettingsUpdateIT {
                 .andExpect(jsonPath("$.permissions.membersCanManageSimulatedProfiles").value(true))
                 .andExpect(jsonPath("$.permissions.paymentsRequireValidation").value(true))
                 .andExpect(jsonPath("$.permissions.membersCannotMakeExpenses").value(false))
-                .andExpect(jsonPath("$.permissions.membersCanGenerateExpensesForOthers").value(false));
+                // 022 T060: untouched by this partial update, so it keeps the new default (true)
+                .andExpect(jsonPath("$.permissions.membersCanGenerateExpensesForOthers").value(true));
 
         mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
                 .andExpect(status().isOk())
@@ -200,5 +202,82 @@ class GroupSettingsUpdateIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---- 022 T078: debtDueDays ----
+
+    private ResultActions putGroup(Cookie session, long groupId, String body) throws Exception {
+        return mockMvc.perform(put("/api/groups/" + groupId).cookie(session)
+                .contentType(MediaType.APPLICATION_JSON).content(body));
+    }
+
+    private Integer storedDebtDueDays(long groupId) {
+        return jdbcTemplate.queryForObject("SELECT debt_due_days FROM groups WHERE id = ?", Integer.class, groupId);
+    }
+
+    @Test
+    void t078AdminSetsKeepsAndClearsTheDebtDueDays() throws Exception {
+        Cookie admin = verifiedSessionOf("due-days-admin@example.com");
+        registeredFriend();
+        long groupId = createGroup(admin);
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
+                .andExpect(jsonPath("$.debtDueDays").value(org.hamcrest.Matchers.nullValue()));
+
+        putGroup(admin, groupId, "{\"debtDueDays\": 15}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtDueDays").value(15));
+        assertThat(storedDebtDueDays(groupId)).isEqualTo(15);
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
+                .andExpect(jsonPath("$.debtDueDays").value(15));
+
+        // omitted → unchanged; 0 is valid
+        putGroup(admin, groupId, "{\"description\": \"Otra\"}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtDueDays").value(15));
+        putGroup(admin, groupId, "{\"debtDueDays\": 0}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtDueDays").value(0));
+
+        // explicit null → never overdue
+        putGroup(admin, groupId, "{\"debtDueDays\": null}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtDueDays").value(org.hamcrest.Matchers.nullValue()));
+        assertThat(storedDebtDueDays(groupId)).isNull();
+    }
+
+    @Test
+    void t078InvalidDebtDueDaysAnswer400AndKeepTheStoredValue() throws Exception {
+        Cookie admin = verifiedSessionOf("due-days-invalid@example.com");
+        registeredFriend();
+        long groupId = createGroup(admin);
+        putGroup(admin, groupId, "{\"debtDueDays\": 10}").andExpect(status().isOk());
+
+        for (String bad : new String[] {"-1", "3651"}) {
+            putGroup(admin, groupId, "{\"debtDueDays\": " + bad + "}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.properties.fields.debtDueDays")
+                            .value("Los días para el vencimiento tienen que ser un número entero entre 0 y 3650"));
+        }
+        assertThat(storedDebtDueDays(groupId)).isEqualTo(10);
+    }
+
+    @Test
+    void t078OnlyAnAdminCanConfigureTheDebtDueDays() throws Exception {
+        Cookie admin = verifiedSessionOf("due-days-member-admin@example.com");
+        registeredFriend();
+        long groupId = createGroup(admin);
+        putGroup(admin, groupId, "{\"permissions\": {\"membersCanEditGroupData\": true}}")
+                .andExpect(status().isOk());
+        long memberId = jdbcTemplate
+                .queryForObject("SELECT user_id FROM group_members WHERE group_id = ? AND role = 'MEMBER'",
+                        Long.class, groupId);
+        Cookie member = new Cookie("amano_auth", jwtService.issueToken(memberId));
+
+        putGroup(member, groupId, "{\"debtDueDays\": 5}")
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail")
+                        .value("Solo un administrador puede configurar el vencimiento de las deudas"));
+        assertThat(storedDebtDueDays(groupId)).isNull();
     }
 }

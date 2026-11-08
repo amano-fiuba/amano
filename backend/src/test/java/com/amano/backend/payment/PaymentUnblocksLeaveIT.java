@@ -123,6 +123,20 @@ class PaymentUnblocksLeaveIT {
     }
 
     @Test
+    void aVerifiedDebtDoesNotBlockLeaving() throws Exception {
+        s.requireValidation();
+        long paymentId = s.registerReported(s.juanSession, s.juanDebt, "3333.33");
+
+        leave(s.juanSession).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.properties.code").value("PENDING_DEBTS"));
+
+        s.confirmPayment(s.anaSession, paymentId).andExpect(status().isOk());
+
+        leave(s.juanSession).andExpect(status().isOk());
+        assertThat(isActiveMember(s.juan)).isFalse();
+    }
+
+    @Test
     void aSimulatedProfileWithItsDebtPaidCanBeRemovedAndThePaymentKeepsItsName() throws Exception {
         mockMvc.perform(delete("/api/groups/" + s.groupId + "/simulated-profiles/" + s.abuela).cookie(s.anaSession))
                 .andExpect(status().isForbidden());
@@ -139,5 +153,40 @@ class PaymentUnblocksLeaveIT {
                 .cookie(s.anaSession))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].details.fromName").value("Abuela"));
+    }
+
+    private static final String LEAVE_BLOCKED_MESSAGE =
+            "No podés abandonar el grupo: tenés saldos pendientes con otros miembros";
+
+    /** 022 T059: a reported payment is not settled, so leaving stays blocked for debtor and creditor. */
+    @Test
+    void t059AReportedPaymentBlocksTheDebtorAndTheCreditorWithTheDefinedMessage() throws Exception {
+        s.requireValidation();
+        s.registerReported(s.juanSession, s.juanDebt, "3333.33");
+
+        for (Cookie session : new Cookie[] { s.juanSession, s.anaSession }) {
+            leave(session).andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.title").value("Operación bloqueada por deudas pendientes"))
+                    .andExpect(jsonPath("$.detail").value(LEAVE_BLOCKED_MESSAGE))
+                    .andExpect(jsonPath("$.properties.code").value("PENDING_DEBTS"));
+        }
+        assertThat(isActiveMember(s.juan)).isTrue();
+        assertThat(isActiveMember(s.ana)).isTrue();
+    }
+
+    /** 022 T059: an overdue debt is still open and blocks both sides until it is paid. */
+    @Test
+    void t059AnOverdueDebtBlocksUntilItIsPaid() throws Exception {
+        jdbc.update("UPDATE debts SET status = 'OVERDUE' WHERE id = ?", s.juanDebt);
+
+        leave(s.juanSession).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value(LEAVE_BLOCKED_MESSAGE))
+                .andExpect(jsonPath("$.properties.code").value("PENDING_DEBTS"));
+        leave(s.anaSession).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.properties.code").value("PENDING_DEBTS"));
+
+        s.registerFull(s.juanSession, s.juanDebt, "3333.33").andExpect(status().isCreated());
+        leave(s.juanSession).andExpect(status().isOk());
+        assertThat(isActiveMember(s.juan)).isFalse();
     }
 }
