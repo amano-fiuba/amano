@@ -61,7 +61,7 @@ Fuera de alcance (spec): personalizar frecuencias de recurrentes; ver, editar, b
 
 ## Verificaciones previas (primera tarea)
 
-1. Que `V27` siga libre en `main` y en las ramas de 025/026; si no, renumerar.
+1. Que `V29`, `V30` y `V31` sigan libres en `main` y en las ramas de 025/026; si no, renumerar.
 2. Que `debts.group_id` y `group_expenses.group_id` tengan o no FK a `groups` (afecta solo al texto de la migración).
 3. Que ningún otro `Repository` haga consultas sobre `debts` o `group_expenses` sin filtrar por grupo (`grep` de `FROM Debt`, `FROM GroupExpense`, `findAll`).
 4. Que el formulario de grupo no envíe ya `category` u otros campos (evitar el `400` por propiedad desconocida al migrar en partes).
@@ -105,7 +105,7 @@ Hasta que existan los pasos 3 y 4, las opciones "Gasto grupal" y "Gasto con amig
 - `FriendExpenseIT` (Testcontainers): alta 201/200 idempotente/422; no amigo 404; participantes y pagador inválidos 400; deuda `PENDING` con `group_id NULL`; sin conversión; `DELETE` de amistad bloqueado; saldos, deudas pendientes y vencimiento de grupo no incluyen la deuda directa.
 - `UserAccountServiceTest`: preferencias con monedas nuevas; mensaje "Moneda no soportada".
 - `GroupServiceTest`: moneda principal fuera de ARS/USD/EUR → 400.
-- Migración: IT que aplica `V27` sobre datos existentes y verifica los `CHECK`.
+- Migración: IT que aplica `V29`, `V30` y `V31` sobre datos existentes y verifica los `CHECK`.
 
 **Frontend**
 
@@ -162,7 +162,7 @@ backend/src/main/java/com/amano/backend/
 ├── friendship/NoOpDirectDebtPort.java      # MOD/DEL: reemplazado por el adaptador
 └── common/ProblemDetailExceptionHandler.java # MOD: 503 CURRENCY_CATALOG_UNAVAILABLE
 
-backend/src/main/resources/db/migration/V27__expense_entry_modes.sql   # NUEVO
+backend/src/main/resources/db/migration/V29__expense_entry_modes.sql   # NUEVO
 
 frontend/src/
 ├── api/currencyClient.js                   # NUEVO

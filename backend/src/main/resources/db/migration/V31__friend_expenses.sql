@@ -1,4 +1,4 @@
--- V29__friend_expenses.sql
+-- V31__friend_expenses.sql
 -- Feature 027, US4 (gasto con amigo), ver specs/027-expense-entry-modes/data-model.md.
 --
 -- Un gasto con amigo reutiliza group_expenses, sus partes y debts sin grupo:

@@ -18,10 +18,10 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import com.amano.backend.user.Currency;
 
 /**
- * 027 T017/T046: V27 widens the currency CHECKs of expenses, group expenses,
+ * 027 T017/T046: V29 widens the currency CHECKs of expenses, group expenses,
  * debts, payments and preferences to the {@link Currency} catalog (leaving the
- * group primary currency on ARS/USD/EUR) and V28 adds the nullable 007
- * classification to group expenses; V29 lets an expense with a friend live
+ * group primary currency on ARS/USD/EUR) and V30 adds the nullable 007
+ * classification to group expenses; V31 lets an expense with a friend live
  * without group (exactly one of group / friend) and its debts without group.
  */
 @SpringBootTest(properties = {
