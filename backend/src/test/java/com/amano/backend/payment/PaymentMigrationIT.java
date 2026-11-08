@@ -194,7 +194,7 @@ class PaymentMigrationIT {
     void amountAndCurrencyAreChecked() {
         assertThatThrownBy(() -> validRegistered("0"))
                 .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> payment("REGISTERED", juan, null, ana, juan, "1.00", "BRL", UUID.randomUUID()))
+        assertThatThrownBy(() -> payment("REGISTERED", juan, null, ana, juan, "1.00", "XAU", UUID.randomUUID()))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 

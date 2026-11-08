@@ -24,16 +24,23 @@ public class ExchangeRateConfig {
             @Value("${amano.exchange.bcra.connect-timeout-ms:3000}") long connectTimeoutMs,
             @Value("${amano.exchange.bcra.read-timeout-ms:5000}") long readTimeoutMs,
             @Value("${amano.exchange.bcra.max-attempts:2}") int maxAttempts) {
+        return new BcraExchangeRateClient(bcraRestClient(baseUrl, connectTimeoutMs, readTimeoutMs), maxAttempts);
+    }
+
+    /**
+     * RestClient for the public BCRA API with the configured timeouts. Shared with
+     * the 027 currency catalog ({@code com.amano.backend.currency.CurrencyConfig}).
+     */
+    public static RestClient bcraRestClient(String baseUrl, long connectTimeoutMs, long readTimeoutMs) {
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(Math.max(100, connectTimeoutMs)))
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
         requestFactory.setReadTimeout(Duration.ofMillis(Math.max(100, readTimeoutMs)));
-        RestClient restClient = RestClient.builder()
+        return RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(requestFactory)
                 .build();
-        return new BcraExchangeRateClient(restClient, maxAttempts);
     }
 
     @Bean

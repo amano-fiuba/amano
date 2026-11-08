@@ -206,8 +206,8 @@ class RegistrationServiceTest {
     @Test
     void rejectsInvalidCurrencyValues() {
         assertThat(errorFieldsOf(request("Ana", null, "ana@example.com",
-                "Password123!", "Password123!", true, List.of("ARS", "BOB"), null)).get("currencies"))
-                .isEqualTo("Las monedas deben ser ARS, USD o EUR");
+                "Password123!", "Password123!", true, List.of("ARS", "XAU"), null)).get("currencies"))
+                .isEqualTo("Moneda no soportada");
     }
 
     @Test

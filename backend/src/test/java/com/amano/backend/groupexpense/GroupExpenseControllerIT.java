@@ -1112,7 +1112,7 @@ class GroupExpenseControllerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.date")
                         .value("La fecha debe tener el formato aaaa-mm-dd"));
-        getQuote(anaSession, "?currency=BRL&date=2026-01-18")
+        getQuote(anaSession, "?currency=XAU&date=2026-01-18")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.currency").value("La moneda no es válida"));
         getQuote(anaSession, "?currency=USD").andExpect(status().isBadRequest());

@@ -385,6 +385,18 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** 027 (contracts/currencies-api.md): BCRA catalog unavailable and nothing cached. */
+    @ExceptionHandler(com.amano.backend.currency.CurrencyCatalogUnavailableException.class)
+    public ProblemDetail handleCurrencyCatalogUnavailable(
+            com.amano.backend.currency.CurrencyCatalogUnavailableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        problem.setTitle("Catálogo de monedas no disponible");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.currency.CurrencyCatalogUnavailableException.CODE));
+        return problem;
+    }
+
     /** Spec motive 5 — admin: primero quitar el rol (US4): 403, exact message. */
     @ExceptionHandler(com.amano.backend.groups.AdminRemovalBlockedException.class)
     public ProblemDetail handleAdminRemovalBlocked(

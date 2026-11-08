@@ -130,6 +130,10 @@ public class GroupService {
             } catch (IllegalArgumentException e) {
                 throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
             }
+            // 027 R3: expenses accept the whole BCRA catalog, the primary currency does not.
+            if (!Currency.GROUP_PRIMARY.contains(currency)) {
+                throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
+            }
         }
         group.setPrimaryCurrency(currency);
         Group savedGroup = groupRepository.save(group);
