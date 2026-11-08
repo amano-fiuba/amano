@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -47,7 +47,9 @@ import GroupExpenseFormView, {
   NOT_A_MEMBER_MESSAGE,
   ONLY_OWN_PAYMENTS_MESSAGE,
   PAYER_ALWAYS_PARTICIPATES,
-  PERSONAL_LABEL,
+  FILL_REMAINING_LABEL,
+  SHARED_LABEL,
+  SPLIT_METHOD_LABEL,
   PERSONAL_NOTE,
   PARTICIPANTS_REQUIRED_MESSAGE,
   QUOTE_DEBOUNCE_MS,
@@ -94,6 +96,13 @@ async function fillAmount(user, value) {
 }
 
 const participantBox = (name) => screen.getByRole('checkbox', { name: new RegExp(name) })
+// Rows of the split panel that show an amount (included participants), as
+// "<participant label><amount>" texts.
+const shareRows = () =>
+  screen.getAllByTestId('split-row').filter((row) => within(row).queryByTestId('share-amount'))
+const shareText = (row) =>
+  `${within(row).getByRole('checkbox').closest('label').textContent}${within(row).getByTestId('share-amount').textContent}`
+const sharedSwitch = () => screen.findByRole('switch', { name: SHARED_LABEL })
 
 beforeEach(() => {
   getGroup.mockReset()
@@ -125,7 +134,7 @@ describe('GroupExpenseFormView (017)', () => {
     for (const name of ['Ana López', 'Juan Pérez', 'Abuela']) {
       expect(participantBox(name)).toBeChecked()
     }
-    expect(screen.getByText(/Abuela \(perfil simulado\)/)).toBeInTheDocument()
+    expect(participantBox('Abuela \\(perfil simulado\\)')).toBeInTheDocument()
     expect(getGroup).toHaveBeenCalledWith('3')
     expect(getMembers).toHaveBeenCalledWith('3')
   })
@@ -135,7 +144,7 @@ describe('GroupExpenseFormView (017)', () => {
     renderView()
     await fillAmount(user, '10.000')
 
-    let rows = screen.getAllByTestId('share-preview-row')
+    let rows = shareRows()
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent('Ana López (pagó)')
     expect(rows[0]).toHaveTextContent('$ 3.333,34')
@@ -143,7 +152,7 @@ describe('GroupExpenseFormView (017)', () => {
 
     await user.click(participantBox('Ana López'))
     await fillAmount(user, '100')
-    rows = screen.getAllByTestId('share-preview-row')
+    rows = shareRows()
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent('Juan Pérez')
     expect(rows[0]).toHaveTextContent('$ 50,00')
@@ -151,11 +160,11 @@ describe('GroupExpenseFormView (017)', () => {
     await user.click(participantBox('Ana López'))
     await user.selectOptions(screen.getByLabelText('¿Quién pagó?'), 'u:15')
     await user.click(participantBox('Juan Pérez'))
-    rows = screen.getAllByTestId('share-preview-row')
+    rows = shareRows()
     expect(rows[0]).toHaveTextContent('$ 50,00')
     await fillAmount(user, '100,01')
     expect(screen.getByText(REST_IN_ORDER_NOTE)).toBeInTheDocument()
-    expect(screen.getAllByTestId('share-preview-row')[0]).toHaveTextContent('$ 50,01')
+    expect(shareRows()[0]).toHaveTextContent('$ 50,01')
   })
 
   it('un MEMBER sin la casilla no puede elegir otro pagador', async () => {
@@ -559,15 +568,17 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     await user.type(input, value)
   }
 
+  const SPLIT_LABELS = { EQUAL: 'Partes iguales', CUSTOM: 'Personalizado', PERCENTAGE: 'Porcentajes' }
   async function chooseSplit(user, code) {
-    await user.selectOptions(await screen.findByLabelText('¿Cómo se reparte?'), code)
+    await user.click(await screen.findByRole('radio', { name: SPLIT_LABELS[code] }))
   }
 
   it('ofrece EQUAL, CUSTOM y PERCENTAGE, arranca en partes iguales y no muestra inputs por participante', async () => {
     renderView()
-    const select = await screen.findByLabelText('¿Cómo se reparte?')
-    expect(select).toHaveValue('EQUAL')
-    expect(Array.from(select.options).map((option) => option.value)).toEqual(['EQUAL', 'CUSTOM', 'PERCENTAGE'])
+    const methods = await screen.findByRole('group', { name: SPLIT_METHOD_LABEL })
+    const radios = within(methods).getAllByRole('radio')
+    expect(radios.map((radio) => radio.value)).toEqual(['EQUAL', 'CUSTOM', 'PERCENTAGE'])
+    expect(within(methods).getByRole('radio', { name: 'Partes iguales' })).toBeChecked()
     expect(screen.queryByLabelText(/^Importe de /)).not.toBeInTheDocument()
     expect(screen.queryByTestId('split-difference')).not.toBeInTheDocument()
   })
@@ -620,7 +631,7 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
 
     expect(participantBox('Ana López')).toBeChecked()
     expect(participantBox('Ana López')).toBeDisabled()
-    expect(screen.getByText(PAYER_ALWAYS_PARTICIPATES)).toBeInTheDocument()
+    expect(participantBox('Ana López').closest('label').title).toContain(PAYER_ALWAYS_PARTICIPATES)
 
     await user.click(participantBox('Juan Pérez')) // lo saco del reparto
     expect(screen.queryByLabelText('Importe de Juan Pérez')).not.toBeInTheDocument()
@@ -721,11 +732,10 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     await typeValue(user, 'Porcentaje de Juan Pérez', '33,33')
     await typeValue(user, 'Porcentaje de Abuela', '33,33')
 
-    const rows = screen.getAllByTestId('share-preview-row')
-    expect(rows.map((row) => row.textContent)).toEqual([
-      'Ana López (pagó)$ 33,34',
-      'Juan Pérez$ 33,33',
-      'Abuela$ 33,33',
+    expect(shareRows().map(shareText)).toEqual([
+      'Ana López (pagó)$ 33,34 ARS',
+      'Juan Pérez$ 33,33 ARS',
+      'Abuela (perfil simulado)$ 33,33 ARS',
     ])
     expect(screen.queryByText(REST_TO_PAYER_NOTE)).not.toBeInTheDocument()
   })
@@ -749,11 +759,116 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
 
     expect(await screen.findByTestId('converted-amount')).toHaveTextContent('$ 100,00 USD · $ 125.050,00 ARS')
     expect(diff()).toHaveTextContent('Los importes suman exactamente el total')
-    await waitFor(() => expect(screen.getAllByTestId('share-preview-row')).toHaveLength(2))
-    const rows = screen.getAllByTestId('share-preview-row').map((row) => row.textContent)
-    expect(rows).toEqual(['Ana López (pagó)$ 50.020,00', 'Juan Pérez$ 75.030,00'])
+    await waitFor(() => expect(shareRows()).toHaveLength(2))
+    expect(shareRows().map(shareText)).toEqual([
+      'Ana López (pagó)≈ $ 50.020,00 ARS',
+      'Juan Pérez≈ $ 75.030,00 ARS',
+    ])
     expect(screen.getByText(SPLIT_ESTIMATE_NOTE)).toBeInTheDocument()
     expect(getExchangeQuote).toHaveBeenCalledTimes(1)
+  })
+
+  it('muestra solo el nombre de pila y el nombre completo queda en el tooltip', async () => {
+    renderView()
+    const label = (await screen.findByRole('checkbox', { name: /Juan Pérez/ })).closest('label')
+    expect(label.querySelector('.group-expense__name').firstChild.textContent).toBe('Juan')
+    expect(label).toHaveAttribute('title', 'Juan Pérez')
+  })
+
+  it('el interruptor de gasto compartido arranca encendido', async () => {
+    renderView()
+    expect(await sharedSwitch()).toBeChecked()
+  })
+
+  it('el slider de porcentaje carga el valor del participante y el campo lo muestra', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '1000')
+    await chooseSplit(user, 'PERCENTAGE')
+
+    fireEvent.change(screen.getByLabelText('Deslizar porcentaje de Juan Pérez'), { target: { value: '40' } })
+    expect(screen.getByLabelText('Porcentaje de Juan Pérez')).toHaveValue('40')
+    expect(diff()).toHaveTextContent('Falta repartir 60 %')
+
+    await typeValue(user, 'Porcentaje de Abuela', '25,5')
+    // The browser snaps the thumb to the step; the typed value stays exact.
+    expect(Number(screen.getByLabelText('Deslizar porcentaje de Abuela').value)).toBeCloseTo(25.5, 0)
+  })
+
+  it('con porcentajes incompletos cada fila ya muestra su monto estimado', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '1000')
+    await chooseSplit(user, 'PERCENTAGE')
+    await typeValue(user, 'Porcentaje de Juan Pérez', '25')
+
+    expect(shareRows().map(shareText)).toEqual(['Juan Pérez$ 250,00 ARS'])
+  })
+
+  it('al sacar a alguien en porcentajes desaparecen su slider y su campo', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await chooseSplit(user, 'PERCENTAGE')
+    await user.click(participantBox('Juan Pérez'))
+
+    expect(screen.queryByLabelText('Porcentaje de Juan Pérez')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Deslizar porcentaje de Juan Pérez')).not.toBeInTheDocument()
+  })
+
+  it('en otra moneda cada fila muestra el monto en la moneda del gasto y en la del grupo', async () => {
+    getExchangeQuote.mockResolvedValue({
+      ok: true,
+      quote: { rate: 1000, rateDate: '2026-01-05', rateSource: 'BCRA', groupCurrency: 'ARS' },
+    })
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS.slice(0, 2) })
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '100')
+    const date = await screen.findByLabelText('Fecha')
+    await user.clear(date)
+    await user.type(date, '05/01/2026')
+    await user.selectOptions(screen.getByLabelText('Moneda'), 'USD')
+
+    await waitFor(() => expect(shareRows()[0]).toHaveTextContent('≈'))
+    expect(shareRows().map(shareText)).toEqual([
+      'Ana López (pagó)$ 50,00 USD≈ $ 50.000,00 ARS',
+      'Juan Pérez$ 50,00 USD≈ $ 50.000,00 ARS',
+    ])
+    expect(screen.getByText(SPLIT_ESTIMATE_NOTE)).toBeInTheDocument()
+  })
+
+  it('repartir lo que falta completa en partes iguales los porcentajes vacíos', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '1000')
+    await chooseSplit(user, 'PERCENTAGE')
+    await typeValue(user, 'Porcentaje de Ana López', '50')
+    await user.click(screen.getByRole('button', { name: FILL_REMAINING_LABEL }))
+
+    expect(screen.getByLabelText('Porcentaje de Juan Pérez')).toHaveValue('25')
+    expect(screen.getByLabelText('Porcentaje de Abuela')).toHaveValue('25')
+    expect(diff()).toHaveTextContent('Los porcentajes suman exactamente 100 %')
+    expect(screen.queryByRole('button', { name: FILL_REMAINING_LABEL })).not.toBeInTheDocument()
+    expect(save()).toBeEnabled()
+  })
+
+  it('repartir lo que falta reparte los centavos sobrantes y, si todos tienen valor, suma a todos', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '100')
+    await chooseSplit(user, 'CUSTOM')
+    await user.click(screen.getByRole('button', { name: FILL_REMAINING_LABEL }))
+
+    expect(screen.getByLabelText('Importe de Ana López')).toHaveValue('33,34')
+    expect(screen.getByLabelText('Importe de Juan Pérez')).toHaveValue('33,33')
+    expect(screen.getByLabelText('Importe de Abuela')).toHaveValue('33,33')
+    expect(save()).toBeEnabled()
+
+    await typeValue(user, 'Importe de Abuela', '30,33')
+    await user.click(screen.getByRole('button', { name: FILL_REMAINING_LABEL }))
+    expect(screen.getByLabelText('Importe de Ana López')).toHaveValue('34,34')
+    expect(screen.getByLabelText('Importe de Juan Pérez')).toHaveValue('34,33')
+    expect(screen.getByLabelText('Importe de Abuela')).toHaveValue('31,33')
   })
 
   it('al volver a partes iguales desaparecen los inputs y se puede guardar sin importes', async () => {
@@ -864,15 +979,14 @@ describe('GroupExpenseFormView: selector de pagador (022 T073)', () => {
 
 // 022 T077: gasto personal (crear) y edición de un gasto personal.
 describe('GroupExpenseFormView: gasto personal al crear (022 T077)', () => {
-  const personalBox = () => screen.getByRole('checkbox', { name: PERSONAL_LABEL })
 
   it('ofrece la opción de gasto personal, que oculta reparto y participantes y explica que no genera deudas', async () => {
     const user = userEvent.setup()
     renderView()
-    await user.click(await screen.findByRole('checkbox', { name: PERSONAL_LABEL }))
+    await user.click(await sharedSwitch())
 
     expect(screen.getByTestId('personal-note')).toHaveTextContent(PERSONAL_NOTE)
-    expect(screen.queryByLabelText('¿Cómo se reparte?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: SPLIT_METHOD_LABEL })).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: /Participantes/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox', { name: /Juan Pérez/ })).not.toBeInTheDocument()
   })
@@ -882,7 +996,7 @@ describe('GroupExpenseFormView: gasto personal al crear (022 T077)', () => {
     const user = userEvent.setup()
     renderView()
     await fillAmount(user, '250')
-    await user.click(await screen.findByRole('checkbox', { name: PERSONAL_LABEL }))
+    await user.click(await sharedSwitch())
 
     expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeEnabled()
     await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
@@ -902,7 +1016,7 @@ describe('GroupExpenseFormView: gasto personal al crear (022 T077)', () => {
     renderView()
     await fillAmount(user, '250')
     await user.selectOptions(await screen.findByLabelText('¿Quién pagó?'), 'u:15')
-    await user.click(personalBox())
+    await user.click(await sharedSwitch())
     await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
 
     await screen.findByText('Detalle del gasto')
@@ -915,10 +1029,10 @@ describe('GroupExpenseFormView: gasto personal al crear (022 T077)', () => {
   it('al desmarcarla vuelve el reparto con todos los participantes', async () => {
     const user = userEvent.setup()
     renderView()
-    await user.click(await screen.findByRole('checkbox', { name: PERSONAL_LABEL }))
-    await user.click(personalBox())
+    await user.click(await sharedSwitch())
+    await user.click(await sharedSwitch())
 
-    expect(screen.getByLabelText('¿Cómo se reparte?')).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: SPLIT_METHOD_LABEL })).toBeInTheDocument()
     for (const name of ['Ana López', 'Juan Pérez', 'Abuela']) {
       expect(participantBox(name)).toBeChecked()
     }
@@ -977,7 +1091,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     expect(screen.getByLabelText('Descripción')).toHaveValue('Súper')
     expect(getGroupExpense).toHaveBeenCalledWith('3', '12')
     expect(screen.queryByLabelText('¿Quién pagó?')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('¿Cómo se reparte?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: SPLIT_METHOD_LABEL })).not.toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Volver al gasto' })).toHaveAttribute('href', '/groups/3/expenses/12')
     expect(save()).toBeEnabled()

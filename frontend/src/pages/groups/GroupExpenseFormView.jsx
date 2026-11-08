@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
@@ -11,9 +11,10 @@ import {
   updateGroupExpense,
 } from '../../api/groupExpensesClient'
 import TextField from '../../components/TextField'
+import { PaidIcon } from '../../components/NavIcons'
 import SelectField from '../../components/SelectField'
 import SubmitButton from '../../components/SubmitButton'
-import ExpenseSharePreview from '../../components/groups/ExpenseSharePreview'
+import { REST_IN_ORDER_NOTE, REST_TO_PAYER_NOTE } from '../../components/groups/ExpenseSharePreview'
 import ConvertedAmount from '../../components/debts/ConvertedAmount'
 import { useSnackbar } from '../../components/Snackbar'
 import useCurrentDate, { deviceTimeZone } from '../../hooks/useCurrentDate'
@@ -26,7 +27,7 @@ import {
   validateDescription,
 } from '../../validation/expenseValidation'
 import { expensePermissions } from './expensePermissions'
-import { splitEqually } from './splitEqually'
+import { fromCents, splitEqually, toCents } from './splitEqually'
 import { convertAmount } from './convertPreview'
 import { customShares, summarizeCustom } from './splitCustom'
 import {
@@ -37,6 +38,7 @@ import {
 } from './splitPercentage'
 import { formatAmount, formatIsoDate } from '../../validation/expenseFormat'
 import { participantKey, toParticipant, userIdOf } from './participantKeys'
+import './groups.scss'
 
 // Fixed texts of the screen (specs/017-debt-states, US3), exported for tests.
 export const GROUP_EXPENSE_SUCCESS_MESSAGE = 'Gasto registrado'
@@ -54,10 +56,12 @@ export const QUOTE_ERROR_MESSAGE =
 export const QUOTE_DEBOUNCE_MS = 400
 // 022 T072/T073: split method, hints of the split inputs and 403 fallback.
 const SPLIT_OPTIONS = Object.freeze([
-  { code: 'EQUAL', label: 'En partes iguales' },
-  { code: 'CUSTOM', label: 'Importes personalizados' },
+  { code: 'EQUAL', label: 'Partes iguales' },
+  { code: 'CUSTOM', label: 'Personalizado' },
   { code: 'PERCENTAGE', label: 'Porcentajes' },
 ])
+export const SPLIT_METHOD_LABEL = '¿Cómo se reparte?'
+export const FILL_REMAINING_LABEL = 'Repartir lo que falta en partes iguales'
 export const SPLIT_HINT_CUSTOM = 'Cargá el importe de cada participante en la moneda del gasto'
 export const SPLIT_HINT_PERCENTAGE = 'Cargá el porcentaje de cada participante'
 export const SPLIT_NEEDS_AMOUNT = 'Ingresá el monto del gasto para poder repartirlo'
@@ -65,7 +69,8 @@ export const PAYER_ALWAYS_PARTICIPATES = 'Quien pagó siempre participa del repa
 export const SPLIT_ESTIMATE_NOTE = 'Montos estimados en la moneda del grupo'
 export const ONLY_OWN_PAYMENTS_MESSAGE = 'Solo podés registrar gastos pagados por vos'
 // 022 T077: personal expenses (create without participants) and their edition.
-export const PERSONAL_LABEL = 'Es un gasto personal (sin deudas con nadie)'
+// The panel switch is on by default; turning it off makes the expense personal.
+export const SHARED_LABEL = 'Gasto compartido'
 export const PERSONAL_NOTE = 'Se registra solo a nombre de quien pagó y no genera deudas.'
 export const EDIT_SUCCESS_MESSAGE = 'Gasto actualizado'
 export const EDIT_NOTHING_MESSAGE = 'Enviá al menos un campo para editar'
@@ -97,7 +102,8 @@ export default function GroupExpenseFormView() {
   const [formError, setFormError] = useState('')
   const [participantsError, setParticipantsError] = useState('')
   const [splitMethod, setSplitMethod] = useState('EQUAL')
-  const [personal, setPersonal] = useState(false)
+  const [shared, setShared] = useState(true)
+  const personal = !shared
   const method = personal ? 'EQUAL' : splitMethod
   // Typed values per method and participant key (kept when switching method).
   const [splitValues, setSplitValues] = useState({ CUSTOM: {}, PERCENTAGE: {} })
@@ -187,9 +193,14 @@ export default function GroupExpenseFormView() {
     else if (!mayEdit) editBlocked = EDIT_NOT_ALLOWED_MESSAGE
   }
   const { canCreateExpenses, canExpenseForOthers } = expensePermissions(group)
-  const names = useMemo(
-    () => Object.fromEntries(members.map((member) => [participantKey(member), member.name])),
-    [members],
+  // The split panel shows first names only; when two members share one, both
+  // keep their full name so they can be told apart.
+  const firstNames = members.map((member) => member.name.trim().split(/\s+/)[0])
+  const shortNames = Object.fromEntries(
+    members.map((member, index) => [
+      participantKey(member),
+      firstNames.filter((name) => name === firstNames[index]).length > 1 ? member.name : firstNames[index],
+    ]),
   )
   const registered = members.filter((member) => member.userId != null)
   const payerOptions = registered.map((member) => ({ code: participantKey(member), label: member.name }))
@@ -278,13 +289,79 @@ export default function GroupExpenseFormView() {
   const splitSummary = customSummary ?? percentageSummary
   const splitValid = !nonEqual || Boolean(splitSummary?.ok)
   const anyTyped = orderedSelection.some((key) => String(typed[key] ?? '').trim() !== '')
-  let shares = null
-  if (method === 'EQUAL') {
-    shares = parsedAmount.ok ? splitEqually(parsedAmount.canonical, orderedSelection, payerKey) : null
-  } else if (method === 'CUSTOM' && estimatedTotal) {
-    shares = customShares(estimatedTotal, parsedAmount.canonical, customEntries, payerKey)
-  } else if (method === 'PERCENTAGE' && estimatedTotal) {
-    shares = percentageShares(estimatedTotal, percentageEntries, payerKey)
+  const originalTotal = parsedAmount.ok ? parsedAmount.canonical : null
+
+  // Shares of `total` for the current method, mirroring the backend: in the
+  // expense currency (total = original) and, for a foreign currency, in the
+  // group currency (total = converted estimate). Null while the split is invalid.
+  function sharesOf(total) {
+    if (!total || !originalTotal) return null
+    if (method === 'EQUAL') return splitEqually(total, orderedSelection, payerKey)
+    if (method === 'CUSTOM') return customShares(total, originalTotal, customEntries, payerKey)
+    return percentageShares(total, percentageEntries, payerKey)
+  }
+  const originalShares = sharesOf(originalTotal)
+  const convertedShares = foreignCurrency ? sharesOf(estimatedTotal) : null
+
+  // Amount of one participant over `total`: the exact share when the split is
+  // valid, otherwise a live estimate from what was typed so far (floor, like
+  // the backend does for non-payers) so every row reacts while typing.
+  function rowAmount(key, total, exactShares) {
+    if (exactShares) return exactShares.find((share) => share.key === key)?.amount ?? null
+    const totalCents = toCents(total)
+    if (totalCents === null) return null
+    let part = null
+    let whole = null
+    if (method === 'PERCENTAGE') {
+      const parsed = parsePercentage(typed[key])
+      if (parsed.ok) [part, whole] = [parsed.hundredths, 10000]
+    } else if (method === 'CUSTOM') {
+      const cents = toCents(customEntries.find((entry) => entry.key === key)?.amount)
+      const original = toCents(originalTotal)
+      if (cents && original) [part, whole] = [cents, original]
+    }
+    if (part === null) return null
+    return fromCents(Number((BigInt(totalCents) * BigInt(part)) / BigInt(whole)))
+  }
+  const unevenEqual =
+    method === 'EQUAL' && Array.isArray(originalShares) &&
+    new Set(originalShares.map((share) => share.cents)).size > 1
+  const percentFill = Math.min(100, Math.max(0, (percentageSummary?.sumHundredths ?? 0) / 100))
+
+  // "Repartir lo que falta": what is still missing (cents or hundredths of a
+  // percent) goes in equal parts to the participants without a valid value; if
+  // everyone has one, it is added on top of everyone's. Leftover units go to the
+  // first ones in the list.
+  const missing =
+    method === 'CUSTOM' ? (parsedAmount.ok ? customSummary.differenceCents : 0)
+      : method === 'PERCENTAGE' ? percentageSummary.differenceHundredths
+        : 0
+  const canFillRemaining = missing > 0 && orderedSelection.length > 0
+  function unitsOf(key) {
+    if (method === 'CUSTOM') {
+      const parsed = parseArgentineAmount(typed[key] ?? '')
+      const cents = parsed.ok ? toCents(parsed.canonical) : null
+      return cents && cents > 0 ? cents : null
+    }
+    const parsed = parsePercentage(typed[key])
+    return parsed.ok ? parsed.hundredths : null
+  }
+  function formatUnits(units) {
+    if (method === 'PERCENTAGE') return formatPercentage(units)
+    return `${Math.floor(units / 100)},${String(units % 100).padStart(2, '0')}`
+  }
+  function fillRemaining() {
+    const empty = orderedSelection.filter((key) => unitsOf(key) === null)
+    const targets = empty.length > 0 ? empty : orderedSelection
+    const base = Math.floor(missing / targets.length)
+    const rest = missing % targets.length
+    const next = { ...typed }
+    targets.forEach((key, index) => {
+      const add = base + (index < rest ? 1 : 0)
+      if (add > 0) next[key] = formatUnits((unitsOf(key) ?? 0) + add)
+    })
+    setParticipantsError('')
+    setSplitValues((previous) => ({ ...previous, [method]: next }))
   }
 
   function setSplitValue(key, value) {
@@ -454,7 +531,7 @@ export default function GroupExpenseFormView() {
   }
 
   return (
-    <main className="page group-page group-expense">
+    <main className={`page group-page group-expense${isEdit ? '' : ' group-expense--wide'}`}>
       <nav className="group-page__back">
         <Link to={isEdit ? `/groups/${id}/expenses/${expenseId}` : `/groups/${id}`}>
           {isEdit ? 'Volver al gasto' : 'Volver al grupo'}
@@ -499,72 +576,72 @@ export default function GroupExpenseFormView() {
       )}
 
       {load.status === 'ready' && (isEdit ? !editBlocked : canCreateExpenses) && (
-        <form className="group-card group-expense__form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form className="group-expense__form" onSubmit={handleSubmit(onSubmit)} noValidate>
           {formError && (
-            <p role="alert" data-testid="group-expense-error">
+            <p role="alert" className="group-expense__form-error" data-testid="group-expense-error">
               {formError}
             </p>
           )}
 
-          <TextField
-            label="Monto"
-            inputMode="decimal"
-            autoComplete="off"
-            error={errors.amount?.message}
-            {...register('amount', {
-              validate: (value) => {
-                const parsed = parseArgentineAmount(value)
-                return parsed.ok ? true : parsed.error
-              },
-            })}
-          />
-          <SelectField
-            label="Moneda"
-            options={CURRENCY_OPTIONS}
-            error={errors.currency?.message}
-            {...register('currency', {
-              validate: (value) => (value ? true : 'La moneda es obligatoria'),
-            })}
-          />
+          <div className="group-card group-expense__main">
+            <TextField
+              label="Monto"
+              inputMode="decimal"
+              autoComplete="off"
+              error={errors.amount?.message}
+              {...register('amount', {
+                validate: (value) => {
+                  const parsed = parseArgentineAmount(value)
+                  return parsed.ok ? true : parsed.error
+                },
+              })}
+            />
+            <SelectField
+              label="Moneda"
+              options={CURRENCY_OPTIONS}
+              error={errors.currency?.message}
+              {...register('currency', {
+                validate: (value) => (value ? true : 'La moneda es obligatoria'),
+              })}
+            />
 
-          <TextField
-            label="Fecha"
-            placeholder="dd/mm/aaaa"
-            autoComplete="off"
-            error={errors.date?.message}
-            {...register('date', { validate: validateDate })}
-          />
+            <TextField
+              label="Fecha"
+              placeholder="dd/mm/aaaa"
+              autoComplete="off"
+              error={errors.date?.message}
+              {...register('date', { validate: validateDate })}
+            />
 
-          <div className="group-expense__quote" aria-live="polite" data-testid="quote-preview">
-            {quoteStatus === 'loading' && <p>{QUOTE_LOADING_MESSAGE}</p>}
-            {quoteStatus === 'ready' && (
-              <>
-                <p>
-                  Monto estimado:{' '}
-                  <ConvertedAmount
-                    amount={quoteAmount}
-                    currency={currencyValue}
-                    convertedAmount={quote.converted}
-                    convertedCurrency={groupCurrency}
-                  />
-                </p>
-                <p className="group-expense__quote-note">{QUOTE_NOTICE}</p>
-              </>
-            )}
-            {quoteStatus === 'error' && <p>{QUOTE_ERROR_MESSAGE}</p>}
-          </div>
+            <div className="group-expense__quote" aria-live="polite" data-testid="quote-preview">
+              {quoteStatus === 'loading' && <p>{QUOTE_LOADING_MESSAGE}</p>}
+              {quoteStatus === 'ready' && (
+                <>
+                  <p>
+                    Monto estimado:{' '}
+                    <ConvertedAmount
+                      amount={quoteAmount}
+                      currency={currencyValue}
+                      convertedAmount={quote.converted}
+                      convertedCurrency={groupCurrency}
+                    />
+                  </p>
+                  <p className="group-expense__quote-note">{QUOTE_NOTICE}</p>
+                </>
+              )}
+              {quoteStatus === 'error' && <p>{QUOTE_ERROR_MESSAGE}</p>}
+            </div>
 
-          <TextField
-            label="Descripción"
-            autoComplete="off"
-            error={errors.description?.message}
-            {...register('description', {
-              validate: (value) => validateDescription(value) || true,
-            })}
-          />
+            <TextField
+              label="Descripción"
+              autoComplete="off"
+              error={errors.description?.message}
+              {...register('description', {
+                validate: (value) => validateDescription(value) || true,
+              })}
+            />
 
-          {!isEdit && (
-            <>
+            {!isEdit && (
               <SelectField
                 label="¿Quién pagó?"
                 options={payerOptions}
@@ -577,65 +654,166 @@ export default function GroupExpenseFormView() {
                   setPayerKey(event.target.value || null)
                 }}
               />
+            )}
+          </div>
 
-              <label className="group-expense__personal">
+          {!isEdit && (
+            <section className="group-card group-expense__split" aria-label="Reparto del gasto">
+              <label className="group-expense__switch">
                 <input
                   type="checkbox"
-                  checked={personal}
+                  role="switch"
+                  checked={shared}
                   onChange={(event) => {
                     setParticipantsError('')
-                    setPersonal(event.target.checked)
+                    setShared(event.target.checked)
                   }}
                 />
-                {PERSONAL_LABEL}
+                <span>{SHARED_LABEL}</span>
               </label>
 
               {personal ? (
                 <p className="field__hint" data-testid="personal-note">{PERSONAL_NOTE}</p>
               ) : (
                 <>
-                  <SelectField
-                    label="¿Cómo se reparte?"
-                    options={SPLIT_OPTIONS}
-                    placeholder={null}
-                    value={splitMethod}
-                    onChange={(event) => {
-                      setParticipantsError('')
-                      setSplitMethod(event.target.value)
-                    }}
-                  />
+                  <fieldset className="group-expense__methods">
+                    <legend className="visually-hidden">{SPLIT_METHOD_LABEL}</legend>
+                    {SPLIT_OPTIONS.map((option) => (
+                      <label
+                        key={option.code}
+                        className={`group-expense__method${splitMethod === option.code ? ' is-active' : ''}`}
+                      >
+                        <input
+                          type="radio"
+                          name="splitMethod"
+                          value={option.code}
+                          checked={splitMethod === option.code}
+                          onChange={() => {
+                            setParticipantsError('')
+                            setSplitMethod(option.code)
+                          }}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </fieldset>
 
                   <fieldset className="group-expense__participants">
-                    <legend>Participantes</legend>
-                    {nonEqual && <p className="field__hint">{PAYER_ALWAYS_PARTICIPATES}</p>}
-                    {members.map((member) => {
-                      const key = participantKey(member)
-                      const included = orderedSelection.includes(key)
-                      const lockedPayer = nonEqual && key === payerKey
-                      return (
-                        <div key={key} className="group-expense__participant-row">
-                          <label className="group-expense__participant">
-                            <input
-                              type="checkbox"
-                              checked={included}
-                              disabled={lockedPayer}
-                              onChange={() => toggleParticipant(key)}
-                            />
-                            {member.name}
-                            {member.simulatedProfileId != null && ' (perfil simulado)'}
-                          </label>
-                          {nonEqual && included && (
-                            <TextField
-                              label={`${method === 'CUSTOM' ? 'Importe' : 'Porcentaje'} de ${member.name}`}
-                              inputMode="decimal"
-                              autoComplete="off"
-                              value={typed[key] ?? ''}
-                              onChange={(event) => setSplitValue(key, event.target.value)}
-                            />
-                          )}
-                        </div>
-                      )
-                    })}
+                    <legend className="visually-hidden">Participantes</legend>
+                    <ul className={`group-expense__rows group-expense__rows--${method.toLowerCase()}`}>
+                      {members.map((member) => {
+                        const key = participantKey(member)
+                        const included = orderedSelection.includes(key)
+                        const lockedPayer = nonEqual && key === payerKey
+                        const shortName = shortNames[key] ?? member.name
+                        // What the short name leaves out stays for screen readers.
+                        const hiddenName = [
+                          member.name.slice(shortName.length).trim(),
+                          member.simulatedProfileId != null ? '(perfil simulado)' : '',
+                        ].filter(Boolean).join(' ')
+                        const original = included && method !== 'CUSTOM'
+                          ? rowAmount(key, originalTotal, originalShares)
+                          : null
+                        const converted = included && foreignCurrency
+                          ? rowAmount(key, estimatedTotal, convertedShares)
+                          : null
+                        const sliderValue = (() => {
+                          const parsed = parsePercentage(typed[key])
+                          return parsed.ok ? parsed.hundredths / 100 : 0
+                        })()
+                        return (
+                          <li
+                            key={key}
+                            className={`group-expense__row group-expense__row--${method.toLowerCase()}${included ? '' : ' is-excluded'}`}
+                            data-testid="split-row"
+                          >
+                            <label
+                              className="group-expense__participant"
+                              title={lockedPayer ? `${member.name}. ${PAYER_ALWAYS_PARTICIPATES}` : member.name}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={included}
+                                disabled={lockedPayer}
+                                onChange={() => toggleParticipant(key)}
+                              />
+                              <span className="group-expense__name">
+                                {shortName}
+                                {hiddenName && <>{' '}<span className="visually-hidden">{hiddenName}</span></>}
+                              </span>
+                              {key === payerKey && (
+                                <span className="group-expense__payer-tag" title="Pagó">
+                                  <PaidIcon />
+                                  <span className="visually-hidden"> (pagó)</span>
+                                </span>
+                              )}
+                            </label>
+
+                            {included && method === 'CUSTOM' && (
+                              <div className="group-expense__row-control">
+                
+                                <input
+                                  className="group-expense__split-input"
+                                  aria-label={`Importe de ${member.name}`}
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  placeholder="0,00"
+                                  value={typed[key] ?? ''}
+                                  onChange={(event) => setSplitValue(key, event.target.value)}
+                                />
+                                <span className="group-expense__unit">{currencyValue}</span>
+                              </div>
+                            )}
+
+                            {included && method === 'PERCENTAGE' && (
+                              <div className="group-expense__row-control">
+                                <input
+                                  type="range"
+                                  className="group-expense__slider"
+                                  min="0"
+                                  max="100"
+                                  step="1"
+                                  aria-label={`Deslizar porcentaje de ${member.name}`}
+                                  value={sliderValue}
+                                  style={{ '--fill': `${sliderValue}%` }}
+                                  onChange={(event) => setSplitValue(key, event.target.value)}
+                                />
+                                <input
+                                  className="group-expense__split-input group-expense__split-input--percent"
+                                  aria-label={`Porcentaje de ${member.name}`}
+                                  inputMode="decimal"
+                                  autoComplete="off"
+                                  placeholder="0"
+                                  value={typed[key] ?? ''}
+                                  onChange={(event) => setSplitValue(key, event.target.value)}
+                                />
+                                <span className="group-expense__unit">%</span>
+                              </div>
+                            )}
+
+                            {(original || converted) && (
+                              <span
+                                className="group-expense__share"
+                                data-testid="share-amount"
+                                title={[
+                                  original && `$ ${formatAmount(original)} ${currencyValue}`,
+                                  converted && `≈ $ ${formatAmount(converted)} ${groupCurrency}`,
+                                ].filter(Boolean).join(' · ')}
+                              >
+                                {original && (
+                                  <span>$ {formatAmount(original)} {currencyValue}</span>
+                                )}
+                                {converted && (
+                                  <span className="group-expense__share-converted">
+                                    ≈ $ {formatAmount(converted)} {groupCurrency}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
                     {participantsError && (
                       <p role="alert" data-testid="participants-error">
                         {participantsError}
@@ -644,39 +822,58 @@ export default function GroupExpenseFormView() {
                   </fieldset>
 
                   {nonEqual && (
-                    <div className="group-expense__difference" aria-live="polite" data-testid="split-difference">
+                    <div
+                      className={`group-expense__difference${splitValid ? ' is-complete' : ''}`}
+                      aria-live="polite"
+                      data-testid="split-difference"
+                    >
+                      {method === 'PERCENTAGE' && (
+                        <div className="group-expense__meter" aria-hidden="true">
+                          <span style={{ width: `${percentFill}%` }} />
+                        </div>
+                      )}
                       {!anyTyped && !(method === 'CUSTOM' && !parsedAmount.ok) ? (
                         <p>{method === 'CUSTOM' ? SPLIT_HINT_CUSTOM : SPLIT_HINT_PERCENTAGE}</p>
                       ) : (
                         <>
-                          <p>{splitDifferenceText()}</p>
+                          <p className="group-expense__difference-main">{splitDifferenceText()}</p>
                           {splitSummary?.error && anyTyped && <p>{splitSummary.error}</p>}
                         </>
+                      )}
+                      {canFillRemaining && (
+                        <button
+                          type="button"
+                          className="text-button group-expense__fill"
+                          onClick={fillRemaining}
+                        >
+                          {FILL_REMAINING_LABEL}
+                        </button>
                       )}
                     </div>
                   )}
 
-                  <ExpenseSharePreview
-                    shares={shares}
-                    names={names}
-                    payerKey={payerKey}
-                    showNote={method === 'EQUAL'}
-                  />
-                  {nonEqual && shares && foreignCurrency && (
+                  {unevenEqual && (
+                    <p className="group-expense__preview-note">
+                      {orderedSelection.includes(payerKey) ? REST_TO_PAYER_NOTE : REST_IN_ORDER_NOTE}
+                    </p>
+                  )}
+                  {foreignCurrency && convertedShares && (
                     <p className="group-expense__preview-note">{SPLIT_ESTIMATE_NOTE}</p>
                   )}
                 </>
               )}
-            </>
+            </section>
           )}
 
-          <SubmitButton
-            loading={isSubmitting}
-            loadingLabel="Guardando…"
-            disabled={!isEdit && (!hasOtherParticipant || !splitValid)}
-          >
-            {isEdit ? 'Guardar cambios' : 'Guardar gasto'}
-          </SubmitButton>
+          <div className="group-expense__actions">
+            <SubmitButton
+              loading={isSubmitting}
+              loadingLabel="Guardando…"
+              disabled={!isEdit && (!hasOtherParticipant || !splitValid)}
+            >
+              {isEdit ? 'Guardar cambios' : 'Guardar gasto'}
+            </SubmitButton>
+          </div>
         </form>
       )}
     </main>
