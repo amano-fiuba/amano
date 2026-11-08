@@ -160,6 +160,7 @@ Partial update of a **personal** group expense (no participants other than the p
 }
 ```
 
+- A caller who is neither the member who registered the expense, nor its payer, nor an administrator answers `403` `"No podés editar este gasto"`.
 - A failed currency conversion answers `503` and persists no change.
 - Success answers `200` with the updated `GroupExpenseResponse`.
 - Validation errors answer `400` with `properties.fields`; non-members answer the neutral `404`.
@@ -188,6 +189,7 @@ Deletes a **personal** group expense (no participants other than the payer) that
 
 - If the expense has participants other than the payer but no debts (defensive case), it also answers `409` with `"No se permite eliminar un gasto que ya tiene participantes"`.
 - Balances are derived from debts (`BalanceCalculator`, D4); there is no stored balance table to rewrite. After a successful personal-expense deletion the next balance query simply reflects the removed expense (which contributed no debts).
+- A caller who is neither the member who registered the expense, nor its payer, nor an administrator answers `403` `"No podés eliminar este gasto"`.
 - Non-members answer the neutral `404`; anonymous users answer `401`.
 
 **Who may delete (confirmed)**: the member who registered the expense (`createdByUserId`), the payer (`payerUserId`), or a group administrator.

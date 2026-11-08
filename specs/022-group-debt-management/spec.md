@@ -64,11 +64,11 @@ El sistema compensa deudas cruzadas y propone el conjunto reducido de transferen
 
 ### User Story 5 - Gestionar estado de cada deuda (Priority: P2)
 
-Cada deuda tiene un estado: Pendiente (estado inicial), Pago informado, Pagado, Verificado y Vencido. Los estados evolucionan conforme se registran y verifican pagos.
+Cada deuda tiene un estado: Pendiente (estado inicial), Pago parcial, Pago informado, Pagado, Verificado y Vencido. Los estados evolucionan conforme se registran y verifican pagos (totales o parciales).
 
 **Why this priority**: El seguimiento del estado de las deudas permite a los usuarios saber el estado actual de cada obligación y qué acciones aún deben realizar.
 
-**Independent Test**: Given a newly created debt, when checked, then its state is "Pendiente". After registering an informed payment (without validation), when checked, then its state is "Pago informado". After an administrator validates, when checked, then its state is "Verificado". After confirming full payment, when checked, then its state is "Pagado".
+**Independent Test**: Given a newly created debt, when checked, then its state is "Pendiente". After registering an informed payment (without validation), when checked, then its state is "Pago informado". After an administrator validates, when checked, then its state is "Verificado". After confirming a payment that covers the whole outstanding balance, when checked, then its state is "Pagado"; after a payment that leaves a balance, its state is "Pago parcial".
 
 **Acceptance Scenarios**:
 1. Given a new debt, when viewed, then its initial state is "Pendiente".
@@ -77,18 +77,21 @@ Cada deuda tiene un estado: Pendiente (estado inicial), Pago informado, Pagado, 
 
 ### User Story 6 - Registrar pago de deuda pendiente (Priority: P2)
 
-Registrar el pago de una deuda pendiente en la que el miembro está involucrado, dejando constancia en el historial. Si el grupo tiene activada "Pagos requieren validación", el pago queda como "Pago informado" hasta que un Administrador lo confirme (pasa a Verificado) o lo rechace (la deuda sigue Pendiente). Si está desactivada, el pago informado se considera confirmado (Pagado). No se puede registrar un pago sobre una deuda que no esté pendiente.
+Registrar el pago de una deuda con saldo pendiente en la que el miembro está involucrado, dejando constancia en el historial. El pago puede ser **parcial o total**: el monto tiene que ser mayor que cero y no superar el saldo pendiente de la deuda (monto de la deuda menos lo ya pagado); por defecto se ofrece el saldo pendiente completo. Si el grupo tiene activada "Pagos requieren validación", el pago queda como "Pago informado" hasta que un Administrador lo confirme (se suma a lo pagado y la deuda pasa a Pago parcial si queda saldo o a Verificado si queda en cero) o lo rechace (la deuda vuelve a su estado anterior, Pendiente o Pago parcial). Si está desactivada, el pago se considera confirmado al instante: se suma a lo pagado y la deuda pasa a Pago parcial si queda saldo o a Pagado si queda en cero. Mientras una deuda tenga un pago informado esperando decisión, no se admite otro pago sobre ella. No se puede registrar un pago sobre una deuda saldada (Pagado o Verificado).
 
 **Why this priority**: Registrar pagos es esencial para mantener los saldos actualizados y cerrar deudas. La lógica de validación asegura el control según la configuración del grupo.
 
-**Independent Test**: Given a group member involved in a pending debt, when they register a payment, then the payment is recorded in the history and the debt state updates according to the group's "Pagos requiere validación" setting. Attempting to register a payment on a non-pending debt fails.
+**Independent Test**: Given a group member involved in a debt with outstanding balance, when they register a payment greater than zero and not greater than the outstanding balance, then the payment is recorded in the history and the debt state updates according to the amount paid and the group's "Pagos requiere validación" setting. A payment above the outstanding balance, or any payment on a settled debt or on a debt that already has a payment waiting for validation, fails.
 
 **Acceptance Scenarios**:
-1. Given a pending debt in a group without "Pagos requiere validación", when a member registers payment, then the debt state becomes "Pagado" and is recorded in the group's activity history.
-2. Given a pending debt in a group with "Pagos requiere validación", when a member registers payment, then the debt state becomes "Pago informado" and waits for administrator confirmation.
-3. Given an administrator confirming a "Pago informado", when confirmed, then the debt state becomes "Verificado".
-4. Given an administrator rejecting a "Pago informado", when rejected, then the debt state remains "Pendiente".
-5. Given a debt that is not "Pendiente" (e.g., already "Pagado"), when attempting to register a payment, then the system rejects the operation.
+1. Given a pending debt in a group without "Pagos requiere validación", when a member registers a payment for the whole outstanding balance, then the debt state becomes "Pagado" and is recorded in the group's activity history.
+2. Given a pending debt in a group without "Pagos requiere validación", when a member registers a payment smaller than the outstanding balance, then the payment is confirmed immediately, the amount paid increases, the debt state becomes "Pago parcial" and the outstanding balance decreases by that amount.
+3. Given a pending debt in a group with "Pagos requiere validación", when a member registers a payment (partial or total), then the debt state becomes "Pago informado", the amount paid does not change yet and the payment waits for administrator confirmation; while it waits, another payment on the same debt is rejected.
+4. Given an administrator confirming a "Pago informado", when confirmed, then the payment is added to the amount paid and the debt state becomes "Verificado" if nothing is left to pay, or "Pago parcial" if an outstanding balance remains.
+5. Given an administrator rejecting a "Pago informado", when rejected, then the debt returns to its previous state ("Pendiente" or "Pago parcial") with the same outstanding balance and accepts a new payment.
+6. Given a payment greater than the outstanding balance, or a payment of zero or less, when attempting to register it, then the system rejects the operation.
+7. Given a debt that is settled ("Pagado" or "Verificado"), when attempting to register a payment, then the system rejects the operation.
+8. Given an overdue debt ("Vencido"), when a partial payment is registered, then the debt becomes "Pago parcial" (decision to be confirmed, see Assumptions); when the payment covers the whole balance it follows the rules above.
 
 ### User Story 7 - Ver mis deudas pendientes (Priority: P3)
 
@@ -144,10 +147,10 @@ The system MUST calculate automatically, within each group, cuánto debe y cuán
 The system MUST simplify group debts (liquidación) compensando deudas cruzadas y proponiendo el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales. La cantidad de transferencias propuestas es menor o igual a la cantidad de miembros con saldo distinto de cero menos uno.
 
 ### FR-005: Estados de deuda
-The system MUST manage the state of each debt with the following sequence: Pendiente (estado inicial) → Pago informado → Verificado (si requiere validación) / Pagado (si no requiere validación) → Vencido. Cada deuda comienza en estado Pendiente.
+The system MUST manage the state of each debt with the following sequence: Pendiente (estado inicial) → Pago parcial (si se paga una parte) / Pago informado (si requiere validación) → Verificado (si requiere validación) / Pagado (si no requiere validación) → Vencido. Cada deuda comienza en estado Pendiente.
 
 ### FR-006: Registrar pago de deuda
-The system MUST allow registering the payment of a pending debt in which the member is involved, leaving a record in the history. If the group has "Pagos requieren validación" activated, the payment remains as "Pago informado" until an Administrator confirms it (changes to Verificado) or rejects it (the debt remains Pendiente). If disabled, the informed payment is considered confirmed (Pagado). It is not possible to register a payment on a debt that is not pending.
+The system MUST allow registering a partial or total payment of a debt with outstanding balance in which the member is involved, leaving a record in the history. The amount must be greater than zero and not greater than the outstanding balance (amount owed minus amount already paid). If the group has "Pagos requieren validación" activated, the payment remains as "Pago informado" without changing the amount paid until an Administrator confirms it (the amount is added and the debt becomes Verificado, or Pago parcial if a balance remains) or rejects it (the debt goes back to its previous state, Pendiente or Pago parcial). If disabled, the payment is confirmed at once: it is added to the amount paid and the debt becomes Pago parcial or Pagado. A debt can have only one payment waiting for validation at a time. It is not possible to register a payment on a settled debt.
 
 ### FR-007: Ver deudas pendientes
 The system MUST show the member how much they owe, to whom (person or group), with access to the detail and origin of each debt, deducting payments already made and verified.
@@ -165,7 +168,7 @@ The system MUST prevent a member with pending balance from leaving the group. Ex
 
 - **Gasto**: Registro de un gasto compartido o personal. Atributos: monto, moneda, fecha, categoría, tipo (único/recurrente), medio de pago, pagador, participantes (opcional), descripción. Relacionado con un grupo y determina deudas.
 
-- **Deuda**: Obligación que un miembro tiene con otro (o simulado) derivada de un gasto compartido. Atributos: monto, acreedor, deudor, estado (Pendiente, Pago informado, Pagado, Verificado, Vencido), origen (gasto relacionado), pagos registrados. Pertenece a un grupo.
+- **Deuda**: Obligación que un miembro tiene con otro (o simulado) derivada de un gasto compartido. Atributos: monto, acreedor, deudor, estado (Pendiente, Pago parcial, Pago informado, Pagado, Verificado, Vencido), origen (gasto relacionado), pagos registrados. Pertenece a un grupo.
 
 - **Miembro del grupo**: Participante de un grupo. Puede ser una persona con cuenta o una persona simulada (sin cuenta, cargada por nombre y mail). Los miembros simulados participan en cálculos de deudas pero no pueden recibir pagos ni tienen cuentas.
 
@@ -173,7 +176,7 @@ The system MUST prevent a member with pending balance from leaving the group. Ex
 
 - **Persona simulada**: Alguien sin cuenta, cargado por nombre y mail, que participa de los gastos y del cálculo de deudas pero no usa la aplicación. Existe para que quienes no quieren registrarse, instalar ni aprender la app puedan ser incluidos igual.
 
-- **Pago registrado**: Registro de que una deuda ha sido pagada. Atributos: fecha, monto, quién pagó, estado resultante (según configuración del grupo).
+- **Pago registrado**: Registro de que una deuda ha sido pagada, en forma total o parcial. Atributos: fecha, monto (mayor que cero y no superior al saldo pendiente), quién pagó, estado resultante (según configuración del grupo).
 
 ## Success Criteria
 
@@ -198,7 +201,7 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 
 - Los usuarios ya tienen cuentas, amistades y grupos configurados (la gestión de esas entidades es otra feature).
 - Las personas simuladas son cargadas manualmente por nombre y mail y no tienen acceso a la aplicación.
-- La fuente de cotizaciones es el tipo de cambio oficial del BCRA (API pública Estadísticas Cambiarias v1.0, sin credenciales). Este diseño reemplaza a OANDA, mencionado en el backlog original, y el cambio está pendiente de confirmar con el Product Owner. No se fija la tasa manualmente ni se usa una tasa por defecto: si no hay cotización disponible (incluidos fines de semana y feriados, con hasta 7 días hacia atrás), el gasto se rechaza con 503 y no se guarda.
+- La fuente de cotizaciones es el tipo de cambio oficial del BCRA (API pública Estadísticas Cambiarias v1.0, sin credenciales). Este diseño reemplaza a OANDA, mencionado en el backlog original. Esta fuente está confirmada por el Product Owner. Se usa el **tipo de cambio oficial** del BCRA, no el dólar blue ni el MEP. No se fija la tasa manualmente ni se usa una tasa por defecto: si no hay cotización disponible (incluidos fines de semana y feriados, con hasta 7 días hacia atrás), el gasto se rechaza con 503 y no se guarda.
 - Un "Administrador de grupo" es un miembro con permisos especiales para validar o rechazar pagos cuando la configuración "Pagos requiere validación" está activada.
 - Los gastos recurrentes (tipo "recurrente") se manejan según lo definido en la spec 009 (Pausa o finalización de gasto recurrente): la entidad Expense y su lógica de recurrencia ya existen en ese feature. Para la feature 022, los gastos recurrentes requieren una frecuencia (Semanal, Mensual o Anual) y generan sus repeticiones de forma automática, tal como quedó definido en la spec 009. La simplificación de deudas aplica sobre el saldo actual después de cada registro.
 - La moneda principal de un grupo se define cuando se crea el grupo y puede ser ARS, USD o EUR.
@@ -212,7 +215,7 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 
 - Q: Redondeo de centavos en repartos en partes iguales y quién absorbe la diferencia? → A: Cada parte se calcula en centavos hacia abajo (piso) y el resto, si lo hay, lo absorbe el pagador. La razón es que ningún participante no pagador pague de más por redondeo. Ejemplos con el pagador: 100,00 entre 3 → 33,33 / 33,33 / 33,34; 0,05 entre 3 → 0,01 / 0,01 / 0,03. La misma regla se aplica al reparto por porcentajes.
 - Q: Origen de la fecha límite que determina el estado Vencido? → A: The deadline is configured per group by the administrator as a fixed number of days from the expense date; debts automatically transition to "Vencido" when the current date exceeds (expense date + days configured). If not configured, debts never automatically become "Vencido" (remain in their current state until manual transition). Note: for recurring expenses, after the date they're considered 'Vencido'; for non-recurring expenses, no date applies.
-- Q: Si se admiten pagos parciales? → A: Only full payments are allowed; attempting to register a payment less than the total debt is rejected.
+- Q: Si se admiten pagos parciales? → A: **Sí, se admiten** (decisión de producto del 2026-11-07, que reemplaza la anterior "solo pagos completos"). El monto del pago debe ser mayor que cero y no superar el saldo pendiente (monto de la deuda menos lo ya pagado); uno mayor se rechaza. Sin validación, el pago se confirma al instante y suma a lo pagado (Pago parcial si queda saldo, Pagado si queda en cero). Con validación, el pago queda informado sin tocar lo pagado; al confirmarlo se suma (Pago parcial o Verificado) y al rechazarlo la deuda vuelve a su estado anterior. Solo puede haber un pago por validar a la vez por deuda.
 - Q: Qué ocurre con saldos y pagos ya registrados al editar o eliminar un gasto? → A: Editing an expense is not allowed once it has participants (only description/categoría can be modified before registration; after registration, the expense is immutable). Deleting an expense is only allowed if it has no participants (personal expense) and no debts are associated; if the expense has associated debts, deletion is rejected.
 - Q: Si las deudas de una misma persona se consolidan entre grupos distintos? → A: Debts are tracked per-group and displayed separately. A member sees their debts organized by group, with the total across all groups shown as a summary, but each debt is settled independently within its group. Payments are applied to specific debts in specific groups. The "total owed" summary is informational only and doesn't create a cross-group obligation.
 - Q: ¿Quién puede cargar un gasto pagado por otro miembro y cómo se registra? → A: Cualquier miembro del grupo puede cargar un gasto pagado por otro miembro (decisión confirmada por el equipo, 2026-11-06). Reglas: (1) el pagador y todos los participantes deben ser miembros del grupo, y esta validación se hace en el servidor; (2) se guardan por separado el pagador (`payerUserId`) y quien registró el gasto (`createdByUserId`); (3) las deudas se generan contra el pagador; (4) el historial de actividad muestra a quien registró y al pagador. Los participantes también pueden ser personas simuladas del grupo, que siguen siendo informativas y no tienen obligación financiera. Esta respuesta reemplaza la anterior de esta misma sesión, que prohibía cargar gastos en nombre de otro.
@@ -221,6 +224,6 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 - Q: Pago de una transferencia propuesta cuando A le debe a B y B le debe a C, y se propone que A pague a C? → A: (a) la propuesta es solo orientativa y los pagos se registran sobre deudas directas
 - Q: Personas simuladas en saldos y liquidación? → A: incluidas en saldos y propuesta como informativas; sus pagos los registra un administrador; el pagador siempre es un usuario registrado
 - Q: Vencimiento: umbral por grupo o cualquier gasto? → A: cualquier gasto, con el umbral por grupo
-- Q: Una deuda vencida se puede pagar? → A: Confirmado: una deuda en estado Vencido puede pagarse, actualizando su estado a PAGO_INFORMADO o PAGADO según la configuración del grupo
-- Q: Pagos parciales: si la spec 018 permitió pagos parciales, ahora solo se aceptan pagos completos? → A: Ahora solo se aceptan pagos completos; los pagos parciales previos se mantienen como registrados pero no se pueden realizar nuevos pagos parciales
-- Q: Si el servicio de cotizaciones no responde, ¿se rechaza el gasto? → A: Rechazar el gasto con un mensaje claro indicando "No se pudo obtener la cotización; registrá el gasto en la moneda del grupo o reintentá más tarde"
+- Q: Una deuda vencida se puede pagar? → A: Confirmado: una deuda en estado Vencido puede pagarse. Un pago total la deja Pagada (o Pago informado si el grupo valida); un pago parcial la pasa a Pago parcial (**decisión a confirmar**: la alternativa es que siga Vencida con saldo parcial, lo que exige cambiar las restricciones de la base de datos).
+- Q: Pagos parciales: si la spec 018 permitió pagos parciales, ¿qué pasa ahora? → A: Los pagos parciales **siguen permitidos** (reemplaza la respuesta anterior "solo pagos completos"). El flujo de la 018 y el de la 022 quedan alineados: ambos suman al monto pagado de la deuda y producen los mismos estados; los pagos históricos de la 018 se conservan tal como están.
+- Q: Si el servicio de cotizaciones no responde, ¿se rechaza el gasto? → A: Rechazar el gasto con un mensaje claro (texto vigente: "No se pudo obtener la cotización; reintente después o registre en moneda del grupo")

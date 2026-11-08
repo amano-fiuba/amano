@@ -65,8 +65,12 @@ Define the contract for querying group member balances and pending debts. Balanc
 | `currency` | `Currency` | Original debt currency (`ARS`, `USD`, `EUR`) |
 | `convertedAmount` | `BigDecimal` | Debt amount converted to the group's primary currency when the origin expense has a stored conversion; `null` otherwise |
 | `convertedCurrency` | `Currency` | Group's primary currency when `convertedAmount` is present; `null` otherwise |
+| `debtorUserId` | `Long` | User id of the debtor; `null` when the debtor is a simulated profile. Additive (T074): lets the UI tell whether the caller owes (`Le debés a …`) or is owed (`… te debe`) |
+| `creditorUserId` | `Long` | User id of the creditor (always a registered member). Additive (T074) |
 
 **Inclusion rule**: Only debts in the four states that still contribute to balances are included: `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED`, and `OVERDUE`. Debts in settled states (`PAID` and `VERIFIED`) are excluded.
+
+**Partial payments** (decision of 2026-11-07): every open debt contributes and shows its *outstanding balance* `amount − paidAmount`, so a confirmed partial payment lowers the debtor's and the creditor's balances by the amount paid (and the debt becomes `PARTIALLY_PAID`). A `PAYMENT_REPORTED` payment does not change `paidAmount` until it is confirmed, so it does not lower the balances yet.
 
 ## Balance Calculation (Pure Function)
 

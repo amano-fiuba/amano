@@ -125,20 +125,20 @@ how the shares were calculated.
 
 | Status | Meaning | Transition Rules |
 |--------|---------|------------------|
-| `PENDING` | Initial state; no payments yet | Default on debt creation. Can become `PAID`, `PAYMENT_REPORTED` or `OVERDUE` |
-| `PARTIALLY_PAID` | Legacy state from 018; read-only | Never produced by 022. A full payment of the remaining balance can take it to `PAID` or `PAYMENT_REPORTED`; it never becomes `OVERDUE` |
-| `PAYMENT_REPORTED` | Full payment reported, awaiting an admin decision | From `PENDING`, `OVERDUE` or `PARTIALLY_PAID` when the group requires validation. Admin confirm → `VERIFIED`; admin reject → `PENDING` |
-| `PAID` | Full payment received and settled | From `PENDING`, `OVERDUE` or `PARTIALLY_PAID` when the group does not require validation. Final state |
-| `VERIFIED` | Admin confirmed the reported payment | From `PAYMENT_REPORTED`. Final state; equivalent to `PAID` for balance calculations (Q7) |
-| `OVERDUE` | Debt past its due date | Only from `PENDING`, when the group has `debtDueDays` and `currentDate > expenseDate.plusDays(debtDueDays)`. Remains payable |
+| `PENDING` | Initial state; nothing paid yet | Default on debt creation. Can become `PARTIALLY_PAID`, `PAID`, `PAYMENT_REPORTED` or `OVERDUE` |
+| `PARTIALLY_PAID` | Part of the debt was paid and a balance remains (`0 < paidAmount < amount`) | Produced by a confirmed partial payment (022 or the inherited 018 flow) from `PENDING`, `PARTIALLY_PAID` or, as a **decision to confirm**, `OVERDUE`; or by confirming a reported partial payment that leaves a balance. Accepts further payments (`PAID`, `PARTIALLY_PAID` or `PAYMENT_REPORTED`); never becomes `OVERDUE` |
+| `PAYMENT_REPORTED` | A payment (partial or total) reported, awaiting an admin decision | From `PENDING`, `PARTIALLY_PAID` or `OVERDUE` when the group requires validation. Reporting does **not** change `paidAmount`, so the debt keeps contributing its outstanding amount to the balances, and **no other payment is accepted** while it lasts. Admin confirm → the payment is added to `paidAmount` and the debt becomes `VERIFIED` (balance zero) or `PARTIALLY_PAID` (balance left); admin reject → back to its previous state, `PENDING` or `PARTIALLY_PAID` according to `paidAmount` (a debt that was overdue returns as `PENDING` and the job of D7 marks it again) |
+| `PAID` | Everything paid and settled | From `PENDING`, `OVERDUE` or `PARTIALLY_PAID` by a confirmed payment that leaves the balance at zero (group without validation). Final state |
+| `VERIFIED` | Admin confirmed a reported payment that leaves the balance at zero | From `PAYMENT_REPORTED`. Final state; equivalent to `PAID` for balance calculations (Q7) |
+| `OVERDUE` | Debt past its due date | Only from `PENDING`, when the group has `debtDueDays` and `currentDate > expenseDate.plusDays(debtDueDays)`. Remains payable. A total payment follows the normal rules; a **partial** payment turns it into `PARTIALLY_PAID` (decision to confirm; the alternative of keeping `OVERDUE` with a partial balance requires changing `ck_debts_status_matches_paid`) |
 
 **Key Methods** (existing + new):
 - `Debt.pendingFor(expense, share)` → creates `PENDING` debt (existing)
-- `Debt.applyPayment(payment)` → updates `paidAmount`; 022 only accepts a payment for the whole remaining balance and moves the debt to `PAID` or `PAYMENT_REPORTED` depending on the group setting
+- `Debt.applyPayment(amount)` (confirmed payment, partial or total): `0 < amount <= getOutstanding()`; adds the amount to `paidAmount` at once and the status becomes `PARTIALLY_PAID` or `PAID`. `Debt.reportPayment(amount)` (group that requires validation): same validation; the debt only becomes `PAYMENT_REPORTED` and `paidAmount` is left untouched. `Debt.confirmReportedPayment(amount)` adds the reported amount and gives `PARTIALLY_PAID` or `VERIFIED`; `Debt.rejectReportedPayment()` returns the status to `PENDING`/`PARTIALLY_PAID` from the unchanged `paidAmount`. (Implemented in T080; `applyFullPayment` and `DebtStatus.settledBy` no longer exist.)
 - `Debt.getOutstanding()` → `amount.subtract(paidAmount)` (existing)
 - `Debt.isSettled()` → `status == PAID or status == VERIFIED` (extended)
 
-**Migration for the state CHECK** (V18):
+**Migration for the state CHECK** (V18; V24 only repairs data: `paid_amount` of reported debts written with `paid_amount = amount` goes back to `amount - payment.amount`):
 
 ```sql
 ALTER TABLE debts DROP CONSTRAINT ck_debts_status;
@@ -155,13 +155,13 @@ ALTER TABLE debts ADD CONSTRAINT ck_debts_status_matches_paid CHECK (
     OR (status = 'OVERDUE'        AND paid_amount = 0));
 ```
 
-`PARTIALLY_PAID` stays valid so existing 018 rows keep loading; the 022 code never creates it.
+No change of these constraints is needed for partial payments: `PARTIALLY_PAID` already requires `0 < paid_amount < amount`, `PAID`/`VERIFIED` require `paid_amount = amount`, and `PAYMENT_REPORTED` allows any `paid_amount` from 0 to `amount`. Only the alternative "`OVERDUE` with a partial balance" would require changing `OVERDUE AND paid_amount = 0`.
 
 **Invariants**:
-- `0 <= paidAmount <= amount`
-- `PAYMENT_REPORTED` does **not** count as settled: only `PAID` and `VERIFIED` are settled for balances
+- `0 <= paidAmount <= amount`; the sum of the `CONFIRMED` payments of a debt never exceeds `amount`
+- `PAYMENT_REPORTED` does **not** count as settled: only `PAID` and `VERIFIED` are settled for balances (`paidAmount` stays unchanged, `0` or the part already paid, until the administrator confirms; V24 repairs rows written before this rule)
 - `OVERDUE` only when the group has `debtDueDays` configured and only from `PENDING`
-- `PARTIALLY_PAID` is read-only for 022
+- `PARTIALLY_PAID` is produced by partial payments and is not final: it accepts further payments
 
 **Relationships**:
 - `N:1` with `GroupExpense` (the expense that generated the debt)
@@ -185,13 +185,13 @@ New fields added in V18:
 | `status` | `PaymentStatus` | No | Payment state | `PENDING`, `REPORTED`, `CONFIRMED`, `REJECTED`; existing rows = `CONFIRMED` |
 | `decidedByUserId` | `Long` | Yes | Admin who confirmed/rejected | FK `users(id)`; both decided fields set or both null |
 | `decidedAt` | `OffsetDateTime` | Yes | When the decision was made | Both decided fields set or both null |
-| `legacy` | `boolean` | No | Pre-022 payment | Existing rows `TRUE`; new rows `FALSE` |
+| `legacy` | `boolean` | No | Informative origin marker: payment created before 022 or by the inherited 018 endpoint | Existing rows `TRUE`; rows written by the 022 endpoint `FALSE`. It no longer excludes anything from an index (see V25) |
 
 **PaymentStatus** enum values:
 - `PENDING`: reserved for a payment registered but not yet processed (not produced by the 018 flow)
-- `REPORTED`: full payment reported; awaiting an admin decision when the group requires validation
-- `CONFIRMED`: payment accepted and applied to the debt (no validation required, or admin confirmed under the 018 flow)
-- `REJECTED`: admin rejected the payment; the debt returns to `PENDING`. If it was already overdue, the next execution of the overdue debt job (D7) moves it back to `OVERDUE`; the job never changes `PARTIALLY_PAID`. If a legacy 018 partial payment existed, the debt returns to `PARTIALLY_PAID` with the `paid_amount` it had before the rejected payment
+- `REPORTED`: payment (partial or total) reported; awaiting an admin decision when the group requires validation. At most one per debt
+- `CONFIRMED`: payment accepted and added to the debt's `paidAmount` (no validation required, or an administrator confirmed it). A debt can have several `CONFIRMED` payments
+- `REJECTED`: admin rejected the payment; the debt returns to its previous state from its unchanged `paid_amount`: `PENDING` (nothing paid) or `PARTIALLY_PAID`. If it was overdue, it returns as `PENDING` and the next execution of the overdue debt job (D7) marks it `OVERDUE` again; the job never changes `PARTIALLY_PAID`
 
 **Migration (V18)**:
 
@@ -214,11 +214,21 @@ CREATE UNIQUE INDEX uq_payments_active_debt ON payments (debt_id)
     WHERE legacy = FALSE AND status IN ('REPORTED', 'CONFIRMED');
 ```
 
-The partial index is the database backstop for "one active payment per debt"; the legacy
-rows (including the partial payments of 018) stay outside it.
+**Migration V25 (partial payments, task T079, implemented)**:
+
+```sql
+DROP INDEX uq_payments_active_debt;
+CREATE UNIQUE INDEX uq_payments_reported_debt ON payments (debt_id)
+    WHERE status = 'REPORTED';
+```
+
+V18's `uq_payments_active_debt` allowed one non-legacy `REPORTED` **or** `CONFIRMED` payment per debt, which would forbid a second partial payment. The new partial unique index is the database backstop for "one payment waiting for validation at a time"; any number of `CONFIRMED` payments can coexist. Existing rows: nothing is rewritten and the migration cannot fail on data — `legacy` rows are all `CONFIRMED` (outside the new index), the old index already allowed at most one `REPORTED` per debt, and the non-legacy `CONFIRMED` payments (previous full payments) simply stop being limited. No `CHECK` changes.
+
+**Inherited 018 flow and `legacy`**: `POST /api/payments` and the 022 endpoint add to `paidAmount` through the same domain operations and follow the group's "Pagos requieren validación", so both produce the same states (`PARTIALLY_PAID`/`PAID`, or `PAYMENT_REPORTED` while a payment waits) and the same balances. `legacy` only records the origin (written before 022 or by the inherited endpoint); it has no functional role: it is not part of V25's index, and a `REPORTED` payment with `legacy = true` is listed and decided like any other. Existing payments are never rewritten.
 
 **Invariants**:
-- `0 < amount <= debt.getOutstanding()`; 022 accepts only a payment for the whole remaining balance
+- `0 < amount <= debt.getOutstanding()` (partial payments allowed); a greater amount is rejected (400)
+- At most one `REPORTED` payment per debt; while it exists no other payment is accepted (409)
 - Same `idempotencyKey` reused → returns existing result (no duplicate)
 - `decidedByUserId` and `decidedAt` must both be set or both be null
 - `PAYMENT_REPORTED`/`REPORTED` does not settle the debt by itself
@@ -293,7 +303,7 @@ source to infer it from); `debt_due_days` is nullable and is added exactly once.
 
 ## Summary of Changes from Existing Model
 
-1. **DebtStatus extended** from 3 states (PENDING/PARTIALLY_PAID/PAID) to 6 states (PENDING/PARTIALLY_PAID/PAYMENT_REPORTED/PAID/VERIFIED/OVERDUE); `PARTIALLY_PAID` is read-only
+1. **DebtStatus extended** from 3 states (PENDING/PARTIALLY_PAID/PAID) to 6 states (PENDING/PARTIALLY_PAID/PAYMENT_REPORTED/PAID/VERIFIED/OVERDUE); `PARTIALLY_PAID` is produced by partial payments
 2. **Payment is extended, not recreated**: existing `com.amano.backend.payment.Payment` / table `payments` gains `status`, `decided_by_user_id`, `decided_at` and `legacy`; existing rows become `CONFIRMED` + legacy
 3. **Removed from GroupExpense**: `recurrent` field and `vencimientoDias` field (threshold now configured per Group via `debtDueDays`)
 4. **Added to Group**: `primaryCurrency` (default `ARS` for existing groups) and `debtDueDays` (nullable)

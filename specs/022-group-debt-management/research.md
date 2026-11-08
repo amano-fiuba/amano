@@ -1,5 +1,8 @@
 # Research: Group Debt Management - Technical Context Unknowns
 
+> **Nota de vigencia (2026-11-07).** Este documento recoge la investigación inicial. Donde difiere de `plan.md` (decisiones D1–D11), de `data-model.md` y de `contracts/`, valen estos últimos. En particular: los estados de deuda son los seis valores en inglés de `DebtStatus` (`PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED`, `PAID`, `VERIFIED`, `OVERDUE`; la sección 4 usa nombres en español de la primera propuesta); el vencimiento se calcula por el umbral del grupo (`debtDueDays`) para cualquier gasto y solo desde `PENDING`, no por gasto recurrente (sección 5); las cotizaciones no usan tasa por defecto (sección 7); y no se incorporó ninguna dependencia de pruebas de propiedades. Desde el 2026-11-07 los **pagos parciales están permitidos** (monto > 0 y ≤ saldo pendiente, un único pago por validar a la vez por deuda): cualquier mención de aceptar solo pagos completos queda reemplazada por plan.md D6 y `contracts/payment-validation.md`.
+
+
 **Feature**: Group Debt Management (specs/022-group-debt-management)
 **Created**: 2026-11-06
 **Status**: Phase 0 - Research Complete
@@ -95,30 +98,29 @@ Guarantee: ≤ n-1 transfers where n = |{members with balance != 0}|
 **Findings**:
 - Current `DebtStatus` enum has: `PENDING`, `PARTIALLY_PAID`, `PAID` (3 states)
 - Current `Debt.applyPayment()` moves PENDING → PARTIALLY_PAID → PAID
-- Current `Debt.isSettled()` returns true only for PAID
+- (Estado inicial, antes de la 022) `Debt.isSettled()` devolvía true solo para PAID; hoy devuelve true para PAID y VERIFIED
 - No `Pago informado`, `Verificado`, or `Vencido` states exist
 - No transition rules based on "payments require validation" group setting
 
 **Required Extension**:
-Add new states to the debt state machine:
+Add new states to the debt state machine (nombres de la primera propuesta; los valores reales están en `data-model.md`):
 - `PENDIENTE` (equivalent to current PENDING)
 - `PAGO_INFORMADO` (payment registered, awaiting validation or auto-confirmed)
 - `PAGADO` (equivalent to current PAID, full amount paid)
 - `VERIFICADO` (admin confirmed payment, for groups with validation)
-- `VENCIDO` (auto-transition after deadline, only for recurring expenses)
+- `VENCIDO` (auto-transition after the group's deadline; see D7: any expense, only from `PENDING`)
 
 **New State Machine Transitions**:
 ```
 PENDIENTE → PAGO_INFORMADO (when payment registered, with/without validation)
 PAGO_INFORMADO → PAGADO (if no validation required, or admin confirms)
 PAGO_INFORMADO → PENDIENTE (if admin rejects)
-ANY → VENCIDO (if recurring expense and current date > expense date + configured days)
+PENDIENTE → VENCIDO (if current date > expense date + the group's debtDueDays; D7)
 PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
 ```
 
 **Additional Changes needed**:
 - Extend `DebtStatus` enum (or create new enum)
-- Add `overdueAt` field (optional, for recurring expenses)
 - Add `dias_vencimiento` or configure per group
 - Update `Debt.applyPayment()` to handle the new state transitions
 - Update `GroupExpenseService.create()` to initialize new state
@@ -140,7 +142,7 @@ PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
 2. If yes, create a scheduled task that:
    - Runs periodically (e.g., daily at midnight)
    - Iterates over groups
-   - For each group, checks debts with recurring expenses
+   - For each group with debtDueDays, checks its PENDING debts (any expense)
    - If current date > expense date + configured vencimiento days → set debt status to VENCIDO
    - If not configured per group, skip (or use default)
 3. If no scheduled task mechanism exists, use the "simplest equivalent" - a manual trigger or a simple Quartz/CRON setup
@@ -149,7 +151,7 @@ PAGADO/VERIFICADO are equivalent for balance calculations (per clarification Q7)
 **Idempotency Design**:
 - The task should be safe to run multiple times
 - Check current debt status before transitioning
-- Only transition debts that are in eligible states (PAGO_INFORMADO or PAGADO for recurring)
+- Only transition debts that are in the eligible state (PENDING; settled or reported debts never become overdue)
 - Log what was transitioned for audit
 
 **Rationale**: Following the design decision to use existing project mechanisms. Spring `@Scheduled` is the standard Java Spring approach.
@@ -226,7 +228,7 @@ Expense in USD 50, group primary currency ARS, date 2026-01-18 (Sunday)
 ```
 
 **Fallback Behavior**:
-- If the BCRA API does not respond after retries and the rate is not cached → **expense not saved (503)**, message: "No se pudo obtener la cotización; registre el gasto en la moneda del grupo o reintente después"
+- If the BCRA API does not respond after retries and the rate is not cached → **expense not saved (503)**, message: "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
 - If the requested date is a weekend or holiday → use the last business day's quote within 7 days
 - If cache hit → use it (no staleness concern for historical rates)
 - Tests never call the real BCRA API: they use a double of `ExchangeRateProvider`
