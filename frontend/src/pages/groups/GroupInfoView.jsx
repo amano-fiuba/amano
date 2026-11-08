@@ -7,7 +7,7 @@ import GroupDescriptionPanel from '../../components/groups/GroupDescriptionPanel
 import MemberListView from '../../components/groups/MemberListView'
 import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupEditForm from '../../components/groups/GroupEditForm'
-import { PencilIcon } from '../../components/NavIcons'
+import { GroupSettingsIcon, PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
 import GroupReminderSettingsPanel from '../../components/groups/GroupReminderSettingsPanel'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
@@ -81,61 +81,49 @@ export default function GroupInfoView() {
         <>
           <header className="group-hero" data-testid="group-detail">
             <div className="group-hero__identity">
-              {editing ? (
-                <GroupEditForm
-                  group={group}
-                  onCancel={() => setEditing(false)}
-                  onSaved={(updated) => {
-                    setGroup(updated)
-                    setEditing(false)
-                  }}
-                />
-              ) : (
-                <>
-                  <GroupPhotoPanel photo={group.photo ?? null} />
-                  <div className="group-hero__text">
-                    <h1>{group.name}</h1>
-                    <GroupDescriptionPanel description={group.description ?? null} />
-                    {group.primaryCurrency && (
-                      <p className="group-hero__meta" data-testid="group-currency">
-                        Moneda: {group.primaryCurrency}
-                      </p>
-                    )}
-                    <p className="group-hero__meta" data-testid="group-role">
-                      {memberCountLabel(group.memberCount)}
-                      <span aria-hidden="true">·</span>
-                      <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
-                        <span className="visually-hidden">Tu rol: </span>
-                        {roleLabel(group.currentUserRole)}
-                      </span>
-                    </p>
-                  </div>
-                </>
-              )}
+              <GroupPhotoPanel photo={group.photo ?? null} />
+              <div className="group-hero__text">
+                <h1>{group.name}</h1>
+                <GroupDescriptionPanel description={group.description ?? null} />
+                {group.primaryCurrency && (
+                  <p className="group-hero__meta" data-testid="group-currency">
+                    Moneda: {group.primaryCurrency}
+                  </p>
+                )}
+                <p className="group-hero__meta" data-testid="group-role">
+                  {memberCountLabel(group.memberCount)}
+                  <span aria-hidden="true">·</span>
+                  <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
+                    <span className="visually-hidden">Tu rol: </span>
+                    {roleLabel(group.currentUserRole)}
+                  </span>
+                </p>
+              </div>
+
             </div>
+            {/* Acciones arriba a la derecha y "Salir" en la esquina inferior derecha. */}
+            <div className="group-hero__side">
             <div className="group-hero__actions">
-              <Link
-                className="group-action"
-                to={`/groups/${id}/history`}
-                data-testid="group-history-link"
-              >
-                Historial de actividad
-              </Link>
-              <Link
+
+                           <Link
                 className="group-action"
                 to={`/groups/${id}/debts`}
                 data-testid="group-debts-link"
               >
                 Deudas y saldos
               </Link>
-              {canEditGroupData && !editing && (
+              {/* Como Configuración: la cabecera no cambia, el botón pasa a
+                  "Cerrar" y el formulario se abre en un panel debajo. */}
+              {canEditGroupData && (
                 <button
                   type="button"
                   className="group-action"
                   data-testid="group-edit-button"
-                  onClick={() => setEditing(true)}
+                  aria-expanded={editing}
+                  aria-label={editing ? 'Cerrar edición' : undefined}
+                  onClick={() => setEditing(!editing)}
                 >
-                  <PencilIcon /> Editar
+                  {editing ? 'Cerrar' : <><PencilIcon /> Editar</>}
                 </button>
               )}
               {isAdmin && (
@@ -143,15 +131,40 @@ export default function GroupInfoView() {
                   type="button"
                   className="group-action"
                   aria-expanded={showPermissions}
+                  aria-label={showPermissions ? 'Cerrar configuración' : undefined}
                   onClick={() => { setShowPermissions(!showPermissions) }}
                 >
-                  {showPermissions ? 'Cerrar ajustes' : 'Configuración del grupo'}
+                  {showPermissions ? 'Cerrar' : <><GroupSettingsIcon /> Configuración</>}
                 </button>
               )}
             </div>
+            <LeaveGroupPanel
+              groupId={Number(id)}
+              isLastAdmin={Boolean(group.isLastAdmin)}
+              isLastMember={Boolean(group.isLastMember)}
+            />
+            </div>
+            {editing && (
+              <div className="group-admin-panel" data-testid="edit-panel">
+                <GroupEditForm
+                  group={group}
+                  onSaved={(updated) => {
+                    setGroup(updated)
+                    setEditing(false)
+                  }}
+                />
+              </div>
+            )}
             {showPermissions && (
               <div className="group-admin-panel" data-testid="permissions-panel">
-                <GroupPermissionsPanel group={group} permissions={group.permissions ?? {}} />
+                <GroupPermissionsPanel
+                  group={group}
+                  permissions={group.permissions ?? {}}
+                  onSaved={() => {
+                    setShowPermissions(false)
+                    refreshGroup()
+                  }}
+                />
                 <GroupReminderSettingsPanel groupId={group.id} isAdmin={isAdmin} />
               </div>
             )}
@@ -166,22 +179,13 @@ export default function GroupInfoView() {
                 <button
                   type="button"
                   className="group-action"
-                  aria-expanded={showAddMember}
-                  onClick={() => { setShowAddMember(!showAddMember) }}
+                  aria-haspopup="dialog"
+                  onClick={() => setShowAddMember(true)}
                 >
-                  {showAddMember ? 'Cerrar' : 'Agregar miembro'}
+                  Agregar miembro
                 </button>
               )}
             </div>
-            {showAddMember && (
-              <div className="group-admin-panel" data-testid="add-member-panel">
-                <AddMemberView
-                  group={group}
-                  permissions={group.permissions ?? {}}
-                  onAdded={handleMemberAdded}
-                />
-              </div>
-            )}
             <MemberListView
               groupId={Number(id)}
               currentUserId={user?.id ?? null}
@@ -208,13 +212,14 @@ export default function GroupInfoView() {
           </section>
           </div>
 
-          <footer className="group-detail__footer">
-            <LeaveGroupPanel
-              groupId={Number(id)}
-              isLastAdmin={Boolean(group.isLastAdmin)}
-              isLastMember={Boolean(group.isLastMember)}
+          {showAddMember && (
+            <AddMemberView
+              group={group}
+              permissions={group.permissions ?? {}}
+              onAdded={handleMemberAdded}
+              onClose={() => setShowAddMember(false)}
             />
-          </footer>
+          )}
         </>
       )}
     </main>

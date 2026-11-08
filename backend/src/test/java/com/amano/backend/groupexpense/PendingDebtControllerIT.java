@@ -185,7 +185,7 @@ class PendingDebtControllerIT {
             throws Exception {
         String body = """
                 {"amount": "%s", "currency": "%s", "date": "%s", "description": "Súper",
-                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": %s}
                 """.formatted(amount, currency, EXPENSE_DATE, payer, participants);
         String response = mockMvc.perform(post("/api/groups/" + groupId + "/expenses").cookie(anaSession)

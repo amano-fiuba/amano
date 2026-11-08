@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router'
 import { GROUPS_NETWORK_ERROR_MESSAGE, createGroup } from '../../api/groupsClient'
 
 import FriendPicker from '../../components/groups/FriendPicker'
+import PeopleChips from '../../components/groups/PeopleChips'
+import { fullName } from '../../utils/personSearch'
 import { useSnackbar } from '../../components/Snackbar'
 import SelectField from '../../components/SelectField'
 import SubmitButton from '../../components/SubmitButton'
@@ -114,6 +116,10 @@ export default function CreateGroupView() {
   }
 
   const memberCount = friends.length + simulated.length
+  // Crear se habilita con los obligatorios completos: nombre y al menos una
+  // persona (elegida o el perfil simulado que se está escribiendo).
+  const canCreate =
+    fields.name.trim() !== '' && (memberCount > 0 || Boolean(readDraft().profile))
 
   return (
     <main className="page create-group">
@@ -144,28 +150,26 @@ export default function CreateGroupView() {
 
         <fieldset className="create-group__members">
           <legend>¿Quiénes participan?</legend>
+          {/* Amigos y perfiles simulados elegidos, juntos en fichas. */}
+          <PeopleChips
+            people={[
+              ...friends.map((friend) => ({
+                key: `friend-${friend.id}`,
+                name: fullName(friend),
+                detail: friend.email,
+                avatarUrl: friend.avatarUrl,
+                onRemove: () => setFriends((prev) => prev.filter(({ id }) => id !== friend.id)),
+              })),
+              ...simulated.map(({ name, email }) => ({
+                key: `simulated-${email}`,
+                name,
+                detail: email,
+                simulated: true,
+                onRemove: () => removeSimulated(email),
+              })),
+            ]}
+          />
           <FriendPicker selected={friends} onChange={setFriends} />
-
-          {simulated.length > 0 && (
-            <ul className="create-group__profiles" aria-label="Perfiles simulados">
-              {simulated.map(({ name, email }) => (
-                <li key={email}>
-                  <span className="friend-picker__identity">
-                    <strong>{name}</strong>
-                    <span>{email}</span>
-                  </span>
-                  <button
-                    type="button"
-                    className="group-action"
-                    aria-label={`Quitar a ${name}`}
-                    onClick={() => removeSimulated(email)}
-                  >
-                    Quitar
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
 
           {showSimulatedForm ? (
             <div className="create-group__simulated">
@@ -206,7 +210,15 @@ export default function CreateGroupView() {
           )}
         </fieldset>
 
-        <SubmitButton loading={saving}>Crear grupo</SubmitButton>
+        {/* Cancelar a la izquierda y Crear a la derecha. */}
+        <div className="form-actions form-actions--split">
+          <button type="button" disabled={saving} onClick={() => navigate('/groups')}>
+            Cancelar
+          </button>
+          <SubmitButton loading={saving} disabled={!canCreate}>
+            Crear
+          </SubmitButton>
+        </div>
       </form>
     </main>
   )

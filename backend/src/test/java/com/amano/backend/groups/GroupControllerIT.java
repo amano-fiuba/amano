@@ -43,7 +43,8 @@ import tools.jackson.databind.node.JsonNodeFactory;
 class GroupControllerIT {
 
     /** Real friendships replacing the old stub property (see {@link FriendshipFixtures}). */
-    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com", "listfriend@example.com");
+    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com", "listfriend@example.com",
+            "canmember@example.com");
 
     @Container
     @ServiceConnection
@@ -241,6 +242,30 @@ class GroupControllerIT {
                                 "memberType", "REGISTERED",
                                 "identifier", "stranger@example.com")))))
                 .andExpect(status().isNotFound());
+    }
+
+    /** 027 (FR-021): each list item says whether the caller may register expenses there. */
+    @Test
+    void groupsListTellsWhetherTheCallerCanCreateExpenses() throws Exception {
+        Cookie member = verifiedSessionOf("canmember@example.com");
+        Cookie admin = verifiedSessionOf("canadmin@example.com");
+        String created = postGroup(admin, "Permisos", Map.of(
+                "memberType", "REGISTERED",
+                "identifier", "canmember@example.com"));
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups").cookie(member))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].canCreateExpenses").value(true));
+
+        jdbcTemplate.update("UPDATE group_permissions SET members_cannot_make_expenses = TRUE WHERE group_id = ?",
+                groupId);
+
+        mockMvc.perform(get("/api/groups").cookie(member))
+                .andExpect(jsonPath("$[0].currentUserRole").value("MEMBER"))
+                .andExpect(jsonPath("$[0].canCreateExpenses").value(false));
+        mockMvc.perform(get("/api/groups").cookie(admin))
+                .andExpect(jsonPath("$[0].canCreateExpenses").value(true));
     }
 
     @Test

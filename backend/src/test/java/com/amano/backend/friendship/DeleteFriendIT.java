@@ -195,12 +195,12 @@ class DeleteFriendIT {
     }
 
     @Test
-    void withoutTheStubDebtModuleDeletionProceeds() throws Exception {
+    void withoutDirectDebtsDeletionProceeds() throws Exception {
         long me = verified("SinDeuda");
         long friend = verified("AmigaDos");
         friends(me, friend);
 
-        // NoOpDirectDebtPort reports no direct debt until the real module exists.
+        // 027: no expense with a friend between them, so there is no direct debt.
         deleteAs(me, String.valueOf(friend))
                 .andExpect(status().isNoContent());
     }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
+import HomeLink from '../components/HomeLink'
 
 // Pantalla "Mi perfil" (specs/002-user-profile): los datos provienen
 // únicamente del contrato de sesión GET /api/users/me vía me();
@@ -42,6 +43,7 @@ export default function ProfilePage() {
     if (error) {
       return (
         <main className="page">
+          <HomeLink />
           <h1>Mi perfil</h1>
           <p role="alert">No se pudo cargar el perfil. Intenta nuevamente</p>
         </main>
@@ -59,6 +61,7 @@ export default function ProfilePage() {
 
   return (
     <main className="page">
+      <HomeLink />
       <img
         src={avatarUrl}
         alt={`Avatar de ${user.firstName}`}

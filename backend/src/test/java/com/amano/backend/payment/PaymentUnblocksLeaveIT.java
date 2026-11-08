@@ -113,7 +113,7 @@ class PaymentUnblocksLeaveIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"amount": "100.00", "currency": "ARS", "date": "2026-11-05",
-                         "payerUserId": %d, "participants": [{"type": "REGISTERED", "userId": %d}]}
+                         "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d, "participants": [{"type": "REGISTERED", "userId": %d}]}
                         """.formatted(s.ana, s.juan)))
                 .andExpect(status().isCreated());
         s.pay(s.juanSession, s.juanDebt, "3333.33").andExpect(status().isCreated());

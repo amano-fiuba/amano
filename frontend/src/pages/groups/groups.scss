@@ -5,6 +5,13 @@
   max-width: 760px;
 }
 
+.groups-page__no-matches {
+  margin: 0;
+  padding: 1rem 0;
+  color: var(--color-texto-suave);
+  text-align: center;
+}
+
 .groups-page__header {
   display: flex;
   flex-wrap: wrap;
@@ -220,38 +227,6 @@
 }
 
 // Mientras se edita, el formulario ocupa su propia fila del encabezado.
-.group-hero__identity:has(.group-edit-form) {
-  flex: 1 1 100%;
-}
-
-.leave-group-modal {
-  position: relative;
-}
-
-.leave-group-modal__close {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-texto-suave);
-  font-size: 1.4rem;
-  line-height: 1;
-  cursor: pointer;
-
-  &:hover:enabled {
-    background: var(--color-fondo);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-  }
-}
-
 // Botones del módulo: la acción secundaria y la destructiva.
 .group-action svg {
   flex: 0 0 auto;
@@ -278,50 +253,11 @@
   }
 }
 
-.group-danger {
-  border-color: transparent;
-  padding: 0.5rem 0.8rem;
-  background: transparent;
+// Variante destructiva de .group-action ("Salir"): mismo recuadro, letras y
+// hover en rojo (el hover naranja queda para las acciones no destructivas).
+.group-action--danger {
+  border-color: color-mix(in srgb, var(--color-error) 55%, var(--color-borde));
   color: var(--color-error);
-  font-size: 0.875rem;
-
-  &:hover {
-    background: color-mix(in srgb, var(--color-error) 12%, transparent);
-    color: var(--color-error);
-  }
-}
-
-// Confirmaciones en línea (abandonar el grupo, eliminar un miembro).
-.group-confirm {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-control);
-  background: var(--color-fondo);
-  text-align: left;
-
-  p {
-    flex: 1 0 100%;
-    margin: 0;
-    font-size: 0.875rem;
-  }
-}
-
-.group-confirm__danger {
-  border-color: var(--color-error);
-  padding: 0.5rem 0.8rem;
-  background: var(--color-error);
-  color: var(--color-superficie);
-  font-size: 0.875rem;
-
-  &:hover {
-    border-color: var(--color-error);
-    background: var(--color-error);
-    filter: brightness(0.9);
-  }
 }
 
 // Detalle de un grupo.
@@ -431,9 +367,13 @@
 
 .group-hero__identity {
   display: flex;
+  // Ocupa el espacio libre: si midiera solo su contenido, un texto corto
+  // (rol "Miembro") mandaba el nombre debajo de la foto.
+  flex: 1 1 20rem;
   flex-wrap: wrap;
   align-items: center;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .group-hero__text {
@@ -468,7 +408,25 @@
 .group-hero__actions {
   display: flex;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.6rem;
+}
+
+// Columna derecha del encabezado: las acciones que correspondan según el rol y
+// la configuración (historial, editar, configuración) y "Salir" debajo, a la
+// derecha, siempre a la misma distancia.
+.group-hero__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin-left: auto;
+}
+
+.leave-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
 }
 
 // La sección no genera caja: así un error de la foto ocupa todo el ancho del
@@ -611,60 +569,134 @@
   }
 }
 
-.add-member__types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 1.25rem;
-  margin-bottom: 0.75rem;
-}
-
-.add-member__search {
+// Modal "Agregar amigos a {grupo}" (AddMemberView).
+.add-members {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.4rem 0.5rem;
-  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
 
-  > label,
-  > p,
-  > .add-member__result {
-    grid-column: 1 / -1;
+  .list-search {
+    margin-bottom: 0.6rem;
   }
 }
 
-.add-member__simulated {
-  display: grid;
-  gap: 0.4rem;
-  justify-items: start;
+.add-members__status {
+  margin: 0;
+  padding: 0.5rem 0;
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
 
   button {
     margin-top: 0.5rem;
   }
 }
 
-.add-member__result {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem 0.75rem;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--color-borde);
-  font-size: 0.875rem;
+// Unas cuatro o cinco filas y el resto se scrollea.
+.add-members__list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: min(20rem, 50vh);
+  margin: 0;
+  padding: 0 0.35rem 0 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
 
-  span {
-    min-width: 0;
-    overflow-wrap: anywhere;
+.add-members__row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-superficie);
+
+  img {
+    flex: 0 0 auto;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-superficie-fuerte);
+  }
+
+  .group-action {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  // Ya es miembro: fila sombreada, sin acción.
+  &.is-member {
+    background: var(--color-superficie-fuerte);
+    opacity: 0.8;
   }
 }
 
-.group-detail__footer {
+.add-members__identity {
   display: flex;
-  justify-content: flex-end;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
 
-  section {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: var(--color-texto-suave);
+    font-size: 0.8rem;
+  }
+}
+
+.add-members__added {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.add-members__simulated {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-borde);
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+
+  .text-button {
+    display: inline;
+    font-weight: 700;
+  }
+
+  form {
+    display: grid;
+    gap: 0.4rem;
+    justify-items: start;
+
+    label {
+      font-size: 0.85rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--color-borde);
+      border-radius: var(--radio-control);
+      background: var(--color-fondo);
+      color: var(--color-texto);
+      font: inherit;
+    }
+
+    button {
+      margin-top: 0.5rem;
+    }
   }
 }
 
@@ -674,6 +706,19 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+// Con las tres columnas, la lista de miembros scrollea dentro de su tarjeta
+// (unos cinco miembros, o el 60 % del alto si la pantalla es baja). Apiladas
+// (≤ 960px) se scrollea la página, como en Amigos.
+@media (min-width: 961px) {
+  .group-board .member-rows {
+    max-height: min(27rem, 60vh);
+    padding-right: 0.35rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
 }
 
 .member-row {
@@ -750,7 +795,14 @@
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
-  box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-sombra) 22%, transparent);
+}
+
+// Fijado a la pantalla (MemberActionsMenu calcula top/right desde el botón),
+// para que no lo recorte la lista de miembros con scroll.
+.member-menu__panel--fixed {
+  position: fixed;
+  z-index: 20;
 }
 
 .member-menu__item {
@@ -784,10 +836,6 @@
   .member-row__body {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .group-detail__footer {
-    justify-content: stretch;
   }
 
   .group-row__chevron {
@@ -918,65 +966,72 @@
   }
 }
 
-.friend-picker__list {
-  display: grid;
-  gap: 0.35rem;
-  max-height: 15rem;
+// Fichas de las personas elegidas en Crear grupo (amigos y perfiles simulados):
+// siempre visibles aunque la lista esté filtrada; la ✕ deshace la elección.
+.people-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
   list-style: none;
 }
 
-.friend-picker__row {
-  display: flex;
+.people-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-control);
-  cursor: pointer;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-
-  &:hover {
-    border-color: var(--color-naranja);
-  }
-
-  &.is-selected {
-    background: var(--color-superficie-fuerte);
-    border-color: var(--color-acento);
-  }
-
-  input {
-    flex: 0 0 auto;
-    width: 1.1rem;
-    height: 1.1rem;
-    margin: 0;
-    accent-color: var(--color-acento);
-  }
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.2rem 0.25rem 0.2rem 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--color-acento) 45%, var(--color-borde));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-acento) 12%, var(--color-superficie));
+  font-size: 0.85rem;
+  font-weight: 600;
 
   img {
     flex: 0 0 auto;
+    width: 1.5rem;
+    height: 1.5rem;
     border-radius: 50%;
     object-fit: cover;
   }
-}
 
-.friend-picker__identity {
-  display: grid;
-  min-width: 0;
-
-  strong,
-  span {
+  > span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  span {
+  button {
+    display: inline-grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 1.6rem;
+    height: 1.6rem;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    box-shadow: none;
     color: var(--color-texto-suave);
-    font-size: 0.82rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+      background: color-mix(in srgb, var(--color-error) 14%, transparent);
+      color: var(--color-error);
+    }
   }
+}
+
+// Perfil simulado: borde punteado, para distinguirlo de un amigo.
+.people-chip--simulated {
+  border-style: dashed;
+  background: var(--color-superficie);
 }
 
 .friend-picker__status {
@@ -984,24 +1039,6 @@
   gap: 0.5rem;
   margin: 0;
   color: var(--color-texto-suave);
-}
-
-.create-group__profiles {
-  display: grid;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-
-  li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--color-borde);
-    border-radius: var(--radio-control);
-  }
 }
 
 .create-group__simulated {
@@ -1020,11 +1057,6 @@
   color: var(--color-error);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .friend-picker__row {
-    transition: none;
-  }
-}
 
 /* Debts and payments screen (specs/022-group-debt-management, T074/T075). */
 .group-expense__status--reported { font-style: italic; }
@@ -1120,9 +1152,34 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   }
 
-  .group-expense--wide .group-expense__split {
-    position: sticky;
-    top: 5rem;
+  // 027 (FR-023/FR-024): the left column sets the height. The panel does not add
+  // to the row (height 0, at least the row height) and only its member list
+  // scrolls, so the footer buttons stay right under both columns.
+  .group-expense--wide .group-expense__form--fixed {
+    align-items: stretch;
+
+    .group-expense__split {
+      height: 0;
+      min-height: 100%;
+      overflow: hidden;
+    }
+
+    .group-expense__split fieldset.group-expense__participants {
+      display: flex;
+      flex: 1 1 0;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .group-card ul.group-expense__rows {
+      flex: 1 1 0;
+      align-content: start;
+      min-height: 0;
+      overflow-y: auto;
+      // Room for the focus ring and the scrollbar.
+      padding: 2px 0.35rem 2px 2px;
+    }
   }
 }
 
@@ -1271,6 +1328,10 @@
     grid-column: 1 / -1;
     align-items: center;
     row-gap: 0.35rem;
+    // 027 (FR-022): the same height in "Partes iguales", "Personalizado" and
+    // "Porcentajes" (the height of a row with an input), so switching methods
+    // does not move the list.
+    min-height: var(--split-row-height, 3.25rem);
     padding: 0.4rem 0.6rem;
 
     &.is-excluded {

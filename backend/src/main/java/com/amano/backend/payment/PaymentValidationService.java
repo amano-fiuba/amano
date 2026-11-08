@@ -89,7 +89,8 @@ public class PaymentValidationService {
         // The first read takes the lock (plan.md D6): concurrent payments of the
         // same debt wait here and the loser sees the winner's committed state.
         Debt debt = debtRepository.findByIdForUpdate(debtId).orElseThrow(DebtNotFoundException::new);
-        if (!debt.getGroupId().equals(groupId)) {
+        // 027 (T090): a direct debt (expense with a friend) has no group and is not payable here.
+        if (!java.util.Objects.equals(debt.getGroupId(), groupId)) {
             throw new DebtNotFoundException();
         }
         GroupMember caller = activeMembership(callerId, groupId);

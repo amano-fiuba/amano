@@ -115,7 +115,7 @@ button.app-header__action {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
-  box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-sombra) 22%, transparent);
   color: var(--color-texto);
 
   h2 {
@@ -253,6 +253,23 @@ button.app-header__action {
     color: var(--color-texto-suave);
     font-weight: 400;
   }
+
+  // "Ver más": link al pie de cada sección, alineado a la derecha.
+  .global-search__more {
+    display: block;
+    width: fit-content;
+    margin: 0.1rem 0 0.3rem auto;
+    padding: 0.3rem 0.4rem;
+    color: var(--color-acento-oscuro);
+    font-size: 0.85rem;
+    font-weight: 700;
+
+    &:hover,
+    &:focus-visible {
+      color: var(--color-acento-oscuro);
+      text-decoration: underline;
+    }
+  }
 }
 
 .quick-actions {
@@ -278,7 +295,7 @@ button.quick-actions__toggle {
   border-radius: 50%;
   background: var(--color-barra);
   color: #fff;
-  box-shadow: 0 8px 20px rgb(15 30 50 / 32%);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-sombra) 32%, transparent);
 
   &:hover {
     background: var(--color-barra);
@@ -299,25 +316,87 @@ button.quick-actions__toggle {
 
 .quick-actions__menu {
   min-width: 12rem;
+  margin: 0;
   padding: 0.35rem;
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
-  box-shadow: 0 12px 28px rgb(15 30 50 / 22%);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-sombra) 22%, transparent);
   list-style: none;
+}
 
-  a {
-    display: block;
-    padding: 0.55rem 0.7rem;
-    border-radius: var(--radio-control);
+// Ítems del menú y del submenú "Registrar gasto" (027): enlaces y botones con
+// el mismo aspecto, sin el relieve de los botones (ver $quietos en detalles.scss).
+.quick-actions__item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0.55rem 0.7rem;
+  border: 0;
+  border-radius: var(--radio-control);
+  background: transparent;
+  color: var(--color-texto);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+
+  svg {
+    flex: none;
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  &:hover,
+  &:focus-visible,
+  &.is-active {
+    background: var(--color-superficie-fuerte);
     color: var(--color-texto);
+  }
+}
 
-    &:hover,
-    &:focus-visible {
-      background: var(--color-superficie-fuerte);
-      color: var(--color-texto);
+// Flecha del ítem que abre el submenú, al final de la fila.
+.quick-actions__parent {
+  position: relative;
+
+  > .quick-actions__item svg {
+    margin-left: auto;
+    color: var(--color-texto-suave);
+  }
+}
+
+// Submenú a la derecha, alineado por abajo para crecer hacia arriba (el botón
+// "+" está pegado al borde inferior de la pantalla).
+.quick-actions__submenu {
+  position: absolute;
+  bottom: -0.35rem;
+  left: calc(100% + 0.6rem);
+  min-width: 14rem;
+
+  // Puente invisible: el puntero cruza el hueco sin salir del ítem.
+  &::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -0.7rem;
+    width: 0.7rem;
+    content: '';
+  }
+
+  // Si no entra a la derecha (FR-003), se ubica encima del ítem.
+  &--flip {
+    bottom: calc(100% + 0.35rem);
+    left: 0;
+
+    &::before {
+      display: none;
     }
   }
+}
+
+.quick-actions__back {
+  color: var(--color-texto-suave);
 }
 
 :root[data-theme='dark'] {

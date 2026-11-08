@@ -19,7 +19,7 @@ vi.mock('../../api/groupExpensesClient', async (importOriginal) => ({
 
 const setUser = vi.fn()
 vi.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 7 }, setUser }),
+  useAuth: () => ({ user: { id: 7, currencies: ['ARS', 'USD', 'EUR'] }, setUser }),
 }))
 
 const showSnackbar = vi.fn()
@@ -65,6 +65,17 @@ import { CUSTOM_AMOUNT_INVALID, CUSTOM_SUM_INVALID } from './splitCustom'
 import { PERCENTAGE_SUM_INVALID } from './splitPercentage'
 import { REST_IN_ORDER_NOTE, REST_TO_PAYER_NOTE } from '../../components/groups/ExpenseSharePreview'
 
+// 027: "Guardar" opens the final summary; confirm it when it shows up (valid form).
+async function saveForm(user, button = screen.getByRole('button', { name: 'Guardar' })) {
+  await user.click(button)
+  const confirm = await screen
+    .findByRole('button', { name: 'Confirmar' }, { timeout: 200 })
+    .catch(() => null)
+  if (confirm) {
+    await user.click(confirm)
+  }
+}
+
 // 017 T036 (US3): "Nuevo gasto" form (plan.md §Diseño del frontend).
 
 const MEMBERS = [
@@ -93,7 +104,19 @@ async function fillAmount(user, value) {
   const amount = await screen.findByLabelText('Monto')
   await user.clear(amount)
   await user.type(amount, value)
+  // 027 (FR-020): a new expense also needs its 007 classification.
+  if (screen.queryByLabelText('¿Quién pagó?') && screen.getByLabelText('Categoría').value === '') {
+    await fillClassification(user)
+  }
 }
+
+async function fillClassification(user) {
+  await user.selectOptions(screen.getByLabelText('Categoría'), 'FOOD')
+  await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
+  await user.selectOptions(screen.getByLabelText('Medio de pago'), 'CASH')
+}
+
+const CLASSIFICATION = { category: 'FOOD', type: 'ONE_TIME', paymentMethod: 'CASH' }
 
 const participantBox = (name) => screen.getByRole('checkbox', { name: new RegExp(name) })
 // Rows of the split panel that show an amount (included participants), as
@@ -177,7 +200,7 @@ describe('GroupExpenseFormView (017)', () => {
     getGroup.mockResolvedValue(group('MEMBER', { membersCannotMakeExpenses: true }))
     renderView()
     expect(await screen.findByTestId('group-expense-forbidden')).toHaveTextContent(CANNOT_CREATE_MESSAGE)
-    expect(screen.queryByRole('button', { name: 'Guardar gasto' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Volver al grupo' })).toHaveAttribute('href', '/groups/3')
   })
 
@@ -187,7 +210,7 @@ describe('GroupExpenseFormView (017)', () => {
     await screen.findByLabelText('¿Quién pagó?')
     await user.click(participantBox('Juan Pérez'))
     await user.click(participantBox('Abuela'))
-    expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
     expect(PARTICIPANTS_REQUIRED_MESSAGE).toBe('Elegí al menos un participante además de quien pagó')
   })
 
@@ -197,7 +220,7 @@ describe('GroupExpenseFormView (017)', () => {
     renderView()
     await fillAmount(user, '10.000')
     await user.type(screen.getByLabelText('Descripción'), '  Súper  ')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
     expect(showSnackbar).toHaveBeenCalledWith(GROUP_EXPENSE_SUCCESS_MESSAGE)
@@ -226,13 +249,13 @@ describe('GroupExpenseFormView (017)', () => {
       .mockResolvedValueOnce({ ok: true, created: false, expense: { id: 12 } })
     renderView()
     await fillAmount(user, '100')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent(GROUP_EXPENSE_NETWORK_ERROR_MESSAGE)
     expect(screen.getByLabelText('Monto')).toHaveValue('100')
 
     crypto.randomUUID.mockReturnValue('key-2')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
     expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
     expect(createGroupExpense.mock.calls.map((call) => call[2])).toEqual(['key-1', 'key-1'])
   })
@@ -253,7 +276,7 @@ describe('GroupExpenseFormView (017)', () => {
       .mockResolvedValueOnce({ ok: false, status: 403, detail: 'Solo podés registrar gastos pagados por vos', fields: {} })
     renderView()
     await fillAmount(user, '100')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     expect(await screen.findByText('El monto no alcanza para dividirlo entre 3 participantes')).toBeInTheDocument()
     expect(screen.getByTestId('participants-error')).toHaveTextContent('Algún participante no pertenece al grupo')
@@ -261,7 +284,7 @@ describe('GroupExpenseFormView (017)', () => {
     expect(screen.getByLabelText('Monto')).toHaveValue('100')
 
     crypto.randomUUID.mockReturnValue('key-2')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent('Solo podés registrar gastos pagados por vos')
     expect(createGroupExpense.mock.calls.map((call) => call[2])).toEqual(['key-1', 'key-2'])
   })
@@ -273,10 +296,10 @@ describe('GroupExpenseFormView (017)', () => {
       .mockResolvedValueOnce({ ok: false, status: 401, detail: '', fields: {} })
     renderView()
     await fillAmount(user, '100')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent(REUSED_KEY_MESSAGE)
 
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
     await waitFor(() => expect(setUser).toHaveBeenCalledWith(null))
   })
 
@@ -287,7 +310,7 @@ describe('GroupExpenseFormView (017)', () => {
     const date = screen.getByLabelText('Fecha')
     await user.clear(date)
     await user.type(date, '01/01/2999')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     expect(await screen.findByText('Ingresá un monto válido')).toBeInTheDocument()
     expect(screen.getByText('La fecha no puede ser posterior a hoy')).toBeInTheDocument()
@@ -443,10 +466,10 @@ describe('GroupExpenseFormView: vista previa de la cotización (022 T070)', () =
 
     expect(await screen.findByText(QUOTE_ERROR_MESSAGE)).toBeInTheDocument()
     expect(screen.queryByTestId('converted-amount')).not.toBeInTheDocument()
-    const submit = screen.getByRole('button', { name: 'Guardar gasto' })
+    const submit = screen.getByRole('button', { name: 'Guardar' })
     expect(submit).toBeEnabled()
 
-    await user.click(submit)
+    await saveForm(user, submit)
     expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({ amount: '100.00', currency: 'USD' })
   })
@@ -552,14 +575,14 @@ describe('GroupExpenseFormView: moneda por defecto del grupo', () => {
     renderView()
     await fillAmount(user, '10')
     expect(screen.getByLabelText('Moneda')).toHaveValue('USD')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
     await screen.findByText('Detalle del gasto')
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({ currency: 'USD' })
   })
 })
 
 describe('GroupExpenseFormView: reparto (022 T072)', () => {
-  const save = () => screen.getByRole('button', { name: 'Guardar gasto' })
+  const save = () => screen.getByRole('button', { name: 'Guardar' })
   const diff = () => screen.getByTestId('split-difference')
 
   async function typeValue(user, label, value) {
@@ -650,7 +673,7 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     await typeValue(user, 'Importe de Ana López', '3.000')
     await typeValue(user, 'Importe de Juan Pérez', '6000,00')
     await typeValue(user, 'Importe de Abuela', '1000')
-    await user.click(save())
+    await saveForm(user, save())
 
     expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({
@@ -685,7 +708,7 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     await typeValue(user, 'Porcentaje de Abuela', '19,5')
     expect(diff()).toHaveTextContent('Los porcentajes suman exactamente 100 %')
     expect(save()).toBeEnabled()
-    await user.click(save())
+    await saveForm(user, save())
 
     await screen.findByText('Detalle del gasto')
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({
@@ -883,7 +906,7 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     expect(screen.queryByLabelText(/^Importe de /)).not.toBeInTheDocument()
     expect(participantBox('Ana López')).toBeEnabled()
     expect(save()).toBeEnabled()
-    await user.click(save())
+    await saveForm(user, save())
     await screen.findByText('Detalle del gasto')
     const payload = createGroupExpense.mock.calls[0][1]
     expect(payload.splitMethod).toBe('EQUAL')
@@ -903,7 +926,7 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     await typeValue(user, 'Importe de Ana López', '50')
     await typeValue(user, 'Importe de Juan Pérez', '30')
     await typeValue(user, 'Importe de Abuela', '20')
-    await user.click(save())
+    await saveForm(user, save())
 
     expect(await screen.findByTestId('participants-error')).toHaveTextContent(CUSTOM_SUM_INVALID)
   })
@@ -922,7 +945,7 @@ describe('GroupExpenseFormView: selector de pagador (022 T073)', () => {
       .toEqual(['Ana López', 'Juan Pérez']) // sin la persona simulada ni opción vacía
     await user.selectOptions(payer, 'u:15')
     await fillAmount(user, '100')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     await screen.findByText('Detalle del gasto')
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({ payerUserId: 15 })
@@ -938,7 +961,7 @@ describe('GroupExpenseFormView: selector de pagador (022 T073)', () => {
     expect(payer).toBeDisabled()
     expect(payer).toHaveValue('u:7')
     await fillAmount(user, '100')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
     await screen.findByText('Detalle del gasto')
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({ payerUserId: 7 })
   })
@@ -960,10 +983,10 @@ describe('GroupExpenseFormView: selector de pagador (022 T073)', () => {
     renderView()
     await user.selectOptions(await screen.findByLabelText('¿Quién pagó?'), 'u:15')
     await fillAmount(user, '100')
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent(ONLY_OWN_PAYMENTS_MESSAGE)
-    expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
   })
 
   it('si el 403 no trae detalle usa el mensaje por defecto', async () => {
@@ -971,7 +994,7 @@ describe('GroupExpenseFormView: selector de pagador (022 T073)', () => {
     const user = userEvent.setup()
     renderView()
     await fillAmount(user, '100')
-    await user.click(await screen.findByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user, await screen.findByRole('button', { name: 'Guardar' }))
 
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent(ONLY_OWN_PAYMENTS_MESSAGE)
   })
@@ -998,8 +1021,8 @@ describe('GroupExpenseFormView: gasto personal al crear (022 T077)', () => {
     await fillAmount(user, '250')
     await user.click(await sharedSwitch())
 
-    expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
+    await saveForm(user)
 
     await screen.findByText('Detalle del gasto')
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({
@@ -1017,7 +1040,7 @@ describe('GroupExpenseFormView: gasto personal al crear (022 T077)', () => {
     await fillAmount(user, '250')
     await user.selectOptions(await screen.findByLabelText('¿Quién pagó?'), 'u:15')
     await user.click(await sharedSwitch())
-    await user.click(screen.getByRole('button', { name: 'Guardar gasto' }))
+    await saveForm(user)
 
     await screen.findByText('Detalle del gasto')
     expect(createGroupExpense.mock.calls[0][1]).toMatchObject({
@@ -1102,7 +1125,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     const user = userEvent.setup()
     await edit()
     await changeAmount(user, '2.000')
-    await user.click(save())
+    await saveForm(user, save())
 
     expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
     expect(updateGroupExpense).toHaveBeenCalledWith('3', '12', { amount: '2000.00' })
@@ -1119,7 +1142,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     await user.clear(date)
     await user.type(date, '06/01/2026')
     await user.clear(screen.getByLabelText('Descripción'))
-    await user.click(save())
+    await saveForm(user, save())
 
     await screen.findByText('Detalle del gasto')
     expect(updateGroupExpense).toHaveBeenCalledWith('3', '12', {
@@ -1132,7 +1155,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
   it('sin cambios no llama a la API y muestra el mensaje del servidor', async () => {
     const user = userEvent.setup()
     await edit()
-    await user.click(save())
+    await saveForm(user, save())
 
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent(EDIT_NOTHING_MESSAGE)
     expect(updateGroupExpense).not.toHaveBeenCalled()
@@ -1142,7 +1165,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     const user = userEvent.setup()
     await edit()
     await changeAmount(user, 'abc')
-    await user.click(save())
+    await saveForm(user, save())
 
     expect(await screen.findByText('Ingresá un monto válido')).toBeInTheDocument()
     expect(updateGroupExpense).not.toHaveBeenCalled()
@@ -1158,7 +1181,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     ]) {
       updateGroupExpense.mockResolvedValueOnce({ ok: false, status, detail, fields: {} })
       await changeAmount(user, String(status))
-      await user.click(save())
+      await saveForm(user, save())
       await waitFor(() => expect(screen.getByTestId('group-expense-error')).toHaveTextContent(detail))
       expect(screen.getByLabelText('Monto')).toHaveValue(String(status))
     }
@@ -1175,7 +1198,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
       fields: { amount: 'El monto no puede superar 999.999.999,99' },
     })
     await changeAmount(user, '5')
-    await user.click(save())
+    await saveForm(user, save())
     expect(await screen.findByText('El monto no puede superar 999.999.999,99')).toBeInTheDocument()
 
     updateGroupExpense.mockResolvedValueOnce({
@@ -1185,7 +1208,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
       fields: { body: 'Enviá al menos un campo para editar' },
     })
     await changeAmount(user, '6')
-    await user.click(save())
+    await saveForm(user, save())
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent('Enviá al menos un campo para editar')
   })
 
@@ -1194,7 +1217,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     const user = userEvent.setup()
     await edit()
     await changeAmount(user, '7')
-    await user.click(save())
+    await saveForm(user, save())
 
     expect(await screen.findByTestId('group-expense-error')).toHaveTextContent(GROUP_EXPENSE_UPDATE_ERROR_MESSAGE)
     expect(screen.getByLabelText('Monto')).toHaveValue('7')
@@ -1205,7 +1228,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     const user = userEvent.setup()
     await edit()
     await changeAmount(user, '7')
-    await user.click(save())
+    await saveForm(user, save())
     await waitFor(() => expect(setUser).toHaveBeenCalledWith(null))
   })
 
@@ -1248,7 +1271,7 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
     const user = userEvent.setup()
     await edit({ ...PERSONAL, payer: JUAN, createdBy: JUAN })
     await changeAmount(user, '8')
-    await user.click(save())
+    await saveForm(user, save())
     await screen.findByText('Detalle del gasto')
     expect(updateGroupExpense).toHaveBeenCalledWith('3', '12', { amount: '8.00' })
   })
@@ -1268,3 +1291,212 @@ describe('GroupExpenseFormView: editar un gasto personal (022 T077)', () => {
   })
 })
 
+
+describe('GroupExpenseFormView: datos de 007 y diseño (027 US3)', () => {
+  function renderEditOf(expense) {
+    getGroupExpense.mockResolvedValue({ ok: true, expense })
+    return render(
+      <MemoryRouter initialEntries={['/groups/3/expenses/12/edit']}>
+        <Routes>
+          <Route path="/groups/:id/expenses/:expenseId/edit" element={<GroupExpenseFormView />} />
+          <Route path="/groups/:id/expenses/:expenseId" element={<p>Detalle del gasto</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  const PERSONAL = {
+    id: 12,
+    groupId: 3,
+    amount: '1500.00',
+    currency: 'ARS',
+    date: '2026-01-05',
+    description: 'Súper',
+    payer: { userId: 7, name: 'Ana López' },
+    createdBy: { userId: 7, name: 'Ana López' },
+    shares: [{ position: 0, type: 'REGISTERED', userId: 7, name: 'Ana López', amount: '1500.00', isPayer: true }],
+    debts: [],
+  }
+
+  it('el alta envía categoría, tipo y medio de pago', async () => {
+    const user = userEvent.setup()
+    createGroupExpense.mockResolvedValue({ ok: true, expense: { id: 99 } })
+    renderView()
+
+    await fillAmount(user, '300')
+    await user.selectOptions(screen.getByLabelText('Categoría'), 'LEISURE')
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'RECURRING')
+    await saveForm(user)
+
+    await waitFor(() => expect(createGroupExpense).toHaveBeenCalledTimes(1))
+    expect(createGroupExpense.mock.calls[0][1]).toMatchObject({
+      ...CLASSIFICATION,
+      category: 'LEISURE',
+      type: 'RECURRING',
+    })
+    // Un gasto compartido "Recurrente" es informativo: no se pide ni se envía frecuencia.
+    expect(screen.queryByLabelText('Frecuencia')).not.toBeInTheDocument()
+    expect(createGroupExpense.mock.calls[0][1]).not.toHaveProperty('frequency')
+  })
+
+  it('en el alta los tres campos son obligatorios', async () => {
+    const user = userEvent.setup()
+    renderView()
+    const amount = await screen.findByLabelText('Monto')
+    await user.type(amount, '300')
+
+    await saveForm(user)
+
+    expect(await screen.findByText('La categoría es obligatoria')).toBeInTheDocument()
+    expect(screen.getByText('El tipo de gasto es obligatorio')).toBeInTheDocument()
+    expect(screen.getByText('El medio de pago es obligatorio')).toBeInTheDocument()
+    expect(createGroupExpense).not.toHaveBeenCalled()
+  })
+
+  it('los 400 de clasificación se muestran junto a su campo', async () => {
+    const user = userEvent.setup()
+    createGroupExpense.mockResolvedValue({
+      ok: false,
+      status: 400,
+      fields: { category: 'La categoría no es válida' },
+    })
+    renderView()
+
+    await fillAmount(user, '300')
+    await saveForm(user)
+
+    expect(await screen.findByText('La categoría no es válida')).toBeInTheDocument()
+    expect(screen.getByLabelText('Categoría')).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('la fecha usa el calendario y la moneda ofrece las del usuario y "Ver más…"', async () => {
+    renderView()
+    await screen.findByLabelText('Monto')
+
+    expect(screen.getByRole('button', { name: 'Abrir calendario' })).toBeInTheDocument()
+    const options = within(screen.getByLabelText('Moneda'))
+      .getAllByRole('option', { hidden: true })
+      .map((option) => option.textContent)
+    expect(options).toEqual(expect.arrayContaining(['Peso argentino', 'Dólar estadounidense', 'Euro', 'Ver más…']))
+  })
+
+  it('tiene Cancelar a la izquierda y Guardar a la derecha, y el formulario de alta es de altura fija', async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <MemoryRouter initialEntries={['/groups/3/expenses/new']}>
+        <Routes>
+          <Route path="/groups/:id/expenses/new" element={<GroupExpenseFormView />} />
+          <Route path="/groups/:id" element={<p>Pantalla del grupo</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await screen.findByLabelText('Monto')
+
+    expect(container.querySelector('form')).toHaveClass('group-expense__form--fixed')
+    const buttons = container.querySelectorAll('.expense-actions button')
+    expect(buttons[0]).toHaveTextContent('Cancelar')
+    expect(buttons[1]).toHaveTextContent('Guardar')
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByText('Pantalla del grupo')).toBeInTheDocument()
+    expect(createGroupExpense).not.toHaveBeenCalled()
+  })
+
+  it('la edición precarga la clasificación y envía solo la que cambió', async () => {
+    const user = userEvent.setup()
+    updateGroupExpense.mockResolvedValue({ ok: true, expense: PERSONAL })
+    const { container } = renderEditOf({ ...PERSONAL, category: 'FOOD', type: 'ONE_TIME', paymentMethod: 'CASH' })
+    await screen.findByLabelText('Monto')
+
+    expect(container.querySelector('form')).not.toHaveClass('group-expense__form--fixed')
+    expect(screen.getByLabelText('Categoría')).toHaveValue('FOOD')
+    expect(screen.getByLabelText('Medio de pago')).toHaveValue('CASH')
+
+    await user.selectOptions(screen.getByLabelText('Medio de pago'), 'TRANSFER')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(updateGroupExpense).toHaveBeenCalledWith('3', '12', { paymentMethod: 'TRANSFER' }))
+  })
+
+  it('un gasto anterior a 027, sin clasificación, se puede editar sin completarla', async () => {
+    const user = userEvent.setup()
+    updateGroupExpense.mockResolvedValue({ ok: true, expense: PERSONAL })
+    renderEditOf(PERSONAL)
+    const amount = await screen.findByLabelText('Monto')
+
+    expect(screen.getByLabelText('Categoría')).toHaveValue('')
+    await user.clear(amount)
+    await user.type(amount, '2000')
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(updateGroupExpense).toHaveBeenCalledWith('3', '12', { amount: '2000.00' }))
+  })
+
+  it('"Cancelar" en la edición vuelve al detalle del gasto', async () => {
+    const user = userEvent.setup()
+    renderEditOf(PERSONAL)
+    await screen.findByLabelText('Monto')
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.getByText('Detalle del gasto')).toBeInTheDocument()
+  })
+})
+
+describe('GroupExpenseFormView: resumen final antes de guardar (027)', () => {
+  const row = (summary, label) => summary.getByText(label).nextSibling
+
+  it('muestra grupo, monto, clasificación, pagador y la parte de cada uno; guarda solo al confirmar', async () => {
+    const user = userEvent.setup()
+    getGroup.mockResolvedValue({ ok: true, group: { ...group().group, name: 'Depto' } })
+    createGroupExpense.mockResolvedValue({ ok: true, expense: { id: 99 } })
+    renderView()
+    await fillAmount(user, '300')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    const summary = within(await screen.findByRole('dialog', { name: 'Confirmá el gasto' }))
+    expect(createGroupExpense).not.toHaveBeenCalled()
+    expect(row(summary, 'Grupo')).toHaveTextContent('Depto')
+    expect(row(summary, 'Monto')).toHaveTextContent('$ 300,00 ARS')
+    expect(row(summary, 'Categoría')).toHaveTextContent('Alimentos')
+    expect(row(summary, '¿Quién pagó?')).toHaveTextContent('Ana López')
+    expect(row(summary, 'Reparto')).toHaveTextContent('Partes iguales')
+    const shares = summary.getByRole('list', { name: 'Parte de cada uno' })
+    expect(within(shares).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Ana López$ 100,00 ARS',
+      'Juan Pérez$ 100,00 ARS',
+      'Abuela$ 100,00 ARS',
+    ])
+
+    await user.click(summary.getByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
+    expect(createGroupExpense).toHaveBeenCalledTimes(1)
+  })
+
+  it('un gasto personal del grupo se resume sin reparto', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '300')
+    await user.click(await screen.findByRole('switch', { name: SHARED_LABEL }))
+
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    const summary = within(await screen.findByRole('dialog', { name: 'Confirmá el gasto' }))
+    expect(row(summary, 'Reparto')).toHaveTextContent('Gasto personal (sin deudas)')
+    expect(summary.queryByRole('list', { name: 'Parte de cada uno' })).not.toBeInTheDocument()
+  })
+
+  it('"Volver" cierra el resumen sin guardar', async () => {
+    const user = userEvent.setup()
+    renderView()
+    await fillAmount(user, '300')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+    await user.click(await screen.findByRole('button', { name: 'Volver' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(createGroupExpense).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Monto')).toHaveValue('300')
+  })
+})

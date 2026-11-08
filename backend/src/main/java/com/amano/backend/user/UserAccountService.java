@@ -165,7 +165,7 @@ public class UserAccountService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    /** Q1: subset of {ARS, USD, EUR}, no duplicates; empty list is also valid. */
+    /** Q1: subset of {@link Currency} (027: the BCRA catalog), no duplicates; empty list is also valid. */
     private static Set<Currency> parseCurrencies(java.util.List<String> requested,
             Map<String, String> fieldErrors) {
         if (requested == null) {
@@ -185,7 +185,7 @@ public class UserAccountService {
             }
         }
         catch (IllegalArgumentException invalidCurrency) {
-            fieldErrors.put("currencies", "Las monedas deben ser ARS, USD o EUR");
+            fieldErrors.put("currencies", "Moneda no soportada");
             return Set.of();
         }
         return seen.stream().map(Currency::valueOf).collect(java.util.stream.Collectors.toSet());

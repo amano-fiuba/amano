@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { FRIENDS_NETWORK_ERROR_MESSAGE, listFriends } from '../../api/friendsClient'
 import { useAuth } from '../../auth/AuthContext'
 import { NO_FRIENDS_MESSAGE } from '../FriendsList'
+import { normalizeText as normalize } from '../../validation/normalizeText'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
 
@@ -10,22 +11,17 @@ function fullName(friend) {
   return friend.lastName ? `${friend.firstName} ${friend.lastName}` : friend.firstName
 }
 
-// Lowercase and without accents, so "jose" finds "José".
-function normalize(text) {
-  return (text ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-}
-
 function matches(friend, term) {
   return [fullName(friend), friend.email].some((value) => normalize(value).includes(term))
 }
 
 /**
- * Friends list with checkboxes (spec 023 FR-023, FR-024, FR-027). The filter
- * runs on the already loaded list, and `selected` lives in the parent so it
- * survives the filter.
+ * Friends list (spec 023 FR-023, FR-024, FR-027) with the same rows as the
+ * "Agregar miembro" modal: "Agregar" on each friend and "Agregado" once chosen.
+ * The chosen ones are removed from the chips that CreateGroupView shows above
+ * (PeopleChips), which stay visible even while the list is filtered. The
+ * filter runs on the already loaded list, and `selected` lives in the parent so
+ * it survives the filter.
  */
 export default function FriendPicker({ selected, onChange }) {
   const { setUser } = useAuth()
@@ -109,19 +105,31 @@ export default function FriendPicker({ selected, onChange }) {
           Ningún amigo coincide con tu búsqueda
         </p>
       ) : (
-        <ul className="friend-picker__list" aria-label="Tus amigos">
+        <ul className="add-members__list" aria-label="Tus amigos">
           {visible.map((friend) => {
             const isSelected = selected.some(({ id }) => id === friend.id)
             return (
-              <li key={friend.id}>
-                <label className={`friend-picker__row${isSelected ? ' is-selected' : ''}`}>
-                  <input type="checkbox" checked={isSelected} onChange={() => toggle(friend)} />
-                  <img src={friend.avatarUrl || DEFAULT_AVATAR} alt="" width={36} height={36} />
-                  <span className="friend-picker__identity">
-                    <strong>{fullName(friend)}</strong>
-                    <span>{friend.email}</span>
-                  </span>
-                </label>
+              <li
+                key={friend.id}
+                className={isSelected ? 'add-members__row is-member' : 'add-members__row'}
+              >
+                <img src={friend.avatarUrl || DEFAULT_AVATAR} alt="" width={36} height={36} />
+                <span className="add-members__identity">
+                  <strong>{fullName(friend)}</strong>
+                  <span>{friend.email}</span>
+                </span>
+                {isSelected ? (
+                  <span className="add-members__added">Agregado</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="group-action"
+                    aria-label={`Agregar a ${fullName(friend)}`}
+                    onClick={() => toggle(friend)}
+                  >
+                    Agregar
+                  </button>
+                )}
               </li>
             )
           })}

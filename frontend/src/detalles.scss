@@ -1,9 +1,9 @@
 // Detalles sobre la estética actual: botones en relieve, patrón de fondo y los
-// colores del logo. El azul sigue siendo la base; el naranja marca interacción.
+// colores del logo. El turquesa es la base; el naranja marca interacción.
 // Se importa después de los estilos de cada pantalla.
 
-$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete";
-$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout, .delete-friend-dialog__cancel";
+$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .quick-actions__item, .date-field__toggle, .date-field__nav, .date-field__day, .group-photo__change, .form-success, .friend-card__delete, .confirm-modal__close, .people-chip button";
+$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout, .delete-friend-dialog__cancel, .choice-dialog__cancel, .choice-dialog__retry, .expense-actions__cancel";
 $primarios: "button:not(#{$quietos}, #{$secundarios}), .buttonLink, .home-cta:not(.home-cta--secondary)";
 $tiempo: 120ms;
 
@@ -11,7 +11,7 @@ $tiempo: 120ms;
   // Del logo. Sobre naranja el texto va oscuro: el blanco no llega a 3:1.
   --color-naranja: #f77c42;
   --color-naranja-claro: #fab370;
-  --color-sobre-naranja: #1c2e45;
+  --color-sobre-naranja: #12343b;
   --color-turquesa: #09a0a2;
   --tecla-luz: color-mix(in srgb, white 28%, transparent);
   --tecla-sombra: color-mix(in srgb, var(--color-texto) 26%, transparent);
@@ -25,7 +25,7 @@ $tiempo: 120ms;
 
 :root[data-theme='dark'] {
   --color-naranja: #fb8f46;
-  --color-sobre-naranja: #161e2a;
+  --color-sobre-naranja: #0e1b22;
   --color-turquesa: #24a0b3;
   --tecla-luz: color-mix(in srgb, white 45%, transparent);
   --tecla-sombra: color-mix(in srgb, black 55%, transparent);
@@ -66,8 +66,9 @@ $tiempo: 120ms;
   }
 }
 
-.group-confirm__danger,
-.delete-friend-dialog__confirm {
+// Confirmar de ConfirmModal: tecla roja, como toda acción destructiva
+// (023 FR-002; los colores base están en index.scss).
+.confirm-modal__confirm {
   --tecla-borde: var(--tecla-borde-error);
   --tecla-borde-hover: var(--tecla-borde-error);
   --tecla-pulsada: var(--color-error);
@@ -100,6 +101,23 @@ $tiempo: 120ms;
   &:disabled {
     box-shadow: none;
     transform: none;
+  }
+}
+
+// "Salir" del grupo: secundario destructivo, con borde, sombra y presionado en
+// rojo en vez de naranja (023 FR-002).
+.group-action.group-action--danger {
+  &:hover:not(:disabled) {
+    border-color: var(--color-error);
+    box-shadow: 0 4px 0 var(--color-error);
+    color: var(--color-error);
+  }
+
+  &:active:not(:disabled) {
+    border-color: var(--color-error);
+    background: color-mix(in srgb, var(--color-error) 18%, var(--color-superficie));
+    box-shadow: 0 0 0 var(--color-error);
+    color: var(--color-error);
   }
 }
 
@@ -147,7 +165,7 @@ button.app-header__action {
   }
 }
 
-// AppHeader.scss fija el azul del botón "+" en modo oscuro con más especificidad.
+// AppHeader.scss fija el color del botón "+" en modo oscuro con más especificidad.
 :root[data-theme='dark'] button.quick-actions__toggle:active,
 :root[data-theme='dark'] button.quick-actions__toggle.is-open,
 :root[data-theme='dark'] button.quick-actions__toggle.is-open:hover {

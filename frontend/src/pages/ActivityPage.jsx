@@ -4,6 +4,7 @@ import { useSessionData } from '../hooks/useSessionData'
 import { CATEGORY_OPTIONS, labelOf } from '../validation/expenseCatalog'
 import { formatAmount, formatIsoDate } from '../validation/expenseFormat'
 import './MainPage.scss'
+import HomeLink from '../components/HomeLink'
 
 // Pantalla de actividad personal: los últimos 200 gastos propios.
 export default function ActivityPage() {
@@ -11,6 +12,7 @@ export default function ActivityPage() {
 
   return (
     <main className="page">
+      <HomeLink />
       <h1>Actividad personal</h1>
 
       {status === 'loading' && <p aria-busy="true">Cargando…</p>}

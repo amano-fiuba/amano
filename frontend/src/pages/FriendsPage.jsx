@@ -7,7 +7,10 @@ import {
 } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
 import FriendsList from '../components/FriendsList'
+import ListSearch, { ListSearchNoMatches } from '../components/ListSearch'
 import { useSnackbar } from '../components/Snackbar'
+import { filterPeople, fullName } from '../utils/personSearch'
+import HomeLink from '../components/HomeLink'
 
 // Exact messages of the spec (FR-013), exported for the tests.
 export const NO_PENDING_REQUESTS_MESSAGE = 'No tenés solicitudes de amistad pendientes'
@@ -17,10 +20,7 @@ export const REJECTED_MESSAGE = 'Solicitud de amistad rechazada'
 const DEFAULT_AVATAR = '/avatar-default.png'
 const ACCEPT_LABEL = 'Aceptar'
 const REJECT_LABEL = 'Rechazar'
-
-function fullName(sender) {
-  return sender.lastName ? `${sender.firstName} ${sender.lastName}` : sender.firstName
-}
+export const NO_REQUEST_MATCHES_MESSAGE = 'Ninguna solicitud coincide con tu búsqueda'
 
 // "Amigos" screen (features 011 US3 and 012 US1/US2/US3). The "Solicitudes"
 // section lists the pending requests received by the session user and lets the
@@ -39,6 +39,7 @@ export default function FriendsPage() {
   const [responding, setResponding] = useState(null)
   const [notice, setNotice] = useState(null)
   const [friendsReloadKey, setFriendsReloadKey] = useState(0)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -111,112 +112,129 @@ export default function FriendsPage() {
     return responding.action === 'ACCEPT' ? 'accepting' : 'rejecting'
   }
 
+  const showRequests = !isLoading && !error
+  const visibleRequests = filterPeople(requests, search, (request) => request.sender)
+
   return (
-    <main className="page friends-page">
+    <main className="friends-page">
       <header className="friends-page__header">
+        <HomeLink />
         <h1>Amigos</h1>
         <p className="friends-page__lead">
           Consultá tus amigos y revisá las solicitudes de amistad que recibiste.
         </p>
       </header>
 
-      <FriendsList reloadKey={friendsReloadKey} />
+      <div className="friends-page__columns">
+        <FriendsList reloadKey={friendsReloadKey} />
 
-      <section className="friends-requests" aria-labelledby="friends-requests-title">
-        <div className="friends-requests__header">
-          <h2 id="friends-requests-title">Solicitudes</h2>
-          {!isLoading && !error && requests.length > 0 && (
-            <span className="friends-requests__count" aria-live="polite">
-              {requests.length === 1 ? '1 pendiente' : `${requests.length} pendientes`}
-            </span>
+        <section className="friends-requests" aria-labelledby="friends-requests-title">
+          <div className="friends-requests__header">
+            <h2 id="friends-requests-title">Solicitudes pendientes</h2>
+            {!isLoading && !error && requests.length > 0 && (
+              <span className="friends-requests__count" aria-live="polite">
+                {requests.length === 1 ? '1 pendiente' : `${requests.length} pendientes`}
+              </span>
+            )}
+          </div>
+
+          {showRequests && requests.length > 0 && (
+            <ListSearch
+              label="Buscar en Solicitudes pendientes"
+              value={search}
+              onChange={setSearch}
+            />
           )}
-        </div>
 
-        {isLoading && (
-          <div className="friends-requests__loading" role="status">
-            <span className="button-spinner" aria-hidden="true" />
-            <p>Cargando solicitudes…</p>
-          </div>
-        )}
+          {isLoading && (
+            <div className="friends-requests__loading" role="status">
+              <span className="button-spinner" aria-hidden="true" />
+              <p>Cargando solicitudes…</p>
+            </div>
+          )}
 
-        {!isLoading && error && (
-          <div className="friends-requests__error" role="alert">
-            <p>{error}</p>
-            <button
-              type="button"
-              className="friends-requests__retry"
-              onClick={() => {
-                setIsLoading(true)
-                setError(null)
-                setReloadToken((token) => token + 1)
-              }}
+          {!isLoading && error && (
+            <div className="friends-requests__error" role="alert">
+              <p>{error}</p>
+              <button
+                type="button"
+                className="friends-requests__retry"
+                onClick={() => {
+                  setIsLoading(true)
+                  setError(null)
+                  setReloadToken((token) => token + 1)
+                }}
+              >
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {!isLoading && !error && notice && (
+            <p
+              className={`friends-requests__notice friends-requests__notice--${notice.kind}`}
+              role="status"
             >
-              Reintentar
-            </button>
-          </div>
-        )}
+              {notice.message}
+            </p>
+          )}
 
-        {!isLoading && !error && notice && (
-          <p
-            className={`friends-requests__notice friends-requests__notice--${notice.kind}`}
-            role="status"
-          >
-            {notice.message}
-          </p>
-        )}
+          {!isLoading && !error && !notice && requests.length === 0 && (
+            <p className="friends-requests__empty" role="status">
+              {NO_PENDING_REQUESTS_MESSAGE}
+            </p>
+          )}
 
-        {!isLoading && !error && !notice && requests.length === 0 && (
-          <p className="friends-requests__empty" role="status">
-            {NO_PENDING_REQUESTS_MESSAGE}
-          </p>
-        )}
+          {showRequests && requests.length > 0 && visibleRequests.length === 0 && (
+            <ListSearchNoMatches message={NO_REQUEST_MATCHES_MESSAGE} query={search} />
+          )}
 
-        {!isLoading && !error && requests.length > 0 && (
-          <ul className="friends-requests__list" aria-label="Solicitudes pendientes">
-            {requests.map((request) => {
-              const actionState = rowActionState(request)
-              return (
-                <li
-                  key={request.id}
-                  className="friend-request-card"
-                  data-testid={`friend-request-${request.id}`}
-                >
-                  <img
-                    className="friend-request-card__avatar"
-                    src={request.sender.avatarUrl || DEFAULT_AVATAR}
-                    alt=""
-                    width={44}
-                    height={44}
-                  />
-                  <div className="friend-request-card__identity">
-                    <strong>{fullName(request.sender)}</strong>
-                    <span>{request.sender.email}</span>
-                  </div>
-                  <span className="friend-request-card__status">Pendiente</span>
-                  <div className="friend-request-card__actions">
-                    <button
-                      type="button"
-                      className="friend-request-card__accept"
-                      disabled={actionState !== 'idle'}
-                      onClick={() => handleRespond(request, 'ACCEPT')}
-                    >
-                      {actionState === 'accepting' ? 'Aceptando…' : ACCEPT_LABEL}
-                    </button>
-                    <button
-                      type="button"
-                      className="friend-request-card__reject"
-                      disabled={actionState !== 'idle'}
-                      onClick={() => handleRespond(request, 'REJECT')}
-                    >
-                      {actionState === 'rejecting' ? 'Rechazando…' : REJECT_LABEL}
-                    </button>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
+          {showRequests && visibleRequests.length > 0 && (
+            <ul className="friends-requests__list" aria-label="Solicitudes pendientes">
+              {visibleRequests.map((request) => {
+                const actionState = rowActionState(request)
+                return (
+                  <li
+                    key={request.id}
+                    className="friend-request-card"
+                    data-testid={`friend-request-${request.id}`}
+                  >
+                    <img
+                      className="friend-request-card__avatar"
+                      src={request.sender.avatarUrl || DEFAULT_AVATAR}
+                      alt=""
+                      width={44}
+                      height={44}
+                    />
+                    <div className="friend-request-card__identity">
+                      <strong>{fullName(request.sender)}</strong>
+                      <span>{request.sender.email}</span>
+                    </div>
+                    <div className="friend-request-card__actions">
+                      <button
+                        type="button"
+                        className="friend-request-card__accept"
+                        disabled={actionState !== 'idle'}
+                        onClick={() => handleRespond(request, 'ACCEPT')}
+                      >
+                        {actionState === 'accepting' ? 'Aceptando…' : ACCEPT_LABEL}
+                      </button>
+                      <button
+                        type="button"
+                        className="friend-request-card__reject"
+                        disabled={actionState !== 'idle'}
+                        onClick={() => handleRespond(request, 'REJECT')}
+                      >
+                        {actionState === 'rejecting' ? 'Rechazando…' : REJECT_LABEL}
+                      </button>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+      </div>
     </main>
   )
 }

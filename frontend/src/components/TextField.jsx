@@ -10,6 +10,7 @@ export default function TextField({
   error,
   hint,
   leadingIcon,
+  hideLabel = false,
   required,
   transformOnBlur,
   ...inputProps
@@ -47,7 +48,9 @@ export default function TextField({
 
   return (
     <div className={error ? 'field field--invalid' : 'field'}>
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id} className={hideLabel ? 'visually-hidden' : undefined}>
+        {label}
+      </label>
       {leadingIcon ? (
         <span className="field__control field__control--with-icon">
           <span className="field__icon" aria-hidden="true">

@@ -1,12 +1,28 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { listGroups, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
-import { byLatestActivity, formatActivityDate, memberCountLabel } from './groupDisplay'
+import {
+  GROUP_SORT_OPTIONS,
+  formatActivityDate,
+  memberCountLabel,
+  sortGroups,
+} from './groupDisplay'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
+import ListSearch from '../../components/ListSearch'
+import { normalizeSearch } from '../../utils/personSearch'
 import './groups.scss'
+import HomeLink from '../../components/HomeLink'
 
 function groupCountLabel(count) {
   return count === 1 ? '1 grupo' : `${count} grupos`
+}
+
+export const NO_GROUP_MATCHES_MESSAGE = 'Ningún grupo coincide con tu búsqueda'
+
+function filterGroups(groups, query) {
+  const term = normalizeSearch(query.trim())
+  if (!term) return groups
+  return groups.filter((group) => normalizeSearch(group.name).includes(term))
 }
 
 function roleLabel(role) {
@@ -14,20 +30,19 @@ function roleLabel(role) {
 }
 
 export default function GroupListView() {
-  const location = useLocation()
-  // Un usuario recién verificado llega desde /verify-email con state
-  // { verifiedWelcome: true }: más acá que al dashboard, porque el primer paso
-  // de la app es unirse o crear un grupo. El estado se limpia al recargar.
-  const verifiedWelcome = location.state?.verifiedWelcome === true
   const [groups, setGroups] = useState(null)
   const [error, setError] = useState('')
+  // `?q=` llega desde "Ver más" del buscador de la barra.
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  const [order, setOrder] = useState('recent')
 
   useEffect(() => {
     let cancelled = false
     listGroups().then((result) => {
       if (cancelled) return
       if (result.ok) {
-        setGroups(byLatestActivity(result.groups))
+        setGroups(result.groups)
       } else {
         setError(GROUPS_NETWORK_ERROR_MESSAGE)
       }
@@ -38,11 +53,13 @@ export default function GroupListView() {
   }, [])
 
   const isEmpty = groups?.length === 0
+  const visibleGroups = groups ? sortGroups(filterGroups(groups, search), order) : []
 
   return (
     <main className="page groups-page">
       <header className="groups-page__header">
         <div>
+          <HomeLink />
           <h1>Mis grupos</h1>
           {groups?.length > 0 && (
             <p className="groups-page__count" data-testid="groups-count">
@@ -56,12 +73,6 @@ export default function GroupListView() {
           </Link>
         )}
       </header>
-      {verifiedWelcome && (
-        <p role="status" data-testid="groups-verified-welcome">
-          Cuenta verificada, ¡bienvenido! Creá tu primer grupo o esperá a que te
-          agreguen a uno.
-        </p>
-      )}
       {error && (
         <p role="alert" data-testid="groups-error">
           {error}
@@ -77,8 +88,34 @@ export default function GroupListView() {
         </div>
       )}
       {groups?.length > 0 && (
+        <ListSearch
+          label="Buscar en Mis grupos"
+          placeholder="Buscá por nombre"
+          value={search}
+          onChange={setSearch}
+        >
+          <select
+            className="list-search__sort"
+            aria-label="Ordenar Mis grupos"
+            value={order}
+            onChange={(event) => setOrder(event.target.value)}
+          >
+            {GROUP_SORT_OPTIONS.map(({ code, label }) => (
+              <option key={code} value={code}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </ListSearch>
+      )}
+      {groups?.length > 0 && visibleGroups.length === 0 && (
+        <p className="groups-page__no-matches" role="status">
+          {NO_GROUP_MATCHES_MESSAGE}
+        </p>
+      )}
+      {visibleGroups.length > 0 && (
         <ul className="group-rows" data-testid="groups-list">
-          {groups.map((group) => (
+          {visibleGroups.map((group) => (
             <li key={group.id}>
               <Link className="group-row" to={`/groups/${group.id}`}>
                 {group.photo ? (

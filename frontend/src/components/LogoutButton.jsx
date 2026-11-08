@@ -1,3 +1,4 @@
+import { startTransition } from 'react'
 import { useNavigate } from 'react-router'
 import { logout } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
@@ -19,8 +20,15 @@ export default function LogoutButton() {
     } catch {
       // Sin sesión del backend: el cleanup local alcanza.
     }
-    setUser(null)
-    navigate('/login', { replace: true })
+    // React Router aplica el cambio de URL dentro de una transición. Si
+    // setUser(null) fuera urgente, se renderizaría antes con la URL vieja y
+    // ProtectedRoute mandaría al login con state.from (p. ej. /settings), así
+    // que el próximo login volvería ahí en vez de a la pantalla principal.
+    // Las dos actualizaciones van en la misma transición para aplicarse juntas.
+    startTransition(() => {
+      setUser(null)
+      navigate('/login', { replace: true })
+    })
   }
 
   return (

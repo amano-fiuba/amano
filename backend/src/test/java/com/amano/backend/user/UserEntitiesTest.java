@@ -49,8 +49,9 @@ class UserEntitiesTest {
     }
 
     @Test
-    void currencyEnumCarriesExactlyTheAllowedCodes() {
-        assertThat(Currency.values()).containsExactly(Currency.ARS, Currency.USD, Currency.EUR);
+    void currencyEnumKeepsArsUsdEurFirst() {
+        // 027: the catalog grows (see CurrencyTest), but the 002 currencies keep their order.
+        assertThat(Currency.values()).startsWith(Currency.ARS, Currency.USD, Currency.EUR);
     }
 
     @Test

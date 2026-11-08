@@ -211,7 +211,7 @@ class ProfileEditIT {
                 .andExpect(jsonPath("$.properties." + FIELDS + ".lastName")
                         .value("El apellido debe tener entre 2 y 50 caracteres"))
                 .andExpect(jsonPath("$.properties." + FIELDS + ".currencies")
-                        .value("Las monedas deben ser ARS, USD o EUR"))
+                        .value("Moneda no soportada"))
                 .andExpect(jsonPath("$.properties." + FIELDS + ".cbuCvu")
                         .value("El CBU/CVU debe tener 22 dígitos"));
 
@@ -220,6 +220,33 @@ class ProfileEditIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Ana"))
                 .andExpect(jsonPath("$.lastName").doesNotExist());
+    }
+
+    /** 027 T014 (FR-014): preferences come from the BCRA catalog, not only ARS/USD/EUR. */
+    @Test
+    void putMeAcceptsCatalogCurrenciesAndRejectsUnsupportedOnes() throws Exception {
+        String email = "ana.edit027@example.com";
+        registerAccount(email, "S3gura!2026", "Ana", null);
+        Cookie session = verifiedSessionOf(email);
+
+        mockMvc.perform(put("/api/users/me").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "firstName", "Ana",
+                                "currencies", java.util.List.of("ARS", "BRL")))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currencies.length()").value(2));
+        assertThat(jdbcTemplate.queryForList(
+                "SELECT currency_code FROM user_currencies WHERE user_id = ?", String.class, userIdOf(email)))
+                .containsExactlyInAnyOrder("ARS", "BRL");
+
+        mockMvc.perform(put("/api/users/me").cookie(session)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "firstName", "Ana",
+                                "currencies", java.util.List.of("XAU")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties." + FIELDS + ".currencies").value("Moneda no soportada"));
     }
 
     /** FR-010: duplicated currency values are rejected (contract table). */
