@@ -36,7 +36,7 @@ Los identificadores FR-### y SC-### de esta especificación son propios de 015.
 - Q: ¿Qué muestra el resumen de perfil? → A: Foto, nombre, CBU, monedas y correo.
 - Q: ¿Se mantiene la columna "Actividad reciente" del boceto? → A: No, se descarta. El espacio libre de la columna derecha muestra solicitudes pendientes.
 - Q: ¿Cómo se ve el acceso a perfil en la barra? → A: Con la foto de perfil, o el avatar por defecto si no tiene una propia.
-- Decisión de implementación: tras verificar el correo se llega a `/` (pantalla principal), con un snackbar "Cuenta verificada". Modifica FR-005 de 003: el mensaje de bienvenida pasa a ser ese snackbar.
+- Decisión de implementación: tras verificar el correo se sigue llegando a `/groups`, porque esa pantalla ya muestra la bienvenida con el primer paso (crear un grupo).
 
 ## User Scenarios & Testing *(mandatory)*
 
