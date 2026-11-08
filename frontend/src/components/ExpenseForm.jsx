@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import TextField from './TextField'
 import SelectField from './SelectField'
+import DatePickerField from './DatePickerField'
+import CurrencySelect from './CurrencySelect'
 import { useSnackbar } from './Snackbar'
 import {
   EXPENSE_NETWORK_ERROR_MESSAGE,
@@ -9,7 +11,6 @@ import {
 } from '../api/expenseClient'
 import {
   CATEGORY_OPTIONS,
-  CURRENCY_OPTIONS,
   FREQUENCY_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   TYPE_OPTIONS,
@@ -28,6 +29,8 @@ export const EXPENSE_REUSED_KEY_MESSAGE =
   'La operación ya fue registrada con datos distintos. Reintentá el guardado.'
 export const EXPENSE_SESSION_EXPIRED_MESSAGE =
   'Tu sesión expiró. Iniciá sesión nuevamente.'
+// 027 (FR-019): leaving with loaded data asks first.
+export const EXPENSE_DISCARD_CONFIRM = '¿Descartar el gasto? Se perderán los datos cargados'
 
 const REQUIRED_SELECT_MESSAGES = {
   currency: 'La moneda es obligatoria',
@@ -58,8 +61,11 @@ const FIELD_NAMES = [
  * errors are surfaced next to their field; network/5xx keep the entered data.
  * Feature 009: choosing "Recurrente" reveals the required "Frecuencia" select,
  * which is only sent for recurring expenses (FR-001/FR-002).
+ * Feature 027 (FR-010, FR-011, FR-018, FR-019): calendar date field, the user's
+ * currencies plus "Ver más" (BCRA catalog), group-like card surface and a
+ * Cancelar / Guardar gasto footer. Never a shared-expense panel.
  */
-export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
+export default function ExpenseForm({ today, initialCurrency = 'ARS', preferredCurrencies = [], onCancel }) {
   const {
     register,
     handleSubmit,
@@ -68,7 +74,7 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
     setError,
     clearErrors,
     control,
-    formState: { errors, isSubmitting, dirtyFields },
+    formState: { errors, isSubmitting, dirtyFields, isDirty },
   } = useForm({
     mode: 'onBlur',
     defaultValues: {
@@ -130,6 +136,13 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
   }
   const validateRequiredSelect = (field) => (value) =>
     value ? true : REQUIRED_SELECT_MESSAGES[field]
+
+  const handleCancel = () => {
+    if (isDirty && !window.confirm(EXPENSE_DISCARD_CONFIRM)) {
+      return
+    }
+    onCancel?.()
+  }
 
   const onSubmit = async (values) => {
     clearErrors()
@@ -210,87 +223,104 @@ export default function ExpenseForm({ today, initialCurrency = 'ARS' }) {
         </p>
       )}
 
-      <TextField
-        label="Monto"
-        inputMode="decimal"
-        autoComplete="off"
-        error={errors.amount?.message}
-        {...register('amount', {
-          validate: (value) => {
-            const amount = parseArgentineAmount(value)
-            return amount.ok ? true : amount.error
-          },
-        })}
-      />
-
-      <SelectField
-        label="Moneda"
-        options={CURRENCY_OPTIONS}
-        error={errors.currency?.message}
-        {...register('currency', {
-          validate: validateRequiredSelect('currency'),
-        })}
-      />
-
-      <TextField
-        label="Fecha"
-        placeholder="dd/mm/aaaa"
-        autoComplete="off"
-        error={errors.date?.message}
-        {...register('date', { validate: validateDate })}
-      />
-
-      <SelectField
-        label="Categoría"
-        options={CATEGORY_OPTIONS}
-        error={errors.category?.message}
-        {...register('category', {
-          validate: validateRequiredSelect('category'),
-        })}
-      />
-
-      <SelectField
-        label="Tipo de gasto"
-        options={TYPE_OPTIONS}
-        error={errors.type?.message}
-        {...register('type', {
-          validate: validateRequiredSelect('type'),
-        })}
-      />
-
-      {isRecurring && (
-        <SelectField
-          label="Frecuencia"
-          options={FREQUENCY_OPTIONS}
-          error={errors.frequency?.message}
-          {...register('frequency', {
-            validate: (value, values) =>
-              values.type !== 'RECURRING' || value ? true : FREQUENCY_REQUIRED_MESSAGE,
+      <div className="group-card expense-form__card">
+        <TextField
+          label="Monto"
+          inputMode="decimal"
+          autoComplete="off"
+          error={errors.amount?.message}
+          {...register('amount', {
+            validate: (value) => {
+              const amount = parseArgentineAmount(value)
+              return amount.ok ? true : amount.error
+            },
           })}
         />
-      )}
 
-      <SelectField
-        label="Medio de pago"
-        options={PAYMENT_METHOD_OPTIONS}
-        error={errors.paymentMethod?.message}
-        {...register('paymentMethod', {
-          validate: validateRequiredSelect('paymentMethod'),
-        })}
-      />
+        <Controller
+          name="currency"
+          control={control}
+          rules={{ validate: validateRequiredSelect('currency') }}
+          render={({ field }) => (
+            <CurrencySelect
+              {...field}
+              preferred={preferredCurrencies}
+              error={errors.currency?.message}
+            />
+          )}
+        />
 
-      <TextField
-        label="Descripción"
-        autoComplete="off"
-        error={errors.description?.message}
-        {...register('description', {
-          validate: (value) => validateDescription(value) || true,
-        })}
-      />
+        <Controller
+          name="date"
+          control={control}
+          rules={{ validate: validateDate }}
+          render={({ field }) => (
+            <DatePickerField
+              {...field}
+              label="Fecha"
+              max={todayIso ?? undefined}
+              error={errors.date?.message}
+            />
+          )}
+        />
 
-      <button type="submit" disabled={isSubmitting}>
-        {isSubmitting ? 'Guardando…' : 'Guardar gasto'}
-      </button>
+        <SelectField
+          label="Categoría"
+          options={CATEGORY_OPTIONS}
+          error={errors.category?.message}
+          {...register('category', {
+            validate: validateRequiredSelect('category'),
+          })}
+        />
+
+        <SelectField
+          label="Tipo de gasto"
+          options={TYPE_OPTIONS}
+          error={errors.type?.message}
+          {...register('type', {
+            validate: validateRequiredSelect('type'),
+          })}
+        />
+
+        {isRecurring && (
+          <SelectField
+            label="Frecuencia"
+            options={FREQUENCY_OPTIONS}
+            error={errors.frequency?.message}
+            {...register('frequency', {
+              validate: (value, values) =>
+                values.type !== 'RECURRING' || value ? true : FREQUENCY_REQUIRED_MESSAGE,
+            })}
+          />
+        )}
+
+        <SelectField
+          label="Medio de pago"
+          options={PAYMENT_METHOD_OPTIONS}
+          error={errors.paymentMethod?.message}
+          {...register('paymentMethod', {
+            validate: validateRequiredSelect('paymentMethod'),
+          })}
+        />
+
+        <TextField
+          label="Descripción"
+          autoComplete="off"
+          error={errors.description?.message}
+          {...register('description', {
+            validate: (value) => validateDescription(value) || true,
+          })}
+        />
+      </div>
+
+      <div className="expense-actions">
+        <button type="button" className="expense-actions__cancel" onClick={handleCancel}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Guardando…' : 'Guardar gasto'}
+        </button>
+      </div>
     </form>
   )
 }

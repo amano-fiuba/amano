@@ -23,6 +23,7 @@ import {
 } from '../validation/avatarValidation'
 import { useSnackbar } from '../components/Snackbar'
 import TextField from '../components/TextField'
+import CurrencySelector from '../components/CurrencySelector'
 import { useAuth } from '../auth/AuthContext'
 import {
   AVATAR_MAX_BYTES,
@@ -36,11 +37,6 @@ import {
 // Mensajes de avatar compartidos con el registro (mismo backend).
 const AVATAR_SIZE_MESSAGE = 'El archivo es demasiado grande (máximo 2 MB)'
 
-const MONEDAS = [
-  { code: 'ARS', label: 'Peso argentino (ARS)' },
-  { code: 'USD', label: 'Dólar estadounidense (USD)' },
-  { code: 'EUR', label: 'Euro (EUR)' },
-]
 
 export default function ProfileEditPage() {
   const { user, setUser } = useAuth()
@@ -119,11 +115,6 @@ export default function ProfileEditPage() {
     }
   }, [setUser]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleMoneda = (code) => {
-    setCurrencies((prev) =>
-      prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code],
-    )
-  }
 
   // FR-011 enmendada: hay modificaciones pendientes si algún campo del form
   // se apartó de la precarga, las monedas difieren de las iniciales (conjunto,
@@ -344,19 +335,11 @@ export default function ProfileEditPage() {
           {...bindField('cbuCvu', rules(validateCbu))}
         />
 
-        <fieldset>
-          <legend>Monedas preferidas (opcional; vacío = ARS por defecto)</legend>
-          {MONEDAS.map(({ code, label }) => (
-            <label key={code}>
-              <input
-                type="checkbox"
-                checked={currencies.includes(code)}
-                onChange={() => toggleMoneda(code)}
-              />
-              {label}
-            </label>
-          ))}
-        </fieldset>
+        <CurrencySelector
+          value={currencies}
+          onChange={setCurrencies}
+          legend="Monedas preferidas (opcional; vacío = ARS por defecto)"
+        />
 
         {/* FR-011 enmendada: Guardar solo cuando hay cambios pendientes;
             siempre deshabilitado durante el envío. */}

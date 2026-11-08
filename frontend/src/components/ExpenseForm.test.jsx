@@ -1,7 +1,16 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../api/currencyClient', () => ({
+  listCurrencies: vi.fn().mockResolvedValue({
+    ok: true,
+    currencies: [
+      { code: 'ARS', bcraName: 'PESO' },
+      { code: 'BRL', bcraName: 'REAL' },
+    ],
+  }),
+}))
 vi.mock('../api/expenseClient', () => ({
   EXPENSE_NETWORK_ERROR_MESSAGE:
     'No se pudo guardar el gasto. Intenta nuevamente',
@@ -11,6 +20,7 @@ vi.mock('../api/expenseClient', () => ({
 import { createExpense } from '../api/expenseClient'
 import { SNACKBAR_VISIBLE_MS } from './Snackbar'
 import ExpenseForm, {
+  EXPENSE_DISCARD_CONFIRM,
   EXPENSE_REUSED_KEY_MESSAGE,
   FREQUENCY_REQUIRED_MESSAGE,
   EXPENSE_SESSION_EXPIRED_MESSAGE,
@@ -555,7 +565,14 @@ describe('ExpenseForm accesibilidad y móvil (T047)', () => {
     for (const label of order) {
       await user.tab()
       expect(screen.getByLabelText(label)).toHaveFocus()
+      if (label === 'Fecha') {
+        // 027 (FR-010): the calendar button follows the date field.
+        await user.tab()
+        expect(screen.getByRole('button', { name: 'Abrir calendario' })).toHaveFocus()
+      }
     }
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toHaveFocus()
     await user.tab()
     expect(submitButton()).toHaveFocus()
   })
@@ -665,3 +682,77 @@ describe('ExpenseForm frecuencia de gastos recurrentes (009, FR-001/FR-002)', ()
   })
 })
 
+
+describe('ExpenseForm: correcciones del gasto personal (027, US2)', () => {
+  it('va en una tarjeta celeste, sin "Gasto compartido", con Cancelar y Guardar gasto al pie', () => {
+    const { container } = renderForm()
+
+    expect(container.querySelector('.group-card.expense-form__card')).toContainElement(
+      screen.getByLabelText('Monto'),
+    )
+    expect(screen.queryByText(/gasto compartido/i)).not.toBeInTheDocument()
+    const actions = container.querySelector('.expense-actions')
+    const buttons = actions.querySelectorAll('button')
+    expect(buttons[0]).toHaveTextContent('Cancelar')
+    expect(buttons[1]).toHaveTextContent('Guardar gasto')
+    expect(container.querySelector('.expense-form__card')).not.toContainElement(actions)
+  })
+
+  it('"Cancelar" sin cambios sale directo', async () => {
+    const onCancel = vi.fn()
+    const confirm = vi.spyOn(window, 'confirm')
+    const user = userEvent.setup()
+    renderForm({ onCancel })
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(confirm).not.toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  it('"Cancelar" con datos cargados pide confirmación y solo sale si se acepta', async () => {
+    const onCancel = vi.fn()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const user = userEvent.setup()
+    renderForm({ onCancel })
+    await user.type(screen.getByLabelText('Monto'), '10')
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(confirm).toHaveBeenCalledWith(EXPENSE_DISCARD_CONFIRM)
+    expect(onCancel).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  it('la fecha se elige con el calendario, que no permite días futuros', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Abrir calendario' }))
+    expect(screen.getByRole('button', { name: '22 de octubre de 2026' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Mes anterior' }))
+    await user.click(screen.getByRole('button', { name: '30 de septiembre de 2026' }))
+
+    expect(screen.getByLabelText('Fecha')).toHaveValue('30/09/2026')
+  })
+
+  it('lista las monedas del usuario y permite enviar una elegida en "Ver más"', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 1 } })
+    renderForm({ initialCurrency: 'ARS', preferredCurrencies: ['ARS', 'USD'] })
+
+    const select = screen.getByLabelText('Moneda')
+    expect(within(select).getByRole('option', { name: 'Dólar estadounidense' })).toBeInTheDocument()
+    await user.selectOptions(select, 'Ver más…')
+    await user.click(await screen.findByLabelText('Real brasileño (BRL)'))
+    await user.click(screen.getByRole('button', { name: 'Elegir' }))
+    await completeRequired(user)
+    await user.click(submitButton())
+
+    await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
+    expect(createExpense.mock.calls[0][0].currency).toBe('BRL')
+  })
+})

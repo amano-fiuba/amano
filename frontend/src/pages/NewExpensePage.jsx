@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { me } from '../api/authClient'
 import ExpenseForm from '../components/ExpenseForm'
 import useCurrentDate from '../hooks/useCurrentDate'
@@ -16,6 +17,8 @@ export const PROFILE_FALLBACK_NOTICE =
 export default function NewExpensePage() {
   const { today } = useCurrentDate()
   const [currency, setCurrency] = useState('ARS')
+  const [preferred, setPreferred] = useState(['ARS'])
+  const navigate = useNavigate()
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
@@ -25,7 +28,12 @@ export default function NewExpensePage() {
         return
       }
       if (result.ok) {
-        setCurrency(preferredCurrency(result.profile?.currencies))
+        const currencies = Array.isArray(result.profile?.currencies) ? result.profile.currencies : []
+        setCurrency(preferredCurrency(currencies))
+        // 027 (FR-011): the currency select lists the profile currencies first.
+        if (currencies.length > 0) {
+          setPreferred(currencies)
+        }
       } else if (result.network) {
         setNotice(PROFILE_FALLBACK_NOTICE)
       }
@@ -43,7 +51,12 @@ export default function NewExpensePage() {
           {notice}
         </p>
       )}
-      <ExpenseForm today={today} initialCurrency={currency} />
+      <ExpenseForm
+        today={today}
+        initialCurrency={currency}
+        preferredCurrencies={preferred}
+        onCancel={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/'))}
+      />
     </main>
   )
 }
