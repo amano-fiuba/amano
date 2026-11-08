@@ -447,8 +447,9 @@ describe('GroupDebtsView: registrar un pago parcial o total (022 T075/T082)', ()
       idempotencyKey: '11111111-1111-4111-8111-111111111111',
     })
     expect(showSnackbar).toHaveBeenCalledWith(PAYMENT_SUCCESS_MESSAGE)
-    const row = await screen.findByTestId('my-debt-row')
-    expect(row).toHaveTextContent('Pago parcial · faltan $ 2.333,33')
+    await waitFor(() => {
+      expect(screen.getByTestId('my-debt-row')).toHaveTextContent('Pago parcial · faltan $ 2.333,33')
+    })
     expect(getPendingDebts).toHaveBeenCalledTimes(2)
   })
 
