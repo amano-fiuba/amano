@@ -1,4 +1,4 @@
-// Tema global (derivado de inicial.scss): paleta cálida beige/verde, Montserrat.
+// Tema global: paleta turquesa/petróleo y naranja tomada del logo, Montserrat.
 :root {
   font-family: "Montserrat", "Segoe UI", Arial, sans-serif;
   color: var(--color-texto);
@@ -11,41 +11,46 @@
   color-scheme: light;
 }
 
-/* Azul cielo — variables base */
+/* Turquesa del logo — variables base */
 :root {
   color-scheme: light;
-  --color-fondo: #edf4fc;
+  --color-fondo: #eaf5f4;
   --color-superficie: #ffffff;
-  --color-superficie-fuerte: #dce8f7;
-  --color-texto: #1c2e45;
-  --color-texto-suave: #5c6f87;
-  --color-borde: #c5d5e9;
-  --color-acento: #4b80c5;
-  --color-acento-oscuro: #28548c;
+  --color-superficie-fuerte: #d3ebe8;
+  --color-texto: #12343b;
+  --color-texto-suave: #4f6f72;
+  --color-borde: #bcdcd8;
+  --color-acento: #0b7f82;
+  --color-acento-oscuro: #0a5f66;
   --color-oliva: #668b83;
   --color-error: #b42336;
   // Tono base fijo: si apuntara a var(--color-acento), el modo oscuro
   // (que redefiniría --color-acento en función del tono) crearía una
   // referencia circular entre variables y las invalidaría a todas.
-  --color-acento-tono: #4b80c5;
+  --color-acento-tono: #0b7f82;
   --color-error-tono: #b42336;
-  --color-barra: #28548c;
+  --color-barra: #0a5f66;
+  // Sombras teñidas con el petróleo del logo en vez de gris azulado.
+  --color-sombra: rgb(8 40 44);
   // Esquinas de toda la app: cambiar estos dos valores alcanza.
   --radio-tarjeta: 8px;
   --radio-control: 6px;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-fondo: #161e2a;
-  --color-superficie: #202c3b;
-  --color-superficie-fuerte: #2b3a4d;
-  --color-texto: #edf4ff;
-  --color-texto-suave: #a8b8ce;
-  --color-borde: #3b4d64;
-  --color-acento: color-mix(in srgb, var(--color-acento-tono) 78%, white);
+  --color-fondo: #0e1b22;
+  --color-superficie: #16262f;
+  --color-superficie-fuerte: #1f343f;
+  --color-texto: #e8f3f5;
+  --color-texto-suave: #a0b9c0;
+  --color-borde: #2e4652;
+  --color-acento: #2fb3c0;
   --color-acento-oscuro: var(--color-acento);
+  // Lo usa el botón "+" de acciones rápidas: petróleo con texto blanco legible.
+  --color-acento-tono: #127a8a;
   --color-error: color-mix(in srgb, var(--color-error-tono) 72%, white);
-  --color-barra: #1b2b40;
+  --color-barra: #0b2a35;
+  --color-sombra: rgb(0 0 0);
 }
 * {
   box-sizing: border-box;
