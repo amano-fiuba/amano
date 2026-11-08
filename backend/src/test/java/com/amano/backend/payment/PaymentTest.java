@@ -104,18 +104,28 @@ class PaymentTest {
         assertThat(payment.getDecidedAt()).isEqualTo(at);
     }
 
+    /**
+     * Rewritten for partial payments (022 T085): {@code legacy} is only an origin marker now, so a
+     * REPORTED payment written by the inherited 018 flow is decided like any other; what still
+     * blocks a decision is the status.
+     */
     @Test
-    void onlyReportedNonLegacyPaymentsAcceptADecision() {
+    void onlyReportedPaymentsAcceptADecisionWhateverTheirOrigin() {
         Payment confirmed = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("3333.33"),
                 LocalDate.of(2026, 11, 7), ANA, "Ana López", KEY, false, PaymentStatus.CONFIRMED);
-        Payment legacy = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
-                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true, PaymentStatus.REPORTED);
+        Payment legacyConfirmed = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
+                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true, PaymentStatus.CONFIRMED);
         OffsetDateTime at = OffsetDateTime.parse("2026-11-07T12:30:00-03:00");
 
         assertThatThrownBy(() -> confirmed.confirmBy(ANA, at)).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> legacy.rejectBy(ANA, at)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> legacyConfirmed.rejectBy(ANA, at)).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> reported().confirmBy(null, at)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> reported().confirmBy(ANA, null)).isInstanceOf(IllegalArgumentException.class);
+
+        Payment legacyReported = Payment.of(PaymentFixtures.juanDebt(), new BigDecimal("1000.00"),
+                LocalDate.of(2026, 11, 5), ANA, "Ana López", KEY, true, PaymentStatus.REPORTED);
+        legacyReported.confirmBy(ANA, at);
+        assertThat(legacyReported.getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
     }
 
     private static Payment reported() {

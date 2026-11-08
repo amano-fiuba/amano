@@ -38,4 +38,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      * the existing result instead of inserting a duplicate.
      */
     Optional<Payment> findByDebtIdAndIdempotencyKey(Long debtId, UUID idempotencyKey);
+
+    /** 022 T075: payments of a group in the given state, oldest first (validation queue). */
+    List<Payment> findByGroupIdAndStatusOrderByCreatedAtAsc(Long groupId, PaymentStatus status);
 }

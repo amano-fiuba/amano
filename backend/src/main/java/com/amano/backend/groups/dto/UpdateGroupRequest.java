@@ -15,6 +15,28 @@ public class UpdateGroupRequest {
 
     private PermissionsInput permissions;
 
+    /**
+     * 022 T078: days until a pending debt becomes overdue. {@code null} means
+     * "never overdue", so whether the key was sent is tracked apart from its value.
+     */
+    private Integer debtDueDays;
+
+    private boolean debtDueDaysPresent;
+
+    public Integer getDebtDueDays() {
+        return debtDueDays;
+    }
+
+    public void setDebtDueDays(Integer debtDueDays) {
+        this.debtDueDays = debtDueDays;
+        this.debtDueDaysPresent = true;
+    }
+
+    /** True when the payload carried {@code debtDueDays} (even as {@code null}). */
+    public boolean isDebtDueDaysPresent() {
+        return debtDueDaysPresent;
+    }
+
     public static class PermissionsInput {
 
         private Boolean membersCannotMakeExpenses;

@@ -17,6 +17,10 @@ public class GroupResponse {
     private Creator creator;
     private int membersCount;
     private String creatorRole;
+    private String primaryCurrency;
+
+    public String getPrimaryCurrency() { return primaryCurrency; }
+    public void setPrimaryCurrency(String primaryCurrency) { this.primaryCurrency = primaryCurrency; }
 
     public static class Creator {
 

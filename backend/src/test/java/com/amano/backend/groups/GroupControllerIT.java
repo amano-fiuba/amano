@@ -120,6 +120,66 @@ class GroupControllerIT {
                 .andExpect(jsonPath("$.creator.email").value("creator@example.com"));
     }
 
+    /** 022 T068: POST /api/groups takes an optional primaryCurrency (ARS by default). */
+    @Test
+    void t068CreationWithoutPrimaryCurrencyDefaultsToArs() throws Exception {
+        Cookie session = verifiedSessionOf("curdefault@example.com");
+
+        String created = mockMvc.perform(post("/api/groups")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "name", "Sin moneda",
+                        "member", Map.of("memberType", "SIMULATED", "identifier", "curdefaultguest@example.com", "name", "Invitada")))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.primaryCurrency").value("ARS"))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(session))
+                .andExpect(jsonPath("$.primaryCurrency").value("ARS"));
+    }
+
+    @Test
+    void t068CreationWithAnAllowedPrimaryCurrencyPersistsAndReturnsIt() throws Exception {
+        Cookie session = verifiedSessionOf("curusd@example.com");
+
+        String created = mockMvc.perform(post("/api/groups")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "name", "En dólares",
+                        "primaryCurrency", "USD",
+                        "member", Map.of("memberType", "SIMULATED", "identifier", "curusdguest@example.com", "name", "Invitada")))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.primaryCurrency").value("USD"))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(session))
+                .andExpect(jsonPath("$.primaryCurrency").value("USD"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT primary_currency FROM groups WHERE id = ?", String.class, groupId)).isEqualTo("USD");
+    }
+
+    @Test
+    void t068CreationWithAnInvalidPrimaryCurrencyAnswers400WithoutCreatingTheGroup() throws Exception {
+        Cookie session = verifiedSessionOf("curbad@example.com");
+        Integer before = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups", Integer.class);
+
+        mockMvc.perform(post("/api/groups")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "name", "Moneda rara",
+                        "primaryCurrency", "BRL",
+                        "member", Map.of("memberType", "SIMULATED", "identifier", "curbadguest@example.com", "name", "Invitada")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.primaryCurrency").value("La moneda no es válida"));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups", Integer.class)).isEqualTo(before);
+    }
+
     @Test
     void creationWithSimulatedProfileSucceeds() throws Exception {
         Cookie session = verifiedSessionOf("simcreator@example.com");

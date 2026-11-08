@@ -288,6 +288,49 @@ public class GroupExpenseService {
                 debtRepository.findByExpenseId(expense.getId()), caller, groupCurrency);
     }
 
+    /**
+     * T069 (022): read-only quote from {@code currency} to the group's primary
+     * currency on {@code date}. Reuses {@link ExchangeRateProvider} (and its
+     * cache); same currency answers rate 1 without calling it. Writes nothing and
+     * deliberately holds no transaction, so no DB connection is kept during the
+     * external call.
+     */
+    public ExchangeQuoteResponse getExchangeQuote(Long callerId, Long groupId, String currency, String date) {
+        activeMembership(callerId, groupId);
+        Currency groupCurrency = primaryCurrencyOf(groupId, Currency.ARS);
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        Currency from = null;
+        try {
+            from = Currency.valueOf(currency == null ? "" : currency.trim().toUpperCase());
+        }
+        catch (IllegalArgumentException e) {
+            fieldErrors.put("currency", currency == null || currency.isBlank() ? CURRENCY_REQUIRED : CURRENCY_INVALID);
+        }
+        LocalDate parsedDate = null;
+        try {
+            parsedDate = LocalDate.parse(date == null ? "" : date.trim());
+            String dateError = ExpenseDateValidator.validationError(parsedDate, null);
+            if (dateError != null) {
+                fieldErrors.put("date", dateError);
+            }
+        }
+        catch (DateTimeParseException e) {
+            fieldErrors.put("date", DATE_FORMAT);
+        }
+        if (!fieldErrors.isEmpty()) {
+            throw new FieldValidationException(fieldErrors);
+        }
+
+        if (from == groupCurrency) {
+            return new ExchangeQuoteResponse(
+                    BigDecimal.ONE.setScale(BcraExchangeRateClient.RATE_SCALE, RoundingMode.HALF_UP),
+                    parsedDate.toString(), BcraExchangeRateClient.SOURCE_SAME_CURRENCY, groupCurrency.name());
+        }
+        ExchangeRateQuote quote = requireExchangeRateProvider().getQuote(from, groupCurrency, parsedDate);
+        return new ExchangeQuoteResponse(quote.rate(), quote.rateDate().toString(), quote.rateSource(),
+                groupCurrency.name());
+    }
+
     public static final String EXPENSE_HAS_PARTICIPANTS = "No se permite editar un gasto que ya tiene participantes";
     public static final String EXPENSE_HAS_DEBTS = "No se puede eliminar un gasto con deudas asociadas";
     public static final String EXPENSE_EDIT_EMPTY = "Enviá al menos un campo para editar";
@@ -856,9 +899,12 @@ public class GroupExpenseService {
                         : expense.getSplitMethod().name());
     }
 
-    /** 018 FR-016: the debt is not settled and the caller is its debtor, its creditor or an ADMIN. */
+    /**
+     * 018 FR-016 / 022: the debt accepts a payment (pending, partially paid or overdue; not settled and
+     * with no payment waiting for validation) and the caller is its debtor, its creditor or an ADMIN.
+     */
     private boolean canRegisterPayment(Debt debt, GroupMember caller) {
-        return !debt.getStatus().isSettled()
+        return debt.getStatus().isPayable()
                 && permissionChecker.canRegisterPayment(caller.getRole(), caller.getId().getUserId(),
                         debt.getDebtorUserId(), debt.getCreditorUserId());
     }

@@ -5,11 +5,12 @@ import java.math.BigDecimal;
 /**
  * State of a debt (017 research.md D5, extended by 022 D3).
  *
- * <p>{@code PENDING} means nothing paid, {@code PARTIALLY_PAID} is the legacy
- * state of 018 (read-only for 022), {@code PAYMENT_REPORTED} is a full payment
- * waiting for an administrator, {@code PAID} is a settled payment without
- * validation, {@code VERIFIED} is a settled payment confirmed by an
- * administrator and {@code OVERDUE} is a pending debt past the group deadline.
+ * <p>{@code PENDING} means nothing paid, {@code PARTIALLY_PAID} that part of the
+ * debt was paid and a balance remains (partial payments, 018 and 022),
+ * {@code PAYMENT_REPORTED} that a payment waits for an administrator (and
+ * {@code paidAmount} is untouched), {@code PAID} is a debt fully paid without
+ * validation, {@code VERIFIED} one whose last payment an administrator
+ * confirmed, and {@code OVERDUE} is a pending debt past the group deadline.
  *
  * <p>{@code PAID} and {@code VERIFIED} are settled; {@code PAYMENT_REPORTED} is
  * not. The {@code ck_debts_status} and {@code ck_debts_status_matches_paid}
@@ -25,9 +26,9 @@ public enum DebtStatus {
 
     /**
      * Status that corresponds to {@code paid} of {@code amount} for the 018
-     * flow; rejects impossible values. It keeps producing only
-     * {@code PENDING}/{@code PARTIALLY_PAID}/{@code PAID}; the 022 full-payment
-     * flow chooses {@code PAID} or {@code PAYMENT_REPORTED} explicitly.
+     * flow; rejects impossible values. It produces only
+     * {@code PENDING}/{@code PARTIALLY_PAID}/{@code PAID}; {@code PAYMENT_REPORTED},
+     * {@code VERIFIED} and {@code OVERDUE} are set explicitly by their flows.
      */
     public static DebtStatus of(BigDecimal amount, BigDecimal paid) {
         if (amount == null || paid == null || paid.signum() < 0 || paid.compareTo(amount) > 0) {
@@ -37,11 +38,6 @@ public enum DebtStatus {
             return PENDING;
         }
         return paid.compareTo(amount) == 0 ? PAID : PARTIALLY_PAID;
-    }
-
-    /** Status of a full payment of the remaining balance (022, D3). */
-    public static DebtStatus settledBy(boolean requiresValidation) {
-        return requiresValidation ? PAYMENT_REPORTED : PAID;
     }
 
     /** True once nothing is left to pay; PENDING, PARTIALLY_PAID, PAYMENT_REPORTED and OVERDUE are unsettled. */

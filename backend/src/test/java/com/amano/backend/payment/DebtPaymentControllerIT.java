@@ -138,26 +138,131 @@ class DebtPaymentControllerIT {
                 s.juanDebt)).isEqualTo("REPORTED");
     }
 
+    /**
+     * Rewritten for partial payments (022 T038/T039): before, anything below the balance was rejected
+     * with "debe ser el total"; now only a payment above the balance, zero or negative is a 400.
+     */
     @Test
-    void aPartialPaymentIsRejectedWithAClearMessage() throws Exception {
-        s.registerFull(s.juanSession, s.juanDebt, "1000.00")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.detail").value("La solicitud contiene campos inválidos"))
-                .andExpect(jsonPath("$.properties.fields.amount")
-                        .value("El monto del pago debe ser el total de la deuda pendiente"));
-
+    void anAmountAboveTheBalanceOrNotPositiveIsRejectedWithAClearMessage() throws Exception {
         s.registerFull(s.juanSession, s.juanDebt, "3333.34")
                 .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("La solicitud contiene campos inválidos"))
                 .andExpect(jsonPath("$.properties.fields.amount")
                         .value("El monto del pago excede la deuda pendiente"));
 
         s.registerFull(s.juanSession, s.juanDebt, "0")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.amount").value("El monto debe ser mayor a cero"));
+        s.registerFull(s.juanSession, s.juanDebt, "-5.00").andExpect(status().isBadRequest());
 
         assertThat(s.payments(s.juanDebt)).isZero();
         assertThat(s.statusOf(s.juanDebt)).isEqualTo("PENDING");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("0.00");
         assertThat(s.paymentEvents()).isZero();
+    }
+
+    @Test
+    void aPartialPaymentWithoutValidationIsConfirmedAtOnceAndLeavesThePartiallyPaidDebt() throws Exception {
+        String body = s.registerFull(s.juanSession, s.juanDebt, "1000.00")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"))
+                .andReturn().getResponse().getContentAsString();
+        long first = objectMapper.readTree(body).get("paymentId").asLong();
+
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PARTIALLY_PAID");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("1000.00");
+        // The balances use the outstanding balance: Juan now owes 2.333,33 and Ana is owed 2.333,33 + Abuela's 3.333,33.
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-2333.33");
+        assertThat(s.netBalanceOf(s.ana)).isEqualByComparingTo("5666.66");
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/activity").cookie(s.anaSession)
+                .param("eventType", "PAYMENT_REGISTERED"))
+                .andExpect(jsonPath("$.content[0].details.paymentId").value(first))
+                .andExpect(jsonPath("$.content[0].details.amount").value("1000.00"))
+                .andExpect(jsonPath("$.content[0].details.debtStatusBefore").value("PENDING"))
+                .andExpect(jsonPath("$.content[0].details.debtStatusAfter").value("PARTIALLY_PAID"));
+
+        // A second partial payment is accepted (several CONFIRMED payments live together)...
+        s.registerFull(s.juanSession, s.juanDebt, "1000.00")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("2000.00");
+        // ...but one above the new balance is not.
+        s.registerFull(s.juanSession, s.juanDebt, "1333.34")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.amount").value("El monto del pago excede la deuda pendiente"));
+        // The rest settles it.
+        s.registerFull(s.juanSession, s.juanDebt, "1333.33")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PAID"));
+
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAID");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("3333.33");
+        assertThat(s.payments(s.juanDebt)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payments WHERE debt_id = ? AND status = 'CONFIRMED'",
+                Integer.class, s.juanDebt)).isEqualTo(3);
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void aPartialPaymentWithValidationIsReportedWithoutTouchingThePaidAmount() throws Exception {
+        s.requireValidation();
+
+        s.registerFull(s.juanSession, s.juanDebt, "1000.00")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("REPORTED"))
+                .andExpect(jsonPath("$.debtStatusAfter").value("PAYMENT_REPORTED"));
+
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAYMENT_REPORTED");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("0.00");
+        // Still owed in full until an administrator confirms it.
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-3333.33");
+    }
+
+    @Test
+    void aPartialPaymentOnAnOverdueDebtLeavesItPartiallyPaid() throws Exception {
+        jdbc.update("UPDATE debts SET status = 'OVERDUE' WHERE id = ?", s.juanDebt);
+
+        s.registerFull(s.juanSession, s.juanDebt, "500.00")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
+
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PARTIALLY_PAID");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("500.00");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-2833.33");
+    }
+
+    @Test
+    void theExpenseDetailOnlyOffersToPayWhileTheDebtAcceptsAPayment() throws Exception {
+        String can = "$.debts[?(@.id == %d)].canRegisterPayment".formatted(s.juanDebt);
+        s.requireValidation();
+        s.registerFull(s.juanSession, s.juanDebt, "1000.00").andExpect(status().isCreated());
+
+        // A payment waits for validation: no new payment can be started.
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/expenses/" + s.expenseId).cookie(s.juanSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(can).value(false));
+
+        // Once decided as a partial payment the debt can receive the rest.
+        long paymentId = jdbc.queryForObject("SELECT id FROM payments WHERE debt_id = ?", Long.class, s.juanDebt);
+        s.confirmPayment(s.anaSession, paymentId).andExpect(status().isOk());
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/expenses/" + s.expenseId).cookie(s.juanSession))
+                .andExpect(jsonPath(can).value(true));
+    }
+
+    @Test
+    void thePendingDebtsAndTheSettlementProposalUseTheOutstandingBalance() throws Exception {
+        s.registerFull(s.juanSession, s.juanDebt, "1000.00").andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/debts/pending").cookie(s.juanSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.debtId == %d)].status".formatted(s.juanDebt)).value("PARTIALLY_PAID"))
+                .andExpect(jsonPath("$[?(@.debtId == %d)].paidAmount".formatted(s.juanDebt)).value(1000.0))
+                .andExpect(jsonPath("$[?(@.debtId == %d)].outstanding".formatted(s.juanDebt)).value(2333.33));
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/settlement-proposal").cookie(s.anaSession))
+                .andExpect(status().isOk())
+                // Ana is owed 2.333,33 (Juan) + 3.333,33 (Abuela).
+                .andExpect(jsonPath("$.proposals[0].summary.totalTransferred").value(5666.66));
     }
 
     @Test
@@ -188,10 +293,16 @@ class DebtPaymentControllerIT {
         s.requireValidation();
         s.registerFull(s.juanSession, s.juanDebt, "3333.33").andExpect(status().isCreated());
 
+        // Rewritten: the 409 now has its own voseo message and any amount is refused while one waits.
         s.registerFull(s.juanSession, s.juanDebt, "3333.33")
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value("Esta deuda ya tiene un pago registrado"))
+                .andExpect(jsonPath("$.detail").value(
+                        "Esta deuda ya tiene un pago esperando validación: esperá a que un administrador lo decida"))
                 .andExpect(jsonPath("$.properties.code").value("DEBT_ALREADY_HAS_PAYMENT"));
+        s.registerFull(s.anaSession, s.juanDebt, "100.00")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(
+                        "Esta deuda ya tiene un pago esperando validación: esperá a que un administrador lo decida"));
 
         assertThat(s.activePayments(s.juanDebt)).isEqualTo(1);
         assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAYMENT_REPORTED");

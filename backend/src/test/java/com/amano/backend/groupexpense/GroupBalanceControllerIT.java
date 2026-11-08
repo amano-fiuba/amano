@@ -244,7 +244,19 @@ class GroupBalanceControllerIT {
 
         pay(juanSession, juanDebt, "1000.00");
 
+        // Rewritten for 022 T085: the inherited endpoint now respects the validation setting, so the
+        // payment is only REPORTED and the balances do not move until an administrator confirms it.
         JsonNode ars = currency(balances(200, anaSession), "ARS");
+        assertThat(total(ars)).isEqualByComparingTo("0.00");
+        assertThat(new BigDecimal(member(ars, juan, "REGISTERED").get("netBalance").asString()))
+                .isEqualByComparingTo("-3333.33");
+
+        long paymentId = jdbc.queryForObject("SELECT id FROM payments WHERE debt_id = ?", Long.class, juanDebt);
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/groups/" + groupId + "/payments/" + paymentId + "/confirm").cookie(anaSession))
+                .andExpect(status().isOk());
+
+        ars = currency(balances(200, anaSession), "ARS");
         assertThat(total(ars)).isEqualByComparingTo("0.00");
         assertThat(new BigDecimal(member(ars, juan, "REGISTERED").get("netBalance").asString()))
                 .isEqualByComparingTo("-2333.33");

@@ -174,7 +174,7 @@ class OverdueDebtJobIT {
         // returns to PENDING (no legacy partial payment in this case).
         jdbc.update("UPDATE debts SET status = 'PAYMENT_REPORTED', paid_amount = 0 WHERE id = ?", debtId);
         Debt debt = debtRepository.findById(debtId).orElseThrow();
-        debt.rejectReportedPayment(new BigDecimal("100.00"));
+        debt.rejectReportedPayment();
         debtRepository.saveAndFlush(debt);
         assertThat(statusOf(debtId)).isEqualTo("PENDING");
 

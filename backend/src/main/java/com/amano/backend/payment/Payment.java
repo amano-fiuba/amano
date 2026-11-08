@@ -172,12 +172,13 @@ public class Payment {
     }
 
     /**
-     * Only a non-legacy {@code REPORTED} payment accepts a decision, and the
+     * Only a {@code REPORTED} payment accepts a decision ({@code legacy} is just
+     * an origin marker and plays no part), and the
      * database CHECK {@code ck_payments_decision} requires both decision
      * columns together, so they are always written as a pair.
      */
     private void decide(PaymentStatus target, Long adminUserId, OffsetDateTime decidedAt) {
-        if (status != PaymentStatus.REPORTED || legacy) {
+        if (status != PaymentStatus.REPORTED) {
             throw new IllegalStateException("Este pago no está pendiente de validación");
         }
         if (adminUserId == null || decidedAt == null) {

@@ -16,6 +16,7 @@ import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
+import com.amano.backend.groupexpense.DebtStatus;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
@@ -28,23 +29,26 @@ import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
 /**
- * Registration of a full debt payment (022 US6, plan.md D6). Only the whole
- * outstanding balance is accepted; the caller must be an active member allowed
- * to register the payment, and payer, receiver and currency come from the debt.
- * The debt row is taken with {@code PESSIMISTIC_WRITE}, so two concurrent
- * payments with different keys are serialized and only the first one applies.
+ * Registration of a partial or total debt payment (022 US6, plan.md D6). The
+ * amount must be greater than zero and not greater than the debt's outstanding
+ * balance; the caller must be an active member allowed to register the payment,
+ * and payer, receiver and currency come from the debt. The debt row is taken
+ * with {@code PESSIMISTIC_WRITE}, so concurrent payments over the same debt are
+ * applied one after the other and each one is validated against the balance the
+ * previous one left.
  *
  * <p>Without the group's "Pagos requiere validación" flag the payment is
- * {@code CONFIRMED} and the debt becomes {@code PAID}; with it the payment is
- * {@code REPORTED} and the debt becomes {@code PAYMENT_REPORTED} until an
- * administrator decides (US5, out of this phase).
+ * {@code CONFIRMED}, added to {@code paid_amount} at once, and the debt becomes
+ * {@code PARTIALLY_PAID} (balance left) or {@code PAID}; with it the payment is
+ * {@code REPORTED} and the debt becomes {@code PAYMENT_REPORTED} WITHOUT touching
+ * {@code paid_amount}, and no other payment is accepted until an administrator
+ * decides (PaymentDecisionService).
  */
 @Service
 public class PaymentValidationService {
 
     static final String NOT_ALLOWED =
             "Solo quien debe, quien cobra o un administrador pueden registrar este pago";
-    static final String PARTIAL_PAYMENT = "El monto del pago debe ser el total de la deuda pendiente";
     static final String EXCESSIVE_PAYMENT = "El monto del pago excede la deuda pendiente";
     static final String KEY_REQUIRED = "Indicá la clave de idempotencia";
     static final String KEY_FORMAT = "La clave de idempotencia debe ser un UUID válido";
@@ -107,16 +111,24 @@ public class PaymentValidationService {
             throw new IdempotencyConflictException();
         }
 
+        if (debt.getStatus() == DebtStatus.PAYMENT_REPORTED) {
+            throw DebtAlreadyHasPaymentException.awaitingValidation();
+        }
         if (!debt.getStatus().isPayable()) {
             throw new DebtAlreadyHasPaymentException();
         }
-        requireExactAmount(normalized.amount(), debt.getOutstanding());
+        requireWithinOutstanding(normalized.amount(), debt.getOutstanding());
 
         boolean requiresValidation = groupPermissionsRepository.findByGroupId(groupId)
                 .map(GroupPermissions::isPaymentsRequireValidation)
                 .orElse(false);
         String debtStatusBefore = debt.getStatus().name();
-        debt.applyFullPayment(requiresValidation);
+        if (requiresValidation) {
+            debt.reportPayment(normalized.amount());
+        }
+        else {
+            debt.applyPayment(normalized.amount());
+        }
         PaymentStatus status = requiresValidation ? PaymentStatus.REPORTED : PaymentStatus.CONFIRMED;
         Payment payment = paymentRepository.save(Payment.of(debt, normalized.amount(), LocalDate.now(clock),
                 callerId, nameOf(debt.getCreditorUserId()), normalized.idempotencyKey(), false, status));
@@ -137,10 +149,8 @@ public class PaymentValidationService {
         return new Registration(toResponse(existing, debt), false);
     }
 
-    private static void requireExactAmount(BigDecimal amount, BigDecimal outstanding) {
-        if (amount.compareTo(outstanding) < 0) {
-            throw new FieldValidationException(Map.of("amount", PARTIAL_PAYMENT));
-        }
+    /** Partial payments are allowed: {@code 0 < amount <= outstanding} (the sign is checked on input). */
+    private static void requireWithinOutstanding(BigDecimal amount, BigDecimal outstanding) {
         if (amount.compareTo(outstanding) > 0) {
             throw new FieldValidationException(Map.of("amount", EXCESSIVE_PAYMENT));
         }

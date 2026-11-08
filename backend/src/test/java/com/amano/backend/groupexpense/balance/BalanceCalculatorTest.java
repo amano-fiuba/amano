@@ -163,7 +163,7 @@ class BalanceCalculatorTest {
                 .isEqualByComparingTo("-250.00");
     }
 
-    /** 022 T037: an OVERDUE debt still counts until a full payment settles it. */
+    /** 022 T037: an OVERDUE debt still counts until a payment for its whole balance settles it. */
     @Test
     void anOverdueDebtStillCountsInTheBalanceUntilItIsPaid() {
         Debt overdue = withStatus(registeredDebt(41L, JUAN, "1000.00"), DebtStatus.OVERDUE);
@@ -173,7 +173,7 @@ class BalanceCalculatorTest {
         assertThat(before.get(MemberRef.registered(JUAN))).isEqualByComparingTo("-1000.00");
         assertThat(before.get(MemberRef.registered(ANA))).isEqualByComparingTo("1000.00");
 
-        overdue.applyFullPayment(false);
+        overdue.applyPayment(new BigDecimal("1000.00"));
 
         assertThat(overdue.getStatus()).isEqualTo(DebtStatus.PAID);
         assertThat(BalanceCalculator.calculate(List.of(overdue))).isEmpty();

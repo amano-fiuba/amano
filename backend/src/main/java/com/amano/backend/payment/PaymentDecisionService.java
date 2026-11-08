@@ -1,7 +1,14 @@
 package com.amano.backend.payment;
 
+
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +41,7 @@ public class PaymentDecisionService {
 
     static final String CONFIRM_NOT_ADMIN = "Solo los administradores pueden confirmar pagos";
     static final String REJECT_NOT_ADMIN = "Solo los administradores pueden rechazar pagos";
+    static final String LIST_NOT_ADMIN = "Solo los administradores pueden ver los pagos por validar";
 
     private final PaymentRepository paymentRepository;
     private final DebtRepository debtRepository;
@@ -56,12 +64,38 @@ public class PaymentDecisionService {
     private record Locked(Payment payment, Debt debt) {
     }
 
+    /**
+     * 022 T075: reported payments of the group awaiting a decision, oldest
+     * first. Read-only; non-members get the neutral 404 and non-admin members a 403.
+     */
+    @Transactional(readOnly = true)
+    public List<PendingPaymentDetail> pendingValidation(Long callerId, Long groupId) {
+        GroupMember caller = activeMembership(callerId, groupId);
+        if (!permissionChecker.canDecidePayments(caller.getRole())) {
+            throw new GroupPermissionDeniedException(LIST_NOT_ADMIN);
+        }
+        List<Payment> payments = paymentRepository
+                .findByGroupIdAndStatusOrderByCreatedAtAsc(groupId, PaymentStatus.REPORTED);
+        Map<Long, Debt> debts = debtRepository
+                .findAllById(payments.stream().map(Payment::getDebtId).toList()).stream()
+                .collect(Collectors.toMap(Debt::getId, Function.identity()));
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        return payments.stream()
+                .map(payment -> new PendingPaymentDetail(payment.getId(), payment.getDebtId(),
+                        debts.containsKey(payment.getDebtId()) ? debts.get(payment.getDebtId()).getExpenseId() : null,
+                        payment.getPayerUserId(), payment.getPayerName(), payment.getReceiverName(),
+                        payment.getAmount().setScale(2, RoundingMode.HALF_UP), payment.getCurrency().name(),
+                        payment.getCreatedAt(),
+                        (int) Math.max(0, ChronoUnit.DAYS.between(payment.getCreatedAt(), now))))
+                .toList();
+    }
+
     @Transactional
     public PaymentConfirmationResponse confirm(Long callerId, Long groupId, Long paymentId) {
         Locked locked = lockAndAuthorize(callerId, groupId, paymentId, CONFIRM_NOT_ADMIN);
         String debtStatusBefore = locked.debt().getStatus().name();
         locked.payment().confirmBy(callerId, OffsetDateTime.now(clock));
-        locked.debt().confirmReportedPayment();
+        locked.debt().confirmReportedPayment(locked.payment().getAmount());
         activityEventService.recordPaymentConfirmed(groupId, callerId, detailsOf(locked, debtStatusBefore));
         return new PaymentConfirmationResponse(locked.payment().getId(), locked.payment().getStatus(),
                 locked.debt().getStatus(), callerId);
@@ -72,7 +106,7 @@ public class PaymentDecisionService {
         Locked locked = lockAndAuthorize(callerId, groupId, paymentId, REJECT_NOT_ADMIN);
         String debtStatusBefore = locked.debt().getStatus().name();
         locked.payment().rejectBy(callerId, OffsetDateTime.now(clock));
-        locked.debt().rejectReportedPayment(locked.payment().getAmount());
+        locked.debt().rejectReportedPayment();
         activityEventService.recordPaymentRejected(groupId, callerId, detailsOf(locked, debtStatusBefore));
         return new PaymentRejectionResponse(locked.payment().getId(), locked.payment().getStatus(),
                 locked.debt().getStatus(), callerId);
@@ -103,7 +137,7 @@ public class PaymentDecisionService {
         if (!permissionChecker.canDecidePayments(caller.getRole())) {
             throw new GroupPermissionDeniedException(notAdminMessage);
         }
-        if (payment.isLegacy() || payment.getStatus() != PaymentStatus.REPORTED
+        if (payment.getStatus() != PaymentStatus.REPORTED
                 || debt.getStatus() != DebtStatus.PAYMENT_REPORTED) {
             throw new PaymentNotDecidableException();
         }
