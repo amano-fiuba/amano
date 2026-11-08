@@ -33,6 +33,8 @@ const LINKS_TO_EXPENSE = [
   'PAYMENT_CONFIRMED',
   'PAYMENT_REJECTED',
   'DEBT_OVERDUE',
+  'DEBT_REMINDER_SENT',
+  'PAYER_DUE_NOTICE_SENT',
 ]
 export default function GroupHistoryView({ groupId }) {
   const auth = useAuth()

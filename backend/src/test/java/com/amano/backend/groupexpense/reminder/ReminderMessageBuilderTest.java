@@ -111,6 +111,13 @@ class ReminderMessageBuilderTest {
     }
 
     @Test
+    void oneRemainingDayIsRenderedInSingular() {
+        ReminderMessageBuilder.Mail mail = builder.payerNotice("Grupo Amigos", "Ana López", "Súper",
+                DUE_DATE, 1, List.of());
+        assertThat(mail.body()).contains("1 día restante");
+    }
+
+    @Test
     void failureNoticeExplainsThatThereIsNoRetry() {
         ReminderMessageBuilder.Mail mail = builder.failureNotice("Grupo Amigos", "deuda",
                 "Juan Pérez", "juan@example.com", DUE_DATE, new BigDecimal("3333.33"), Currency.ARS);

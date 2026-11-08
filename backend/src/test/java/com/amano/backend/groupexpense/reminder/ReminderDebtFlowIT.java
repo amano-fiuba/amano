@@ -89,8 +89,10 @@ class ReminderDebtFlowIT {
 
         job.runReminders();
 
-        assertThat(greenMail.waitForIncomingEmail(5_000, 1)).isTrue();
-        MimeMessage mail = greenMail.getReceivedMessages()[0];
+        assertThat(greenMail.waitForIncomingEmail(5_000, 2)).isTrue();
+        List<MimeMessage> debtMails = messagesWithSubject("Recordatorio de deuda - Grupo Amigos");
+        assertThat(debtMails).hasSize(1);
+        MimeMessage mail = debtMails.get(0);
         assertThat(recipients(mail)).containsExactly(debtorEmail);
         assertThat(mail.getSubject()).isEqualTo("Recordatorio de deuda - Grupo Amigos");
         String body = decodedBody(mail);
@@ -106,7 +108,7 @@ class ReminderDebtFlowIT {
                 "\"dueDate\":\"2026-11-20\"");
 
         job.runReminders();
-        assertThat(greenMail.getReceivedMessages()).hasSize(1);
+        assertThat(messagesWithSubject("Recordatorio de deuda - Grupo Amigos")).hasSize(1);
         assertThat(eventCount(groupId, "DEBT_REMINDER_SENT")).isEqualTo(1);
     }
 
@@ -196,8 +198,8 @@ class ReminderDebtFlowIT {
 
         job.runReminders();
 
-        assertThat(greenMail.waitForIncomingEmail(5_000, 2)).isTrue();
-        List<String> recipients = Arrays.stream(greenMail.getReceivedMessages())
+        assertThat(greenMail.waitForIncomingEmail(5_000, 4)).isTrue();
+        List<String> recipients = messagesWithSubject("Recordatorio de deuda - Grupo Amigos").stream()
                 .map(this::recipients)
                 .flatMap(List::stream)
                 .toList();
@@ -302,6 +304,21 @@ class ReminderDebtFlowIT {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM group_activity WHERE group_id = ? AND event_type = ?",
                 Integer.class, groupId, eventType);
+    }
+
+    private List<MimeMessage> messagesWithSubject(String subject) {
+        return Arrays.stream(greenMail.getReceivedMessages())
+                .filter(mail -> subject.equals(subjectOf(mail)))
+                .toList();
+    }
+
+    private String subjectOf(MimeMessage mail) {
+        try {
+            return mail.getSubject();
+        }
+        catch (MessagingException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     private List<String> recipients(MimeMessage mail) {

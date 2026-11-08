@@ -101,7 +101,9 @@ class ReminderFailureIT {
         long expenseId = expense(groupId, creditorId, "2026-10-21", "Súper", "100.00");
         long debtId = debt(groupId, expenseId, debtorId, creditorId, "PENDING", "100.00", "0.00");
 
-        doThrow(new MailSendException("smtp down")).when(mailService).send(any(String.class),
+        doThrow(new MailSendException("smtp down")).when(mailService).send(eq(debtorEmail),
+                any(ReminderMessageBuilder.Mail.class));
+        doThrow(new MailSendException("smtp down")).when(mailService).send(eq(adminEmail),
                 any(ReminderMessageBuilder.Mail.class));
 
         assertThatCode(() -> job.runReminders()).doesNotThrowAnyException();

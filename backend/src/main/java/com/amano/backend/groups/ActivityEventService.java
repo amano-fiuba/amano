@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -154,6 +155,26 @@ public class ActivityEventService {
         map.put("toName", blankToNull(creditorName));
         map.put("dueDate", dueDate == null ? null : dueDate.toString());
         return record(groupId, GroupActivity.GroupActivityType.DEBT_REMINDER_SENT, null, map);
+    }
+
+    /**
+     * 025: records {@code PAYER_DUE_NOTICE_SENT} after a successful delivery.
+     * {@code pendingTotals} is the payer's pending amount per currency at send
+     * time, so the history keeps the snapshot even if the debts change later.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordPayerDueNoticeSent(Long groupId, Long reminderId, Long expenseId,
+            String payerName, String concept, LocalDate dueDate, long daysRemaining,
+            List<Map<String, String>> pendingTotals) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("reminderId", reminderId);
+        map.put("expenseId", expenseId);
+        map.put("payerName", blankToNull(payerName));
+        map.put("concept", blankToNull(concept));
+        map.put("dueDate", dueDate == null ? null : dueDate.toString());
+        map.put("daysRemaining", daysRemaining);
+        map.put("pendingTotals", pendingTotals == null ? List.of() : pendingTotals);
+        return record(groupId, GroupActivity.GroupActivityType.PAYER_DUE_NOTICE_SENT, null, map);
     }
 
     /**

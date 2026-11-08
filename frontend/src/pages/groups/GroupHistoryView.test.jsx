@@ -266,8 +266,32 @@ describe('GroupHistoryView (014)', () => {
     expect(within(entries[1]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
   })
 
-  it('"Ver gasto" enlaza al detalle solo cuando la entrada trae expenseId (017 FR-024)', async () => {
+  it('los eventos de recordatorios enlazan al detalle del gasto (025 T033)', async () => {
     getActivity.mockResolvedValue(page([
+      {
+        id: 2,
+        eventType: 'DEBT_REMINDER_SENT',
+        actor: null,
+        details: { reminderId: 1, debtId: 4, expenseId: 12, amount: '500.00', currency: 'ARS', fromName: 'Juan' },
+        createdAt: '2026-11-03T16:00:00Z',
+      },
+      {
+        id: 1,
+        eventType: 'PAYER_DUE_NOTICE_SENT',
+        actor: null,
+        details: { reminderId: 2, expenseId: 13, payerName: 'Ana', concept: 'Súper' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(within(entries[0]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/12')
+    expect(within(entries[1]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/13')
+  })
+
+  it('"Ver gasto" enlaza al detalle solo cuando la entrada trae expenseId (017 FR-024)', async () => {    getActivity.mockResolvedValue(page([
       {
         id: 2,
         eventType: 'EXPENSE_CREATED',

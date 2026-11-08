@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,13 +119,20 @@ public class ReminderDispatcher {
         transactionTemplate.executeWithoutResult(status -> {
             int updated = reminderRepository.markSent(reminder.getId(), now, target.mail().subject(),
                     target.mail().body(), now);
-            if (updated == 0 || target.debt() == null || target.expense() == null) {
+            if (updated == 0 || target.expense() == null) {
                 return;
             }
-            Debt debt = target.debt();
-            activityEventService.recordDebtReminderSent(group.getId(), reminder.getId(), debt.getId(),
-                    debt.getExpenseId(), debt.getAmount(), debt.getCurrency().name(),
-                    debt.getDebtorName(), target.creditorName(), target.dueDate());
+            if (target.debt() != null) {
+                Debt debt = target.debt();
+                activityEventService.recordDebtReminderSent(group.getId(), reminder.getId(), debt.getId(),
+                        debt.getExpenseId(), debt.getAmount(), debt.getCurrency().name(),
+                        debt.getDebtorName(), target.creditorName(), target.dueDate());
+            }
+            else {
+                activityEventService.recordPayerDueNoticeSent(group.getId(), reminder.getId(),
+                        target.expense().getId(), target.payerName(), target.concept(), target.dueDate(),
+                        target.daysRemaining(), target.pendingTotals());
+            }
         });
     }
 
@@ -155,8 +164,8 @@ public class ReminderDispatcher {
     }
 
     private boolean stillEligible(Group group, Reminder reminder, LocalDate today) {
-        if (reminder.getKind() != ReminderKind.DEBT) {
-            return true;
+        if (reminder.getKind() == ReminderKind.PAYER_NOTICE) {
+            return payerNoticeStillEligible(group, reminder, today);
         }
         Debt debt = debtRepository.findById(reminder.getDebtId()).orElse(null);
         if (debt == null || group.getDebtDueDays() == null) {
@@ -170,9 +179,24 @@ public class ReminderDispatcher {
         return ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate);
     }
 
+    private boolean payerNoticeStillEligible(Group group, Reminder reminder, LocalDate today) {
+        if (group.getDebtDueDays() == null || reminder.getExpenseId() == null) {
+            return false;
+        }
+        GroupExpense expense = groupExpenseRepository.findById(reminder.getExpenseId()).orElse(null);
+        if (expense == null || expense.getExpenseDate() == null) {
+            return false;
+        }
+        LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+        boolean hasEligibleDebt = debtRepository.findByExpenseId(expense.getId()).stream()
+                .filter(debt -> !ReminderSchedule.isPayerOwnDebt(expense, debt))
+                .anyMatch(debt -> ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate));
+        return ReminderSchedule.isNoticeEligible(hasEligibleDebt, today, dueDate);
+    }
+
     private Target targetOf(Group group, Reminder reminder) {
-        if (reminder.getKind() != ReminderKind.DEBT) {
-            return null;
+        if (reminder.getKind() == ReminderKind.PAYER_NOTICE) {
+            return payerNoticeTarget(group, reminder);
         }
         Debt debt = reminder.getDebtId() == null ? null : debtRepository.findById(reminder.getDebtId()).orElse(null);
         if (debt == null || group.getDebtDueDays() == null) {
@@ -189,7 +213,34 @@ public class ReminderDispatcher {
                 expense.getDescription(), debt.getAmount(), debt.getCurrency(), dueDate, debt.getStatus(),
                 group.getReminderMessage());
         return new Target(debt.getDebtorName(), email, dueDate, debt.getAmount(), debt.getCurrency(),
-                mail, debt, expense, creditorName);
+                mail, debt, expense, creditorName, null, null, 0, List.of());
+    }
+
+    private Target payerNoticeTarget(Group group, Reminder reminder) {
+        if (group.getDebtDueDays() == null || reminder.getExpenseId() == null) {
+            return null;
+        }
+        GroupExpense expense = groupExpenseRepository.findById(reminder.getExpenseId()).orElse(null);
+        if (expense == null || expense.getExpenseDate() == null || expense.getPayerUserId() == null) {
+            return null;
+        }
+        User payer = userRepository.findById(expense.getPayerUserId()).orElse(null);
+        if (payer == null) {
+            return null;
+        }
+        String payerName = ActivityEventService.displayName(payer);
+        if (payerName == null) {
+            payerName = payer.getEmail();
+        }
+        LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+        long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(clock), dueDate);
+        List<Map<String, String>> pendingTotals = ReminderSchedule.pendingTotals(
+                debtRepository.findByGroupId(group.getId()), expense.getPayerUserId());
+        String email = recipients.payerEmail(expense).orElse(null);
+        ReminderMessageBuilder.Mail mail = messageBuilder.payerNotice(group.getName(), payerName,
+                expense.getDescription(), dueDate, daysRemaining, pendingTotals);
+        return new Target(payerName, email, dueDate, expense.getAmount(), expense.getCurrency(), mail,
+                null, expense, null, payerName, expense.getDescription(), daysRemaining, pendingTotals);
     }
 
     private String creditorName(Long userId) {
@@ -205,6 +256,7 @@ public class ReminderDispatcher {
     }
 
     private record Target(String name, String email, LocalDate dueDate, BigDecimal amount, Currency currency,
-            ReminderMessageBuilder.Mail mail, Debt debt, GroupExpense expense, String creditorName) {
+            ReminderMessageBuilder.Mail mail, Debt debt, GroupExpense expense, String creditorName,
+            String payerName, String concept, long daysRemaining, List<Map<String, String>> pendingTotals) {
     }
 }

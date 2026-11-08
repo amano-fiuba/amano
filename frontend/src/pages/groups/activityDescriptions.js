@@ -149,6 +149,16 @@ function debtReminderSent(details) {
   return sentence
 }
 
+function payerDueNoticeSent(details) {
+  const concept = text(details.concept)
+  const payer = text(details.payerName)
+  let sentence = concept
+    ? `envió el aviso de vencimiento del gasto «${concept}»`
+    : 'envió el aviso de vencimiento de un gasto'
+  if (payer) sentence += ` a ${payer}`
+  return sentence
+}
+
 const SYSTEM_EVENTS = new Set(['DEBT_OVERDUE', 'DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
 
 const DESCRIBERS = {
@@ -165,6 +175,7 @@ const DESCRIBERS = {
   DEBT_OVERDUE: debtOverdue,
   LIQUIDATION_PROPOSED: liquidationProposed,
   DEBT_REMINDER_SENT: debtReminderSent,
+  PAYER_DUE_NOTICE_SENT: payerDueNoticeSent,
 }
 
 // FR-014: { actor, text } para una entrada del historial.

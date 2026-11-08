@@ -67,4 +67,12 @@ class ReminderScheduleTest {
         LocalDate sendDate = LocalDate.of(2026, 11, 13);
         assertThat(ReminderSchedule.isDue(sendDate, LocalDate.of(2026, 11, 15), DUE_DATE)).isTrue();
     }
+
+    @Test
+    void theNoticeIsEligibleOnlyWithAnEligibleDebtAndBeforeTheDeadline() {
+        assertThat(ReminderSchedule.isNoticeEligible(true, LocalDate.of(2026, 11, 10), DUE_DATE)).isTrue();
+        assertThat(ReminderSchedule.isNoticeEligible(true, DUE_DATE, DUE_DATE)).isTrue();
+        assertThat(ReminderSchedule.isNoticeEligible(false, LocalDate.of(2026, 11, 10), DUE_DATE)).isFalse();
+        assertThat(ReminderSchedule.isNoticeEligible(true, DUE_DATE.plusDays(1), DUE_DATE)).isFalse();
+    }
 }

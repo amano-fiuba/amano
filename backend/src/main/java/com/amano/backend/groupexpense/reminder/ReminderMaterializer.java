@@ -82,12 +82,58 @@ public class ReminderMaterializer {
                 }
             }
         }
+        Set<Long> currentNoticeExpenseIds = new HashSet<>();
+        Map<Long, List<Debt>> debtsByExpense = debts.stream()
+                .filter(debt -> debt.getExpenseId() != null)
+                .collect(Collectors.groupingBy(Debt::getExpenseId));
+        for (Map.Entry<Long, List<Debt>> entry : debtsByExpense.entrySet()) {
+            Long expenseId = entry.getKey();
+            GroupExpense expense = expenses.computeIfAbsent(expenseId,
+                    id -> groupExpenseRepository.findById(id).orElse(null));
+            if (expense == null || expense.getExpenseDate() == null) {
+                cancelPayerNotice(expenseId, now);
+                continue;
+            }
+            LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), debtDueDays);
+            boolean hasEligibleDebt = entry.getValue().stream()
+                    .filter(debt -> !ReminderSchedule.isPayerOwnDebt(expense, debt))
+                    .anyMatch(debt -> ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate));
+            if (!ReminderSchedule.isNoticeEligible(hasEligibleDebt, today, dueDate)) {
+                cancelPayerNotice(expenseId, now);
+                continue;
+            }
+            currentNoticeExpenseIds.add(expenseId);
+            LocalDate sendDate = ReminderSchedule.sendDate(dueDate, reminderSendDays);
+            Optional<Reminder> existing = reminderRepository.findByKindAndExpenseId(
+                    ReminderKind.PAYER_NOTICE, expenseId);
+            if (existing.isEmpty()) {
+                reminderRepository.save(Reminder.scheduledForPayerNotice(group.getId(), expenseId, sendDate));
+            }
+            else {
+                Reminder reminder = existing.get();
+                if (reminder.getStatus() == ReminderStatus.SCHEDULED && reminder.getClaimedAt() == null
+                        && !sendDate.equals(reminder.getSendDate())) {
+                    reminderRepository.reschedule(reminder.getId(), sendDate, now);
+                }
+            }
+        }
         for (Reminder reminder : reminderRepository.findByGroupIdAndStatusAndClaimedAtIsNull(group.getId(),
                 ReminderStatus.SCHEDULED)) {
             if (reminder.getKind() == ReminderKind.DEBT && !currentDebtIds.contains(reminder.getDebtId())) {
                 reminderRepository.cancel(reminder.getId(), now);
             }
+            if (reminder.getKind() == ReminderKind.PAYER_NOTICE
+                    && !currentNoticeExpenseIds.contains(reminder.getExpenseId())) {
+                reminderRepository.cancel(reminder.getId(), now);
+            }
         }
+    }
+
+    private void cancelPayerNotice(Long expenseId, OffsetDateTime now) {
+        reminderRepository.findByKindAndExpenseId(ReminderKind.PAYER_NOTICE, expenseId)
+                .filter(reminder -> reminder.getStatus() == ReminderStatus.SCHEDULED)
+                .filter(reminder -> reminder.getClaimedAt() == null)
+                .ifPresent(reminder -> reminderRepository.cancel(reminder.getId(), now));
     }
 
     private void cancelDebtReminder(Long debtId, OffsetDateTime now) {

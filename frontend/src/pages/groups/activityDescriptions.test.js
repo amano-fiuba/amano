@@ -132,6 +132,11 @@ describe('describeActivity: gastos y pagos (014 US2 / 022 US8)', () => {
     expect(phrase('DEBT_REMINDER_SENT', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez' }, null))
       .toMatch(/^Sistema envió el recordatorio de la deuda de \$\s?500,00 a Juan Pérez$/)
     expect(phrase('DEBT_REMINDER_SENT', {}, null)).toBe('Sistema envió un recordatorio de deuda')
+
+    expect(phrase('PAYER_DUE_NOTICE_SENT', { concept: 'Súper', payerName: 'Ana López' }, null))
+      .toBe('Sistema envió el aviso de vencimiento del gasto «Súper» a Ana López')
+    expect(phrase('PAYER_DUE_NOTICE_SENT', {}, null))
+      .toBe('Sistema envió el aviso de vencimiento de un gasto')
   })
 
   it('formatea montos y tolera monedas desconocidas o datos faltantes', () => {
