@@ -242,7 +242,7 @@ class GroupSettingsServiceTest {
     }
 
     @Test
-    void groupCreationSeedsPermissionsWithAllCasillasFalse() {
+    void groupCreationSeedsPermissionsWithExpensesForOthersEnabled() {
         com.amano.backend.groups.dto.CreateGroupRequest.MemberInput member =
                 new com.amano.backend.groups.dto.CreateGroupRequest.MemberInput();
         member.setMemberType("REGISTERED");
@@ -266,7 +266,7 @@ class GroupSettingsServiceTest {
         assertThat(saved.getValue().isMembersCannotInvite()).isFalse();
         assertThat(saved.getValue().isMembersCanEditGroupData()).isFalse();
         assertThat(saved.getValue().isMembersCanManageSimulatedProfiles()).isFalse();
-        assertThat(saved.getValue().isMembersCanGenerateExpensesForOthers()).isFalse();
+        assertThat(saved.getValue().isMembersCanGenerateExpensesForOthers()).isTrue();
         assertThat(saved.getValue().isPaymentsRequireValidation()).isFalse();
     }
 }
