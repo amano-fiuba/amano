@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
 import { getGroup, getMembers, getExchangeQuote } from '../../api/groupsClient'
+import { listFriends } from '../../api/friendsClient'
+import { friendName } from '../../validation/friendName'
 import {
   GROUP_EXPENSE_NETWORK_ERROR_MESSAGE,
   GROUP_EXPENSE_UPDATE_ERROR_MESSAGE,
+  createFriendExpense,
   createGroupExpense,
   getGroupExpense,
   updateGroupExpense,
@@ -13,17 +16,27 @@ import {
 import TextField from '../../components/TextField'
 import { PaidIcon } from '../../components/NavIcons'
 import SelectField from '../../components/SelectField'
+import DatePickerField from '../../components/DatePickerField'
+import CurrencySelect from '../../components/CurrencySelect'
 import SubmitButton from '../../components/SubmitButton'
+import ExpenseSummaryDialog from '../../components/ExpenseSummaryDialog'
 import { REST_IN_ORDER_NOTE, REST_TO_PAYER_NOTE } from '../../components/groups/ExpenseSharePreview'
 import ConvertedAmount from '../../components/debts/ConvertedAmount'
 import { useSnackbar } from '../../components/Snackbar'
 import useCurrentDate, { deviceTimeZone } from '../../hooks/useCurrentDate'
-import { CURRENCY_OPTIONS } from '../../validation/expenseCatalog'
+import {
+  CATEGORY_OPTIONS,
+  PAYMENT_METHOD_OPTIONS,
+  TYPE_OPTIONS,
+  currencyLabel,
+  labelOf,
+} from '../../validation/expenseCatalog'
 import {
   DATE_FUTURE,
   normalizeDescription,
   parseArgentineAmount,
   parseArgentineDate,
+  preferredCurrency,
   validateDescription,
 } from '../../validation/expenseValidation'
 import { expensePermissions } from './expensePermissions'
@@ -77,18 +90,44 @@ export const EDIT_NOTHING_MESSAGE = 'Enviá al menos un campo para editar'
 export const EDIT_NOT_PERSONAL_MESSAGE = 'No se permite editar un gasto que ya tiene participantes'
 export const EDIT_NOT_ALLOWED_MESSAGE = 'No podés editar este gasto'
 export const EXPENSE_GONE_MESSAGE = 'No existe el gasto solicitado o no sos miembro del grupo'
+// 027 US4: expense shared with one friend (same form, no group).
+export const NOT_A_FRIEND_MESSAGE = 'No sos amigo de ese usuario'
+export const FRIEND_LOAD_ERROR_MESSAGE = 'No se pudo cargar a tu amigo. Intentá nuevamente'
+export const FRIEND_SUCCESS_PREFIX = 'Gasto registrado con'
 
-const SERVER_FIELDS = ['amount', 'currency', 'date', 'description']
+const SERVER_FIELDS = ['amount', 'currency', 'date', 'description', 'category', 'type', 'paymentMethod']
+
+// 027 (FR-020): the 007 classification, with the personal-expense messages.
+const REQUIRED_SELECT_MESSAGES = {
+  category: 'La categoría es obligatoria',
+  type: 'El tipo de gasto es obligatorio',
+  paymentMethod: 'El medio de pago es obligatorio',
+}
+// Required on creation; an edition of an older expense may leave them empty.
+const requiredSelect = (field, isEdit) => (value) =>
+  value || isEdit ? true : REQUIRED_SELECT_MESSAGES[field]
 
 // "Nuevo gasto" of a group (specs/017-debt-states, US3; plan.md §Diseño del
 // frontend): amount, currency, date, description, payer and participants, with
 // the live preview of the equal split. One Idempotency-Key per save operation,
 // kept across network failures (same rule as ExpenseForm of 007).
-export default function GroupExpenseFormView() {
-  const { id, expenseId } = useParams()
-  const isEdit = Boolean(expenseId)
+// 027 US3: calendar date, the user's currencies plus "Ver más", category, type
+// and payment method, a Cancelar / Guardar footer ("Guardar" opens a final summary
+// and the expense is saved after "Confirmar") and, on wide screens, a
+// height set by the left column with a scrollable split panel (FR-020..FR-024).
+// 027 US4: with mode="friend" (/friends/:friendId/expenses/new) the same form
+// registers an expense with one friend: both are the only participants, there is
+// no "Gasto compartido" switch and no conversion (FR-030..FR-034).
+export default function GroupExpenseFormView({ mode = 'group' }) {
+  const { id, expenseId, friendId } = useParams()
+  const isFriend = mode === 'friend'
+  const isEdit = !isFriend && Boolean(expenseId)
   const auth = useAuth()
   const currentUserId = auth?.user?.id ?? null
+  const myName = [auth?.user?.firstName, auth?.user?.lastName].filter(Boolean).join(' ') || 'Vos'
+  const myCurrencies = auth?.user?.currencies
+  // Stable dependency: the session object may be recreated with an equal list.
+  const myCurrenciesKey = Array.isArray(myCurrencies) ? myCurrencies.join(',') : ''
   const setUser = auth?.setUser
   const navigate = useNavigate()
   const showSnackbar = useSnackbar()
@@ -110,6 +149,9 @@ export default function GroupExpenseFormView() {
   const [payerError, setPayerError] = useState('')
   // Last answer of exchange-quote, tagged with the request it belongs to.
   const [quote, setQuote] = useState({ key: null, status: 'idle', converted: null })
+  // Validated payload waiting for "Confirmar" in the summary (027).
+  const [pending, setPending] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   const {
     register,
@@ -122,13 +164,62 @@ export default function GroupExpenseFormView() {
     formState: { errors, isSubmitting },
   } = useForm({
     mode: 'onBlur',
-    defaultValues: { amount: '', currency: 'ARS', date: today, description: '' },
+    defaultValues: {
+      amount: '',
+      currency: 'ARS',
+      date: today,
+      description: '',
+      category: '',
+      type: '',
+      paymentMethod: '',
+    },
   })
   const amountValue = useWatch({ control, name: 'amount' })
   const currencyValue = useWatch({ control, name: 'currency' })
   const dateValue = useWatch({ control, name: 'date' })
 
   useEffect(() => {
+    if (!isFriend) return undefined
+    let cancelled = false
+    listFriends().then((result) => {
+      if (cancelled) return
+      if (!result.ok) {
+        if (result.status === 401) {
+          setUser?.(null)
+          return
+        }
+        const retryable = Boolean(result.network) || result.status >= 500
+        setLoad({
+          status: 'error',
+          group: null,
+          members: [],
+          error: retryable ? FRIEND_LOAD_ERROR_MESSAGE : NOT_A_FRIEND_MESSAGE,
+          retryable,
+          notFriend: !retryable,
+        })
+        return
+      }
+      const friend = (result.friends ?? []).find((item) => String(item.id) === String(friendId))
+      if (!friend) {
+        setLoad({ status: 'error', group: null, members: [], error: NOT_A_FRIEND_MESSAGE, notFriend: true })
+        return
+      }
+      const members = [
+        { userId: currentUserId, simulatedProfileId: null, name: myName },
+        { userId: friend.id, simulatedProfileId: null, name: friendName(friend) },
+      ]
+      setLoad({ status: 'ready', group: null, friend, members, error: '' })
+      setValue('currency', preferredCurrency(myCurrenciesKey ? myCurrenciesKey.split(',') : []))
+      setSelected(members.map(participantKey))
+      setPayerKey(currentUserId != null ? `u:${currentUserId}` : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isFriend, friendId, retryToken, currentUserId, myName, myCurrenciesKey, setUser, setValue])
+
+  useEffect(() => {
+    if (isFriend) return undefined
     let cancelled = false
     Promise.all([
       getGroup(id),
@@ -164,6 +255,10 @@ export default function GroupExpenseFormView() {
           currency: expense.currency,
           date: formatIsoDate(expense.date),
           description: expense.description ?? '',
+          // Expenses created before 027 have no classification.
+          category: expense.category ?? '',
+          type: expense.type ?? '',
+          paymentMethod: expense.paymentMethod ?? '',
         })
       } else {
         // 022: the expense currency starts as the group's currency.
@@ -175,7 +270,7 @@ export default function GroupExpenseFormView() {
     return () => {
       cancelled = true
     }
-  }, [id, expenseId, isEdit, retryToken, currentUserId, setUser, setValue, reset])
+  }, [id, expenseId, isEdit, isFriend, retryToken, currentUserId, setUser, setValue, reset])
 
   const { group, members } = load
   // 022 T077: only a personal expense (one share, no debts) can be edited, by who
@@ -192,7 +287,15 @@ export default function GroupExpenseFormView() {
     if (!personalExpense) editBlocked = EDIT_NOT_PERSONAL_MESSAGE
     else if (!mayEdit) editBlocked = EDIT_NOT_ALLOWED_MESSAGE
   }
-  const { canCreateExpenses, canExpenseForOthers } = expensePermissions(group)
+  // A friend expense has no group permissions: either of the two may have paid.
+  const { canCreateExpenses, canExpenseForOthers } = isFriend
+    ? { canCreateExpenses: true, canExpenseForOthers: true }
+    : expensePermissions(group)
+  // 027 (FR-011): the group currency and the user's own currencies come first.
+  const preferredCurrencies = [
+    ...(isFriend ? [] : [group?.primaryCurrency || 'ARS']),
+    ...(Array.isArray(myCurrencies) ? myCurrencies : []),
+  ]
   // The split panel shows first names only; when two members share one, both
   // keep their full name so they can be told apart.
   const firstNames = members.map((member) => member.name.trim().split(/\s+/)[0])
@@ -230,7 +333,8 @@ export default function GroupExpenseFormView() {
   // 022 T070: the preview only exists when the chosen currency differs from the
   // group's and the amount and date are valid; it asks exchange-quote when one
   // of those three changes (debounced) and never blocks the submit.
-  const groupCurrency = group?.primaryCurrency || 'ARS'
+  // FR-034: a friend expense keeps its own currency, so there is nothing to convert.
+  const groupCurrency = isFriend ? currencyValue : group?.primaryCurrency || 'ARS'
   const quoteAmount = parsedAmount.ok ? parsedAmount.canonical : null
   const parsedDate = parseArgentineDate(dateValue)
   const quoteDate =
@@ -408,6 +512,9 @@ export default function GroupExpenseFormView() {
     if (values.currency !== expense.currency) changes.currency = values.currency
     if (date.ok && date.iso !== expense.date) changes.date = date.iso
     if (description !== (expense.description ?? '')) changes.description = description
+    for (const field of ['category', 'type', 'paymentMethod']) {
+      if (values[field] && values[field] !== (expense[field] ?? '')) changes[field] = values[field]
+    }
     if (Object.keys(changes).length === 0) {
       setFormError(EDIT_NOTHING_MESSAGE)
       return
@@ -470,6 +577,9 @@ export default function GroupExpenseFormView() {
       currency: values.currency,
       date: date.ok ? date.iso : values.date,
       deviceTimeZone: deviceTimeZone(),
+      category: values.category,
+      type: values.type,
+      paymentMethod: values.paymentMethod,
       payerUserId: userIdOf(payerKey),
       splitMethod: method,
       participants: orderedSelection.map((key) => {
@@ -486,14 +596,61 @@ export default function GroupExpenseFormView() {
       payload.description = description
     }
 
+    const nameOf = (key) => members.find((member) => participantKey(member) === key)?.name ?? ''
+    const money = (amount, currency) => `$ ${formatAmount(amount)} ${currency}`
+    const rows = [
+      isFriend
+        ? { label: 'Con', value: friendName(load.friend) }
+        : { label: 'Grupo', value: group?.name ?? '' },
+      { label: 'Monto', value: money(payload.amount, payload.currency) },
+      ...(foreignCurrency && quoteStatus === 'ready'
+        ? [{ label: `Estimado en ${groupCurrency}`, value: money(quote.converted, groupCurrency) }]
+        : []),
+      { label: 'Moneda', value: currencyLabel(payload.currency) },
+      { label: 'Fecha', value: values.date },
+      { label: 'Categoría', value: labelOf(CATEGORY_OPTIONS, payload.category) },
+      { label: 'Tipo de gasto', value: labelOf(TYPE_OPTIONS, payload.type) },
+      { label: 'Medio de pago', value: labelOf(PAYMENT_METHOD_OPTIONS, payload.paymentMethod) },
+      ...(payload.description ? [{ label: 'Descripción', value: payload.description }] : []),
+      { label: '¿Quién pagó?', value: nameOf(payerKey) },
+      {
+        label: 'Reparto',
+        value: personal ? 'Gasto personal (sin deudas)' : SPLIT_OPTIONS.find((option) => option.code === method).label,
+      },
+    ]
+    const shares = personal || !originalShares
+      ? []
+      : originalShares.map((share) => ({ name: nameOf(share.key), amount: money(share.amount, payload.currency) }))
+    setPending({ payload, rows, shares })
+  }
+
+  const confirmSave = async () => {
+    const { payload } = pending
+    setSaving(true)
+    try {
+      await saveExpense(payload)
+    } finally {
+      setSaving(false)
+      setPending(null)
+    }
+  }
+
+  const saveExpense = async (payload) => {
     const key = idempotencyKey ?? crypto.randomUUID()
     if (idempotencyKey === null) {
       setIdempotencyKey(key)
     }
-    const result = await createGroupExpense(id, payload, key)
+    const result = isFriend
+      ? await createFriendExpense(friendId, payload, key)
+      : await createGroupExpense(id, payload, key)
 
     if (result.ok) {
       setIdempotencyKey(null)
+      if (isFriend) {
+        showSnackbar?.(`${FRIEND_SUCCESS_PREFIX} ${friendName(load.friend)}`)
+        navigate('/')
+        return
+      }
       showSnackbar?.(GROUP_EXPENSE_SUCCESS_MESSAGE)
       navigate(`/groups/${id}/expenses/${result.expense.id}`)
       return
@@ -510,6 +667,11 @@ export default function GroupExpenseFormView() {
     setIdempotencyKey(null)
     if (result.status === 403) {
       setFormError(result.detail || ONLY_OWN_PAYMENTS_MESSAGE)
+      return
+    }
+    if (result.status === 404) {
+      // FR-033: the friendship ended before saving.
+      setFormError(result.detail || NOT_A_FRIEND_MESSAGE)
       return
     }
     if (result.status === 422) {
@@ -530,14 +692,16 @@ export default function GroupExpenseFormView() {
     }
   }
 
+  const backTo = isFriend ? '/' : isEdit ? `/groups/${id}/expenses/${expenseId}` : `/groups/${id}`
+
   return (
     <main className={`page group-page group-expense${isEdit ? '' : ' group-expense--wide'}`}>
       <nav className="group-page__back">
-        <Link to={isEdit ? `/groups/${id}/expenses/${expenseId}` : `/groups/${id}`}>
-          {isEdit ? 'Volver al gasto' : 'Volver al grupo'}
-        </Link>
+        <Link to={backTo}>{isFriend ? 'Volver al inicio' : isEdit ? 'Volver al gasto' : 'Volver al grupo'}</Link>
       </nav>
-      <h1>{isEdit ? 'Editar gasto' : 'Nuevo gasto'}</h1>
+      <h1>
+        {isEdit ? 'Editar gasto' : load.friend ? `Nuevo gasto con ${friendName(load.friend)}` : 'Nuevo gasto'}
+      </h1>
 
       {load.status === 'loading' && (
         <div role="status" className="group-expense__loading">
@@ -549,6 +713,7 @@ export default function GroupExpenseFormView() {
       {load.status === 'error' && (
         <div role="alert" data-testid="group-expense-load-error">
           <p>{load.error}</p>
+          {load.notFriend && <Link to="/friends">Ver mis amigos</Link>}
           {load.retryable && (
             <button
               type="button"
@@ -576,7 +741,11 @@ export default function GroupExpenseFormView() {
       )}
 
       {load.status === 'ready' && (isEdit ? !editBlocked : canCreateExpenses) && (
-        <form className="group-expense__form" onSubmit={handleSubmit(onSubmit)} noValidate>
+        <form
+          className={`group-expense__form${isEdit ? '' : ' group-expense__form--fixed'}`}
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+        >
           {formError && (
             <p role="alert" className="group-expense__form-error" data-testid="group-expense-error">
               {formError}
@@ -596,21 +765,27 @@ export default function GroupExpenseFormView() {
                 },
               })}
             />
-            <SelectField
-              label="Moneda"
-              options={CURRENCY_OPTIONS}
-              error={errors.currency?.message}
-              {...register('currency', {
-                validate: (value) => (value ? true : 'La moneda es obligatoria'),
-              })}
+            <Controller
+              name="currency"
+              control={control}
+              rules={{ validate: (value) => (value ? true : 'La moneda es obligatoria') }}
+              render={({ field }) => (
+                <CurrencySelect {...field} preferred={preferredCurrencies} error={errors.currency?.message} />
+              )}
             />
 
-            <TextField
-              label="Fecha"
-              placeholder="dd/mm/aaaa"
-              autoComplete="off"
-              error={errors.date?.message}
-              {...register('date', { validate: validateDate })}
+            <Controller
+              name="date"
+              control={control}
+              rules={{ validate: validateDate }}
+              render={({ field }) => (
+                <DatePickerField
+                  {...field}
+                  label="Fecha"
+                  max={todayIso ?? undefined}
+                  error={errors.date?.message}
+                />
+              )}
             />
 
             <div className="group-expense__quote" aria-live="polite" data-testid="quote-preview">
@@ -631,6 +806,27 @@ export default function GroupExpenseFormView() {
               )}
               {quoteStatus === 'error' && <p>{QUOTE_ERROR_MESSAGE}</p>}
             </div>
+
+            <SelectField
+              label="Categoría"
+              options={CATEGORY_OPTIONS}
+              error={errors.category?.message}
+              {...register('category', { validate: requiredSelect('category', isEdit) })}
+            />
+
+            <SelectField
+              label="Tipo de gasto"
+              options={TYPE_OPTIONS}
+              error={errors.type?.message}
+              {...register('type', { validate: requiredSelect('type', isEdit) })}
+            />
+
+            <SelectField
+              label="Medio de pago"
+              options={PAYMENT_METHOD_OPTIONS}
+              error={errors.paymentMethod?.message}
+              {...register('paymentMethod', { validate: requiredSelect('paymentMethod', isEdit) })}
+            />
 
             <TextField
               label="Descripción"
@@ -659,6 +855,7 @@ export default function GroupExpenseFormView() {
 
           {!isEdit && (
             <section className="group-card group-expense__split" aria-label="Reparto del gasto">
+              {!isFriend && (
               <label className="group-expense__switch">
                 <input
                   type="checkbox"
@@ -671,6 +868,7 @@ export default function GroupExpenseFormView() {
                 />
                 <span>{SHARED_LABEL}</span>
               </label>
+              )}
 
               {personal ? (
                 <p className="field__hint" data-testid="personal-note">{PERSONAL_NOTE}</p>
@@ -734,7 +932,7 @@ export default function GroupExpenseFormView() {
                               <input
                                 type="checkbox"
                                 checked={included}
-                                disabled={lockedPayer}
+                                disabled={lockedPayer || isFriend}
                                 onChange={() => toggleParticipant(key)}
                               />
                               <span className="group-expense__name">
@@ -865,15 +1063,31 @@ export default function GroupExpenseFormView() {
             </section>
           )}
 
-          <div className="group-expense__actions">
+          <div className="group-expense__actions expense-actions">
+            <button
+              type="button"
+              className="expense-actions__cancel"
+              onClick={() => navigate(backTo)}
+            >
+              Cancelar
+            </button>
             <SubmitButton
-              loading={isSubmitting}
+              loading={isSubmitting || saving}
               loadingLabel="Guardando…"
               disabled={!isEdit && (!hasOtherParticipant || !splitValid)}
             >
-              {isEdit ? 'Guardar cambios' : 'Guardar gasto'}
+              {isEdit ? 'Guardar cambios' : 'Guardar'}
             </SubmitButton>
           </div>
+          {pending && (
+            <ExpenseSummaryDialog
+              rows={pending.rows}
+              shares={pending.shares}
+              confirming={saving}
+              onConfirm={confirmSave}
+              onCancel={() => setPending(null)}
+            />
+          )}
         </form>
       )}
     </main>

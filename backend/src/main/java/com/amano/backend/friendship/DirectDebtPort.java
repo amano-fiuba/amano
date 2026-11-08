@@ -6,9 +6,9 @@ package com.amano.backend.friendship;
  * 016 blocks deleting a friendship while such a debt exists. Group debts are
  * deliberately outside this port: they never block deleting a friendship.
  *
- * <p>The module does not exist yet, so {@link NoOpDirectDebtPort} is the current
- * implementation. The real module will replace it without changing the port or
- * the friends feature.
+ * <p>Implemented since 027 by
+ * {@code com.amano.backend.groupexpense.DebtDirectDebtAdapter}: the debts of an
+ * expense with a friend ({@code group_id} null) are the direct debts.
  */
 public interface DirectDebtPort {
 

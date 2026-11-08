@@ -1152,9 +1152,34 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
   }
 
-  .group-expense--wide .group-expense__split {
-    position: sticky;
-    top: 5rem;
+  // 027 (FR-023/FR-024): the left column sets the height. The panel does not add
+  // to the row (height 0, at least the row height) and only its member list
+  // scrolls, so the footer buttons stay right under both columns.
+  .group-expense--wide .group-expense__form--fixed {
+    align-items: stretch;
+
+    .group-expense__split {
+      height: 0;
+      min-height: 100%;
+      overflow: hidden;
+    }
+
+    .group-expense__split fieldset.group-expense__participants {
+      display: flex;
+      flex: 1 1 0;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+    }
+
+    .group-card ul.group-expense__rows {
+      flex: 1 1 0;
+      align-content: start;
+      min-height: 0;
+      overflow-y: auto;
+      // Room for the focus ring and the scrollbar.
+      padding: 2px 0.35rem 2px 2px;
+    }
   }
 }
 
@@ -1303,6 +1328,10 @@
     grid-column: 1 / -1;
     align-items: center;
     row-gap: 0.35rem;
+    // 027 (FR-022): the same height in "Partes iguales", "Personalizado" and
+    // "Porcentajes" (the height of a row with an input), so switching methods
+    // does not move the list.
+    min-height: var(--split-row-height, 3.25rem);
     padding: 0.4rem 0.6rem;
 
     &.is-excluded {

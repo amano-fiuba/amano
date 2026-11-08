@@ -25,6 +25,7 @@ import CreateGroupView from './pages/groups/CreateGroupView'
 import GroupInfoView from './pages/groups/GroupInfoView'
 import GroupHistoryView from './pages/groups/GroupHistoryView'
 import GroupExpenseFormView from './pages/groups/GroupExpenseFormView'
+import FriendExpenseFormView from './pages/FriendExpenseFormView'
 import GroupDebtsView from './pages/groups/GroupDebtsView'
 import GroupExpenseDetailView from './pages/groups/GroupExpenseDetailView'
 import RegisterPaymentView from './pages/groups/RegisterPaymentView'
@@ -75,6 +76,15 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <NewExpensePage />
+          </ProtectedRoute>
+        }
+      />
+      {/* Gasto con un amigo (specs/027-expense-entry-modes, US4). */}
+      <Route
+        path="/friends/:friendId/expenses/new"
+        element={
+          <ProtectedRoute>
+            <FriendExpenseFormView />
           </ProtectedRoute>
         }
       />

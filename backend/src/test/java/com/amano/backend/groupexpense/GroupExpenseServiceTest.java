@@ -190,6 +190,9 @@ class GroupExpenseServiceTest {
         request.setDeviceTimeZone("America/Argentina/Buenos_Aires");
         request.setPayerUserId(payer);
         request.setParticipants(java.util.Arrays.asList(participants));
+        request.setCategory("FOOD");
+        request.setType("ONE_TIME");
+        request.setPaymentMethod("CASH");
         return request;
     }
 
@@ -331,6 +334,58 @@ class GroupExpenseServiceTest {
                 .containsEntry("date", ExpenseDateValidator.REQUIRED_MESSAGE)
                 .containsEntry("payerUserId", GroupExpenseService.PAYER_REQUIRED)
                 .containsEntry("participants", GroupExpenseService.PARTICIPANTS_REQUIRED);
+    }
+
+    /** 027 T044 (FR-020): the 007 classification is required, validated and saved. */
+    @Test
+    void theClassificationIsSavedAndReturned() {
+        CreateGroupExpenseRequest request = threeWay();
+        request.setCategory("LEISURE");
+        request.setType("RECURRING");
+        request.setPaymentMethod("CREDIT_CARD");
+
+        GroupExpenseResponse response = service.create(ANA, GROUP_ID, KEY, request).expense();
+
+        ArgumentCaptor<GroupExpense> captor = ArgumentCaptor.forClass(GroupExpense.class);
+        verify(expenseRepository).save(captor.capture());
+        assertThat(captor.getValue().getCategory()).isEqualTo(com.amano.backend.expense.ExpenseCategory.LEISURE);
+        // RECURRING is informative: it is stored, nothing is scheduled.
+        assertThat(captor.getValue().getExpenseType()).isEqualTo(com.amano.backend.expense.ExpenseType.RECURRING);
+        assertThat(captor.getValue().getPaymentMethod())
+                .isEqualTo(com.amano.backend.expense.PaymentMethod.CREDIT_CARD);
+        assertThat(response.category()).isEqualTo("LEISURE");
+        assertThat(response.type()).isEqualTo("RECURRING");
+        assertThat(response.paymentMethod()).isEqualTo("CREDIT_CARD");
+    }
+
+    @Test
+    void theClassificationUsesThe007MessagesWhenMissingOrInvalid() {
+        CreateGroupExpenseRequest missing = threeWay();
+        missing.setCategory(null);
+        missing.setType(" ");
+        missing.setPaymentMethod(null);
+        assertThat(fieldErrorsOf(missing))
+                .containsEntry("category", "La categoría es obligatoria")
+                .containsEntry("type", "El tipo de gasto es obligatorio")
+                .containsEntry("paymentMethod", "El medio de pago es obligatorio");
+
+        CreateGroupExpenseRequest invalid = threeWay();
+        invalid.setCategory("PARTY");
+        invalid.setType("WEEKLY");
+        invalid.setPaymentMethod("BITCOIN");
+        assertThat(fieldErrorsOf(invalid))
+                .containsEntry("category", "La categoría no es válida")
+                .containsEntry("type", "El tipo de gasto no es válido")
+                .containsEntry("paymentMethod", "El medio de pago no es válido");
+    }
+
+    @Test
+    void aFrequencyIsNotAcceptedInASharedExpense() {
+        CreateGroupExpenseRequest request = threeWay();
+        request.setType("RECURRING");
+        request.putUnknownProperty("frequency", "WEEKLY");
+
+        assertThat(fieldErrorsOf(request)).containsEntry("frequency", "No se permite informar este campo");
     }
 
     @Test
@@ -576,6 +631,9 @@ class GroupExpenseServiceTest {
 
     private GroupExpense existingThreeWay() {
         GroupExpense existing = new GroupExpense();
+        existing.setCategory(com.amano.backend.expense.ExpenseCategory.FOOD);
+        existing.setExpenseType(com.amano.backend.expense.ExpenseType.ONE_TIME);
+        existing.setPaymentMethod(com.amano.backend.expense.PaymentMethod.CASH);
         ReflectionTestUtils.setField(existing, "id", 12L);
         existing.setGroupId(GROUP_ID);
         existing.setCreatedByUserId(ANA);
@@ -601,6 +659,9 @@ class GroupExpenseServiceTest {
 
     private GroupExpense existingCustom() {
         GroupExpense existing = new GroupExpense();
+        existing.setCategory(com.amano.backend.expense.ExpenseCategory.FOOD);
+        existing.setExpenseType(com.amano.backend.expense.ExpenseType.ONE_TIME);
+        existing.setPaymentMethod(com.amano.backend.expense.PaymentMethod.CASH);
         ReflectionTestUtils.setField(existing, "id", 12L);
         existing.setGroupId(GROUP_ID);
         existing.setCreatedByUserId(ANA);

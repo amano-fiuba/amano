@@ -344,6 +344,20 @@ ul {
   margin-bottom: 1rem;
 }
 
+// 027 (FR-019): pie de los formularios de gasto, Cancelar a la izquierda y
+// Guardar gasto a la derecha, fuera de la tarjeta celeste.
+.expense-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.expense-form__card > .field:last-child {
+  margin-bottom: 0;
+}
+
 // FR-011 enmendada de 005: "Guardar cambios" se ve deshabilitado (gris, cursor
 // bloqueado) mientras no haya modificaciones pendientes por confirmar.
 // Cancelar en el borde izquierdo y la acción principal en el derecho.

@@ -3,9 +3,17 @@ import { Link } from 'react-router'
 import { FRIENDS_NETWORK_ERROR_MESSAGE, listFriends } from '../../api/friendsClient'
 import { useAuth } from '../../auth/AuthContext'
 import { NO_FRIENDS_MESSAGE } from '../FriendsList'
-import { filterPeople, fullName } from '../../utils/personSearch'
+import { normalizeText as normalize } from '../../validation/normalizeText'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
+
+function fullName(friend) {
+  return friend.lastName ? `${friend.firstName} ${friend.lastName}` : friend.firstName
+}
+
+function matches(friend, term) {
+  return [fullName(friend), friend.email].some((value) => normalize(value).includes(term))
+}
 
 /**
  * Friends list (spec 023 FR-023, FR-024, FR-027) with the same rows as the
@@ -78,7 +86,8 @@ export default function FriendPicker({ selected, onChange }) {
     )
   }
 
-  const visible = filterPeople(friends, filter)
+  const term = normalize(filter.trim())
+  const visible = friends.filter((friend) => matches(friend, term))
 
   return (
     <div className="friend-picker">

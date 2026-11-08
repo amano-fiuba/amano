@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   GROUP_EXPENSE_LOAD_ERROR_MESSAGE,
   GROUP_EXPENSE_NETWORK_ERROR_MESSAGE,
+  createFriendExpense,
   createGroupExpense,
   deleteGroupExpense,
   getGroupBalances,
@@ -236,3 +237,48 @@ describe('lecturas de deudas, saldos y liquidación (022 T074)', () => {
   })
 })
 
+
+describe('createFriendExpense (027 US4)', () => {
+  it('201 envía la clave y el cuerpo a la ruta del amigo', async () => {
+    vi.stubGlobal('fetch', respond(201, EXPENSE))
+    const payload = { amount: '100.00', currency: 'ARS' }
+
+    expect(await createFriendExpense(15, payload, 'key-1')).toEqual({ ok: true, expense: EXPENSE, created: true })
+    expect(fetch).toHaveBeenCalledWith('/api/users/me/friends/15/expenses', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'key-1' },
+      body: JSON.stringify(payload),
+    })
+  })
+
+  it('200 es un reenvío idempotente', async () => {
+    vi.stubGlobal('fetch', respond(200, EXPENSE))
+    expect(await createFriendExpense(15, {}, 'k')).toMatchObject({ ok: true, created: false })
+  })
+
+  it('404, 400 y 422 devuelven el detalle, los campos y el código', async () => {
+    vi.stubGlobal('fetch', respond(404, { detail: 'No sos amigo de ese usuario' }))
+    expect(await createFriendExpense(15, {}, 'k')).toMatchObject({
+      ok: false,
+      status: 404,
+      detail: 'No sos amigo de ese usuario',
+    })
+
+    vi.stubGlobal('fetch', respond(400, { properties: { fields: { payerUserId: 'Quien pagó tiene que ser vos o tu amigo' } } }))
+    expect((await createFriendExpense(15, {}, 'k')).fields).toEqual({
+      payerUserId: 'Quien pagó tiene que ser vos o tu amigo',
+    })
+
+    vi.stubGlobal('fetch', respond(422, { properties: { code: 'IDEMPOTENCY_KEY_REUSED' } }))
+    expect(await createFriendExpense(15, {}, 'k')).toMatchObject({ status: 422, code: 'IDEMPOTENCY_KEY_REUSED' })
+  })
+
+  it('5xx y errores de red son errores de red', async () => {
+    vi.stubGlobal('fetch', respond(503, {}))
+    expect(await createFriendExpense(15, {}, 'k')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await createFriendExpense(15, {}, 'k')).toEqual({ ok: false, network: true })
+  })
+})

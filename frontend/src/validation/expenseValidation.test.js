@@ -98,7 +98,9 @@ describe('preferredCurrency', () => {
     expect(preferredCurrency(undefined)).toBe('ARS')
     expect(preferredCurrency(null)).toBe('ARS')
     expect(preferredCurrency([])).toBe('ARS')
-    expect(preferredCurrency(['GBP'])).toBe('ARS')
+    // 027: any supported currency counts; an unsupported code still falls back to ARS.
+    expect(preferredCurrency(['GBP'])).toBe('GBP')
+    expect(preferredCurrency(['XAU'])).toBe('ARS')
     expect(preferredCurrency('ARS')).toBe('ARS')
   })
 })
