@@ -19,13 +19,24 @@ beforeEach(() => {
 })
 
 describe('RemoveMemberDialog (T062/T057)', () => {
+  it('se muestra como modal y Cancelar o Escape lo cierran', () => {
+    const onClose = vi.fn()
+    render(<RemoveMemberDialog groupId={42} member={MEMBER} onClose={onClose} />)
+
+    expect(screen.getByRole('dialog', { name: /Eliminar miembro/i })).toHaveAttribute('aria-modal', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /Cancelar/i }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    fireEvent.click(screen.getByRole('button', { name: /Cerrar/i }))
+    expect(onClose).toHaveBeenCalledTimes(3)
+    expect(removeMember).not.toHaveBeenCalled()
+  })
+
   it('pide confirmación antes de eliminar al miembro', async () => {
     removeMember.mockResolvedValue({ ok: true, removed: true })
 
     render(<RemoveMemberDialog groupId={42} member={MEMBER} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar miembro/i }))
-    expect(screen.getByRole('dialog', { name: /Eliminar a Carla Pérez/i })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: /Eliminar miembro/i })).toBeInTheDocument()
     expect(removeMember).not.toHaveBeenCalled()
 
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
@@ -36,12 +47,13 @@ describe('RemoveMemberDialog (T062/T057)', () => {
   it('muestra la pista de revocar el rol primero para otro admin', async () => {
     render(<RemoveMemberDialog groupId={42} member={{ ...MEMBER, role: 'ADMIN' }} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar miembro/i }))
 
     expect(
       await screen.findByText(/No podés eliminar directamente a otro administrador: primero quitale el rol/i),
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Confirmar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancelar/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Cerrar/i })).toBeInTheDocument()
   })
 
   it('renderiza el motivo del rechazo server-side', async () => {
@@ -53,7 +65,6 @@ describe('RemoveMemberDialog (T062/T057)', () => {
 
     render(<RemoveMemberDialog groupId={42} member={MEMBER} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar miembro/i }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -66,7 +77,6 @@ describe('RemoveMemberDialog (T062/T057)', () => {
 
     render(<RemoveMemberDialog groupId={42} simulatedProfile={SIMULATED} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar perfil simulado/i }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     await waitFor(() => expect(removeSimulatedProfile).toHaveBeenCalledWith(42, 33))
@@ -77,13 +87,13 @@ describe('RemoveMemberDialog (T062/T057)', () => {
     const onRemoved = vi.fn()
     removeSimulatedProfile.mockResolvedValue({ ok: true, removed: true })
 
-    render(<RemoveMemberDialog groupId={42} simulatedProfile={SIMULATED} onRemoved={onRemoved} />)
+    const onClose = vi.fn()
+    render(<RemoveMemberDialog groupId={42} simulatedProfile={SIMULATED} onRemoved={onRemoved} onClose={onClose} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar perfil simulado/i }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     await waitFor(() => expect(onRemoved).toHaveBeenCalledTimes(1))
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
   it('si el servidor rechaza no llama a onRemoved', async () => {
@@ -92,7 +102,6 @@ describe('RemoveMemberDialog (T062/T057)', () => {
 
     render(<RemoveMemberDialog groupId={42} member={MEMBER} onRemoved={onRemoved} />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Eliminar miembro/i }))
     fireEvent.click(screen.getByRole('button', { name: /Confirmar/i }))
 
     expect(await screen.findByTestId('remove-member-error')).toHaveTextContent('No sos admin de este grupo')

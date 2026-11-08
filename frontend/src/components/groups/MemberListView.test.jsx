@@ -203,7 +203,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     const row = await screen.findByTestId('member-row-sim-33')
     await openActions('sim-33')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar perfil simulado' }))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
 
     await waitFor(() => expect(screen.queryByText('Juan Simulado')).not.toBeInTheDocument())
     expect(removeSimulatedProfile).toHaveBeenCalledWith(3, 33)
@@ -224,7 +224,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     const row = await screen.findByTestId('member-row-user-15')
     await openActions('user-15')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar miembro' }))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
 
     await waitFor(() => expect(screen.queryByText('Carla Gómez')).not.toBeInTheDocument())
     expect(removeMember).toHaveBeenCalledWith(3, 15)

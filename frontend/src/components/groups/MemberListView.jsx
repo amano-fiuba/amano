@@ -37,6 +37,9 @@ export default function MemberListView({
 }) {
   const [members, setMembers] = useState(null)
   const [error, setError] = useState('')
+  // Who the removal modal is open for (null → closed). It lives here, not in
+  // the "⋯" panel, so closing the panel does not unmount the modal.
+  const [removalTarget, setRemovalTarget] = useState(null)
   const showSnackbar = useSnackbar()
   // Only the latest request may update the list (no stale responses).
   const requestId = useRef(0)
@@ -190,12 +193,21 @@ export default function MemberListView({
                           Quitarle admin
                         </button>
                       )}
-                      <RemoveMemberDialog
-                        groupId={groupId}
-                        member={isSimulated ? undefined : { userId: member.userId, name: member.name, role: member.role }}
-                        simulatedProfile={isSimulated ? { profileId: simulatedId, name: member.name } : undefined}
-                        onRemoved={handleRemoved}
-                      />
+                      <button
+                        type="button"
+                        className="member-menu__item member-menu__item--danger"
+                        data-testid={`remove-member-${key}`}
+                        onClick={() => {
+                          close()
+                          setRemovalTarget(
+                            isSimulated
+                              ? { simulatedProfile: { profileId: simulatedId, name: member.name } }
+                              : { member: { userId: member.userId, name: member.name, role: member.role } },
+                          )
+                        }}
+                      >
+                        {isSimulated ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
+                      </button>
                     </>
                   )}
                 </MemberActionsMenu>
@@ -204,6 +216,15 @@ export default function MemberListView({
           )
         })}
       </ul>
+      {removalTarget && (
+        <RemoveMemberDialog
+          groupId={groupId}
+          member={removalTarget.member}
+          simulatedProfile={removalTarget.simulatedProfile}
+          onRemoved={handleRemoved}
+          onClose={() => setRemovalTarget(null)}
+        />
+      )}
     </section>
   )
 }
