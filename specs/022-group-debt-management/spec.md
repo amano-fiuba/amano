@@ -12,7 +12,7 @@
 
 ### User Story 1 - Registrar un gasto compartido (Priority: P1)
 
-Un miembro del grupo registra un gasto compartido indicando monto, moneda, fecha, categoría, tipo (único o recurrente), medio de pago, quién pagó y con quiénes se comparte. La descripción es opcional. Quien pagó siempre forma parte del reparto y no puede quitarse. Sin participantes, el gasto es personal y no genera deudas.
+Un miembro del grupo registra un gasto compartido indicando monto, moneda, fecha, quién pagó y con quiénes se comparte. La descripción es opcional. Quien pagó siempre forma parte del reparto y no puede quitarse. Sin participantes, el gasto es personal y no genera deudas.
 
 **Why this priority**: Esta es la funcionalidad básica del sistema; sin registrar gastos, no es posible calcular deudas. Es el punto de entrada para todas las demás funcionalidades.
 
@@ -53,14 +53,18 @@ El sistema calcula automáticamente, dentro de cada grupo, cuánto debe y cuánt
 
 El sistema compensa deudas cruzadas y propone el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales.
 
-**Why this priority**: La liquidación reduce la cantidad de transferencias necesarias para saldar el grupo, minimizando la fricción de cobrar. Los usuarios necesitan saber el número mínimo de movimientos.
+**Why this priority**: La liquidación reduce la cantidad de transferencias necesarias para saldar el grupo, minimizando la fricción de cobrar. Los usuarios necesitan una cantidad reducida de movimientos: como máximo uno menos que los miembros con saldo distinto de cero (el mínimo absoluto no se busca, es un problema NP-difícil).
 
-**Independent Test**: Given a group with complex cross-debts, when the liquidation is generated, then the proposed transfers settle all debts with the minimum number of transactions, and the total transferred equals the net amount needed to settle. The original expense history remains unchanged.
+**Independent Test**: Given a group with complex cross-debts, when the liquidation is generated, then the proposed transfers settle all debts with at most M − 1 transactions (M = members with a non-zero balance), and the total transferred equals the net amount needed to settle. The original expense history remains unchanged.
 
 **Acceptance Scenarios**:
 1. Given a group where Alice owes Bob $10 and Bob owes Alice $5, when liquidation is generated, then the proposal is a single transfer of $5 from Alice to Bob (not two separate transfers).
 2. Given a group with liquidation proposed, when the transfers are executed, then all members end with zero net balance.
 3. Given the liquidation proposal, when reviewed, then the original expense history is unchanged.
+4. Given a group where A owes B $100 and B owes A $50, when liquidation is generated, then the proposal is a single transfer of $50 from A to B (the cross-debts are compensated; the proposal never contains two opposite transfers between the same pair of members).
+5. Given the same pair with several open debts in each direction (for example A owes B $60 and $40, B owes A $30 and $20), when liquidation is generated, then all of them are added up per direction and compensated into one transfer ($50 from A to B).
+6. Given A owes B $50 and B owes A $50, when liquidation is generated, then the proposal has no transfer between them.
+7. Given two groups with the same members, where in group 1 A owes B $100 and B owes A $50, and in group 2 C owes A $40, B owes A $25 and A owes C $20, when liquidation is generated for each group, then group 1 proposes one transfer of $50 from A to B, and group 2 proposes $20 from C to A and $25 from B to A. Debts are never compensated across groups: the A–B debts of group 1 do not offset the B–A debt of group 2.
 
 ### User Story 5 - Gestionar estado de cada deuda (Priority: P2)
 
@@ -73,7 +77,7 @@ Cada deuda tiene un estado: Pendiente (estado inicial), Pago parcial, Pago infor
 **Acceptance Scenarios**:
 1. Given a new debt, when viewed, then its initial state is "Pendiente".
 2. Given a debt with state "Pago informado" in a group without "Pagos requiere validación", when the payment is registered, then the state changes to "Pagado".
-3. Given a debt with state "Pago informado" in a group with "Pagos requiere validación", when an administrator confirms, then the state changes to "Verificado"; when rejected, the state remains "Pendiente".
+3. Given a debt with state "Pago informado" in a group with "Pagos requiere validación", when an administrator confirms, then the state changes to "Verificado" (or "Pago parcial" if the payment was partial and an outstanding balance remains); when rejected, the debt returns to its previous state ("Pendiente" or "Pago parcial").
 
 ### User Story 6 - Registrar pago de deuda pendiente (Priority: P2)
 
@@ -91,7 +95,7 @@ Registrar el pago de una deuda con saldo pendiente en la que el miembro está in
 5. Given an administrator rejecting a "Pago informado", when rejected, then the debt returns to its previous state ("Pendiente" or "Pago parcial") with the same outstanding balance and accepts a new payment.
 6. Given a payment greater than the outstanding balance, or a payment of zero or less, when attempting to register it, then the system rejects the operation.
 7. Given a debt that is settled ("Pagado" or "Verificado"), when attempting to register a payment, then the system rejects the operation.
-8. Given an overdue debt ("Vencido"), when a partial payment is registered, then the debt becomes "Pago parcial" (decision to be confirmed, see Assumptions); when the payment covers the whole balance it follows the rules above.
+8. Given an overdue debt ("Vencido"), when a partial payment is registered, then the debt becomes "Pago parcial" (confirmed decision, 2026-11-08); when the payment covers the whole balance it follows the rules above.
 
 ### User Story 7 - Ver mis deudas pendientes (Priority: P3)
 
@@ -102,7 +106,7 @@ Ver cuánto debo, a quién (persona o grupo), con acceso al detalle y origen de 
 **Independent Test**: Given a group member, when they view their pending debts, then they see a list of all debts they're involved in that are not yet settled, with the amount, counterpart, and origin (which expense generated the debt), excluding payments already made or verified.
 
 **Acceptance Scenarios**:
-1. Given multiple debts in various states for a member, when they view pending debts, then only debts with state "Pendiente" or "Pago informado" (without validation) appear.
+1. Given multiple debts in various states for a member, when they view pending debts, then only open debts appear: "Pendiente", "Pago parcial", "Pago informado" (not settled until an administrator confirms) and "Vencido"; debts in "Pagado" or "Verificado" do not appear.
 2. Given debts with recorded payments, when viewing pending debts, then payments already applied are deducted from the displayed amounts.
 3. Given the detail view, when selecting a specific debt, then the origin (which expense generated it) is shown.
 
@@ -135,7 +139,7 @@ Operar en varias monedas (ARS, USD y EUR como mínimo): cuando un gasto está en
 ## Functional Requirements
 
 ### FR-001: Registrar gasto compartido
-The system MUST allow registering a shared expense with the following parameters: monto (> 0), moneda, fecha (por defecto hoy), categoría, tipo (único o recurrente), medio de pago (efectivo, transferencia o débito), quién pagó y con quiénes se comparte. La descripción es opcional. Quien pagó siempre forma parte del reparto y no puede quitarse. Sin participantes, el gasto es personal y no genera deudas.
+The system MUST allow registering a shared expense with the following parameters: monto (> 0), moneda, fecha (por defecto hoy), quién pagó y con quiénes se comparte. La descripción es opcional. Quien pagó siempre forma parte del reparto y no puede quitarse. Sin participantes, el gasto es personal y no genera deudas.
 
 ### FR-002: Definir método de reparto
 The system MUST support defining cómo se reparte el gasto: partes iguales (por defecto), importes personalizados (la suma debe coincidir con el total) o porcentajes. En el caso de porcentajes, la suma de todos los porcentajes debe ser 100%.
@@ -144,7 +148,7 @@ The system MUST support defining cómo se reparte el gasto: partes iguales (por 
 The system MUST calculate automatically, within each group, cuánto debe y cuánto debe recibir cada miembro (incluyendo personas simuladas), a partir de los gastos y pagos registrados. Los saldos se recalculan cuando se registra un gasto o un pago. Solo cuentan los gastos y participantes del grupo en cuestión. La suma de todos los saldos del grupo es cero.
 
 ### FR-004: Liquidación de deudas (simplificación)
-The system MUST simplify group debts (liquidación) compensando deudas cruzadas y proponiendo el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales. La cantidad de transferencias propuestas es menor o igual a la cantidad de miembros con saldo distinto de cero menos uno.
+The system MUST simplify group debts (liquidación) compensando deudas cruzadas y proponiendo el conjunto reducido de transferencias (quién transfiere, a quién y cuánto) que deja a todos saldados. El total transferido debe coincidir con el total necesario para saldar y la propuesta no modifica el historial de gastos originales. La cantidad de transferencias propuestas es menor o igual a la cantidad de miembros con saldo distinto de cero menos uno. Compensación entre dos miembros: si A le debe 100 a B y B le debe 50 a A, la propuesta es una sola transferencia de 50 de A a B; nunca se proponen dos transferencias opuestas entre el mismo par, y si las deudas se anulan exactamente no se propone ninguna. La compensación se hace por moneda (nunca se mezclan monedas) y sobre el saldo pendiente de cada deuda abierta. La compensación se hace siempre dentro de un mismo grupo, nunca entre grupos distintos. Es solo parte de la propuesta: las deudas originales no se modifican, y los pagos se siguen registrando sobre cada deuda directa (decisión (a) de la sesión de aclaraciones).
 
 ### FR-005: Estados de deuda
 The system MUST manage the state of each debt with the following sequence: Pendiente (estado inicial) → Pago parcial (si se paga una parte) / Pago informado (si requiere validación) → Verificado (si requiere validación) / Pagado (si no requiere validación) → Vencido. Cada deuda comienza en estado Pendiente.
@@ -166,7 +170,7 @@ The system MUST prevent a member with pending balance from leaving the group. Ex
 
 ## Key Entities
 
-- **Gasto**: Registro de un gasto compartido o personal. Atributos: monto, moneda, fecha, categoría, tipo (único/recurrente), medio de pago, pagador, participantes (opcional), descripción. Relacionado con un grupo y determina deudas.
+- **Gasto**: Registro de un gasto compartido o personal. Atributos: monto, moneda, fecha, pagador, participantes (opcional), descripción. Relacionado con un grupo y determina deudas.
 
 - **Deuda**: Obligación que un miembro tiene con otro (o simulado) derivada de un gasto compartido. Atributos: monto, acreedor, deudor, estado (Pendiente, Pago parcial, Pago informado, Pagado, Verificado, Vencido), origen (gasto relacionado), pagos registrados. Pertenece a un grupo.
 
@@ -203,20 +207,19 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 - Las personas simuladas son cargadas manualmente por nombre y mail y no tienen acceso a la aplicación.
 - La fuente de cotizaciones es el tipo de cambio oficial del BCRA (API pública Estadísticas Cambiarias v1.0, sin credenciales). Este diseño reemplaza a OANDA, mencionado en el backlog original. Esta fuente está confirmada por el Product Owner. Se usa el **tipo de cambio oficial** del BCRA, no el dólar blue ni el MEP. No se fija la tasa manualmente ni se usa una tasa por defecto: si no hay cotización disponible (incluidos fines de semana y feriados, con hasta 7 días hacia atrás), el gasto se rechaza con 503 y no se guarda.
 - Un "Administrador de grupo" es un miembro con permisos especiales para validar o rechazar pagos cuando la configuración "Pagos requiere validación" está activada.
-- Los gastos recurrentes (tipo "recurrente") se manejan según lo definido en la spec 009 (Pausa o finalización de gasto recurrente): la entidad Expense y su lógica de recurrencia ya existen en ese feature. Para la feature 022, los gastos recurrentes requieren una frecuencia (Semanal, Mensual o Anual) y generan sus repeticiones de forma automática, tal como quedó definido en la spec 009. La simplificación de deudas aplica sobre el saldo actual después de cada registro.
+- Los gastos recurrentes (spec 009) quedan fuera del alcance de la 022: el gasto compartido de grupo no captura tipo ni frecuencia. La simplificación de deudas aplica sobre el saldo actual después de cada registro.
 - La moneda principal de un grupo se define cuando se crea el grupo y puede ser ARS, USD o EUR.
 - Los porcentajes de reparto se ingresan como números enteros o decimales que suman 100 en total.
-- Los medios de pago (efectivo, transferencia, débito) son solo etiquetas informativas y no afectan el cálculo de montos ni el estado de las deudas.
-- Las categorías de gasto son libres o de un catálogo predefinido (por definir); no afectan los cálculos de deudas.
+- Categoría, tipo (único o recurrente) y medio de pago de un gasto quedan **fuera del alcance** de la 022 (decisión del 2026-11-08): el gasto de grupo (017) no los captura y no se agregan en esta feature. Si más adelante se incorporan, no afectarán el cálculo de montos ni el estado de las deudas.
 - Las fechas de las transacciones son fechas pasadas o presentes; no se permiten fechas futuras para gastos o pagos.
 
 ## Clarifications
 **Session 2026-11-06**
 
 - Q: Redondeo de centavos en repartos en partes iguales y quién absorbe la diferencia? → A: Cada parte se calcula en centavos hacia abajo (piso) y el resto, si lo hay, lo absorbe el pagador. La razón es que ningún participante no pagador pague de más por redondeo. Ejemplos con el pagador: 100,00 entre 3 → 33,33 / 33,33 / 33,34; 0,05 entre 3 → 0,01 / 0,01 / 0,03. La misma regla se aplica al reparto por porcentajes.
-- Q: Origen de la fecha límite que determina el estado Vencido? → A: The deadline is configured per group by the administrator as a fixed number of days from the expense date; debts automatically transition to "Vencido" when the current date exceeds (expense date + days configured). If not configured, debts never automatically become "Vencido" (remain in their current state until manual transition). Note: for recurring expenses, after the date they're considered 'Vencido'; for non-recurring expenses, no date applies.
+- Q: Origen de la fecha límite que determina el estado Vencido? → A: The deadline is configured per group by the administrator as a fixed number of days from the expense date; debts automatically transition to "Vencido" when the current date exceeds (expense date + days configured). If not configured, debts never automatically become "Vencido" (remain in their current state until manual transition). The threshold applies to any expense of the group (see the later clarification "Vencimiento: umbral por grupo o cualquier gasto?").
 - Q: Si se admiten pagos parciales? → A: **Sí, se admiten** (decisión de producto del 2026-11-07, que reemplaza la anterior "solo pagos completos"). El monto del pago debe ser mayor que cero y no superar el saldo pendiente (monto de la deuda menos lo ya pagado); uno mayor se rechaza. Sin validación, el pago se confirma al instante y suma a lo pagado (Pago parcial si queda saldo, Pagado si queda en cero). Con validación, el pago queda informado sin tocar lo pagado; al confirmarlo se suma (Pago parcial o Verificado) y al rechazarlo la deuda vuelve a su estado anterior. Solo puede haber un pago por validar a la vez por deuda.
-- Q: Qué ocurre con saldos y pagos ya registrados al editar o eliminar un gasto? → A: Editing an expense is not allowed once it has participants (only description/categoría can be modified before registration; after registration, the expense is immutable). Deleting an expense is only allowed if it has no participants (personal expense) and no debts are associated; if the expense has associated debts, deletion is rejected.
+- Q: Qué ocurre con saldos y pagos ya registrados al editar o eliminar un gasto? → A: Editing an expense is not allowed once it has participants (only the description can be modified before registration; after registration, the expense is immutable). Deleting an expense is only allowed if it has no participants (personal expense) and no debts are associated; if the expense has associated debts, deletion is rejected.
 - Q: Si las deudas de una misma persona se consolidan entre grupos distintos? → A: Debts are tracked per-group and displayed separately. A member sees their debts organized by group, with the total across all groups shown as a summary, but each debt is settled independently within its group. Payments are applied to specific debts in specific groups. The "total owed" summary is informational only and doesn't create a cross-group obligation.
 - Q: ¿Quién puede cargar un gasto pagado por otro miembro y cómo se registra? → A: Cualquier miembro del grupo puede cargar un gasto pagado por otro miembro (decisión confirmada por el equipo, 2026-11-06). Reglas: (1) el pagador y todos los participantes deben ser miembros del grupo, y esta validación se hace en el servidor; (2) se guardan por separado el pagador (`payerUserId`) y quien registró el gasto (`createdByUserId`); (3) las deudas se generan contra el pagador; (4) el historial de actividad muestra a quien registró y al pagador. Los participantes también pueden ser personas simuladas del grupo, que siguen siendo informativas y no tienen obligación financiera. Esta respuesta reemplaza la anterior de esta misma sesión, que prohibía cargar gastos en nombre de otro.
 - Q: Si Pagado y Verificado son equivalentes para el saldo? → A: Pagado y Verificado son equivalentes para el saldo: una vez que una deuda alcanza cualquiera de estos estados, el saldo correspondiente se considera saldado (cero) para todos los efectos del grupo. La diferencia semántica permanece en el historial (se registra el camino recorrido: Pendiente → Pago informado → Verificado/Pagado), pero no afecta los cálculos de deuda, liquidación, ni el reporte de saldos.
@@ -224,6 +227,6 @@ Un pago informado queda reflejado en el estado de la deuda y en el historial de 
 - Q: Pago de una transferencia propuesta cuando A le debe a B y B le debe a C, y se propone que A pague a C? → A: (a) la propuesta es solo orientativa y los pagos se registran sobre deudas directas
 - Q: Personas simuladas en saldos y liquidación? → A: incluidas en saldos y propuesta como informativas; sus pagos los registra un administrador; el pagador siempre es un usuario registrado
 - Q: Vencimiento: umbral por grupo o cualquier gasto? → A: cualquier gasto, con el umbral por grupo
-- Q: Una deuda vencida se puede pagar? → A: Confirmado: una deuda en estado Vencido puede pagarse. Un pago total la deja Pagada (o Pago informado si el grupo valida); un pago parcial la pasa a Pago parcial (**decisión a confirmar**: la alternativa es que siga Vencida con saldo parcial, lo que exige cambiar las restricciones de la base de datos).
+- Q: Una deuda vencida se puede pagar? → A: Confirmado: una deuda en estado Vencido puede pagarse. Un pago total la deja Pagada (o Pago informado si el grupo valida); un pago parcial la pasa a Pago parcial (**decisión confirmada el 2026-11-08**; se descartó la alternativa de que siga Vencida con saldo parcial, que exigía cambiar las restricciones de la base de datos).
 - Q: Pagos parciales: si la spec 018 permitió pagos parciales, ¿qué pasa ahora? → A: Los pagos parciales **siguen permitidos** (reemplaza la respuesta anterior "solo pagos completos"). El flujo de la 018 y el de la 022 quedan alineados: ambos suman al monto pagado de la deuda y producen los mismos estados; los pagos históricos de la 018 se conservan tal como están.
 - Q: Si el servicio de cotizaciones no responde, ¿se rechaza el gasto? → A: Rechazar el gasto con un mensaje claro (texto vigente: "No se pudo obtener la cotización; reintente después o registre en moneda del grupo")

@@ -66,6 +66,8 @@ Define the contract for the advisory debt liquidation proposal of a group. The p
 4. **Read-only and advisory**: payments are registered on direct debts, not on proposed transfers.
 5. **Currencies**: there is one proposal per debt currency; nothing is converted. The converted amount shown elsewhere in the UI is informational.
 6. **Determinism**: at each step the planner takes the largest creditor and the largest debtor (ties by member id), transfers the smaller of the two amounts and repeats.
+7. **Cross-debt compensation between a pair**: debts in opposite directions between the same two members are compensated before anything is proposed, in the same currency and using each debt's outstanding balance. If A owes B 100.00 and B owes A 50.00, the result is one transfer of 50.00 from A to B. Several debts in each direction are added up per direction first. If they cancel exactly (100.00 vs 100.00) there is no transfer. This falls out of the net balances (A −50.00, B +50.00) and must never produce two opposite transfers for the same pair. The original debts stay untouched and `GET /debts/pending` still lists each one gross: the compensation exists only in the proposal.
+8. **Per group only**: the proposal of a group uses only the debts of that group. Debts of other groups, even between the same members, are never compensated against it (each debt is settled inside its own group).
 
 ## Example
 
@@ -97,3 +99,38 @@ Greedy: largest creditor Bob (+5.00) and largest debtor Alice (−7.00) → Alic
 ```
 
 Check: 2 transfers ≤ 3 − 1; total 7.00 = 5.00 + 2.00 (sum of positive balances); gross debts were 18.00.
+
+## Example: cross-debts between two members
+
+```
+Group: A, B (ARS)
+Debts: A owes B 100.00, B owes A 50.00
+
+Net balances: A −50.00, B +50.00   (sum 0)
+
+{
+  "groupId": 1,
+  "primaryCurrency": "ARS",
+  "proposals": [{
+    "currency": "ARS",
+    "transfers": [
+      { "fromMemberId": 1, "fromMemberName": "A", "fromMemberType": "REGISTERED",
+        "toMemberId": 2, "toMemberName": "B", "toMemberType": "REGISTERED",
+        "amount": 50.00, "informative": false }
+    ],
+    "summary": { "totalTransferred": 50.00, "totalNetBalances": 50.00, "membersSettled": 2, "transferCount": 1 }
+  }]
+}
+```
+
+Same members in two groups (each group has its own proposal and they never offset each other):
+
+```
+Group 1: A owes B 100.00, B owes A 50.00
+         Net: A −50.00, B +50.00      → proposal: A pays 50.00 to B
+
+Group 2: C owes A 40.00, B owes A 25.00, A owes C 20.00
+         Net: A +45.00, B −25.00, C −20.00   → proposal: B pays 25.00 to A, C pays 20.00 to A
+```
+
+Check: 1 transfer ≤ 2 − 1; total 50.00 = sum of positive balances; gross debts were 150.00. If B owed A 100.00 instead, both balances would be 0.00 and `proposals` would have no transfers for that currency.
