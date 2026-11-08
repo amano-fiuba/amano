@@ -13,9 +13,10 @@ const FORMAT_MESSAGE = 'El archivo debe ser una imagen JPG o PNG válida'
 
 /**
  * Edit mode of the group data (photo, name, description). Changes are staged
- * locally and persisted together on "Guardar cambios"; "Cancelar" discards.
+ * locally and persisted together on "Guardar"; closing the panel ("Cerrar"
+ * in the group header) discards them.
  */
-export default function GroupEditForm({ group, onSaved, onCancel }) {
+export default function GroupEditForm({ group, onSaved }) {
   const showSnackbar = useSnackbar()
   const [name, setName] = useState(group.name)
   const [description, setDescription] = useState(group.description ?? '')
@@ -114,12 +115,10 @@ export default function GroupEditForm({ group, onSaved, onCancel }) {
         <textarea value={description} rows={3} onChange={(e) => setDescription(e.target.value)} />
       </label>
       {error && <p role="alert" data-testid="group-edit-error">{error}</p>}
-      <div>
+      {/* Sin Cancelar: el panel se cierra con "Cerrar" en la cabecera. */}
+      <div className="form-actions">
         <button type="submit" className="group-action" disabled={saving}>
-          Guardar cambios
-        </button>{' '}
-        <button type="button" className="group-action" disabled={saving} onClick={onCancel}>
-          Cancelar
+          Guardar
         </button>
       </div>
     </form>

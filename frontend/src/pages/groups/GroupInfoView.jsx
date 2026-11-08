@@ -80,44 +80,35 @@ export default function GroupInfoView() {
         <>
           <header className="group-hero" data-testid="group-detail">
             <div className="group-hero__identity">
-              {editing ? (
-                <GroupEditForm
-                  group={group}
-                  onCancel={() => setEditing(false)}
-                  onSaved={(updated) => {
-                    setGroup(updated)
-                    setEditing(false)
-                  }}
-                />
-              ) : (
-                <>
-                  <GroupPhotoPanel photo={group.photo ?? null} />
-                  <div className="group-hero__text">
-                    <h1>{group.name}</h1>
-                    <GroupDescriptionPanel description={group.description ?? null} />
-                    <p className="group-hero__meta" data-testid="group-role">
-                      {memberCountLabel(group.memberCount)}
-                      <span aria-hidden="true">·</span>
-                      <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
-                        <span className="visually-hidden">Tu rol: </span>
-                        {roleLabel(group.currentUserRole)}
-                      </span>
-                    </p>
-                  </div>
-                </>
-              )}
+              <GroupPhotoPanel photo={group.photo ?? null} />
+              <div className="group-hero__text">
+                <h1>{group.name}</h1>
+                <GroupDescriptionPanel description={group.description ?? null} />
+                <p className="group-hero__meta" data-testid="group-role">
+                  {memberCountLabel(group.memberCount)}
+                  <span aria-hidden="true">·</span>
+                  <span className={`role-chip role-chip--${group.currentUserRole.toLowerCase()}`}>
+                    <span className="visually-hidden">Tu rol: </span>
+                    {roleLabel(group.currentUserRole)}
+                  </span>
+                </p>
+              </div>
             </div>
             {/* Acciones arriba a la derecha y "Salir" en la esquina inferior derecha. */}
             <div className="group-hero__side">
             <div className="group-hero__actions">
-              {canEditGroupData && !editing && (
+              {/* Como Configuración: la cabecera no cambia, el botón pasa a
+                  "Cerrar" y el formulario se abre en un panel debajo. */}
+              {canEditGroupData && (
                 <button
                   type="button"
                   className="group-action"
                   data-testid="group-edit-button"
-                  onClick={() => setEditing(true)}
+                  aria-expanded={editing}
+                  aria-label={editing ? 'Cerrar edición' : undefined}
+                  onClick={() => setEditing(!editing)}
                 >
-                  <PencilIcon /> Editar
+                  {editing ? 'Cerrar' : <><PencilIcon /> Editar</>}
                 </button>
               )}
               {isAdmin && (
@@ -138,6 +129,17 @@ export default function GroupInfoView() {
               isLastMember={Boolean(group.isLastMember)}
             />
             </div>
+            {editing && (
+              <div className="group-admin-panel" data-testid="edit-panel">
+                <GroupEditForm
+                  group={group}
+                  onSaved={(updated) => {
+                    setGroup(updated)
+                    setEditing(false)
+                  }}
+                />
+              </div>
+            )}
             {showPermissions && (
               <div className="group-admin-panel" data-testid="permissions-panel">
                 <GroupPermissionsPanel

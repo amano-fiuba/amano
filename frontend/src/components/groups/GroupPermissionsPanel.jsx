@@ -56,8 +56,8 @@ export default function GroupPermissionsPanel({ group, permissions, onSaved }) {
           </label>
         </div>
       ))}
-      <button type="button" onClick={handleSubmit} disabled={saving}>
-        Guardar permisos
+      <button type="button" className="group-action" onClick={handleSubmit} disabled={saving}>
+        Guardar
       </button>
       {error && (
         <p role="alert" data-testid="permissions-error">

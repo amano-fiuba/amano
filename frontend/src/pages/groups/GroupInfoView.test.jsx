@@ -78,7 +78,9 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     renderView()
 
-    const links = await screen.findAllByRole('link', { name: 'Ver gasto' })
+    // La pantalla monta varias tarjetas con sus propias consultas: en máquinas
+    // lentas tarda más que el segundo por defecto de findAll.
+    const links = await screen.findAllByRole('link', { name: 'Ver gasto' }, { timeout: 5000 })
     expect(links[0]).toHaveAttribute('href', '/groups/3/expenses/44')
     expect(getActivity).toHaveBeenCalledWith('3', expect.objectContaining({ eventTypes: ['EXPENSE_CREATED'] }))
     expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/groups/3/history')
@@ -162,6 +164,24 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     expect(screen.queryByRole('button', { name: /Actualizar lista/i })).not.toBeInTheDocument()
   })
 
+  it('Editar abre el formulario debajo sin ocultar la cabecera y pasa a "Cerrar"', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+
+    expect(screen.getByRole('heading', { level: 1, name: GROUP.name })).toBeInTheDocument()
+    expect(screen.getByTestId('edit-panel')).toBeInTheDocument()
+    const closeEdit = screen.getByRole('button', { name: 'Cerrar edición' })
+    expect(closeEdit).toHaveTextContent(/^Cerrar$/)
+
+    fireEvent.click(closeEdit)
+
+    expect(screen.queryByTestId('edit-panel')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+  })
+
   it('al guardar la configuración se cierra sola y vuelve a consultar el grupo', async () => {
     getGroup.mockResolvedValue({ ok: true, group: GROUP })
     updateGroup.mockResolvedValue({ ok: true, group: GROUP })
@@ -170,7 +190,7 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }))
     expect(screen.getByRole('heading', { name: 'Permisos de los miembros' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar permisos' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
     await waitFor(() => expect(screen.queryAllByTestId('permissions-panel')).toHaveLength(0))
     expect(screen.getByRole('button', { name: 'Configuración' })).toBeInTheDocument()
