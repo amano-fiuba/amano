@@ -126,7 +126,7 @@ class GroupSettingsUpdateIT {
                 .andExpect(jsonPath("$.permissions.membersCanManageSimulatedProfiles").value(true))
                 .andExpect(jsonPath("$.permissions.paymentsRequireValidation").value(true))
                 .andExpect(jsonPath("$.permissions.membersCannotMakeExpenses").value(false))
-                .andExpect(jsonPath("$.permissions.membersCanGenerateExpensesForOthers").value(false));
+                .andExpect(jsonPath("$.permissions.membersCanGenerateExpensesForOthers").value(true));
 
         mockMvc.perform(get("/api/groups/" + groupId).cookie(admin))
                 .andExpect(status().isOk())
