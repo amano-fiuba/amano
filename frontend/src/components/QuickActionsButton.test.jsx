@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes } from 'react-router'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import QuickActionsButton from './QuickActionsButton'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
@@ -10,14 +10,41 @@ vi.mock('../auth/AuthContext', () => ({ useAuth }))
 
 function renderButton() {
   return render(
-    <MemoryRouter>
-      <QuickActionsButton />
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<QuickActionsButton />} />
+        <Route path="/expenses/new" element={<p>Pantalla de gasto personal</p>} />
+        <Route path="/groups/new" element={<p>Pantalla de crear grupo</p>} />
+      </Routes>
     </MemoryRouter>,
   )
 }
 
+async function openMenu(user) {
+  await user.click(screen.getByRole('button', { name: 'Acciones rápidas' }))
+  return screen.getByRole('menuitem', { name: 'Registrar gasto' })
+}
+
+function setMatchMedia(matches) {
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }))
+}
+
+const originalMatchMedia = window.matchMedia
+
 beforeEach(() => {
   useAuth.mockReturnValue({ user: { id: 7 } })
+  setMatchMedia(false)
+})
+
+afterEach(() => {
+  window.matchMedia = originalMatchMedia
+  vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
 describe('QuickActionsButton (015, US4)', () => {
@@ -32,11 +59,11 @@ describe('QuickActionsButton (015, US4)', () => {
     const user = userEvent.setup()
     renderButton()
 
-    await user.click(screen.getByRole('button', { name: 'Acciones rápidas' }))
+    await openMenu(user)
 
-    expect(screen.getByRole('link', { name: 'Crear grupo' })).toHaveAttribute('href', '/groups/new')
-    expect(screen.getByRole('link', { name: 'Registrar gasto' })).toHaveAttribute('href', '/expenses/new')
-    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).toHaveAttribute(
+    expect(screen.getByRole('menu', { name: 'Acciones rápidas' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Crear grupo' })).toHaveAttribute('href', '/groups/new')
+    expect(screen.getByRole('menuitem', { name: 'Gastos recurrentes' })).toHaveAttribute(
       'href',
       '/expenses/recurring',
     )
@@ -46,9 +73,197 @@ describe('QuickActionsButton (015, US4)', () => {
     const user = userEvent.setup()
     renderButton()
 
-    await user.click(screen.getByRole('button', { name: 'Acciones rápidas' }))
-    await user.click(screen.getByRole('link', { name: 'Crear grupo' }))
+    await openMenu(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Crear grupo' }))
 
-    expect(screen.queryByRole('link', { name: 'Crear grupo' })).not.toBeInTheDocument()
+    expect(screen.getByText('Pantalla de crear grupo')).toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
+
+describe('QuickActionsButton: submenú "Registrar gasto" (027, US1)', () => {
+  it('"Registrar gasto" anuncia un submenú cerrado', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    const trigger = await openMenu(user)
+
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
+  })
+
+  it('se abre con clic y muestra solo las opciones habilitadas', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    const trigger = await openMenu(user)
+    await user.click(trigger)
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('menu', { name: 'Registrar gasto' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Gasto personal' })).toHaveAttribute(
+      'href',
+      '/expenses/new',
+    )
+    // US3 y US4 todavía no están integradas: sus opciones no se muestran (FR-001).
+    expect(screen.queryByRole('menuitem', { name: 'Gasto con amigo' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Gasto grupal' })).not.toBeInTheDocument()
+  })
+
+  it('un segundo clic sobre "Registrar gasto" cierra el submenú', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    const trigger = await openMenu(user)
+    await user.click(trigger)
+    await user.click(trigger)
+
+    expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
+  })
+
+  it('se abre con hover y se cierra al salir, con un pequeño retardo', async () => {
+    vi.useFakeTimers()
+    renderButton()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Acciones rápidas' }))
+    const item = screen.getByRole('menuitem', { name: 'Registrar gasto' }).closest('li')
+
+    fireEvent.mouseEnter(item)
+    expect(screen.getByRole('menu', { name: 'Registrar gasto' })).toBeInTheDocument()
+
+    fireEvent.mouseLeave(item)
+    // Volver antes del retardo lo mantiene abierto.
+    fireEvent.mouseEnter(item)
+    act(() => vi.advanceTimersByTime(300))
+    expect(screen.getByRole('menu', { name: 'Registrar gasto' })).toBeInTheDocument()
+
+    fireEvent.mouseLeave(item)
+    act(() => vi.advanceTimersByTime(300))
+    expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
+  })
+
+  it('"Gasto personal" lleva al formulario y cierra todo el menú', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+    await user.click(screen.getByRole('menuitem', { name: 'Gasto personal' }))
+
+    expect(screen.getByText('Pantalla de gasto personal')).toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('con teclado: flecha derecha abre y enfoca la primera opción; flecha izquierda vuelve', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    const trigger = await openMenu(user)
+    trigger.focus()
+    await user.keyboard('{ArrowRight}')
+
+    expect(screen.getByRole('menuitem', { name: 'Gasto personal' })).toHaveFocus()
+
+    await user.keyboard('{ArrowLeft}')
+
+    expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
+  it('con teclado: Enter abre el submenú y Escape lo cierra devolviendo el foco', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    const trigger = await openMenu(user)
+    trigger.focus()
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByRole('menuitem', { name: 'Gasto personal' })).toHaveFocus()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
+    // Solo se cierra el submenú: el menú principal sigue abierto.
+    expect(screen.getByRole('menu', { name: 'Acciones rápidas' })).toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
+  it('con teclado: las flechas recorren los ítems del menú', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    await openMenu(user)
+    const first = screen.getByRole('menuitem', { name: 'Crear grupo' })
+    first.focus()
+
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'Registrar gasto' })).toHaveFocus()
+
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'Gastos recurrentes' })).toHaveFocus()
+
+    await user.keyboard('{ArrowDown}')
+    expect(first).toHaveFocus()
+
+    await user.keyboard('{ArrowUp}')
+    expect(screen.getByRole('menuitem', { name: 'Gastos recurrentes' })).toHaveFocus()
+  })
+
+  it('Escape en el menú principal cierra todo', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+    screen.getByRole('menuitem', { name: 'Crear grupo' }).focus()
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('un clic fuera cierra el menú y el submenú', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+    await user.click(document.body)
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('si no entra a la derecha, el submenú se ubica en la posición alternativa', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 0,
+      left: 200,
+      right: window.innerWidth + 50,
+      bottom: 100,
+      width: 300,
+      height: 100,
+      x: 200,
+      y: 0,
+    })
+    renderButton()
+
+    await user.click(await openMenu(user))
+
+    expect(screen.getByRole('menu', { name: 'Registrar gasto' })).toHaveClass(
+      'quick-actions__submenu--flip',
+    )
+  })
+
+  it('en móvil el submenú reemplaza la lista y "Volver" regresa', async () => {
+    setMatchMedia(true)
+    const user = userEvent.setup()
+    renderButton()
+
+    await user.click(await openMenu(user))
+
+    expect(screen.queryByRole('menuitem', { name: 'Crear grupo' })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Gasto personal' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('menuitem', { name: 'Volver' }))
+
+    expect(screen.getByRole('menuitem', { name: 'Crear grupo' })).toBeInTheDocument()
+    expect(screen.queryByRole('menu', { name: 'Registrar gasto' })).not.toBeInTheDocument()
   })
 })

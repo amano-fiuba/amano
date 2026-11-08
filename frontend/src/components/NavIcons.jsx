@@ -119,3 +119,43 @@ export function PaidIcon() {
     </Icon>
   )
 }
+
+// Una persona: gasto personal (027, submenú "Registrar gasto").
+export function PersonIcon() {
+  return (
+    <Icon>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20c.6-3.8 3.1-5.8 7-5.8s6.4 2 7 5.8" />
+    </Icon>
+  )
+}
+
+// Dos personas: gasto con un amigo (027). El gasto grupal usa GroupsIcon.
+export function FriendIcon() {
+  return (
+    <Icon>
+      <circle cx="8" cy="8.5" r="3" />
+      <circle cx="16" cy="8.5" r="3" />
+      <path d="M2.5 19.5c.5-3.2 2.6-5 5.5-5 1.6 0 2.9.5 3.9 1.5" />
+      <path d="M21.5 19.5c-.5-3.2-2.6-5-5.5-5-1.6 0-2.9.5-3.9 1.5" />
+    </Icon>
+  )
+}
+
+// Flecha hacia la derecha: ítem que abre un submenú.
+export function ChevronRightIcon() {
+  return (
+    <Icon>
+      <path d="m9 6 6 6-6 6" />
+    </Icon>
+  )
+}
+
+// Flecha hacia la izquierda: volver del submenú en móvil.
+export function ChevronLeftIcon() {
+  return (
+    <Icon>
+      <path d="m15 6-6 6 6 6" />
+    </Icon>
+  )
+}
