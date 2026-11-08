@@ -2,8 +2,8 @@
 // colores del logo. El azul sigue siendo la base; el naranja marca interacción.
 // Se importa después de los estilos de cada pantalla.
 
-$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .group-photo__change, .form-success, .friend-card__delete";
-$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout, .delete-friend-dialog__cancel";
+$quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .quick-actions__item, .date-field__toggle, .date-field__nav, .date-field__day, .group-photo__change, .form-success, .friend-card__delete";
+$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .site-nav__logout, .delete-friend-dialog__cancel, .choice-dialog__cancel, .choice-dialog__retry, .expense-actions__cancel";
 $primarios: "button:not(#{$quietos}, #{$secundarios}), .buttonLink, .home-cta:not(.home-cta--secondary)";
 $tiempo: 120ms;
 

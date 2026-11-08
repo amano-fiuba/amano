@@ -8,6 +8,51 @@ export const CURRENCY_OPTIONS = Object.freeze([
   { code: 'EUR', label: 'Euro' },
 ])
 
+// 027 (FR-011 a FR-014): the 32 currencies an expense or a preference accepts,
+// the same constants as the backend Currency enum and the V27 CHECKs. ARS, USD and
+// EUR come first (same order as CURRENCY_OPTIONS); the rest, alphabetically by code.
+// CURRENCY_OPTIONS above stays as the group primary-currency catalog (027 R3).
+export const ALL_CURRENCY_OPTIONS = Object.freeze([
+  ...CURRENCY_OPTIONS,
+  { code: 'AUD', label: 'Dólar australiano' },
+  { code: 'AWG', label: 'Florín arubeño' },
+  { code: 'BOB', label: 'Boliviano' },
+  { code: 'BRL', label: 'Real brasileño' },
+  { code: 'CAD', label: 'Dólar canadiense' },
+  { code: 'CHF', label: 'Franco suizo' },
+  { code: 'CLP', label: 'Peso chileno' },
+  { code: 'CNY', label: 'Yuan chino' },
+  { code: 'COP', label: 'Peso colombiano' },
+  { code: 'CZK', label: 'Corona checa' },
+  { code: 'DKK', label: 'Corona danesa' },
+  { code: 'GBP', label: 'Libra esterlina' },
+  { code: 'HKD', label: 'Dólar de Hong Kong' },
+  { code: 'ILS', label: 'Nuevo séquel israelí' },
+  { code: 'INR', label: 'Rupia india' },
+  { code: 'JPY', label: 'Yen japonés' },
+  { code: 'MXN', label: 'Peso mexicano' },
+  { code: 'NIO', label: 'Córdoba nicaragüense' },
+  { code: 'NOK', label: 'Corona noruega' },
+  { code: 'NZD', label: 'Dólar neozelandés' },
+  { code: 'PEN', label: 'Sol peruano' },
+  { code: 'PYG', label: 'Guaraní paraguayo' },
+  { code: 'RSD', label: 'Dinar serbio' },
+  { code: 'RUB', label: 'Rublo ruso' },
+  { code: 'SEK', label: 'Corona sueca' },
+  { code: 'SGD', label: 'Dólar de Singapur' },
+  { code: 'TRY', label: 'Lira turca' },
+  { code: 'UYU', label: 'Peso uruguayo' },
+  { code: 'ZAR', label: 'Rand sudafricano' },
+])
+
+/**
+ * Spanish label of a currency code; `fallback` (e.g. the BCRA name) for a code
+ * without a label, and the code itself when there is neither.
+ */
+export function currencyLabel(code, fallback) {
+  return labelOf(ALL_CURRENCY_OPTIONS, code) || fallback || code
+}
+
 export const CATEGORY_OPTIONS = Object.freeze([
   { code: 'FOOD', label: 'Alimentos' },
   { code: 'TRANSPORT', label: 'Transporte' },

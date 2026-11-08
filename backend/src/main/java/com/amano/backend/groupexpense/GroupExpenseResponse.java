@@ -12,7 +12,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * the expense was registered; payer and creator use the current visible name.
  * Conversion fields ({@code convertedAmount}, {@code convertedCurrency},
  * {@code exchangeRate}, {@code rateDate}, {@code rateSource}) and
- * {@code splitMethod} are additive (022 D8 and D2/T066).
+ * {@code splitMethod} are additive (022 D8 and D2/T066). 027 (FR-020) adds
+ * {@code category}, {@code type} and {@code paymentMethod}, null for older expenses;
+ * US4 adds {@code friend}, the other person of an expense with a friend ({@code groupId} null).
  */
 public record GroupExpenseResponse(
         Long id,
@@ -31,7 +33,62 @@ public record GroupExpenseResponse(
         OffsetDateTime createdAt,
         List<Share> shares,
         List<DebtView> debts,
-        String splitMethod) {
+        String splitMethod,
+        String category,
+        String type,
+        String paymentMethod,
+        Person friend) {
+
+    /** 027 US3 constructor without {@code friend} (null: a group expense). */
+    public GroupExpenseResponse(
+            Long id,
+            Long groupId,
+            String amount,
+            String currency,
+            String convertedAmount,
+            String convertedCurrency,
+            String exchangeRate,
+            String rateDate,
+            String rateSource,
+            String date,
+            String description,
+            Person payer,
+            Person createdBy,
+            OffsetDateTime createdAt,
+            List<Share> shares,
+            List<DebtView> debts,
+            String splitMethod,
+            String category,
+            String type,
+            String paymentMethod) {
+        this(id, groupId, amount, currency, convertedAmount, convertedCurrency, exchangeRate, rateDate,
+                rateSource, date, description, payer, createdBy, createdAt, shares, debts, splitMethod,
+                category, type, paymentMethod, null);
+    }
+
+    /** 024 constructor without the 027 classification (null: expense created before 027). */
+    public GroupExpenseResponse(
+            Long id,
+            Long groupId,
+            String amount,
+            String currency,
+            String convertedAmount,
+            String convertedCurrency,
+            String exchangeRate,
+            String rateDate,
+            String rateSource,
+            String date,
+            String description,
+            Person payer,
+            Person createdBy,
+            OffsetDateTime createdAt,
+            List<Share> shares,
+            List<DebtView> debts,
+            String splitMethod) {
+        this(id, groupId, amount, currency, convertedAmount, convertedCurrency, exchangeRate, rateDate,
+                rateSource, date, description, payer, createdBy, createdAt, shares, debts, splitMethod,
+                null, null, null);
+    }
 
     /** 022 constructor without the split method, kept for backward compatibility. */
     public GroupExpenseResponse(

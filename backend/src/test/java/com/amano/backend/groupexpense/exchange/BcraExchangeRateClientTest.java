@@ -172,6 +172,38 @@ class BcraExchangeRateClientTest {
         server.verify();
     }
 
+    /** 027 T013: currencies beyond USD/EUR, including MXN published by the BCRA as MXP. */
+    @Test
+    void newCatalogCurrenciesUseTheirBcraCode() {
+        LocalDate date = LocalDate.of(2026, 11, 5);
+        String body = """
+                {
+                  "status": 200,
+                  "results": {
+                    "fecha": "%s",
+                    "detalle": [
+                      { "codigoMoneda": "BRL", "descripcion": "REAL", "tipoPase": 0.18, "tipoCotizacion": 281.63495900 },
+                      { "codigoMoneda": "MXP", "descripcion": "PESO MEXICANO", "tipoPase": 0.05, "tipoCotizacion": 82.45085200 },
+                      { "codigoMoneda": "USD", "descripcion": "DOLAR E.E.U.U.", "tipoPase": 1, "tipoCotizacion": 1545.5 }
+                    ]
+                  }
+                }
+                """.formatted(date);
+
+        server.expect(requestTo(urlFor(date))).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        ExchangeRateQuote brlToArs = client.getQuote(Currency.BRL, Currency.ARS, date);
+        assertThat(brlToArs.rate()).isEqualByComparingTo("281.63495900");
+        server.verify();
+
+        server.reset();
+        server.expect(requestTo(urlFor(date))).andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+        ExchangeRateQuote mxnToUsd = client.getQuote(Currency.MXN, Currency.USD, date);
+        // 82.450852 / 1545.5 = 0.0533489... -> 0.05334898
+        assertThat(mxnToUsd.rate()).isEqualByComparingTo("0.05334898");
+        assertThat(mxnToUsd.rate().scale()).isEqualTo(8);
+        server.verify();
+    }
+
     @Test
     void weekendEmptyListWalksBackToTheLastBusinessDayAndRecordsItsDate() {
         LocalDate sunday = LocalDate.of(2026, 1, 18);

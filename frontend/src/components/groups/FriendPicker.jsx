@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { FRIENDS_NETWORK_ERROR_MESSAGE, listFriends } from '../../api/friendsClient'
 import { useAuth } from '../../auth/AuthContext'
 import { NO_FRIENDS_MESSAGE } from '../FriendsList'
+import { normalizeText as normalize } from '../../validation/normalizeText'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
 
@@ -10,13 +11,6 @@ function fullName(friend) {
   return friend.lastName ? `${friend.firstName} ${friend.lastName}` : friend.firstName
 }
 
-// Lowercase and without accents, so "jose" finds "José".
-function normalize(text) {
-  return (text ?? '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .toLowerCase()
-}
 
 function matches(friend, term) {
   return [fullName(friend), friend.email].some((value) => normalize(value).includes(term))

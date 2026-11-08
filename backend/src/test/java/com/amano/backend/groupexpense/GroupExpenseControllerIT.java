@@ -155,7 +155,7 @@ class GroupExpenseControllerIT {
     private String threeWayBody(String amount) {
         return """
                 {"amount": "%s", "currency": "ARS", "date": "2026-11-05", "description": "Súper",
-                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [
                    {"type": "REGISTERED", "userId": %d},
                    {"type": "REGISTERED", "userId": %d},
@@ -231,7 +231,7 @@ class GroupExpenseControllerIT {
     @Test
     void withoutThePayerTheRemainderGoesToTheFirstParticipant() throws Exception {
         String body = """
-                {"amount": "100.00", "currency": "USD", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "USD", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "SIMULATED", "simulatedProfileId": %d},
                                   {"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, abuela, juan);
@@ -246,7 +246,7 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.description").doesNotExist());
 
         String odd = """
-                {"amount": "0.05", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "0.05", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "SIMULATED", "simulatedProfileId": %d},
                                   {"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, abuela, juan);
@@ -326,7 +326,7 @@ class GroupExpenseControllerIT {
     void t023CustomSplitPersistsTheRequestedShares() throws Exception {
         String custom = """
                 {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "description": "Súper",
-                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
@@ -355,7 +355,7 @@ class GroupExpenseControllerIT {
     @Test
     void t023CustomSplitMustSumTheConvertedTotal() throws Exception {
         String invalid = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
@@ -375,7 +375,7 @@ class GroupExpenseControllerIT {
     @Test
     void t024PercentageSplitFloorsNonPayersAndThePayerAbsorbsTheRemainder() throws Exception {
         String percentage = """
-                {"amount": "0.05", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "0.05", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "PERCENTAGE",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "percentage": "33.33"},
@@ -401,7 +401,7 @@ class GroupExpenseControllerIT {
     @Test
     void t024SplitValidationMessagesAreVoseoAndRejectInvalidCombinations() throws Exception {
         String equalWithAmount = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "EQUAL",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "50.00"},
@@ -414,7 +414,7 @@ class GroupExpenseControllerIT {
                         .value("El reparto en partes iguales no acepta importes ni porcentajes por participante"));
 
         String unknownMethod = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "HALF",
                  "participants": [{"type": "REGISTERED", "userId": %d},
                                   {"type": "REGISTERED", "userId": %d},
@@ -426,7 +426,7 @@ class GroupExpenseControllerIT {
                         .value("El método de reparto debe ser EQUAL, CUSTOM o PERCENTAGE"));
 
         String zeroPercentage = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "PERCENTAGE",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "percentage": "0"},
@@ -439,7 +439,7 @@ class GroupExpenseControllerIT {
                         .value("Cada porcentaje tiene que ser mayor que 0"));
 
         String wrongPercentageSum = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "PERCENTAGE",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "percentage": "33.33"},
@@ -452,7 +452,7 @@ class GroupExpenseControllerIT {
                         .value("Los porcentajes deben sumar exactamente 100"));
 
         String mixed = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "30.00", "percentage": "30"},
@@ -465,7 +465,7 @@ class GroupExpenseControllerIT {
                         .value("Elegí importe o porcentaje, no ambos"));
 
         String payerOutside = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "60.00"},
@@ -484,7 +484,7 @@ class GroupExpenseControllerIT {
     void t023AndT024IdempotencyConsidersTheSplitMethodAndAmounts() throws Exception {
         String key = UUID.randomUUID().toString();
         String custom = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
@@ -501,7 +501,7 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.properties.code").value("IDEMPOTENCY_KEY_REUSED"));
 
         String otherAmounts = """
-                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "100.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "30.00"},
@@ -524,7 +524,7 @@ class GroupExpenseControllerIT {
                         new BigDecimal("18.50000000"), date, BcraExchangeRateClient.SOURCE_BCRA));
 
         String usd = """
-                {"amount": "50.00", "currency": "USD", "date": "2026-01-15", "payerUserId": %d,
+                {"amount": "50.00", "currency": "USD", "date": "2026-01-15", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "splitMethod": "CUSTOM",
                  "participants": [
                    {"type": "REGISTERED", "userId": %d, "amount": "25.00"},
@@ -544,17 +544,18 @@ class GroupExpenseControllerIT {
     @Test
     void invalidFieldsAnswer400PerFieldWithoutWriting() throws Exception {
         String body = """
-                {"amount": "0.02", "currency": "XYZ", "date": "2999-01-01", "payerUserId": %d,
+                {"amount": "0.02", "currency": "XYZ", "date": "2999-01-01", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d},
                                   {"type": "REGISTERED", "userId": %d},
-                                  {"type": "SIMULATED", "simulatedProfileId": %d}], "category": "FOOD"}
+                                  {"type": "SIMULATED", "simulatedProfileId": %d}], "frequency": "WEEKLY"}
                 """.formatted(ana, ana, juan, abuela);
 
         postExpense(anaSession, UUID.randomUUID().toString(), body)
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.currency").value("La moneda no es válida"))
                 .andExpect(jsonPath("$.properties.fields.date").value("La fecha no puede ser posterior a hoy"))
-                .andExpect(jsonPath("$.properties.fields.category").value("No se permite informar este campo"));
+                // 027: category is a field now; a frequency is still rejected in a shared expense.
+                .andExpect(jsonPath("$.properties.fields.frequency").value("No se permite informar este campo"));
 
         String tooSmall = threeWayBody("0.02");
         postExpense(anaSession, UUID.randomUUID().toString(), tooSmall)
@@ -563,7 +564,7 @@ class GroupExpenseControllerIT {
                         .value("El monto no alcanza para dividirlo entre 3 participantes"));
 
         String onlyPayer = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         postExpense(anaSession, UUID.randomUUID().toString(), onlyPayer)
@@ -571,7 +572,7 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.debts.length()").value(0));
 
         String outsiderParticipant = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, outsider);
         postExpense(anaSession, UUID.randomUUID().toString(), outsiderParticipant)
@@ -630,7 +631,7 @@ class GroupExpenseControllerIT {
                 .content("{\"permissions\": {\"membersCannotMakeExpenses\": true}}"))
                 .andExpect(status().isOk());
         String juanPays = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}, {"type": "REGISTERED", "userId": %d}]}
                 """.formatted(juan, juan, ana);
         postExpense(juanSession, UUID.randomUUID().toString(), juanPays)
@@ -714,7 +715,7 @@ class GroupExpenseControllerIT {
 
         String usdBody = """
                 {"amount": "50.00", "currency": "USD", "date": "2026-01-18", "description": "Hotel",
-                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [
                    {"type": "REGISTERED", "userId": %d},
                    {"type": "REGISTERED", "userId": %d}]}
@@ -757,7 +758,7 @@ class GroupExpenseControllerIT {
 
         String usdBody = """
                 {"amount": "50.00", "currency": "USD", "date": "2026-01-15", "description": "Taxi",
-                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [
                    {"type": "REGISTERED", "userId": %d},
                    {"type": "REGISTERED", "userId": %d}]}
@@ -778,7 +779,7 @@ class GroupExpenseControllerIT {
 
         String usdBody = """
                 {"amount": "50.00", "currency": "USD", "date": "2026-01-18", "description": "Cena",
-                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "payerUserId": %d,
+                 "deviceTimeZone": "America/Argentina/Buenos_Aires", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [
                    {"type": "REGISTERED", "userId": %d},
                    {"type": "REGISTERED", "userId": %d}]}
@@ -824,7 +825,7 @@ class GroupExpenseControllerIT {
     @Test
     void t020PatchEmptyBodyAnswers400() throws Exception {
         String personal = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
@@ -852,7 +853,7 @@ class GroupExpenseControllerIT {
     @Test
     void t020PatchPersonalExpenseUpdatesAndRecordsEvent() throws Exception {
         String personal = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
@@ -867,10 +868,86 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.description").value("Editado"));
     }
 
+    /** 027 T045 (FR-020): the classification travels in the response; older rows answer null. */
+    @Test
+    void classificationIsReturnedAndNullForExpensesCreatedBefore027() throws Exception {
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), threeWayBody("100.00"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.category").value("FOOD"))
+                .andExpect(jsonPath("$.type").value("ONE_TIME"))
+                .andExpect(jsonPath("$.paymentMethod").value("CASH"))
+                .andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        // A row written before 027 has no classification.
+        jdbc.update("UPDATE group_expenses SET category = NULL, expense_type = NULL, payment_method = NULL"
+                + " WHERE id = ?", id);
+        mockMvc.perform(get("/api/groups/" + groupId + "/expenses/" + id).cookie(anaSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.category").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.type").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.paymentMethod").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void missingClassificationIsRejectedWithoutSaving() throws Exception {
+        String body = threeWayBody("100.00")
+                .replace("\"category\": \"FOOD\", \"type\": \"ONE_TIME\", \"paymentMethod\": \"CASH\", ", "");
+        Integer before = jdbc.queryForObject("SELECT COUNT(*) FROM group_expenses", Integer.class);
+
+        postExpense(anaSession, UUID.randomUUID().toString(), body)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.category").value("La categoría es obligatoria"))
+                .andExpect(jsonPath("$.properties.fields.type").value("El tipo de gasto es obligatorio"))
+                .andExpect(jsonPath("$.properties.fields.paymentMethod").value("El medio de pago es obligatorio"));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM group_expenses", Integer.class)).isEqualTo(before);
+    }
+
+    /** 027 SC-007: a BCRA catalog currency beyond USD/EUR is converted to the group currency. */
+    @Test
+    void aBrlExpenseIsConvertedToTheGroupCurrency() throws Exception {
+        LocalDate date = LocalDate.of(2026, 11, 5);
+        when(bcraExchangeRateClient.getQuote(Currency.BRL, Currency.ARS, date))
+                .thenReturn(new ExchangeRateQuote(new BigDecimal("281.63495900"), date, "BCRA"));
+        String body = threeWayBody("100.00").replace("\"currency\": \"ARS\"", "\"currency\": \"BRL\"");
+
+        postExpense(anaSession, UUID.randomUUID().toString(), body)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.currency").value("BRL"))
+                .andExpect(jsonPath("$.convertedCurrency").value("ARS"))
+                .andExpect(jsonPath("$.convertedAmount").value("28163.50"))
+                .andExpect(jsonPath("$.rateSource").value("BCRA"));
+    }
+
+    @Test
+    void patchOfAPersonalExpenseEditsTheClassification() throws Exception {
+        String personal = """
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d}]}
+                """.formatted(ana, ana);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(body).get("id").asLong();
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"category\": \"HEALTH\", \"paymentMethod\": \"TRANSFER\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.category").value("HEALTH"))
+                .andExpect(jsonPath("$.type").value("ONE_TIME"))
+                .andExpect(jsonPath("$.paymentMethod").value("TRANSFER"));
+
+        mockMvc.perform(patch("/api/groups/" + groupId + "/expenses/" + id)
+                .cookie(anaSession).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\": \"WEEKLY\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.type").value("El tipo de gasto no es válido"));
+    }
+
     @Test
     void t020PatchCurrencyWithoutQuoteAnswers503WithoutSaving() throws Exception {
         String personal = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
@@ -903,7 +980,7 @@ class GroupExpenseControllerIT {
     @Test
     void t022DeletePersonalExpenseAnswers204AndRecordsEvents() throws Exception {
         String personal = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
@@ -932,7 +1009,7 @@ class GroupExpenseControllerIT {
     @Test
     void t020AndT021PermissionsAreEnforced() throws Exception {
         String personal = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
@@ -961,7 +1038,7 @@ class GroupExpenseControllerIT {
     @Test
     void t022DeletePersonalExpenseKeepsGroupBalancesZero() throws Exception {
         String personal = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(ana, ana);
         String body = postExpense(anaSession, UUID.randomUUID().toString(), personal)
@@ -991,7 +1068,7 @@ class GroupExpenseControllerIT {
         assertThat(flag).isTrue();
 
         String nonMemberPayer = """
-                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "payerUserId": %d,
+                {"amount": "10.00", "currency": "ARS", "date": "2026-11-05", "category": "FOOD", "type": "ONE_TIME", "paymentMethod": "CASH", "payerUserId": %d,
                  "participants": [{"type": "REGISTERED", "userId": %d}]}
                 """.formatted(outsider, ana);
         postExpense(anaSession, UUID.randomUUID().toString(), nonMemberPayer)
@@ -1112,7 +1189,7 @@ class GroupExpenseControllerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.date")
                         .value("La fecha debe tener el formato aaaa-mm-dd"));
-        getQuote(anaSession, "?currency=BRL&date=2026-01-18")
+        getQuote(anaSession, "?currency=XAU&date=2026-01-18")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.currency").value("La moneda no es válida"));
         getQuote(anaSession, "?currency=USD").andExpect(status().isBadRequest());

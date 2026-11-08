@@ -98,7 +98,7 @@ public class GroupExpenseController {
         return ResponseEntity.ok(service.get(callerId, id, expenseId));
     }
 
-    private static UUID parseIdempotencyKey(String raw) {
+    static UUID parseIdempotencyKey(String raw) {
         try {
             return UUID.fromString(raw);
         }

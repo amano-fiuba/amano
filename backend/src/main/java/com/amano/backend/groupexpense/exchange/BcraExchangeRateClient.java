@@ -116,21 +116,21 @@ public class BcraExchangeRateClient implements ExchangeRateProvider {
 
     static BigDecimal computeRate(Currency from, Currency to, Map<String, BigDecimal> arsPerUnit) {
         if (from == Currency.ARS) {
-            BigDecimal toArs = arsPerUnit.get(to.name());
+            BigDecimal toArs = arsPerUnit.get(to.bcraCode());
             if (toArs == null || toArs.signum() <= 0) {
                 return null;
             }
             return BigDecimal.ONE.divide(toArs, RATE_SCALE, RoundingMode.HALF_UP);
         }
         if (to == Currency.ARS) {
-            BigDecimal fromArs = arsPerUnit.get(from.name());
+            BigDecimal fromArs = arsPerUnit.get(from.bcraCode());
             if (fromArs == null || fromArs.signum() <= 0) {
                 return null;
             }
             return fromArs.setScale(RATE_SCALE, RoundingMode.HALF_UP);
         }
-        BigDecimal fromArs = arsPerUnit.get(from.name());
-        BigDecimal toArs = arsPerUnit.get(to.name());
+        BigDecimal fromArs = arsPerUnit.get(from.bcraCode());
+        BigDecimal toArs = arsPerUnit.get(to.bcraCode());
         if (fromArs == null || fromArs.signum() <= 0 || toArs == null || toArs.signum() <= 0) {
             return null;
         }

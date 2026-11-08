@@ -130,6 +130,10 @@ public class GroupService {
             } catch (IllegalArgumentException e) {
                 throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
             }
+            // 027 R3: expenses accept the whole BCRA catalog, the primary currency does not.
+            if (!Currency.GROUP_PRIMARY.contains(currency)) {
+                throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
+            }
         }
         group.setPrimaryCurrency(currency);
         Group savedGroup = groupRepository.save(group);
@@ -562,7 +566,12 @@ public class GroupService {
         summary.setLastActivityAt(lastActivity.getOrDefault(group.getId(), group.getCreatedAt()));
         summary.setMemberCount(activeMemberCount(group.getId()));
         groupMemberRepository.findByIdGroupIdAndIdUserId(group.getId(), userId)
-                .ifPresent(membership -> summary.setCurrentUserRole(membership.getRole()));
+                .ifPresent(membership -> {
+                    summary.setCurrentUserRole(membership.getRole());
+                    // 027 (FR-021): the "Gasto grupal" chooser greys out groups where it is not allowed.
+                    summary.setCanCreateExpenses(permissionChecker.canCreateExpenses(membership.getRole(),
+                            groupPermissionsRepository.findByGroupId(group.getId()).orElse(null)));
+                });
         return summary;
     }
 

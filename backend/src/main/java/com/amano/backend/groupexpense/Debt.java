@@ -35,7 +35,8 @@ public class Debt {
     @Column(name = "id", nullable = false)
     private Long id;
 
-    @Column(name = "group_id", nullable = false)
+    /** Null for a direct debt between friends (027 US4). */
+    @Column(name = "group_id")
     private Long groupId;
 
     @Column(name = "expense_id", nullable = false)

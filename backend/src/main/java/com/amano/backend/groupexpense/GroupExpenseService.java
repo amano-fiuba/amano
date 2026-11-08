@@ -23,6 +23,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.expense.ExpenseClassification;
+import com.amano.backend.expense.ExpenseCategory;
+import com.amano.backend.expense.ExpenseType;
+import com.amano.backend.expense.PaymentMethod;
 import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.ExpenseDescriptionNormalizer;
@@ -72,6 +76,10 @@ public class GroupExpenseService {
     static final String PARTICIPANTS_REQUIRED = "Elegí al menos un participante además de quien pagó";
     static final String PARTICIPANTS_REPEATED = "Hay participantes repetidos";
     static final String PARTICIPANTS_NOT_IN_GROUP = "Algún participante no pertenece al grupo";
+    static final String FRIEND_EXPENSE_NOT_FOUND = "No existe el gasto solicitado";
+    static final String FRIEND_PAYER_INVALID = "Quien pagó tiene que ser vos o tu amigo";
+    static final String FRIEND_PARTICIPANTS_INVALID =
+            "El gasto se comparte entre vos y tu amigo: los dos tienen que ser los únicos participantes";
     static final String AMOUNT_TOO_SMALL = "El monto no alcanza para dividirlo entre %d participantes";
     static final String UNKNOWN_PROPERTY = "No se permite informar este campo";
 
@@ -159,7 +167,8 @@ public class GroupExpenseService {
 
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date, String description,
             Long payerUserId, String payerName, List<ResolvedParticipant> participants, int payerIndex,
-            SplitMethod splitMethod, List<BigDecimal> customAmounts, List<BigDecimal> percentages) {
+            SplitMethod splitMethod, List<BigDecimal> customAmounts, List<BigDecimal> percentages,
+            ExpenseClassification classification) {
     }
 
     /** Parsed values of the requested split; both lists are null when any participant is invalid. */
@@ -189,10 +198,95 @@ public class GroupExpenseService {
         Optional<GroupExpense> existing =
                 expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey);
         if (existing.isPresent()) {
-            return replay(existing.get(), groupId, normalized, caller);
+            return replay(existing.get(), groupId, null, normalized, caller);
         }
 
         Currency groupCurrency = primaryCurrencyOf(groupId, normalized.currency());
+        Persisted persisted = persist(callerId, groupId, null, idempotencyKey, normalized, groupCurrency);
+        GroupExpense saved = persisted.expense();
+
+        activityEventService.recordExpenseCreated(groupId, callerId, new ExpenseActivityDetails(
+                saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription(),
+                saved.getPayerUserId(), normalized.payerName()));
+
+        return new Registration(toResponse(saved, persisted.shares(), persisted.debts(), caller, groupCurrency),
+                true);
+    }
+
+    /**
+     * 027 US4: expense shared with a friend, outside any group (contracts/shared-expenses-api.md).
+     * The friendship and the names of both people are resolved by {@link FriendExpenseService};
+     * validation, split, rounding and idempotency are the group ones. There is no
+     * conversion: the debt stays in the expense currency (FR-034).
+     */
+    @Transactional
+    public Registration createWithFriend(Long callerId, Long friendId, Map<Long, String> pairNames,
+            UUID idempotencyKey, CreateGroupExpenseRequest request) {
+        NormalizedExpense normalized = normalize(request, pairNames, Map.of(),
+                friendRules(callerId, friendId, request));
+        Optional<GroupExpense> existing =
+                expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey);
+        if (existing.isPresent()) {
+            return replay(existing.get(), null, friendId, normalized, null);
+        }
+        Persisted persisted = persist(callerId, null, friendId, idempotencyKey, normalized, normalized.currency());
+        return new Registration(toResponse(persisted.expense(), persisted.shares(), persisted.debts(), null,
+                normalized.currency()), true);
+    }
+
+    /** 027 US4: same unique-index race resolution as {@link #resolveConcurrentRegistration}. */
+    @Transactional(readOnly = true)
+    public Registration resolveConcurrentFriendRegistration(Long callerId, Long friendId, Map<Long, String> pairNames,
+            UUID idempotencyKey, CreateGroupExpenseRequest request) {
+        NormalizedExpense normalized = normalize(request, pairNames, Map.of(),
+                friendRules(callerId, friendId, request));
+        GroupExpense winner = expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Idempotency conflict without a persisted winner"));
+        return replay(winner, null, friendId, normalized, null);
+    }
+
+    /** 027 US4: an expense with a friend, readable only by its two participants. */
+    @Transactional(readOnly = true)
+    public GroupExpenseResponse getWithFriend(Long callerId, Long friendId, Long expenseId) {
+        GroupExpense expense = expenseRepository.findDirectBetween(expenseId, callerId, friendId)
+                .orElseThrow(() -> new GroupNotFoundException(FRIEND_EXPENSE_NOT_FOUND));
+        return toResponse(expense, shareRepository.findByExpenseIdOrderByPositionAsc(expense.getId()),
+                debtRepository.findByExpenseId(expense.getId()), null, expense.getCurrency());
+    }
+
+    /** 027 US4: exactly the caller and the friend take part, and one of them paid. */
+    private static Map<String, String> friendRules(Long callerId, Long friendId, CreateGroupExpenseRequest request) {
+        Map<String, String> errors = new LinkedHashMap<>();
+        Long payer = request.getPayerUserId();
+        if (payer != null && !payer.equals(callerId) && !payer.equals(friendId)) {
+            errors.put("payerUserId", FRIEND_PAYER_INVALID);
+        }
+        List<CreateGroupExpenseRequest.Participant> participants = request.getParticipants();
+        boolean pair = participants != null && participants.size() == 2
+                && participants.stream().allMatch(participant -> participant != null
+                        && ParticipantType.REGISTERED.name().equals(participant.type())
+                        && participant.simulatedProfileId() == null)
+                && participants.stream().map(CreateGroupExpenseRequest.Participant::userId)
+                        .collect(Collectors.toSet()).equals(Set.of(callerId, friendId));
+        if (!pair) {
+            errors.put("participants", FRIEND_PARTICIPANTS_INVALID);
+        }
+        return errors;
+    }
+
+    /** What {@link #persist} wrote. */
+    private record Persisted(GroupExpense expense, List<GroupExpenseShare> shares, List<Debt> debts) {
+    }
+
+    /**
+     * Converts the total to {@code targetCurrency} if needed (022 D8) and saves the
+     * expense, its shares and one PENDING debt per participant other than the payer.
+     * Exactly one of {@code groupId} / {@code friendUserId} is set (027 US4).
+     */
+    private Persisted persist(Long callerId, Long groupId, Long friendUserId, UUID idempotencyKey,
+            NormalizedExpense normalized, Currency targetCurrency) {
+        Currency groupCurrency = targetCurrency;
         BigDecimal convertedAmount;
         BigDecimal exchangeRate;
         LocalDate rateDate;
@@ -224,6 +318,7 @@ public class GroupExpenseService {
         List<BigDecimal> amounts = sharesOf(convertedAmount, normalized);
         GroupExpense expense = new GroupExpense();
         expense.setGroupId(groupId);
+        expense.setFriendUserId(friendUserId);
         expense.setCreatedByUserId(callerId);
         expense.setPayerUserId(normalized.payerUserId());
         expense.setAmount(normalized.amount());
@@ -233,6 +328,9 @@ public class GroupExpenseService {
         expense.setRateDate(rateDate);
         expense.setRateSource(rateSource);
         expense.setSplitMethod(normalized.splitMethod());
+        expense.setCategory(normalized.classification().category());
+        expense.setExpenseType(normalized.classification().type());
+        expense.setPaymentMethod(normalized.classification().paymentMethod());
         expense.setExpenseDate(normalized.date());
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
@@ -255,11 +353,7 @@ public class GroupExpenseService {
         }
         List<Debt> savedDebts = debtRepository.saveAll(debts);
 
-        activityEventService.recordExpenseCreated(groupId, callerId, new ExpenseActivityDetails(
-                saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription(),
-                saved.getPayerUserId(), normalized.payerName()));
-
-        return new Registration(toResponse(saved, shares, savedDebts, caller, groupCurrency), true);
+        return new Persisted(saved, shares, savedDebts);
     }
 
     /**
@@ -274,7 +368,7 @@ public class GroupExpenseService {
         GroupExpense winner = expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey)
                 .orElseThrow(() -> new IllegalStateException(
                         "Idempotency conflict without a persisted winner"));
-        return replay(winner, groupId, normalized, caller);
+        return replay(winner, groupId, null, normalized, caller);
     }
 
     /** Detail of an expense of a group the caller belongs to (FR-020). */
@@ -297,7 +391,15 @@ public class GroupExpenseService {
      */
     public ExchangeQuoteResponse getExchangeQuote(Long callerId, Long groupId, String currency, String date) {
         activeMembership(callerId, groupId);
-        Currency groupCurrency = primaryCurrencyOf(groupId, Currency.ARS);
+        return quote(currency, date, primaryCurrencyOf(groupId, Currency.ARS));
+    }
+
+    /**
+     * Read-only quote from {@code currency} to {@code groupCurrency} on {@code date}
+     * with the 022 validations. 027 (FR-035) reuses it for the personal expense
+     * preview to ARS ({@code GET /api/currencies/quote}). Holds no transaction.
+     */
+    public ExchangeQuoteResponse quote(String currency, String date, Currency groupCurrency) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
         Currency from = null;
         try {
@@ -383,6 +485,26 @@ public class GroupExpenseService {
         if (fields.containsKey("description")) {
             newDescription = ExpenseDescriptionNormalizer.normalize(fields.get("description"));
         }
+        // 027 FR-020: the classification can be edited too; each field only when sent.
+        Map<String, String> classificationErrors = new LinkedHashMap<>();
+        ExpenseCategory newCategory = fields.containsKey("category")
+                ? ExpenseClassification.parseCatalog(fields.get("category"), ExpenseCategory.class, "category",
+                        ExpenseClassification.CATEGORY_REQUIRED, ExpenseClassification.CATEGORY_INVALID,
+                        classificationErrors)
+                : expense.getCategory();
+        ExpenseType newType = fields.containsKey("type")
+                ? ExpenseClassification.parseCatalog(fields.get("type"), ExpenseType.class, "type",
+                        ExpenseClassification.TYPE_REQUIRED, ExpenseClassification.TYPE_INVALID,
+                        classificationErrors)
+                : expense.getExpenseType();
+        PaymentMethod newPaymentMethod = fields.containsKey("paymentMethod")
+                ? ExpenseClassification.parseCatalog(fields.get("paymentMethod"), PaymentMethod.class,
+                        "paymentMethod", ExpenseClassification.PAYMENT_REQUIRED,
+                        ExpenseClassification.PAYMENT_INVALID, classificationErrors)
+                : expense.getPaymentMethod();
+        if (!classificationErrors.isEmpty()) {
+            throw new FieldValidationException(classificationErrors);
+        }
 
         Currency groupCurrency = primaryCurrencyOf(groupId, newCurrency);
         BigDecimal convertedAmount = newAmount;
@@ -404,6 +526,9 @@ public class GroupExpenseService {
         expense.setCurrency(newCurrency);
         expense.setExpenseDate(newDate);
         expense.setDescription(newDescription);
+        expense.setCategory(newCategory);
+        expense.setExpenseType(newType);
+        expense.setPaymentMethod(newPaymentMethod);
         expense.setConvertedAmount(convertedAmount);
         expense.setExchangeRate(exchangeRate);
         expense.setRateDate(rateDate);
@@ -448,13 +573,16 @@ public class GroupExpenseService {
                 callerId, Map.of("expenseId", expenseId));
     }
 
-    private Registration replay(GroupExpense existing, Long groupId, NormalizedExpense normalized,
+    private Registration replay(GroupExpense existing, Long groupId, Long friendUserId, NormalizedExpense normalized,
             GroupMember caller) {
         List<GroupExpenseShare> shares = shareRepository.findByExpenseIdOrderByPositionAsc(existing.getId());
-        if (!existing.getGroupId().equals(groupId) || !samePayload(existing, shares, normalized)) {
+        // 027 (T090): Objects.equals, a key may belong to an expense with a friend (null group).
+        if (!Objects.equals(existing.getGroupId(), groupId) || !Objects.equals(existing.getFriendUserId(), friendUserId)
+                || !samePayload(existing, shares, normalized)) {
             throw new IdempotencyConflictException();
         }
-        Currency groupCurrency = primaryCurrencyOf(groupId, existing.getCurrency());
+        Currency groupCurrency = groupId == null ? existing.getCurrency()
+                : primaryCurrencyOf(groupId, existing.getCurrency());
         return new Registration(toResponse(existing, shares, debtRepository.findByExpenseId(existing.getId()),
                 caller, groupCurrency), false);
     }
@@ -484,6 +612,9 @@ public class GroupExpenseService {
                 || !existing.getExpenseDate().equals(normalized.date())
                 || !Objects.equals(existing.getDescription(), normalized.description())
                 || !existing.getPayerUserId().equals(normalized.payerUserId())
+                || existing.getCategory() != normalized.classification().category()
+                || existing.getExpenseType() != normalized.classification().type()
+                || existing.getPaymentMethod() != normalized.classification().paymentMethod()
                 || shares.size() != normalized.participants().size()) {
             return false;
         }
@@ -569,6 +700,18 @@ public class GroupExpenseService {
     }
 
     private NormalizedExpense validateAndNormalize(Long groupId, CreateGroupExpenseRequest request) {
+        Map<Long, SimulatedProfile> profiles = simulatedProfileRepository.findByGroupId(groupId).stream()
+                .collect(Collectors.toMap(SimulatedProfile::getId, Function.identity()));
+        return normalize(request, activeMemberNames(groupId), profiles, Map.of());
+    }
+
+    /**
+     * Validates against the people who may take part ({@code activeMemberNames},
+     * {@code profiles}); {@code overrides} replace the messages of the same fields
+     * (027 US4 uses them for the friend rules).
+     */
+    private NormalizedExpense normalize(CreateGroupExpenseRequest request, Map<Long, String> activeMemberNames,
+            Map<Long, SimulatedProfile> profiles, Map<String, String> overrides) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
 
         String amountError = ExpenseAmountNormalizer.validationError(request.getAmount());
@@ -582,7 +725,6 @@ public class GroupExpenseService {
             fieldErrors.put("description", descriptionError);
         }
 
-        Map<Long, String> activeMemberNames = activeMemberNames(groupId);
         Long payer = request.getPayerUserId();
         if (payer == null) {
             fieldErrors.put("payerUserId", PAYER_REQUIRED);
@@ -590,9 +732,12 @@ public class GroupExpenseService {
         else if (!activeMemberNames.containsKey(payer)) {
             fieldErrors.put("payerUserId", PAYER_NOT_MEMBER);
         }
-        List<ResolvedParticipant> participants = resolveParticipants(groupId, request.getParticipants(),
-                payer, activeMemberNames, fieldErrors);
+        List<ResolvedParticipant> participants = resolveParticipants(profiles, request.getParticipants(),
+                activeMemberNames, fieldErrors);
         SplitMethod splitMethod = parseSplitMethod(request.getSplitMethod(), fieldErrors);
+        // 027 FR-020: same catalogs and messages as a personal expense (007).
+        ExpenseClassification classification = ExpenseClassification.parse(request.getCategory(),
+                request.getType(), request.getPaymentMethod(), fieldErrors);
         int payerIndex = payerIndex(participants, payer);
         List<BigDecimal> customAmounts = null;
         List<BigDecimal> percentages = null;
@@ -634,6 +779,7 @@ public class GroupExpenseService {
         for (String unknown : request.getUnknownProperties().keySet()) {
             fieldErrors.put(unknown, UNKNOWN_PROPERTY);
         }
+        fieldErrors.putAll(overrides);
 
         if (!fieldErrors.isEmpty()) {
             throw new FieldValidationException(fieldErrors);
@@ -641,7 +787,8 @@ public class GroupExpenseService {
 
         return new NormalizedExpense(ExpenseAmountNormalizer.normalize(request.getAmount()), currency, date,
                 ExpenseDescriptionNormalizer.normalize(request.getDescription()), payer,
-                activeMemberNames.get(payer), participants, payerIndex, splitMethod, customAmounts, percentages);
+                activeMemberNames.get(payer), participants, payerIndex, splitMethod, customAmounts, percentages,
+                classification);
     }
 
     private static SplitMethod parseSplitMethod(String raw, Map<String, String> fieldErrors) {
@@ -756,15 +903,13 @@ public class GroupExpenseService {
      * Participants in request order, or {@code null} after recording the field
      * error: at least one besides the payer, no repetitions, all of the group.
      */
-    private List<ResolvedParticipant> resolveParticipants(Long groupId,
-            List<CreateGroupExpenseRequest.Participant> raw, Long payer, Map<Long, String> activeMemberNames,
+    private List<ResolvedParticipant> resolveParticipants(Map<Long, SimulatedProfile> profiles,
+            List<CreateGroupExpenseRequest.Participant> raw, Map<Long, String> activeMemberNames,
             Map<String, String> fieldErrors) {
         if (raw == null || raw.isEmpty()) {
             fieldErrors.put("participants", PARTICIPANTS_REQUIRED);
             return null;
         }
-        Map<Long, SimulatedProfile> profiles = simulatedProfileRepository.findByGroupId(groupId).stream()
-                .collect(Collectors.toMap(SimulatedProfile::getId, Function.identity()));
         List<ResolvedParticipant> resolved = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         boolean repeated = false;
@@ -848,6 +993,9 @@ public class GroupExpenseService {
             List<Debt> debts, GroupMember caller, Currency groupCurrency) {
         Map<Long, String> names = new HashMap<>();
         Set<Long> people = new HashSet<>(List.of(expense.getPayerUserId(), expense.getCreatedByUserId()));
+        if (expense.getFriendUserId() != null) {
+            people.add(expense.getFriendUserId());
+        }
         for (User user : userRepository.findAllById(people)) {
             names.put(user.getId(), nameOf(user));
         }
@@ -896,7 +1044,13 @@ public class GroupExpenseService {
                 shareViews,
                 debtViews,
                 expense.getSplitMethod() == null ? SplitMethod.EQUAL.name()
-                        : expense.getSplitMethod().name());
+                        : expense.getSplitMethod().name(),
+                expense.getCategory() == null ? null : expense.getCategory().name(),
+                expense.getExpenseType() == null ? null : expense.getExpenseType().name(),
+                expense.getPaymentMethod() == null ? null : expense.getPaymentMethod().name(),
+                expense.getFriendUserId() == null ? null
+                        : new GroupExpenseResponse.Person(expense.getFriendUserId(),
+                                names.get(expense.getFriendUserId())));
     }
 
     /**
@@ -904,6 +1058,10 @@ public class GroupExpenseService {
      * with no payment waiting for validation) and the caller is its debtor, its creditor or an ADMIN.
      */
     private boolean canRegisterPayment(Debt debt, GroupMember caller) {
+        // 027 US4: paying a direct debt is out of scope, so it is never offered.
+        if (caller == null || debt.getGroupId() == null) {
+            return false;
+        }
         return debt.getStatus().isPayable()
                 && permissionChecker.canRegisterPayment(caller.getRole(), caller.getId().getUserId(),
                         debt.getDebtorUserId(), debt.getCreditorUserId());

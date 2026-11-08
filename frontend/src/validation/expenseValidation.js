@@ -1,3 +1,4 @@
+import { ALL_CURRENCY_OPTIONS, codesOf } from './expenseCatalog'
 // Pure expense validations (FR-011..FR-017, FR-022; research.md D3/D4/D5).
 // The backend is the source of truth: these rules only provide immediate
 // feedback. Amounts are handled as strings, never with Number/parseFloat, so the
@@ -19,6 +20,7 @@ export const DESCRIPTION_LENGTH =
   'La descripción no puede superar los 200 caracteres'
 
 const CURRENCY_ORDER = ['ARS', 'USD', 'EUR']
+const SUPPORTED_CURRENCIES = codesOf(ALL_CURRENCY_OPTIONS)
 
 function amountError(error) {
   return { ok: false, canonical: null, error }
@@ -122,10 +124,15 @@ function compareParts(aInteger, aFraction, bInteger, bFraction) {
   return 0
 }
 
-/** Preferred currency of the profile: ARS → USD → EUR; absent/invalid ⇒ ARS. */
+/** Preferred currency of the profile: ARS → USD → EUR → any other supported one; none ⇒ ARS. */
 export function preferredCurrency(currencies) {
   const available = Array.isArray(currencies) ? currencies : []
-  return CURRENCY_ORDER.find((code) => available.includes(code)) ?? 'ARS'
+  // 027: a preference outside ARS/USD/EUR (e.g. only BRL) is still the user's currency.
+  return (
+    CURRENCY_ORDER.find((code) => available.includes(code)) ??
+    available.find((code) => SUPPORTED_CURRENCIES.includes(code)) ??
+    'ARS'
+  )
 }
 
 /**
