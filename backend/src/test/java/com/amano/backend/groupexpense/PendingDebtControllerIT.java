@@ -283,4 +283,16 @@ class PendingDebtControllerIT {
         assertThat(node.get("creditorName").asString()).isEqualTo("Ana López");
         assertThat(node.get("status").asString()).isEqualTo("PENDING");
     }
+
+    @Test
+    void t074TheDebtsCarryTheIdsOfBothSidesSoTheUiKnowsWhoOwes() throws Exception {
+        JsonNode asDebtor = debt(pending(juanSession), pendingDebt);
+        assertThat(asDebtor.get("debtorUserId").asLong()).isEqualTo(juan);
+        assertThat(asDebtor.get("creditorUserId").asLong()).isEqualTo(ana);
+
+        // Ana is the creditor of the simulated Abuela's debt, which has no debtor user.
+        JsonNode simulated = debt(pending(anaSession), abuelaDebt);
+        assertThat(simulated.get("debtorUserId").isNull()).isTrue();
+        assertThat(simulated.get("creditorUserId").asLong()).isEqualTo(ana);
+    }
 }

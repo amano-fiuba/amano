@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.amano.backend.common.FieldValidationException;
@@ -104,6 +105,17 @@ public class GroupExpenseController {
         catch (IllegalArgumentException | NullPointerException exception) {
             throw new FieldValidationException(Map.of("idempotencyKey", INVALID_IDEMPOTENCY_KEY));
         }
+    }
+
+    @GetMapping(path = "/api/groups/{id}/exchange-quote", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> exchangeQuote(@PathVariable Long id,
+            @RequestParam(name = "currency", required = false) String currency,
+            @RequestParam(name = "date", required = false) String date) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        return ResponseEntity.ok(service.getExchangeQuote(callerId, id, currency, date));
     }
 
     private static Long currentUserId() {

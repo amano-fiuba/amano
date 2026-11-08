@@ -3,35 +3,29 @@
 **Feature**: Group Debt Management (022)
 **Related Specs**: FR-009, User Story 9, Assumptions in spec.md
 **Created**: 2026-11-06
+**Updated**: 2026-11-07 (aligned with the implementation: `ExchangeRateProvider`, in-memory LRU cache, `SAME_CURRENCY`, preview endpoint)
 
 ## Purpose
 
-Define the contract for converting amounts between currencies when an expense is in a currency different from the group's primary currency. Shows both the original amount and its converted equivalent, using the exchange rate from the transaction date.
+Define how amounts are converted when an expense is in a currency different from the group's primary currency. Both the original amount and its converted equivalent are kept and shown, using the official BCRA exchange rate of the expense date. The conversion is applied **once, to the total**, when the expense is saved.
 
-## Request
+## Internal contract (there is no public conversion endpoint)
 
-### `CurrencyConversionRequest`
+The conversion is applied by the backend when an expense of a group is saved; the only public read is the quote preview documented at the end of this file. The internal contract is `ExchangeRateProvider`:
 
-| Field | Type | Description | Required |
-|-------|------|-------------|----------|
-| `amount` | `BigDecimal` | The amount to convert | Yes; > 0 |
-| `fromCurrency` | `Currency` | The currency of the amount | Yes |
-| `toCurrency` | `Currency` | The target currency (usually the group's primary currency) | Yes |
-| `date` | `LocalDate` | The transaction date for the exchange rate | Yes; not future |
+```
+ExchangeRateQuote getQuote(Currency from, Currency to, LocalDate date)
+```
 
-## Response
+| Field of `ExchangeRateQuote` | Type | Description |
+|------------------------------|------|-------------|
+| `rate` | `BigDecimal` | Rate `from` → `to`, scale 8 (`1` for the same currency) |
+| `rateDate` | `LocalDate` | Date of the quote actually used (may be an earlier business day) |
+| `rateSource` | `String` | `BCRA`, or `SAME_CURRENCY` when no conversion applies |
 
-### `CurrencyConversionResponse`
+`date` must not be in the future. When no quote can be resolved the provider throws `ExchangeRateUnavailableException`, mapped to `503`.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `amount` | `BigDecimal` | The original amount (same as request) |
-| `fromCurrency` | `Currency` | The original currency |
-| `toCurrency` | `Currency` | The target currency |
-| `convertedAmount` | `BigDecimal` | The amount in the target currency |
-| `exchangeRate` | `BigDecimal` | The rate applied (fromCurrency → toCurrency) |
-| `date` | `LocalDate` | The date the rate was effective from |
-| `rateSource` | `String` | Identifier of the rate source (e.g., "BCRA") |
+What the expense stores and returns (`GroupExpenseResponse`, additive): `amount` and `currency` (original, always kept), `convertedAmount` and `convertedCurrency` (group currency), `exchangeRate`, `rateDate` and `rateSource`.
 
 ## Exchange Rate Logic
 
@@ -58,59 +52,53 @@ timeouts and retries and no new dependencies. The base URL comes from `BCRA_BASE
 - `rate_date` and the response `date` are the date of the quote actually used, not the
   expense date.
 
-### 2. Fallback Flow (Service Unavailable)
+### 2. Failure Flow (Service Unavailable)
 
-If the BCRA API does not respond after retries:
-
-1. **Check if there's a cached rate** (for the same par/date, even if previously stored)
-2. If a cached rate exists → use it; `rateSource` stays `"BCRA"`
-3. If no cache or no quote within the last 7 days → **expense not saved**: return error 503 with message "No se pudo obtener la cotización; registre el gasto en la moneda del grupo o reintente después"
-4. **No default memo rate** is used; the expense simply cannot be registered without a valid rate
+1. A quote already in the cache for `(from, to, date)` is returned without calling the BCRA.
+2. Otherwise the BCRA is called with timeouts and a bounded number of attempts (`amano.exchange.bcra.*`), walking back up to 7 days for a business day.
+3. If the BCRA does not answer or has no quote within the last 7 days → **the expense is not saved**: `503` with the message `"No se pudo obtener la cotización; reintente después o registre en moneda del grupo"` (`properties.code = EXCHANGE_RATE_UNAVAILABLE`). Nothing is written (no expense, share, debt or history event).
+4. **No default or memo rate** is used; the expense cannot be registered without a valid rate.
 
 ### 3. Same Currency
 
-If `fromCurrency == toCurrency`:
+If `from == to`:
 - `exchangeRate` = 1
 - `convertedAmount` = `amount`
-- `rateSource` = "same-currency"
+- `rateSource` = `"SAME_CURRENCY"` and `rateDate` = the expense date
+- the provider and the BCRA are **not** called
 
 ## Rate Caching Strategy
 
 | Aspect | Design |
 |--------|--------|
-| **Cache Key** | `"{fromCurrency}-{toCurrency}-{date}"` (e.g., "USD-ARS-2026-01-15") |
-| **No TTL** | Historical rates for a given date are deterministic and never stale; cache persists for session lifetime |
-| **Storage** | In-memory map (Caffeine) or Redis (if already project-configured) |
-| **Eviction** | LRU (Least Recently Used) when cache exceeds configured size (e.g., 1000 entries) |
-| **Cache Miss** | Fetch from external service; on success, store in cache |
-| **Rate Determinism** | Same par → same date always gives same rate; no "stale data" concept |
+| **Cache Key** | `(fromCurrency, toCurrency, date)`; a quote resolved from an earlier business day is also stored under that effective date |
+| **No TTL** | Historical rates for a given date are deterministic and never stale |
+| **Storage** | In-process map (`CachingExchangeRateProvider`); no external cache |
+| **Eviction** | LRU when the cache exceeds `amano.exchange.bcra.cache-max-size` (1000 by default) |
+| **Cache Miss** | Fetch from the BCRA; on success, store in the cache |
+| **Rate Determinism** | Same pair and date always give the same rate |
 
 ## Example
 
 ```
-Input: CurrencyConversionRequest(amount=50, fromCurrency=USD, toCurrency=ARS, date=2026-01-15)
+Group in ARS; expense of 50.00 USD dated 2026-01-15.
 
 BCRA rate USD→ARS on 2026-01-15: 18.50
 
-Output: CurrencyConversionResponse(
-  amount=50,
-  fromCurrency=USD,
-  toCurrency=ARS,
-  convertedAmount=925.00,
-  exchangeRate=18.50,
-  date=2026-01-15,
-  rateSource="BCRA"
-)
+GroupExpenseResponse (relevant fields):
+  amount=50.00, currency=USD,
+  convertedAmount=925.00, convertedCurrency=ARS,
+  exchangeRate=18.50000000, rateDate=2026-01-15, rateSource=BCRA
 ```
 
-If 2026-01-15 is a holiday and the last business day was 2026-01-13, the response `date`
-is `2026-01-13`: the date of the quote actually used.
+If 2026-01-15 is a holiday and the last business day was 2026-01-13, `rateDate` is
+`2026-01-13`: the date of the quote actually used.
 
 ## Behavior Rules
 
 1. **Original amount always shown**: The `amount` field always reflects the original user-entered value.
 2. **Converted amount always computed**: Even if the group's primary currency matches the expense currency, the converted amount is shown (equals the original).
-3. **Rate source transparency**: The `rateSource` field tells the user whether the rate came from the live service or cache.
+3. **Rate source transparency**: `rateSource` is `BCRA` for an official quote and `SAME_CURRENCY` when no conversion was needed; `rateDate` tells which day's quote was used.
 4. **No floating point**: All monetary values use `BigDecimal` with 2 decimal places.
 5. **Rate persistence**: The applied rate is stored with the expense (per the money representation design decision: "guardar siempre moneda original, monto original, monto convertido y tasa aplicada").
 6. **If the BCRA API is unavailable or has no quote within 7 days → expense not saved (503)**: no default/memo fallback; the user must register in the group's primary currency or retry later.
@@ -120,7 +108,7 @@ is `2026-01-13`: the date of the quote actually used.
 When registering a gasto with a currency different from the group's primary:
 
 1. If `expense.currency != group.primaryCurrency`:
-   - Fetch conversion rate for `expense.date` via `CurrencyConversionService.getRate()`
+   - Fetch the rate for `expense.date` via `ExchangeRateProvider.getQuote()`
    - If 503 returned (no rate available) → **reject expense registration** with error message "No se pudo obtener la cotización; reintente después o registre en moneda del grupo"
    - If rate obtained → store `montoConvertido` and `tasaAplicada` with the expense
    - Display both original and converted amounts in UI
@@ -129,4 +117,52 @@ When registering a gasto with a currency different from the group's primary:
    - `convertedAmount` = `amount`
    - `exchangeRate` = 1
    - No external API call needed
-   - `montoConvertido` = `amount`, `tasaAplicada` = 1, `rateSource` = "same-currency"
+   - `convertedAmount` = `amount`, `exchangeRate` = 1, `rateSource` = "SAME_CURRENCY"
+
+---
+
+## Exchange Quote Preview (read-only)
+
+Lets the expense form show an estimated converted amount before saving (US9, T069/T070). It reuses `ExchangeRateProvider` and its cache; it contains **no conversion logic of its own** (the client multiplies amount × rate) and **writes nothing**. The quote that is stored is the one resolved when the expense is saved (D8), so the final rate may differ from the previewed one.
+
+### `GET /api/groups/{groupId}/exchange-quote?currency=USD&date=2026-01-18`
+
+| Parameter | Type | Required | Notes |
+|-----------|------|----------|-------|
+| `groupId` (path) | number | Yes | Group of the caller |
+| `currency` | text | Yes | `ARS`, `USD` or `EUR` (case-insensitive); the currency of the expense |
+| `date` | text | Yes | `aaaa-mm-dd`; not in the future (same tolerance as the expense date) |
+
+The target currency is always the group's `primaryCurrency`.
+
+### Response `200`
+
+```json
+{
+  "rate": 1250.50000000,
+  "rateDate": "2026-01-16",
+  "rateSource": "BCRA",
+  "groupCurrency": "ARS"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rate` | number | Rate `currency` → group currency, scale 8 |
+| `rateDate` | text | Effective date of the quote (may be an earlier business day, up to 7 days back) |
+| `rateSource` | text | `BCRA`; `SAME_CURRENCY` when `currency` equals the group currency |
+| `groupCurrency` | text | The group's primary currency |
+
+Same currency → `rate` `1.00000000`, `rateDate` equal to the requested `date`, `rateSource` `SAME_CURRENCY`, and the provider is **not** called.
+
+### Errors
+
+| Status | When | Body |
+|--------|------|------|
+| `400` | Missing/invalid `currency` (`"La moneda no es válida"` / `"La moneda es obligatoria"`), missing/bad-format `date` (`"La fecha debe tener el formato aaaa-mm-dd"`) or future `date` (`"La fecha no puede ser posterior a hoy"`) | `ProblemDetail` with `properties.fields.currency` / `properties.fields.date` |
+| `401` | No session | `ProblemDetail` |
+| `404` | Not an active member of the group, or the group does not exist (neutral) | `"No existe el grupo solicitado o no sos miembro"` |
+| `503` | No quote available (same message and `properties.code = EXCHANGE_RATE_UNAVAILABLE` as when saving an expense) | `"No se pudo obtener la cotización; reintente después o registre en moneda del grupo"` |
+
+Frontend behavior (T070): the form asks only when the currency differs from the group's and the amount and date are valid, when one of the three changes (400 ms debounce); a failure never blocks saving.
+

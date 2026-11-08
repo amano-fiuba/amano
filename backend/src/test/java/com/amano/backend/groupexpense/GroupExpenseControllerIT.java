@@ -999,4 +999,124 @@ class GroupExpenseControllerIT {
                 .andExpect(jsonPath("$.properties.fields.payerUserId")
                         .value("Quien pagó tiene que ser miembro del grupo"));
     }
+
+    // ---- T069 (022): GET /api/groups/{id}/exchange-quote (read-only preview) ----
+
+    private ResultActions getQuote(Cookie session, String query) throws Exception {
+        var request = get("/api/groups/" + groupId + "/exchange-quote" + query);
+        if (session != null) {
+            request.cookie(session);
+        }
+        return mockMvc.perform(request);
+    }
+
+    private int totalActivityEvents() {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM group_activity WHERE group_id = ?", Integer.class, groupId);
+    }
+
+    @Test
+    void t069QuoteForADifferentCurrencyAnswersRateScale8EffectiveDateSourceAndGroupCurrency() throws Exception {
+        LocalDate sunday = LocalDate.of(2026, 1, 18);
+        LocalDate friday = LocalDate.of(2026, 1, 16);
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, sunday))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("1250.50000000"), friday, BcraExchangeRateClient.SOURCE_BCRA));
+
+        String body = getQuote(anaSession, "?currency=USD&date=2026-01-18")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateDate").value("2026-01-16"))
+                .andExpect(jsonPath("$.rateSource").value("BCRA"))
+                .andExpect(jsonPath("$.groupCurrency").value("ARS"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).contains("\"rate\":1250.50000000");
+    }
+
+    @Test
+    void t069QuoteIsExpressedInTheGroupsPrimaryCurrency() throws Exception {
+        jdbc.update("UPDATE groups SET primary_currency = 'USD' WHERE id = ?", groupId);
+        LocalDate date = LocalDate.of(2026, 1, 18);
+        when(bcraExchangeRateClient.getQuote(Currency.ARS, Currency.USD, date))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("0.00080000"), date, BcraExchangeRateClient.SOURCE_BCRA));
+
+        getQuote(juanSession, "?currency=ARS&date=2026-01-18")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rate").value(0.0008))
+                .andExpect(jsonPath("$.groupCurrency").value("USD"));
+        verify(bcraExchangeRateClient).getQuote(Currency.ARS, Currency.USD, date);
+    }
+
+    @Test
+    void t069QuoteForTheGroupCurrencyIsRateOneWithoutCallingTheProvider() throws Exception {
+        String body = getQuote(anaSession, "?currency=ARS&date=2026-01-18")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rateDate").value("2026-01-18"))
+                .andExpect(jsonPath("$.rateSource").value("SAME_CURRENCY"))
+                .andExpect(jsonPath("$.groupCurrency").value("ARS"))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(body).contains("\"rate\":1.00000000");
+        verify(bcraExchangeRateClient, never()).getQuote(any(), any(), any());
+    }
+
+    @Test
+    void t069QuoteReusesTheProviderCacheAndWritesNothingToTheDatabase() throws Exception {
+        LocalDate date = LocalDate.of(2026, 1, 18);
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, date))
+                .thenReturn(new ExchangeRateQuote(
+                        new BigDecimal("1250.50000000"), date, BcraExchangeRateClient.SOURCE_BCRA));
+        int expensesBefore = count("group_expenses");
+        int debtsBefore = count("debts");
+        int eventsBefore = totalActivityEvents();
+
+        getQuote(anaSession, "?currency=USD&date=2026-01-18").andExpect(status().isOk());
+        getQuote(juanSession, "?currency=usd&date=2026-01-18").andExpect(status().isOk());
+
+        verify(bcraExchangeRateClient, times(1)).getQuote(Currency.USD, Currency.ARS, date);
+        assertThat(count("group_expenses")).isEqualTo(expensesBefore);
+        assertThat(count("debts")).isEqualTo(debtsBefore);
+        assertThat(totalActivityEvents()).isEqualTo(eventsBefore);
+    }
+
+    @Test
+    void t069QuoteWithoutAvailableRateAnswers503WithTheExistingMessage() throws Exception {
+        when(bcraExchangeRateClient.getQuote(Currency.USD, Currency.ARS, LocalDate.of(2026, 1, 18)))
+                .thenThrow(new ExchangeRateUnavailableException());
+
+        getQuote(anaSession, "?currency=USD&date=2026-01-18")
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.detail")
+                        .value("No se pudo obtener la cotización; reintente después o registre en moneda del grupo"))
+                .andExpect(jsonPath("$.properties.code").value("EXCHANGE_RATE_UNAVAILABLE"));
+    }
+
+    @Test
+    void t069QuoteIsOnlyForActiveMembersNeutral404ForOthersAnd401WithoutSession() throws Exception {
+        getQuote(outsiderSession, "?currency=USD&date=2026-01-18")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("No existe el grupo solicitado o no sos miembro"));
+
+        jdbc.update("UPDATE group_members SET left_at = now() WHERE group_id = ? AND user_id = ?", groupId, juan);
+        getQuote(juanSession, "?currency=USD&date=2026-01-18").andExpect(status().isNotFound());
+
+        getQuote(null, "?currency=USD&date=2026-01-18").andExpect(status().isUnauthorized());
+        verify(bcraExchangeRateClient, never()).getQuote(any(), any(), any());
+    }
+
+    @Test
+    void t069QuoteRejectsFutureDatesBadFormatsInvalidCurrenciesAndMissingParameters() throws Exception {
+        String future = LocalDate.now().plusDays(10).toString();
+        getQuote(anaSession, "?currency=USD&date=" + future)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.date").value("La fecha no puede ser posterior a hoy"));
+        getQuote(anaSession, "?currency=USD&date=18/01/2026")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.date")
+                        .value("La fecha debe tener el formato aaaa-mm-dd"));
+        getQuote(anaSession, "?currency=BRL&date=2026-01-18")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.currency").value("La moneda no es válida"));
+        getQuote(anaSession, "?currency=USD").andExpect(status().isBadRequest());
+        getQuote(anaSession, "?date=2026-01-18").andExpect(status().isBadRequest());
+        verify(bcraExchangeRateClient, never()).getQuote(any(), any(), any());
+    }
 }

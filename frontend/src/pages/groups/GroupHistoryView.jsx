@@ -4,7 +4,9 @@ import { getActivity } from '../../api/groupsClient'
 import { useAuth } from '../../auth/AuthContext'
 import {
   ACTIVITY_FILTERS,
+  deletedExpenseIds,
   describeActivity,
+  expenseLinkId,
   formatTime,
   groupByDay,
 } from './activityDescriptions'
@@ -25,17 +27,6 @@ function initialFilter(value) {
 // agrupadas por día, filtro "Mostrar", paginación y estados de carga, vacío y
 // error. Una respuesta vieja nunca pisa a la consulta más reciente.
 
-// Entries that open the expense detail: the expense itself (017) and its payments/debts (018 FR-022; 022 US8).
-const LINKS_TO_EXPENSE = [
-  'EXPENSE_CREATED',
-  'PAYMENT_MADE',
-  'PAYMENT_REGISTERED',
-  'PAYMENT_CONFIRMED',
-  'PAYMENT_REJECTED',
-  'DEBT_OVERDUE',
-  'DEBT_REMINDER_SENT',
-  'PAYER_DUE_NOTICE_SENT',
-]
 export default function GroupHistoryView({ groupId }) {
   const auth = useAuth()
   const setUser = auth?.setUser
@@ -93,6 +84,7 @@ export default function GroupHistoryView({ groupId }) {
 
   const { status, entries, totalPages, error, retryable } = state
   const days = groupByDay(entries)
+  const deletedIds = deletedExpenseIds(entries)
   const lastPage = Math.max(totalPages, 1)
 
   return (
@@ -147,6 +139,7 @@ export default function GroupHistoryView({ groupId }) {
               <ol className="group-history__entries">
                 {day.entries.map((entry) => {
                   const { actor, text } = describeActivity(entry)
+                  const linkedExpenseId = expenseLinkId(entry, deletedIds)
                   return (
                     <li
                       key={entry.id}
@@ -156,9 +149,9 @@ export default function GroupHistoryView({ groupId }) {
                       <p>
                         <strong>{actor}</strong> {text}
                       </p>
-                      {LINKS_TO_EXPENSE.includes(entry.eventType) && entry.details?.expenseId != null && (
+                      {linkedExpenseId != null && (
                         <Link
-                          to={`/groups/${groupId}/expenses/${entry.details.expenseId}`}
+                          to={`/groups/${groupId}/expenses/${linkedExpenseId}`}
                           className="group-history__expense-link"
                         >
                           Ver gasto

@@ -2,6 +2,7 @@ package com.amano.backend.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,11 +120,13 @@ class PaymentDecisionControllerIT {
 
     @Test
     void rejectingTheRemainingPaymentOfALegacyPartialDebtRestoresThePreviousAmount() throws Exception {
-        s.requireValidation();
+        // Rewritten for 022 T085: the earlier 018 partial payment is made BEFORE the group asks for
+        // validation (the inherited endpoint now respects the setting too).
         String legacy = s.pay(s.juanSession, s.juanDebt, "1000.00")
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         long legacyPayment = objectMapper.readTree(legacy).get("id").asLong();
+        s.requireValidation();
         long reported = s.registerReported(s.juanSession, s.juanDebt, "2333.33");
 
         s.rejectPayment(s.anaSession, reported)
@@ -313,5 +316,195 @@ class PaymentDecisionControllerIT {
     private jakarta.servlet.http.Cookie carlaAdminSession() {
         s.makeAdmin(s.carla);
         return s.carlaSession;
+    }
+
+    // ---- T075 (022): GET /api/groups/{id}/payments/pending-validation ----
+
+    private org.springframework.test.web.servlet.ResultActions pendingValidation(
+            jakarta.servlet.http.Cookie session) throws Exception {
+        var request = get("/api/groups/" + s.groupId + "/payments/pending-validation");
+        if (session != null) {
+            request.cookie(session);
+        }
+        return mockMvc.perform(request);
+    }
+
+    @Test
+    void t075AdminsListOnlyTheReportedPaymentsWithTheirDetails() throws Exception {
+        long paymentId = reportedPayment();
+
+        pendingValidation(s.anaSession)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].paymentId").value(paymentId))
+                .andExpect(jsonPath("$[0].debtId").value(s.juanDebt))
+                .andExpect(jsonPath("$[0].expenseId").value(s.expenseId))
+                .andExpect(jsonPath("$[0].payerUserId").value(s.juan))
+                .andExpect(jsonPath("$[0].payerName").value("Juan Pérez"))
+                .andExpect(jsonPath("$[0].receiverName").value("Ana López"))
+                .andExpect(jsonPath("$[0].amount").value(3333.33))
+                .andExpect(jsonPath("$[0].currency").value("ARS"))
+                .andExpect(jsonPath("$[0].registeredAt").isNotEmpty())
+                .andExpect(jsonPath("$[0].daysPending").value(0));
+    }
+
+    @Test
+    void t075DecidedPaymentsLeaveTheQueue() throws Exception {
+        long paymentId = reportedPayment();
+        s.confirmPayment(s.anaSession, paymentId).andExpect(status().isOk());
+
+        pendingValidation(s.anaSession)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void t075OnlyAdminsSeeTheQueueNeutral404ForOthersAnd401WithoutSession() throws Exception {
+        reportedPayment();
+
+        pendingValidation(s.carlaSession)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.detail").value("Solo los administradores pueden ver los pagos por validar"));
+        pendingValidation(s.outsiderSession)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value(PaymentNotFoundException.MESSAGE));
+        pendingValidation(null).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void t075TheQueueDoesNotLeakPaymentsOfOtherGroups() throws Exception {
+        PaymentScenario other = new PaymentScenario(mockMvc, jdbc, jwtService, objectMapper);
+        other.requireValidation();
+        other.registerReported(other.juanSession, other.juanDebt, "3333.33");
+
+        pendingValidation(s.anaSession)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // ---- T056 (022): a reported payment is NOT settled (plan.md D4) ----
+
+    private java.math.BigDecimal juanBalance() throws Exception {
+        String body = mockMvc.perform(get("/api/groups/" + s.groupId + "/balances").cookie(s.anaSession))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        for (var member : objectMapper.readTree(body).get("currencies").get(0).get("balances")) {
+            if (member.get("memberId").asLong() == s.juan && "REGISTERED".equals(member.get("memberType").asString())) {
+                return new java.math.BigDecimal(member.get("netBalance").asString());
+            }
+        }
+        throw new AssertionError("Juan is not in the balances");
+    }
+
+    @Test
+    void t056AReportedPaymentKeepsCountingInTheBalancesAndTheProposalUntilItIsConfirmed() throws Exception {
+        assertThat(juanBalance()).isEqualByComparingTo("-3333.33");
+        long paymentId = reportedPayment();
+
+        // Reported: still owed, shown with its full outstanding amount and in the proposal.
+        assertThat(juanBalance()).isEqualByComparingTo("-3333.33");
+        assertThat(jdbc.queryForObject("SELECT paid_amount FROM debts WHERE id = ?", BigDecimal.class,
+                s.juanDebt)).isEqualByComparingTo("0.00");
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/debts/pending").cookie(s.juanSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.debtId == %d)].status".formatted(s.juanDebt)).value("PAYMENT_REPORTED"))
+                .andExpect(jsonPath("$[?(@.debtId == %d)].outstanding".formatted(s.juanDebt)).value(3333.33));
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/settlement-proposal").cookie(s.anaSession))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.proposals[0].summary.totalTransferred").value(6666.66));
+
+        // Confirmed (VERIFIED): settled, Juan is at zero.
+        s.confirmPayment(s.anaSession, paymentId).andExpect(status().isOk());
+        assertThat(juanBalance()).isEqualByComparingTo("0.00");
+        assertThat(jdbc.queryForObject("SELECT paid_amount FROM debts WHERE id = ?", BigDecimal.class,
+                s.juanDebt)).isEqualByComparingTo("3333.33");
+    }
+
+    @Test
+    void t056ARejectedReportedPaymentLeavesTheBalanceUnchanged() throws Exception {
+        long paymentId = reportedPayment();
+        assertThat(juanBalance()).isEqualByComparingTo("-3333.33");
+
+        s.rejectPayment(s.anaSession, paymentId).andExpect(status().isOk());
+
+        assertThat(juanBalance()).isEqualByComparingTo("-3333.33");
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PENDING");
+    }
+
+    // ---- Partial payments (022 T080): confirming ADDS the amount; rejecting restores the state ----
+
+    @Test
+    void confirmingPartialReportedPaymentsAddsThemAndEndsVerified() throws Exception {
+        s.requireValidation();
+        long first = s.registerReported(s.juanSession, s.juanDebt, "1000.00");
+
+        s.confirmPayment(s.anaSession, first)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PARTIALLY_PAID");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("1000.00");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-2333.33");
+
+        long second = s.registerReported(s.juanSession, s.juanDebt, "2333.33");
+        // While it waits, nothing else is accepted and nothing is paid yet.
+        s.registerFull(s.juanSession, s.juanDebt, "1.00").andExpect(status().isConflict());
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("1000.00");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-2333.33");
+
+        s.confirmPayment(s.anaSession, second)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtStatusAfter").value("VERIFIED"));
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("VERIFIED");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("3333.33");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("0.00");
+
+        // The history keeps the amount of each decided payment.
+        mockMvc.perform(get("/api/groups/" + s.groupId + "/activity").cookie(s.anaSession)
+                .param("eventType", "PAYMENT_CONFIRMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[0].details.amount").value("2333.33"))
+                .andExpect(jsonPath("$.content[0].details.debtStatusAfter").value("VERIFIED"))
+                .andExpect(jsonPath("$.content[1].details.amount").value("1000.00"))
+                .andExpect(jsonPath("$.content[1].details.debtStatusAfter").value("PARTIALLY_PAID"));
+    }
+
+    @Test
+    void rejectingAPartialReportedPaymentReturnsTheDebtToItsPreviousState() throws Exception {
+        s.requireValidation();
+        // Nothing paid before: back to PENDING.
+        long first = s.registerReported(s.juanSession, s.juanDebt, "1000.00");
+        s.rejectPayment(s.anaSession, first)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PENDING"));
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("0.00");
+
+        // Something paid before: back to PARTIALLY_PAID with the same paid amount.
+        long second = s.registerReported(s.juanSession, s.juanDebt, "1000.00");
+        s.confirmPayment(s.anaSession, second).andExpect(status().isOk());
+        long third = s.registerReported(s.juanSession, s.juanDebt, "500.00");
+        s.rejectPayment(s.anaSession, third)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
+
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PARTIALLY_PAID");
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("1000.00");
+        assertThat(s.netBalanceOf(s.juan)).isEqualByComparingTo("-2333.33");
+    }
+
+    @Test
+    void aDecisionOnAPaymentWrittenByTheInheritedFlowWorksLikeAnyOtherReportedPayment() throws Exception {
+        // legacy is only an origin marker: it must not make a REPORTED payment undecidable.
+        s.requireValidation();
+        long paymentId = s.registerReported(s.juanSession, s.juanDebt, "1000.00");
+        jdbc.update("UPDATE payments SET legacy = TRUE WHERE id = ?", paymentId);
+
+        pendingValidation(s.anaSession)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].paymentId").value(paymentId))
+                .andExpect(jsonPath("$[0].amount").value(1000.0));
+        s.confirmPayment(s.anaSession, paymentId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.debtStatusAfter").value("PARTIALLY_PAID"));
     }
 }

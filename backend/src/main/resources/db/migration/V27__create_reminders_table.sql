@@ -1,4 +1,4 @@
--- V25__create_reminders_table.sql
+-- V27__create_reminders_table.sql
 -- 025 T005: tabla única con discriminador para el recordatorio de una deuda
 -- (DEBT) y el aviso al pagador de un gasto (PAYER_NOTICE). Comparten la
 -- programación, el reclamo y el ciclo de vida.

@@ -133,7 +133,7 @@ Este documento resuelve las incógnitas técnicas del plan a partir del código 
 
 ## 9. Migraciones y versionado
 
-**Decisión**: V24 (columnas de configuración en `groups`), V25 (tabla `reminders`) y V26 (tipos de evento del historial). Son las siguientes versiones libres después de V23.
+**Decisión**: V26 (columnas de configuración en `groups`), V27 (tabla `reminders`) y V28 (tipos de evento del historial). Son las siguientes versiones libres después de V25.
 
 **Hallazgos**:
 - La última migración del repositorio es `V23__default_members_can_generate_expenses_for_others_true.sql`.

@@ -35,7 +35,9 @@ import { PAYMENT_BEFORE_EXPENSE } from './paymentValidation'
 import RegisterPaymentView, {
   CANNOT_PAY_MESSAGE,
   DEBT_ALREADY_PAID_MESSAGE,
+  DEBT_AWAITING_VALIDATION_MESSAGE,
   DEBT_NOT_FOUND_MESSAGE,
+  PAYMENT_REPORTED_MESSAGE,
   PAYMENT_REUSED_KEY_MESSAGE,
   PAYMENT_SUCCESS_MESSAGE,
 } from './RegisterPaymentView'
@@ -130,9 +132,9 @@ describe('RegisterPaymentView (018)', () => {
     expect(registerPayment).not.toHaveBeenCalled()
   })
 
-  it('201 muestra el snackbar y vuelve al detalle del gasto', async () => {
+  it('201 con pago confirmado muestra "Pago registrado" y vuelve al detalle del gasto', async () => {
     const user = userEvent.setup()
-    registerPayment.mockResolvedValue({ ok: true, payment: { id: 54 }, created: true })
+    registerPayment.mockResolvedValue({ ok: true, payment: { id: 54, status: 'CONFIRMED' }, created: true })
     await readyForm()
 
     await setField(user, 'Monto', '1.000')
@@ -146,6 +148,23 @@ describe('RegisterPaymentView (018)', () => {
       deviceTimeZone: 'America/Argentina/Buenos_Aires',
     }, 'key-1')
     expect(showSnackbar).toHaveBeenCalledWith(PAYMENT_SUCCESS_MESSAGE)
+  })
+
+  it('201 con pago informado (status REPORTED) avisa que queda esperando validación (022 T085)', async () => {
+    const user = userEvent.setup()
+    registerPayment.mockResolvedValue({
+      ok: true,
+      payment: { id: 54, status: 'REPORTED', debt: { status: 'PAYMENT_REPORTED' } },
+      created: true,
+    })
+    await readyForm()
+
+    await setField(user, 'Monto', '1.000')
+    await user.click(screen.getByRole('button', { name: 'Registrar pago' }))
+
+    expect(await screen.findByText('Detalle del gasto')).toBeInTheDocument()
+    expect(showSnackbar).toHaveBeenCalledWith(PAYMENT_REPORTED_MESSAGE)
+    expect(showSnackbar).not.toHaveBeenCalledWith(PAYMENT_SUCCESS_MESSAGE)
   })
 
   it('un error de red conserva la clave para el reintento', async () => {
@@ -200,16 +219,43 @@ describe('RegisterPaymentView (018)', () => {
       .toHaveTextContent('Solo quien debe, quien cobra o un administrador pueden registrar este pago')
   })
 
-  it('409 avisa que la deuda ya está pagada y ofrece volver', async () => {
+  it('409 avisa que la deuda ya está pagada (o esperando validación) y ofrece volver', async () => {
     const user = userEvent.setup()
     registerPayment.mockResolvedValue({ ok: false, status: 409, detail: 'La deuda ya está pagada', code: 'DEBT_ALREADY_PAID' })
-    await readyForm()
+    const { unmount } = await readyForm().then(() => ({ unmount: renderView().unmount }))
+    unmount()
 
     await user.click(screen.getByRole('button', { name: 'Registrar pago' }))
     const blocked = await screen.findByTestId('register-payment-blocked')
     expect(blocked).toHaveTextContent(DEBT_ALREADY_PAID_MESSAGE)
     expect(within(blocked).getByRole('link', { name: 'Volver al gasto' })).toHaveAttribute('href', '/groups/3/expenses/12')
     expect(screen.queryByLabelText('Monto')).not.toBeInTheDocument()
+  })
+
+  it('409 con pago esperando validación muestra el texto en voseo del servidor y una deuda ya informada bloquea el formulario', async () => {
+    const user = userEvent.setup()
+    registerPayment.mockResolvedValue({
+      ok: false,
+      status: 409,
+      detail: DEBT_AWAITING_VALIDATION_MESSAGE,
+      code: 'DEBT_ALREADY_HAS_PAYMENT',
+    })
+    const { unmount } = renderView()
+    await screen.findByLabelText('Monto')
+    await user.click(screen.getByRole('button', { name: 'Registrar pago' }))
+    expect(await screen.findByTestId('register-payment-blocked')).toHaveTextContent(DEBT_AWAITING_VALIDATION_MESSAGE)
+    unmount()
+
+    registerPayment.mockResolvedValue({ ok: false, status: 409, detail: '' })
+    const second = renderView()
+    await screen.findByLabelText('Monto')
+    await user.click(screen.getByRole('button', { name: 'Registrar pago' }))
+    expect(await screen.findByTestId('register-payment-blocked')).toHaveTextContent(DEBT_ALREADY_PAID_MESSAGE)
+    second.unmount()
+
+    getGroupExpense.mockResolvedValue(expenseWith({ ...DEBT, status: 'PAYMENT_REPORTED', canRegisterPayment: false }))
+    renderView()
+    expect(await screen.findByTestId('register-payment-blocked')).toHaveTextContent(DEBT_AWAITING_VALIDATION_MESSAGE)
   })
 
   it('404 al enviar muestra el mensaje neutral', async () => {

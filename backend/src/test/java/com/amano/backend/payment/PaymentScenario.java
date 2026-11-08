@@ -51,7 +51,8 @@ final class PaymentScenario {
         this.mockMvc = mockMvc;
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
-        int n = SEQUENCE.incrementAndGet() + (int) (System.nanoTime() % 100000);
+        // Unique per scenario: the counter alone is unique within the JVM, the clock keeps it unique across runs.
+        String n = SEQUENCE.incrementAndGet() + "t" + System.nanoTime();
         ana = user(jdbc, "Ana", "López", "ana" + n + "@payments.dev");
         juan = user(jdbc, "Juan", "Pérez", "juan" + n + "@payments.dev");
         carla = user(jdbc, "Carla", "Gómez", "carla" + n + "@payments.dev");
@@ -201,6 +202,35 @@ final class PaymentScenario {
     int activePayments(long debtId) {
         return jdbc.queryForObject(
                 "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = FALSE", Integer.class, debtId);
+    }
+
+    /** Paid amount stored in the debt. */
+    java.math.BigDecimal paidAmount(long debtId) {
+        return jdbc.queryForObject("SELECT paid_amount FROM debts WHERE id = ?", java.math.BigDecimal.class, debtId);
+    }
+
+    /** Net balance (ARS) of a registered member according to GET /balances, read by Ana. */
+    java.math.BigDecimal netBalanceOf(long userId) throws Exception {
+        String body = mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .get("/api/groups/" + groupId + "/balances").cookie(anaSession))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var currencies = objectMapper.readTree(body).get("currencies");
+        java.math.BigDecimal sum = java.math.BigDecimal.ZERO;
+        java.math.BigDecimal result = java.math.BigDecimal.ZERO;
+        for (var currency : currencies) {
+            for (var member : currency.get("balances")) {
+                java.math.BigDecimal net = new java.math.BigDecimal(member.get("netBalance").asString());
+                sum = sum.add(net);
+                if ("REGISTERED".equals(member.get("memberType").asString())
+                        && member.get("memberId").asLong() == userId) {
+                    result = net;
+                }
+            }
+        }
+        if (sum.signum() != 0) {
+            throw new AssertionError("The balances of the group do not add up to zero: " + sum);
+        }
+        return result;
     }
 
     void requireValidation() {

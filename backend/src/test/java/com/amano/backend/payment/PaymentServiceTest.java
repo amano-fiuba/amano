@@ -38,6 +38,8 @@ import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupPermissionChecker;
+import com.amano.backend.groups.GroupPermissions;
+import com.amano.backend.groups.GroupPermissionsRepository;
 import com.amano.backend.groups.GroupPermissionDeniedException;
 import com.amano.backend.groups.PaymentActivityDetails;
 import com.amano.backend.user.User;
@@ -61,6 +63,7 @@ class PaymentServiceTest {
     private GroupMemberRepository groupMemberRepository;
     private UserRepository userRepository;
     private ActivityEventService activityEventService;
+    private GroupPermissionsRepository groupPermissionsRepository;
     private PaymentService service;
     private Debt debt;
 
@@ -72,8 +75,9 @@ class PaymentServiceTest {
         groupMemberRepository = mock(GroupMemberRepository.class);
         userRepository = mock(UserRepository.class);
         activityEventService = mock(ActivityEventService.class);
+        groupPermissionsRepository = mock(GroupPermissionsRepository.class);
         service = new PaymentService(debtRepository, paymentRepository, expenseRepository, groupMemberRepository,
-                new GroupPermissionChecker(), userRepository, activityEventService);
+                new GroupPermissionChecker(), userRepository, activityEventService, groupPermissionsRepository);
 
         debt = PaymentFixtures.juanDebt();
         when(debtRepository.findByIdForUpdate(31L)).thenReturn(Optional.of(debt));
@@ -100,6 +104,13 @@ class PaymentServiceTest {
     private void member(long userId, String role) {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, userId))
                 .thenReturn(Optional.of(new GroupMember(userId, GROUP_ID, role)));
+    }
+
+    /** The group asks an administrator to validate payments (022). */
+    private void requireValidation() {
+        GroupPermissions permissions = new GroupPermissions();
+        permissions.setPaymentsRequireValidation(true);
+        when(groupPermissionsRepository.findByGroupId(GROUP_ID)).thenReturn(Optional.of(permissions));
     }
 
     private static User user(long id, String first, String last) {
@@ -280,6 +291,72 @@ class PaymentServiceTest {
         assertThat(saved.getValue().isLegacy()).isTrue();
         assertThat(saved.getValue().getStatus()).isEqualTo(PaymentStatus.CONFIRMED);
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAID);
+    }
+
+    // ── 022: the inherited flow follows the validation setting ───────────────
+
+    @Test
+    void withValidationAPartialPaymentIsReportedAndThePaidAmountIsNotTouched() {
+        requireValidation();
+
+        PaymentResponse response = service.register(JUAN, KEY, pay("1000.00")).payment();
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(response.status()).isEqualTo("REPORTED");
+        assertThat(response.debt().status()).isEqualTo("PAYMENT_REPORTED");
+        assertThat(response.debt().outstanding()).isEqualTo("3333.33");
+        assertThat(response.debt().canRegisterPayment()).isFalse();
+        ArgumentCaptor<Payment> saved = ArgumentCaptor.forClass(Payment.class);
+        verify(paymentRepository).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(PaymentStatus.REPORTED);
+        // legacy stays the origin marker of this endpoint.
+        assertThat(saved.getValue().isLegacy()).isTrue();
+        assertThat(saved.getValue().getAmount()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void withValidationTheHistoryRecordsTheReportedPaymentWithItsAmountAndTheStatusChange() {
+        requireValidation();
+
+        service.register(JUAN, KEY, pay("1000.00"));
+
+        ArgumentCaptor<PaymentActivityDetails> details = ArgumentCaptor.forClass(PaymentActivityDetails.class);
+        verify(activityEventService).recordPaymentRegistered(eq(GROUP_ID), eq(JUAN), details.capture());
+        verify(activityEventService, never()).recordPaymentMade(any(), any(), any());
+        assertThat(details.getValue()).isEqualTo(new PaymentActivityDetails(54L, new BigDecimal("1000.00"), "ARS",
+                "Juan Pérez", "Ana López", EXPENSE_ID, 31L, "PENDING", "PAYMENT_REPORTED"));
+    }
+
+    @Test
+    void whileAPaymentWaitsForValidationAnotherOneAnswers409WithTheVoseoMessage() {
+        requireValidation();
+        service.register(JUAN, KEY, pay("1000.00"));
+
+        assertThat(catchThrowableOfType(() -> service.register(ANA, UUID.randomUUID(), pay("500.00")),
+                DebtAlreadyHasPaymentException.class))
+                .hasMessage("Esta deuda ya tiene un pago esperando validación: esperá a que un administrador lo decida");
+        verify(paymentRepository, org.mockito.Mockito.times(1)).save(any());
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+    }
+
+    @Test
+    void withoutValidationThePaymentIsConfirmedAtOnceAsBefore() {
+        PaymentResponse response = service.register(JUAN, KEY, pay("1000.00")).payment();
+
+        assertThat(response.status()).isEqualTo("CONFIRMED");
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+        verify(activityEventService).recordPaymentMade(eq(GROUP_ID), eq(JUAN), any());
+        verify(activityEventService, never()).recordPaymentRegistered(any(), any(), any());
+    }
+
+    @Test
+    void anOverdueDebtWithAPartialPaymentBecomesPartiallyPaid() {
+        org.springframework.test.util.ReflectionTestUtils.setField(debt, "status", DebtStatus.OVERDUE);
+
+        service.register(JUAN, KEY, pay("1000.00"));
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
     }
 
     @Test

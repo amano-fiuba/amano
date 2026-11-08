@@ -6,18 +6,37 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('../../api/groupExpensesClient', async (importOriginal) => ({
   ...await importOriginal(),
   getGroupExpense: vi.fn(),
+  deleteGroupExpense: vi.fn(),
+}))
+
+vi.mock('../../api/groupsClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  getGroup: vi.fn(),
 }))
 
 const setUser = vi.fn()
+let authUserId = 7
 vi.mock('../../auth/AuthContext', () => ({
-  useAuth: () => ({ setUser }),
+  useAuth: () => ({ setUser, user: { id: authUserId } }),
 }))
 
+const showSnackbar = vi.fn()
+vi.mock('../../components/Snackbar', () => ({
+  useSnackbar: () => showSnackbar,
+}))
+
+import { getGroup } from '../../api/groupsClient'
 import {
+  GROUP_EXPENSE_DELETE_ERROR_MESSAGE,
   GROUP_EXPENSE_LOAD_ERROR_MESSAGE,
+  deleteGroupExpense,
   getGroupExpense,
 } from '../../api/groupExpensesClient'
-import GroupExpenseDetailView, { EXPENSE_NOT_FOUND_MESSAGE } from './GroupExpenseDetailView'
+import GroupExpenseDetailView, {
+  DELETE_CONFIRM_MESSAGE,
+  DELETE_SUCCESS_MESSAGE,
+  EXPENSE_NOT_FOUND_MESSAGE,
+} from './GroupExpenseDetailView'
 
 // 017 T037 (US3): detail of a group expense with its debts and their states.
 
@@ -67,6 +86,8 @@ function renderView() {
     <MemoryRouter initialEntries={['/groups/3/expenses/12']}>
       <Routes>
         <Route path="/groups/:id/expenses/:expenseId" element={<GroupExpenseDetailView />} />
+        <Route path="/groups/:id" element={<p>Pantalla del grupo</p>} />
+        <Route path="/groups/:id/expenses/:expenseId/edit" element={<p>Pantalla de edición</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -74,7 +95,12 @@ function renderView() {
 
 beforeEach(() => {
   getGroupExpense.mockReset()
+  deleteGroupExpense.mockReset()
+  getGroup.mockReset()
+  getGroup.mockResolvedValue({ ok: true, group: { id: 3, currentUserRole: 'MEMBER' } })
   setUser.mockReset()
+  showSnackbar.mockReset()
+  authUserId = 7
 })
 
 describe('GroupExpenseDetailView (017)', () => {
@@ -161,6 +187,132 @@ describe('GroupExpenseDetailView (017)', () => {
   it('401 cierra la sesión', async () => {
     getGroupExpense.mockResolvedValue({ ok: false, status: 401 })
     renderView()
+    await waitFor(() => expect(setUser).toHaveBeenCalledWith(null))
+  })
+})
+
+// 022 T077: editar y borrar un gasto personal desde el detalle.
+describe('GroupExpenseDetailView: gasto personal (022 T077)', () => {
+  const JUAN = { userId: 15, name: 'Juan Pérez' }
+  const PERSONAL = {
+    ...EXPENSE,
+    shares: [EXPENSE.shares[0]],
+    debts: [],
+  }
+  const editLink = () => screen.queryByRole('link', { name: 'Editar gasto' })
+  const deleteButton = () => screen.queryByRole('button', { name: 'Eliminar gasto' })
+
+  async function renderPersonal(expense = PERSONAL) {
+    getGroupExpense.mockResolvedValue({ ok: true, expense })
+    renderView()
+    await screen.findByTestId('group-expense-detail')
+    await waitFor(() => expect(getGroup).toHaveBeenCalledWith('3'))
+  }
+
+  it('quien lo registró ve Editar y Eliminar; Editar lleva al formulario de edición', async () => {
+    await renderPersonal()
+
+    expect(await screen.findByRole('link', { name: 'Editar gasto' })).toHaveAttribute('href', '/groups/3/expenses/12/edit')
+    expect(deleteButton()).toBeInTheDocument()
+  })
+
+  it('el pagador (aunque no lo haya registrado) y un administrador también los ven', async () => {
+    authUserId = 15
+    await renderPersonal({ ...PERSONAL, payer: JUAN })
+    expect(await screen.findByRole('link', { name: 'Editar gasto' })).toBeInTheDocument()
+  })
+
+  it('un administrador los ve en un gasto personal ajeno', async () => {
+    authUserId = 99
+    getGroup.mockResolvedValue({ ok: true, group: { id: 3, currentUserRole: 'ADMIN' } })
+    await renderPersonal({ ...PERSONAL, payer: JUAN, createdBy: JUAN })
+    expect(await screen.findByRole('link', { name: 'Editar gasto' })).toBeInTheDocument()
+    expect(deleteButton()).toBeInTheDocument()
+  })
+
+  it('un miembro que no lo registró ni pagó no los ve', async () => {
+    authUserId = 99
+    await renderPersonal({ ...PERSONAL, payer: JUAN, createdBy: JUAN })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(editLink()).not.toBeInTheDocument()
+    expect(deleteButton()).not.toBeInTheDocument()
+  })
+
+  it('un gasto compartido (con participantes o deudas) no se ofrece para editar ni borrar, ni a un admin', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: { id: 3, currentUserRole: 'ADMIN' } })
+    await renderPersonal(EXPENSE)
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(editLink()).not.toBeInTheDocument()
+    expect(deleteButton()).not.toBeInTheDocument()
+  })
+
+  it('si no se puede leer el grupo, quien registró el gasto igual lo ve (el servidor decide)', async () => {
+    getGroup.mockResolvedValue({ ok: false, network: true })
+    await renderPersonal()
+    expect(await screen.findByRole('link', { name: 'Editar gasto' })).toBeInTheDocument()
+  })
+
+  it('pide confirmación antes de borrar y Cancelar no borra', async () => {
+    const user = userEvent.setup()
+    await renderPersonal()
+    await user.click(await screen.findByRole('button', { name: 'Eliminar gasto' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Eliminar gasto' })
+    expect(dialog).toHaveTextContent(DELETE_CONFIRM_MESSAGE)
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(deleteGroupExpense).not.toHaveBeenCalled()
+  })
+
+  it('al confirmar borra, avisa y vuelve al grupo', async () => {
+    deleteGroupExpense.mockResolvedValue({ ok: true })
+    const user = userEvent.setup()
+    await renderPersonal()
+    await user.click(await screen.findByRole('button', { name: 'Eliminar gasto' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sí, eliminar' }))
+
+    expect(await screen.findByText('Pantalla del grupo')).toBeInTheDocument()
+    expect(deleteGroupExpense).toHaveBeenCalledWith('3', '12')
+    expect(showSnackbar).toHaveBeenCalledWith(DELETE_SUCCESS_MESSAGE)
+  })
+
+  it('409 con deudas asociadas y 403 muestran el mensaje del servidor y cierran la confirmación', async () => {
+    const user = userEvent.setup()
+    await renderPersonal()
+
+    deleteGroupExpense.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      detail: 'No se puede eliminar un gasto con deudas asociadas',
+    })
+    await user.click(await screen.findByRole('button', { name: 'Eliminar gasto' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sí, eliminar' }))
+    expect(await screen.findByTestId('group-expense-delete-error'))
+      .toHaveTextContent('No se puede eliminar un gasto con deudas asociadas')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    deleteGroupExpense.mockResolvedValueOnce({ ok: false, status: 403, detail: 'No podés eliminar este gasto' })
+    await user.click(screen.getByRole('button', { name: 'Eliminar gasto' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sí, eliminar' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('group-expense-delete-error')).toHaveTextContent('No podés eliminar este gasto'))
+    expect(showSnackbar).not.toHaveBeenCalled()
+  })
+
+  it('un error de red al borrar muestra el mensaje y se puede reintentar; un 401 cierra la sesión', async () => {
+    const user = userEvent.setup()
+    await renderPersonal()
+
+    deleteGroupExpense.mockResolvedValueOnce({ ok: false, network: true })
+    await user.click(await screen.findByRole('button', { name: 'Eliminar gasto' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sí, eliminar' }))
+    expect(await screen.findByTestId('group-expense-delete-error'))
+      .toHaveTextContent(GROUP_EXPENSE_DELETE_ERROR_MESSAGE)
+
+    deleteGroupExpense.mockResolvedValueOnce({ ok: false, status: 401 })
+    await user.click(screen.getByRole('button', { name: 'Eliminar gasto' }))
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Sí, eliminar' }))
     await waitFor(() => expect(setUser).toHaveBeenCalledWith(null))
   })
 })

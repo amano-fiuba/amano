@@ -139,4 +139,50 @@ class DebtPaymentConcurrencyIT {
         assertThat(s.paymentEvents()).isEqualTo(1);
         assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAID");
     }
+
+    /** Partial payments (022 T042): payments are applied one after the other and never pass the balance. */
+    @Test
+    void twoConcurrentPartialPaymentsThatDoNotBothFitApplyOnlyOneAndNeverExceedTheBalance() throws Exception {
+        for (int round = 0; round < ROUNDS; round++) {
+            if (round > 0) {
+                s = new PaymentScenario(mockMvc, jdbc, jwtService, objectMapper);
+            }
+            List<Integer> statuses = together(
+                    fullPayment(s.juanSession, "2000.00"),
+                    fullPayment(s.anaSession, "2000.00"));
+
+            // 2.000 + 2.000 > 3.333,33: the one that arrives second finds only 1.333,33 left.
+            assertThat(statuses).containsExactlyInAnyOrder(201, 400);
+            assertThat(s.payments(s.juanDebt)).isEqualTo(1);
+            assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("2000.00");
+            assertThat(s.paidAmount(s.juanDebt)).isLessThanOrEqualTo(new java.math.BigDecimal("3333.33"));
+            assertThat(s.statusOf(s.juanDebt)).isEqualTo("PARTIALLY_PAID");
+        }
+    }
+
+    @Test
+    void twoConcurrentPartialPaymentsThatBothFitAreAppliedInSeries() throws Exception {
+        List<Integer> statuses = together(
+                fullPayment(s.juanSession, "1000.00"),
+                fullPayment(s.anaSession, "1000.00"));
+
+        assertThat(statuses).containsExactly(201, 201);
+        assertThat(s.payments(s.juanDebt)).isEqualTo(2);
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("2000.00");
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PARTIALLY_PAID");
+    }
+
+    @Test
+    void twoConcurrentPartialPaymentsWithValidationLeaveOneReportedAndNothingPaid() throws Exception {
+        s.requireValidation();
+
+        List<Integer> statuses = together(
+                fullPayment(s.juanSession, "1000.00"),
+                fullPayment(s.anaSession, "1000.00"));
+
+        assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+        assertThat(s.payments(s.juanDebt)).isEqualTo(1);
+        assertThat(s.paidAmount(s.juanDebt)).isEqualByComparingTo("0.00");
+        assertThat(s.statusOf(s.juanDebt)).isEqualTo("PAYMENT_REPORTED");
+    }
 }

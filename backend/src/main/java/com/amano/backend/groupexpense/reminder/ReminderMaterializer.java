@@ -24,7 +24,7 @@ import com.amano.backend.groups.Group;
  * Creates, reschedules and cancels the {@code SCHEDULED} reminders of a group
  * (025 T017). It only touches rows that were never claimed: {@code SENT},
  * {@code FAILED} and claimed rows are final snapshots. The unique partial
- * indexes of V25 guarantee at most one reminder per debt/expense even if two
+ * indexes of V27 guarantee at most one reminder per debt/expense even if two
  * instances run at once.
  */
 @Component

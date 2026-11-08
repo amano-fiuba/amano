@@ -110,33 +110,55 @@ class PaymentMigrationIT {
         List<String> indexes = jdbc.queryForList(
                 "SELECT indexname FROM pg_indexes WHERE tablename = 'payments' ORDER BY indexname", String.class);
         assertThat(indexes).contains("ix_payments_debt", "ix_payments_group",
-                "uq_payments_registered_by_idempotency_key", "uq_payments_active_debt");
+                "uq_payments_registered_by_idempotency_key", "uq_payments_reported_debt");
+        // V25 (022 T079): the V18 index that limited a debt to one active payment is gone.
+        assertThat(indexes).doesNotContain("uq_payments_active_debt");
+        assertThat(jdbc.queryForObject(
+                "SELECT indexdef FROM pg_indexes WHERE indexname = 'uq_payments_reported_debt'", String.class))
+                .contains("UNIQUE", "(debt_id)", "REPORTED");
     }
 
     /**
-     * 022 T032/T033 (D6): the partial unique index allows one active
-     * non-legacy payment per debt; REJECTED rows leave the index, so the debt
-     * can receive a new payment. Legacy rows of 018 never collide.
+     * 022 T079 (D6, V25): at most one payment waits for validation per debt, and
+     * any number of CONFIRMED payments (partial payments) can coexist with it.
+     * Replaces the V18 rule "one active non-legacy payment per debt", whose
+     * intent (no double processing of a debt) now lives in the row lock and the
+     * balance check; the database keeps the one-REPORTED-at-a-time guarantee.
      */
     @Test
-    void onlyOneActiveNonLegacyPaymentIsAllowedPerDebt() {
+    void onlyOneReportedPaymentIsAllowedPerDebtAndConfirmedOnesCoexist() {
         activePayment("REPORTED");
 
-        assertThatThrownBy(() -> activePayment("CONFIRMED"))
+        // A second payment waiting for validation is rejected by the database...
+        assertThatThrownBy(() -> activePayment("REPORTED"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        // ...whatever its legacy flag.
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO payments (group_id, debt_id, payer_type, payer_user_id, payer_name,
+                    receiver_user_id, receiver_name, registered_by_user_id, amount, currency,
+                    payment_date, idempotency_key, status, legacy)
+                VALUES (?, ?, 'REGISTERED', ?, 'Pagador', ?, 'Ana', ?, 5.00, 'ARS',
+                    CURRENT_DATE, ?, 'REPORTED', TRUE)
+                """, groupId, debtId, juan, ana, juan, UUID.randomUUID()))
                 .isInstanceOf(DataIntegrityViolationException.class);
 
-        jdbc.update("UPDATE payments SET status = 'REJECTED' WHERE debt_id = ? AND legacy = FALSE", debtId);
+        // Several CONFIRMED payments (legacy or not) live next to the reported one.
+        activePayment("CONFIRMED");
         activePayment("CONFIRMED");
         validRegistered("1.00");
         validRegistered("2.00");
-
         assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = FALSE"
-                        + " AND status IN ('REPORTED', 'CONFIRMED')",
+                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND status = 'CONFIRMED'",
+                Integer.class, debtId)).isEqualTo(4);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND status = 'REPORTED'",
                 Integer.class, debtId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM payments WHERE debt_id = ? AND legacy = TRUE", Integer.class, debtId))
-                .isEqualTo(2);
+
+        // Once the reported payment is decided, the debt accepts a new one.
+        jdbc.update("UPDATE payments SET status = 'REJECTED' WHERE debt_id = ? AND status = 'REPORTED'", debtId);
+        activePayment("REPORTED");
+        jdbc.update("UPDATE payments SET status = 'CONFIRMED' WHERE debt_id = ? AND status = 'REPORTED'", debtId);
+        activePayment("REPORTED");
     }
 
     @Test

@@ -10,8 +10,8 @@ La 022 completa el núcleo del producto: a partir de los gastos compartidos de u
 
 1. Saldos netos por miembro derivados de las deudas pendientes (sin tabla de saldos), con la suma del grupo siempre en cero.
 2. Liquidación como módulo de dominio puro con algoritmo voraz (a lo sumo n-1 transferencias), de solo lectura.
-3. Máquina de estados de deuda de 6 estados (`PARTIALLY_PAID` se conserva solo para lectura de datos de la 018), con confirmación o rechazo de pagos por un administrador según la casilla "Pagos requieren validación".
-4. Solo pagos completos, con bloqueo de fila para que dos pagos simultáneos no puedan saldar la misma deuda.
+3. Máquina de estados de deuda de 6 estados (`PARTIALLY_PAID` lo producen los pagos parciales, también los de la 018), con confirmación o rechazo de pagos por un administrador según la casilla "Pagos requieren validación".
+4. Pagos parciales o totales (monto > 0 y ≤ saldo pendiente), con bloqueo de fila para que dos pagos simultáneos no puedan superar juntos el saldo de la deuda y un único pago por validar a la vez por deuda.
 5. Vencimiento automático mediante una tarea programada idempotente, con umbral configurable por grupo.
 6. Conversión de moneda con cotización oficial del BCRA de la fecha del gasto, detrás de un adaptador, sin inventar nunca una tasa.
 7. Integración con la 020: no se puede abandonar un grupo con deudas pendientes.
@@ -45,9 +45,9 @@ Este plan **prevalece** sobre research.md, data-model.md, contracts/ y tasks.md 
 | I | Arquitectura | PASS | Extiende `groupexpense`; el dominio nuevo (saldos, liquidación) es puro y sin dependencias de Spring ni JPA; sin capas nuevas |
 | II | Desarrollo guiado por especificaciones | PASS con nota | Hay que reconciliar los artefactos con este plan antes de `/speckit.tasks` |
 | III | Entrega incremental | PASS con nota | Orden por historia: saldos → liquidación → estados y pagos → vencimiento → moneda; tasks.md debe reordenarse (hoy casi todo está en "Foundational") |
-| IV | Alcance controlado | PASS con nota | Fuera: recordatorios, Whistle, estadísticas, amistades, administración de grupos. Toca comportamiento de la 018 (solo pagos completos) y de la 020 (bloqueo por deuda); ambos cambios quedan explícitos |
+| IV | Alcance controlado | PASS con nota | Fuera: recordatorios, Whistle, estadísticas, amistades, administración de grupos. Toca comportamiento de la 018 (se alinea con el nuevo flujo de pagos parciales) y de la 020 (bloqueo por deuda); ambos cambios quedan explícitos |
 | V | Calidad y cobertura | PASS | Unitarias, propiedades, IT con Testcontainers y Vitest; umbral 85 % |
-| VI | Integridad de reglas | PASS con nota | Nunca se inventa una cotización; una deuda solo se salda una vez (bloqueo de fila más índice parcial único); la suma de saldos es cero. La regla de solo pagos completos cambia a la 018 y debe revisarse en el PR |
+| VI | Integridad de reglas | PASS con nota | Nunca se inventa una cotización; la suma de pagos de una deuda nunca supera su monto (bloqueo de fila más validación del saldo) y solo hay un pago por validar a la vez (índice parcial único); la suma de saldos es cero. Los pagos parciales alinean el flujo de la 018 con el de la 022 y deben revisarse en el PR (ver D6) |
 | VII | Contratos REST | PASS con nota | Campos y endpoints aditivos; los estados nuevos aparecen en respuestas existentes y el frontend se actualiza en el mismo release |
 | VIII | Validación y errores | PASS | `ProblemDetail`: 400 validación, 403 sin permiso, 404 neutral, 409 transición inválida, 503 cotización no disponible |
 | IX | Seguridad | PASS | El servidor decide siempre; solo miembros ven saldos; confirmar o rechazar pagos es solo para administradores; no hay credenciales del BCRA y la URL base va por variable de entorno |
@@ -76,28 +76,33 @@ research.md describe el código existente, pero no lo prueba. Antes de implement
 
 **D2. Dinero, reparto y redondeo.** `BigDecimal` con escala 2, comparación con `compareTo`. El reparto admite `splitMethod`: `EQUAL` (por defecto, comportamiento de la 017), `CUSTOM` (importes por participante que suman exactamente el total) y `PERCENTAGE` (porcentajes por participante que suman exactamente 100, cada uno `> 0`). En `EQUAL` y `PERCENTAGE`, cada parte se calcula en centavos hacia abajo (piso) y el **pagador absorbe el resto** (clarificación Q1): su parte es el total menos la suma de las demás, de modo que ningún participante no pagador pague de más por redondeo. La misma regla produce 100,00 entre 3 → 33,33 / 33,33 / 33,34 y 0,05 entre 3 → 0,01 / 0,01 / 0,03 con el pagador. `CUSTOM` no redondea: exige suma exacta. La conversión de moneda se aplica una sola vez al total antes de repartir (D8). Contrato: `contracts/expense-split-and-edit.md`.
 
-**D3. Estados de deuda.** Se conservan los nombres en inglés del código: `PENDING` (Pendiente), `PARTIALLY_PAID` (Pago parcial, solo lectura), `PAYMENT_REPORTED` (Pago informado), `PAID` (Pagado), `VERIFIED` (Verificado), `OVERDUE` (Vencido). `PENDING`, `PARTIALLY_PAID` y `PAID` ya existen, por lo que no hace falta renombrar datos. `PARTIALLY_PAID` se conserva únicamente para poder leer deudas de la 018; la 022 nunca lo produce.
+**D3. Estados de deuda.** Se conservan los nombres en inglés del código: `PENDING` (Pendiente), `PARTIALLY_PAID` (Pago parcial), `PAYMENT_REPORTED` (Pago informado), `PAID` (Pagado), `VERIFIED` (Verificado), `OVERDUE` (Vencido). `PENDING`, `PARTIALLY_PAID` y `PAID` ya existen, por lo que no hace falta renombrar datos. `PARTIALLY_PAID` ya existe por la 018 y, desde el 2026-11-07 (se admiten pagos parciales), también lo producen los pagos parciales de la 022.
 
 | Desde | Hacia | Condición |
 |-------|-------|-----------|
 | (alta) | `PENDING` | Toda deuda nueva |
-| `PENDING`, `OVERDUE` o `PARTIALLY_PAID` | `PAID` | Se registra un pago por el saldo restante completo y el grupo **no** requiere validación |
-| `PENDING`, `OVERDUE` o `PARTIALLY_PAID` | `PAYMENT_REPORTED` | Se registra un pago por el saldo restante completo y el grupo requiere validación |
-| `PAYMENT_REPORTED` | `VERIFIED` | Un administrador confirma el pago |
-| `PAYMENT_REPORTED` | `PENDING` | Un administrador rechaza el pago |
+| `PENDING`, `OVERDUE` o `PARTIALLY_PAID` | `PAID` | Pago confirmado al instante (grupo **sin** validación) por todo el saldo pendiente |
+| `PENDING`, `OVERDUE` o `PARTIALLY_PAID` | `PARTIALLY_PAID` | Pago confirmado al instante (grupo sin validación) por menos que el saldo: se suma a `paidAmount` y queda saldo. Desde `OVERDUE` es una **decisión confirmada** (2026-11-08; se descartó seguir `OVERDUE` con saldo parcial, que exigía cambiar los `CHECK`) |
+| `PENDING` o `PARTIALLY_PAID` | `PAYMENT_REPORTED` | Se registra un pago (parcial o total) y el grupo requiere validación; no se toca `paidAmount` y no puede haber otro pago por validar |
+| `OVERDUE` | `PAYMENT_REPORTED` | Igual que la fila anterior, desde una deuda vencida |
+| `PAYMENT_REPORTED` | `VERIFIED` | Un administrador confirma el pago y el saldo queda en cero (se suma a `paidAmount`) |
+| `PAYMENT_REPORTED` | `PARTIALLY_PAID` | Un administrador confirma el pago y queda saldo |
+| `PAYMENT_REPORTED` | `PENDING` o `PARTIALLY_PAID` | Un administrador rechaza el pago: la deuda vuelve a su estado anterior según `paidAmount` (si estaba vencida, vuelve como `PENDING` y la tarea D7 la vuelve a marcar) |
 | `PENDING` | `OVERDUE` | La tarea programada detecta la deuda vencida (D7); `PARTIALLY_PAID` no pasa a `OVERDUE` |
 
-`PAID` y `VERIFIED` son estados finales y equivalentes para el saldo (Q7). `PAYMENT_REPORTED` no se considera saldado hasta que un administrador lo confirme. El historial conserva el camino recorrido.
+`PAID` y `VERIFIED` son estados finales y equivalentes para el saldo (Q7); `PARTIALLY_PAID` no es final y admite nuevos pagos. `PAYMENT_REPORTED` no se considera saldado hasta que un administrador lo confirme. El historial conserva el camino recorrido.
 
-La restricción `ck_debts_status` de V13 se elimina y se recrea con los seis valores; `ck_debts_status_matches_paid` también se recrea para admitir los estados nuevos sin romper las filas `PARTIALLY_PAID` existentes.
+La restricción `ck_debts_status` de V13 se elimina y se recrea con los seis valores; `ck_debts_status_matches_paid` también se recrea para admitir los estados nuevos (V18). Con pagos parciales no hace falta tocarlo: `PARTIALLY_PAID` ya exige `0 < paid_amount < amount`, `VERIFIED` y `PAID` exigen `paid_amount = amount` y `PAYMENT_REPORTED` admite cualquier `paid_amount` entre 0 y `amount`; solo la alternativa "`OVERDUE` con saldo parcial" exigiría cambiar `OVERDUE AND paid_amount = 0`.
 
-**D4. Saldos derivados.** No hay tabla de saldos. Una deuda está **pendiente de saldar** en `PENDING`, `PAYMENT_REPORTED` y `OVERDUE`; está **saldada** en `PAID` y `VERIFIED`. Como solo se aceptan pagos completos, `paidAmount` vale 0 o el monto total, y la deuda pendiente aporta `amount − paidAmount` con el `getOutstanding()` existente. El saldo neto de un miembro es la suma de lo que le deben menos la suma de lo que debe, dentro del grupo, incluidas las personas simuladas. La suma de saldos del grupo es siempre 0. El cálculo es una función pura (`BalanceCalculator`) que recibe deudas y devuelve saldos; se evalúa en cada consulta.
+**D4. Saldos derivados.** No hay tabla de saldos. Una deuda está **pendiente de saldar** en `PENDING`, `PAYMENT_REPORTED` y `OVERDUE`; está **saldada** en `PAID` y `VERIFIED`. Como se admiten pagos parciales, `paidAmount` va de 0 al monto total y la deuda pendiente aporta su **saldo pendiente** `amount − paidAmount` con el `getOutstanding()` existente; un pago informado no modifica `paidAmount` hasta que se confirma, así que la deuda sigue aportando su saldo. Los saldos, la liquidación y las deudas pendientes usan siempre ese saldo pendiente. El saldo neto de un miembro es la suma de lo que le deben menos la suma de lo que debe, dentro del grupo, incluidas las personas simuladas. La suma de saldos del grupo es siempre 0. El cálculo es una función pura (`BalanceCalculator`) que recibe deudas y devuelve saldos; se evalúa en cada consulta.
 
-**D5. Liquidación.** `SettlementPlanner` es puro y recibe los saldos netos. Mientras haya saldos distintos de cero, toma el mayor acreedor y el mayor deudor (desempate por identificador, para que el resultado sea reproducible), transfiere el menor de los dos montos y repite. Cada paso deja al menos a un miembro en cero y el último deja a dos, por lo que hay **a lo sumo n-1 transferencias** (n = miembros con saldo distinto de cero). El mínimo absoluto es un problema NP-difícil y no se busca. Invariantes: el total transferido es la suma de los saldos positivos (no la suma bruta de deudas, que es mayor cuando hay deudas cruzadas), aplicar la propuesta deja a todos en cero y el cálculo no modifica gastos ni deudas.
+**D5. Liquidación.** `SettlementPlanner` es puro y recibe los saldos netos. Mientras haya saldos distintos de cero, toma el mayor acreedor y el mayor deudor (desempate por identificador, para que el resultado sea reproducible), transfiere el menor de los dos montos y repite. Cada paso deja al menos a un miembro en cero y el último deja a dos, por lo que hay **a lo sumo n-1 transferencias** (n = miembros con saldo distinto de cero). El mínimo absoluto es un problema NP-difícil y no se busca. **Compensación entre dos miembros:** sale de los saldos netos, sin lógica aparte; si A le debe 100 a B y B le debe 50 a A, los saldos son A −50 y B +50 y el planificador propone una sola transferencia de 50 de A a B (si se anulan exactamente, ninguna). Un test lo fija para que nadie la reemplace por un recorrido deuda por deuda que emita dos transferencias opuestas (T086). Invariantes: el total transferido es la suma de los saldos positivos (no la suma bruta de deudas, que es mayor cuando hay deudas cruzadas), aplicar la propuesta deja a todos en cero y el cálculo no modifica gastos ni deudas.
 
-**D6. Pagos y concurrencia.** Se **extiende la entidad y la tabla existentes** (`com.amano.backend.payment.Payment`, tabla `payments`, V14) con `ALTER TABLE`; no se crea otra clase ni otra tabla. La 018 sigue siendo dueña del flujo de registro. Las columnas nuevas son `status` (`PENDING`, `REPORTED`, `CONFIRMED`, `REJECTED`), `decided_by_user_id`, `decided_at` y `legacy`. Los pagos ya existentes se rellenan con `status = 'CONFIRMED'` y `legacy = TRUE`; los pagos nuevos son `legacy = FALSE`. Un índice único parcial sobre `payments(debt_id)` para pagos activos (`status IN ('REPORTED', 'CONFIRMED')`) **excluye los legacy**, de modo que no choca con los pagos parciales históricos de la 018 ni con los que esa feature genere mientras siga vigente su semántica anterior.
+**D6. Pagos y concurrencia.** Se **extiende la entidad y la tabla existentes** (`com.amano.backend.payment.Payment`, tabla `payments`, V14) con `ALTER TABLE`; no se crea otra clase ni otra tabla. La 018 sigue siendo dueña del flujo de registro. Las columnas nuevas son `status` (`PENDING`, `REPORTED`, `CONFIRMED`, `REJECTED`), `decided_by_user_id`, `decided_at` y `legacy`. Los pagos ya existentes se rellenan con `status = 'CONFIRMED'` y `legacy = TRUE`; los pagos nuevos son `legacy = FALSE`. Los pagos de la 018 y los anteriores a la 022 quedan `legacy = TRUE` y `CONFIRMED`. Un índice único parcial sobre `payments(debt_id)` **donde `status = 'REPORTED'`** garantiza un único pago por validar a la vez por deuda (reemplaza al índice V18 `uq_payments_active_debt`, que también limitaba a un pago `CONFIRMED`; migración V25, ver Migraciones). Puede haber varios pagos `CONFIRMED` por deuda.
 
-Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo pesimista de la fila de la deuda** (`PESSIMISTIC_WRITE`). La misma clave de idempotencia devuelve el pago existente (patrón actual); una clave distinta sobre una deuda ya informada o saldada responde 409. Un pago menor al saldo restante se rechaza (400): solo se aceptan pagos completos. Al confirmar un pago `REPORTED`, la deuda pasa a `VERIFIED`; al rechazarlo, el pago queda `REJECTED` y la deuda vuelve a `PENDING` (o a `OVERDUE` en la próxima ejecución de D7 si ya estaba vencida).
+Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo pesimista de la fila de la deuda** (`PESSIMISTIC_WRITE`). El monto del pago debe ser mayor que 0 y no superar el saldo pendiente `amount − paidAmount`; uno mayor responde 400 (y uno menor o igual se acepta: los pagos parciales están permitidos). La misma clave de idempotencia devuelve el pago existente (patrón actual). Sin validación, el pago queda `CONFIRMED`, se suma a `paidAmount` al instante y la deuda queda `PARTIALLY_PAID` (si queda saldo) o `PAID` (si queda en cero). Con validación, el pago queda `REPORTED` y la deuda `PAYMENT_REPORTED` **sin tocar `paidAmount`**; al confirmar se suma y la deuda queda `PARTIALLY_PAID` o `VERIFIED`; al rechazar, el pago queda `REJECTED` y la deuda vuelve a su estado anterior (`PENDING` o `PARTIALLY_PAID`). Mientras haya un pago `REPORTED` sobre una deuda no se admite otro: 409 con mensaje en voseo. Como el bloqueo serializa los registros, dos pagos concurrentes sobre la misma deuda se aplican uno detrás del otro y el que ya no cabe en el saldo recibe 400.
+
+**Flujo heredado de la 018.** `POST /api/payments` y su pantalla usan las mismas operaciones de dominio (`Debt.applyPayment` / `Debt.reportPayment`) y **respetan la casilla "Pagos requieren validación"**: con validación el pago queda `REPORTED` y la deuda `PAYMENT_REPORTED` sin tocar `paidAmount`; sin validación se confirma al instante. También responde 409 mientras haya un pago esperando validación. El indicador `legacy` queda solo como marcador de origen ("escrito antes de la 022 o por el endpoint heredado"): no entra en ningún índice ni en la decisión de un pago, y los pagos ya guardados no se modifican.
 
 **D7. Vencimiento.** El grupo tiene `debtDueDays` (entero, nulo por defecto; nulo significa que nunca vence). Una tarea `@Scheduled` diaria, con `Clock` inyectado, pasa a `OVERDUE` las deudas `PENDING` cuya fecha de gasto más `debtDueDays` ya pasó. Es idempotente (actualización masiva con condición de estado) y segura con varias instancias. Una deuda vencida **sigue siendo saldo** y se puede pagar. Un rechazo devuelve la deuda a `PENDING`, y si ya está vencida la próxima ejecución la vuelve a `OVERDUE`.
 
@@ -105,18 +110,21 @@ Registrar, confirmar y rechazar pagos corren en una transacción con **bloqueo p
 
 **D9. Edición y borrado de gastos.** Un gasto con participantes además del pagador es inmutable: `PATCH` responde 409 "No se permite editar un gasto que ya tiene participantes" y `DELETE` responde 409 "No se puede eliminar un gasto con deudas asociadas" (o "No se permite eliminar un gasto que ya tiene participantes" en el caso defensivo sin deudas). Un gasto personal (sin participantes además del pagador) se edita con `PATCH /api/groups/{groupId}/expenses/{expenseId}` (`amount`, `currency`, `date`, `description`; el pagador y los participantes no cambian) y se elimina con `DELETE /api/groups/{groupId}/expenses/{expenseId}` con `204`, solo si no tiene deudas. Los saldos son derivados (D4), así que no se recalcula ni reescribe ninguna tabla de saldos. Los endpoints son aditivos: la 017 no cambia de forma. Pueden editar y borrar quien registró el gasto, el pagador o un administrador del grupo (decisión confirmada; contrato §2–§3).
 
-**D10. Integración con la 020.** `GroupService.leaveGroup` consulta a `BalanceQuery.hasOutstandingBalance(groupId, member)`: si el miembro figura como deudor o acreedor en una deuda pendiente de saldar, no puede abandonar (409 con motivo). El mensaje se agrega sin modificar los de 010.
+**D10. Integración con la 020.** `GroupService.leaveGroup` consulta a `DebtPort.hasPendingDebtsForUser` (implementado por `LedgerDebtPort`): si el miembro figura como deudor o acreedor en una deuda pendiente de saldar, no puede abandonar (403 con `code = PENDING_DEBTS`, como define el contrato de la 020). El mensaje se agrega sin modificar los de 010.
 
 **D11. Gastos pagados por otro miembro.** Cualquier miembro activo del grupo puede registrar un gasto cuyo pagador sea otro miembro cuando la casilla `members_can_generate_expenses_for_others` del grupo está activa. La casilla se conserva como permiso por grupo (no se elimina) y su validación en el servidor sigue vigente: si está en `false`, el miembro recibe 403 con el mensaje "Solo podés registrar gastos pagados por vos". Los grupos nuevos arrancan con la casilla en `true` (default en la creación del grupo y migración V23, la siguiente versión libre después de V22, que solo cambia el DEFAULT de la columna); los grupos existentes mantienen su valor. La validación de membresía también es del servidor: el pagador y todos los participantes deben ser miembros activos del grupo (los participantes también pueden ser personas simuladas del grupo). Se guardan por separado `createdByUserId` (quien registró) y `payerUserId` (quien pagó); las deudas se generan contra el pagador y el historial `EXPENSE_CREATED` muestra a ambos. El endpoint `POST /api/groups/{id}/expenses` ya acepta `payerUserId` distinto del principal autenticado y ya persiste ambos campos; falta cambiar el default de la casilla para grupos nuevos y agregar el pagador al historial.
 
-## Decisiones pendientes (bloquean `/speckit.tasks`; resolver con `/speckit.clarify`)
+## Decisiones (todas resueltas al 2026-11-08)
 
-1. **¿Cómo se paga una transferencia propuesta?** La liquidación puede proponer "A le paga a C" cuando A solo le debe a B y B le debe a C; esa transferencia no coincide con ninguna deuda y el pago se registra por deuda. Opciones: (a) la propuesta es solo orientativa y cada pago se registra sobre una deuda directa; (b) registrar una transferencia propuesta salda las deudas de origen mediante neteo. Sin esta decisión, la propuesta no se puede ejecutar dentro de la app.
-2. **Personas simuladas.** FR-003 y SC-001 las incluyen en los saldos, pero la clarificación Q6 dice que "no tienen obligación financiera". Hay que decidir si entran en la propuesta como origen o destino (marcadas como informativas), quién registra sus pagos y si pueden figurar como pagador de un gasto (hoy el acreedor es siempre un usuario registrado).
-3. **Alcance del vencimiento.** La clarificación dice umbral por grupo, pero también que solo vencen los gastos recurrentes. Este plan implementa el umbral por grupo para cualquier gasto; hay que confirmar si se restringe a recurrentes y qué mensaje ve el usuario.
-4. **"Pendiente" incluye "Vencido".** Se interpreta que se puede pagar una deuda `OVERDUE`; la spec dice solo "pendiente" y sería absurdo impedirlo. Confirmar.
-5. **Pagos parciales ya existentes (018).** Resuelto: `PARTIALLY_PAID` y los pagos parciales históricos se conservan para lectura; se marcan `legacy` y quedan fuera del índice único parcial. La 022 solo acepta pagos por el saldo restante completo.
-6. **Cotización no disponible.** Se rechaza el gasto (D8). Confirmar que esa es la política, en vez de permitir cargar la tasa a mano.
+1. **¿Cómo se paga una transferencia propuesta? Resuelto: opción (a).** La liquidación puede proponer "A le paga a C" cuando A solo le debe a B y B le debe a C; esa transferencia no coincide con ninguna deuda y el pago se registra por deuda. Opciones: (a) la propuesta es solo orientativa y cada pago se registra sobre una deuda directa; (b) registrar una transferencia propuesta salda las deudas de origen mediante neteo. Decisión: la propuesta es solo orientativa y cada pago se registra sobre una deuda directa.
+2. **Personas simuladas. Resuelto.** FR-003 y SC-001 las incluyen en los saldos, pero la clarificación Q6 dice que "no tienen obligación financiera". Decisión: entran en saldos y propuesta como informativas, un administrador registra sus pagos y el pagador siempre es un usuario registrado.
+3. **Alcance del vencimiento. Resuelto.** La clarificación dice umbral por grupo, pero también que solo vencen los gastos recurrentes. Este plan implementa el umbral por grupo para cualquier gasto; decisión: vale para cualquier gasto, con el umbral por grupo.
+4. **"Pendiente" incluye "Vencido".** Se interpreta que se puede pagar una deuda `OVERDUE`; la spec dice solo "pendiente" y sería absurdo impedirlo. Confirmado. Un pago **parcial** sobre una deuda vencida la pasa a `PARTIALLY_PAID` (ver el punto 7).
+5. **Pagos parciales.** Resuelto el 2026-11-07: están permitidos (reemplaza la decisión anterior de aceptar solo pagos completos). Monto > 0 y ≤ saldo pendiente; un único pago por validar a la vez por deuda (D6); `PARTIALLY_PAID` deja de ser solo de lectura.
+6. **Cotización no disponible.** Se rechaza el gasto (D8). Confirmado por el Product Owner el 2026-11-07, junto con el uso del tipo de cambio oficial del BCRA (no el blue ni el MEP).
+7. **Deuda `OVERDUE` + pago parcial: resuelto (decisión confirmada el 2026-11-08).** Pasa a `PARTIALLY_PAID`, lo que la saca del vencimiento (la tarea D7 solo marca `PENDING`). Alternativa descartada: que siga `OVERDUE` con saldo parcial, lo que exigía cambiar `ck_debts_status_matches_paid` (`OVERDUE AND paid_amount = 0`).
+8. **Endpoint heredado de la 018 y validación.** Resuelto el 2026-11-07: `POST /api/payments` respeta "Pagos requieren validación" y el 409 por pago en espera (D6, T085).
+9. **Mensaje del 409 por pago ya por validar.** Resuelto: "Esta deuda ya tiene un pago esperando validación: esperá a que un administrador lo decida".
 
 ## Project Structure
 
@@ -162,16 +170,16 @@ backend/src/main/java/com/amano/backend/payment/
 backend/src/main/java/com/amano/backend/groups/
 └── Group.java, GroupService.java     # Group extendido; leaveGroup consulta saldo pendiente (D10)
 
-backend/src/main/resources/db/migration/    # V17, V18, V19, V20, V21 y V22 nuevas (V23 para T060)
+backend/src/main/resources/db/migration/    # V17 a V25 nuevas (V22: eventos de edición y borrado; V23: default de la casilla de gastos para otros; V24: repara paid_amount de pagos informados; V25: índice de un solo pago por validar)
 backend/src/test/java/com/amano/backend/groupexpense/   # pruebas espejo
 
 frontend/src/
-├── pages/groups/GroupDebtsView.jsx                 # nuevo: pestañas Saldos | Mis deudas | Liquidación | Pagos por validar
+├── pages/groups/GroupDebtsView.jsx                 # nuevo: pestañas Mis deudas pendientes | Saldos | Propuesta de liquidación | Pagos por validar (T074)
 ├── components/debts/                               # nuevo
-│   ├── BalanceList.jsx, DebtList.jsx, DebtDetailModal.jsx
-│   ├── RegisterPaymentModal.jsx, SettlementProposal.jsx
-│   ├── PaymentValidationList.jsx, ConvertedAmount.jsx
-│   └── debtStatusLabels.js         # etiquetas en español de los 5 estados
+│   ├── ConvertedAmount.jsx                         # monto original y convertido (T010)
+│   ├── MyDebtsPanel.jsx, PaymentConfirmDialog.jsx  # mis deudas y pago parcial o total (T075, T082)
+│   └── debtStatusLabels.js         # etiquetas en español de los 6 estados
+├── pages/groups/splitCustom.js, splitPercentage.js, convertPreview.js   # helpers de reparto y vista previa de cotización (T070, T071)
 └── (modificados) formulario y detalle de gasto, selector de reparto (`EQUAL`/`CUSTOM`/`PERCENTAGE`), helpers `splitCustom.js`, configuración de grupo (debtDueDays), aviso al abandonar grupo
 ```
 
@@ -187,15 +195,16 @@ frontend/src/
 | `GET /groups/{groupId}/balances` | Miembro | Saldo neto por miembro |
 | `GET /groups/{groupId}/settlement-proposal` | Miembro | Solo lectura; reemplaza el `POST` con cuerpo del contrato actual |
 | `GET /groups/{groupId}/debts/pending` | Miembro | Mis deudas, con origen y detalle |
-| `GET /users/me/debts` | Usuario | Resumen por grupo; el total entre grupos es informativo (Q5) |
-| `POST /groups/{groupId}/debts/{debtId}/payments` | Deudor involucrado | Existente; extiende estados y validación (D6) |
+| `GET /users/me/debts` | Usuario | Resumen por grupo; el total entre grupos es informativo (Q5). **No implementado ni con tarea en esta feature**: pendiente de decidir si va en otra feature o se agrega una tarea |
+| `GET /groups/{groupId}/exchange-quote` | Miembro | Solo lectura; vista previa de la cotización oficial del BCRA para la moneda y fecha del gasto (T069) |
+| `POST /groups/{groupId}/debts/{debtId}/payments` | Deudor, acreedor o administrador | Existente; pago parcial o total (monto > 0 y ≤ saldo), estados y validación (D6) |
 | `GET /groups/{groupId}/payments/pending-validation` | Administrador | Cola de pagos informados |
 | `POST /groups/{groupId}/payments/{paymentId}/confirm` y `/reject` | Administrador | 403 si no es administrador |
 | Ajustes del grupo | Administrador | Campo aditivo `debtDueDays` |
 
 ## Migraciones
 
-Son cinco migraciones nuevas, versionadas e inmutables una vez integradas:
+Son migraciones nuevas, versionadas e inmutables una vez integradas (V17 a V21 del diseño original, más V22 a V25 agregadas durante la implementación):
 
 1. **V17 — `groups`**: `primary_currency VARCHAR(3) NOT NULL DEFAULT 'ARS'` (los grupos existentes quedan en ARS; el valor es explícito y no se infiere de otra tabla) y `debt_due_days INTEGER NULL` (NULL = nunca vence; la columna se agrega una sola vez). Se agregan los `CHECK` de moneda y de `debt_due_days >= 0`.
 2. **V18 — `debts` y `payments`**: se elimina y recrea `ck_debts_status` con `PENDING`, `PARTIALLY_PAID`, `PAYMENT_REPORTED`, `PAID`, `VERIFIED`, `OVERDUE`; se recrea `ck_debts_status_matches_paid` para que `PAYMENT_REPORTED` y `VERIFIED` no violen la restricción y para conservar las filas `PARTIALLY_PAID`; se recrean los índices parciales `ix_debts_open_*` excluyendo `PAID` y `VERIFIED`. Sobre `payments` se agregan por `ALTER TABLE` las columnas `status`, `decided_by_user_id`, `decided_at` y `legacy`; se rellenan las filas existentes con `status = 'CONFIRMED'` y `legacy = TRUE`; se crea el índice único parcial `uq_payments_active_debt ON payments (debt_id) WHERE legacy = FALSE AND status IN ('REPORTED', 'CONFIRMED')`.
@@ -203,7 +212,12 @@ Son cinco migraciones nuevas, versionadas e inmutables una vez integradas:
 4. **V20 — `group_activity`**: se recrea el `CHECK` de `event_type` para admitir los eventos de pago, vencimiento y liquidación de US8 (`PAYMENT_REGISTERED`, `PAYMENT_CONFIRMED`, `PAYMENT_REJECTED`, `DEBT_OVERDUE`, `LIQUIDATION_PROPOSED`) sin perder los eventos existentes.
 5. **V21 — `group_expenses`**: `split_method VARCHAR(10) NOT NULL DEFAULT 'EQUAL'` con `CHECK (split_method IN ('EQUAL', 'CUSTOM', 'PERCENTAGE'))`; los gastos existentes quedan en `EQUAL`.
 
-T060 (default de `members_can_generate_expenses_for_others`) usará **V23**, la siguiente versión libre después de V22. No se edita ninguna migración ya integrada (tampoco V13 ni V14).
+6. **V22 — `group_activity`**: se agregan al `CHECK` de `event_type` los eventos `EXPENSE_EDITED` y `EXPENSE_DELETED`.
+7. **V23 — `group_permissions`**: cambia solo el `DEFAULT` de `members_can_generate_expenses_for_others` a `TRUE` (T060); las filas existentes no cambian.
+8. **V24 — `debts`**: repara `paid_amount` de las deudas `PAYMENT_REPORTED` escritas con `paid_amount = amount` (un pago informado no debe tocar lo pagado).
+9. **V25 — `payments` (pagos parciales, implementada)**: `DROP INDEX uq_payments_active_debt` y `CREATE UNIQUE INDEX uq_payments_reported_debt ON payments (debt_id) WHERE status = 'REPORTED'`. Filas existentes: no se modifica ninguna; los pagos `legacy` son `CONFIRMED` y no entran en el índice nuevo; los pagos `REPORTED` actuales ya cumplían el índice viejo (a lo sumo uno activo por deuda), por lo que cumplen el nuevo y la migración no puede fallar por datos; los pagos `CONFIRMED` no legacy (de pagos completos) siguen siendo válidos y ahora pueden convivir con otros `CONFIRMED` de la misma deuda. No cambia ningún `CHECK`.
+
+No se edita ninguna migración ya integrada (tampoco V13 ni V14).
 
 ## Diseño del frontend
 
@@ -216,13 +230,13 @@ T060 (default de `members_can_generate_expenses_for_others`) usará **V23**, la 
 ## Pruebas
 
 - **Unitarias (puras)**: `BalanceCalculator`, `SettlementPlanner`, reparto `EQUAL`/`CUSTOM`/`PERCENTAGE` (suma exacta, piso al centavo y resto al pagador) y máquina de estados.
-- **Propiedades**, con JUnit 5 y generadores de semilla fija (se imprime la semilla al fallar): suma de saldos igual a cero; total transferido igual a la suma de saldos positivos; transferencias ≤ n-1; aplicar la propuesta deja todos los saldos en cero; las partes de un reparto suman el total; la propuesta no modifica deudas.
-- **Integración (Testcontainers)**: gasto → deudas → saldos; gasto `CUSTOM`/`PERCENTAGE` con shares que suman el total; edición de gasto personal y 409 con participantes; borrado de gasto personal con 204 y 409 con deudas; pago con y sin validación; confirmación y rechazo; **dos pagos concurrentes sobre la misma deuda dejan exactamente uno aplicado**; tarea de vencimiento ejecutada dos veces con el mismo resultado; abandono de grupo bloqueado por deuda; conversión con proveedor simulado y falla del proveedor.
+- **Propiedades**, con JUnit 5 y generadores de semilla fija (se imprime la semilla al fallar): suma de saldos igual a cero; total transferido igual a la suma de saldos positivos; transferencias ≤ n-1; aplicar la propuesta deja todos los saldos en cero; la suma de los pagos confirmados de una deuda nunca supera su monto; los saldos suman cero con pagos parciales; las partes de un reparto suman el total; la propuesta no modifica deudas.
+- **Integración (Testcontainers)**: gasto → deudas → saldos; gasto `CUSTOM`/`PERCENTAGE` con shares que suman el total; edición de gasto personal y 409 con participantes; borrado de gasto personal con 204 y 409 con deudas; pago con y sin validación; confirmación y rechazo; **dos pagos concurrentes sobre la misma deuda se aplican en serie y nunca superan el saldo (el que ya no cabe recibe 400)**; tarea de vencimiento ejecutada dos veces con el mismo resultado; abandono de grupo bloqueado por deuda; conversión con proveedor simulado y falla del proveedor.
 - **Frontend (Vitest)**: pestañas, modales de pago y validación, etiquetas de estado, monto convertido, selector de reparto y validación de sumas `CUSTOM`/`PERCENTAGE`.
 
-## Reconciliación de artefactos (corregir antes de `/speckit.tasks`)
+## Reconciliación de artefactos (aplicada en la etapa final, 2026-11-07)
 
-| Artefacto | Problema | Corrección |
+| Artefacto | Problema (versión anterior) | Corrección aplicada |
 |-----------|----------|------------|
 | research.md §4–5 | `VENCIDO` solo desde `PAGO_INFORMADO` o `PAGADO` (al revés: una deuda saldada no vence) y vencimiento por gasto recurrente | D3 y D7 |
 | research.md §3 | Llama "set cover" al problema NP-difícil de minimizar transferencias | Decir solo NP-difícil |

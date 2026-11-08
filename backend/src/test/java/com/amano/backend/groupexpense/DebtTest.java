@@ -81,10 +81,19 @@ class DebtTest {
         assertThat(DebtStatus.VERIFIED.isPayable()).isFalse();
     }
 
+    /**
+     * 022 T080 (rewritten: DebtStatus.settledBy only knew full payments and was removed): the
+     * group setting decides between immediate effect (applyPayment) and reporting (reportPayment).
+     */
     @Test
-    void aFullPaymentSettlesOrReportsAccordingToTheGroupSetting() {
-        assertThat(DebtStatus.settledBy(false)).isEqualTo(DebtStatus.PAID);
-        assertThat(DebtStatus.settledBy(true)).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+    void thePaymentEntryPointDependsOnTheGroupSetting() {
+        Debt immediate = pending("50.00");
+        immediate.applyPayment(new BigDecimal("50.00"));
+        assertThat(immediate.getStatus()).isEqualTo(DebtStatus.PAID);
+
+        Debt reported = pending("50.00");
+        reported.reportPayment(new BigDecimal("50.00"));
+        assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
     }
 
     @Test
@@ -190,11 +199,12 @@ class DebtTest {
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
     }
 
+    /** Rewritten for partial payments: a payment for the whole balance still ends in PAID / PAYMENT_REPORTED. */
     @Test
-    void aFullPaymentOfTheBalanceMovesTheDebtToPaidOrPaymentReported() {
+    void aPaymentOfTheWholeBalanceMovesTheDebtToPaidOrPaymentReported() {
         Debt settled = pending("50.00");
 
-        settled.applyFullPayment(false);
+        settled.applyPayment(new BigDecimal("50.00"));
 
         assertThat(settled.getStatus()).isEqualTo(DebtStatus.PAID);
         assertThat(settled.getPaidAmount()).isEqualByComparingTo("50.00");
@@ -202,46 +212,102 @@ class DebtTest {
 
         Debt reported = pending("50.00");
 
-        reported.applyFullPayment(true);
+        reported.reportPayment(new BigDecimal("50.00"));
 
+        // Reported is NOT settled (D4): nothing is paid yet and the whole amount keeps counting.
         assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
-        assertThat(reported.getPaidAmount()).isEqualByComparingTo("50.00");
-        assertThat(reported.getOutstanding()).isEqualByComparingTo("0.00");
+        assertThat(reported.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(reported.getOutstanding()).isEqualByComparingTo("50.00");
+        assertThat(reported.getStatus().isSettled()).isFalse();
     }
 
     @Test
-    void aFullPaymentOfTheRemainingBalanceAlsoWorksForLegacyPartialAndOverdueDebts() {
+    void aPartialPaymentAddsToPaidAmountAndLeavesTheDebtPartiallyPaidUntilItReachesZero() {
+        Debt debt = pending("50.00");
+
+        debt.applyPayment(new BigDecimal("20.00"));
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("20.00");
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("30.00");
+
+        debt.applyPayment(new BigDecimal("10.00"));
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("20.00");
+
+        debt.applyPayment(new BigDecimal("20.00"));
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAID);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
+    }
+
+    @Test
+    void aPaymentAboveTheBalanceOrNotPositiveIsRejectedWithoutChanges() {
+        Debt debt = pending("50.00");
+        debt.applyPayment(new BigDecimal("20.00"));
+
+        for (String bad : new String[] { "30.01", "0", "-1", "10.001" }) {
+            assertThatThrownBy(() -> debt.applyPayment(new BigDecimal(bad)))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> debt.reportPayment(new BigDecimal(bad)))
+                    .isInstanceOf(IllegalArgumentException.class);
+        }
+        assertThatThrownBy(() -> debt.applyPayment(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("20.00");
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+    }
+
+    /** Rewritten: a payment on a legacy partial or overdue debt works for any amount up to the balance. */
+    @Test
+    void aPaymentOnALegacyPartialOrOverdueDebtWorks() {
         Debt partial = pending("50.00");
         partial.applyPayment(new BigDecimal("20.00"));
 
-        partial.applyFullPayment(true);
+        partial.reportPayment(new BigDecimal("30.00"));
 
         assertThat(partial.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
-        assertThat(partial.getPaidAmount()).isEqualByComparingTo("50.00");
-        assertThat(partial.getOutstanding()).isEqualByComparingTo("0.00");
+        assertThat(partial.getPaidAmount()).isEqualByComparingTo("20.00");
+        assertThat(partial.getOutstanding()).isEqualByComparingTo("30.00");
 
+        Debt overdueTotal = pending("50.00");
+        ReflectionTestUtils.setField(overdueTotal, "status", DebtStatus.OVERDUE);
+
+        overdueTotal.applyPayment(new BigDecimal("50.00"));
+
+        assertThat(overdueTotal.getStatus()).isEqualTo(DebtStatus.PAID);
+    }
+
+    /** 022 D3: a partial payment moves an OVERDUE debt to PARTIALLY_PAID (decision to confirm). */
+    @Test
+    void aPartialPaymentOnAnOverdueDebtLeavesItPartiallyPaid() {
         Debt overdue = pending("50.00");
         ReflectionTestUtils.setField(overdue, "status", DebtStatus.OVERDUE);
 
-        overdue.applyFullPayment(false);
+        overdue.applyPayment(new BigDecimal("10.00"));
 
-        assertThat(overdue.getStatus()).isEqualTo(DebtStatus.PAID);
+        assertThat(overdue.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+        assertThat(overdue.getOutstanding()).isEqualByComparingTo("40.00");
     }
 
+    /** Rewritten: a debt that waits for a decision or is settled rejects another payment. */
     @Test
-    void aReportedOrSettledDebtRejectsAnotherFullPayment() {
+    void aReportedOrSettledDebtRejectsAnotherPayment() {
         Debt reported = pending("50.00");
-        reported.applyFullPayment(true);
+        reported.reportPayment(new BigDecimal("10.00"));
 
-        assertThatThrownBy(() -> reported.applyFullPayment(false))
+        assertThatThrownBy(() -> reported.applyPayment(new BigDecimal("5.00")))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> reported.reportPayment(new BigDecimal("5.00")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("La deuda ya tiene un pago registrado");
         assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+        assertThat(reported.getPaidAmount()).isEqualByComparingTo("0.00");
 
         Debt paid = pending("50.00");
-        paid.applyFullPayment(false);
+        paid.applyPayment(new BigDecimal("50.00"));
 
-        assertThatThrownBy(() -> paid.applyFullPayment(false))
+        assertThatThrownBy(() -> paid.applyPayment(new BigDecimal("1.00")))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> paid.reportPayment(new BigDecimal("1.00")))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(paid.getStatus()).isEqualTo(DebtStatus.PAID);
     }
@@ -258,12 +324,14 @@ class DebtTest {
         assertThat(debt.getOutstanding()).isEqualByComparingTo("0.00");
     }
 
+    /** Rewritten: confirming a payment that covers the whole balance verifies the debt (the amount is ADDED). */
     @Test
-    void aReportedPaymentMovesTheDebtToVerifiedOnConfirmation() {
+    void aReportedPaymentOfTheWholeBalanceMovesTheDebtToVerifiedOnConfirmation() {
         Debt debt = pending("50.00");
-        debt.applyFullPayment(true);
+        debt.reportPayment(new BigDecimal("50.00"));
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("50.00");
 
-        debt.confirmReportedPayment();
+        debt.confirmReportedPayment(new BigDecimal("50.00"));
 
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.VERIFIED);
         assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
@@ -272,11 +340,31 @@ class DebtTest {
     }
 
     @Test
+    void confirmingAPartialReportedPaymentAddsItAndLeavesTheDebtPartiallyPaid() {
+        Debt debt = pending("50.00");
+        debt.reportPayment(new BigDecimal("20.00"));
+
+        debt.confirmReportedPayment(new BigDecimal("20.00"));
+
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("20.00");
+        assertThat(debt.getOutstanding()).isEqualByComparingTo("30.00");
+        assertThat(debt.getStatus().isPayable()).isTrue();
+
+        // The rest can be reported and confirmed again, ending VERIFIED.
+        debt.reportPayment(new BigDecimal("30.00"));
+        debt.confirmReportedPayment(new BigDecimal("30.00"));
+        assertThat(debt.getStatus()).isEqualTo(DebtStatus.VERIFIED);
+        assertThat(debt.getPaidAmount()).isEqualByComparingTo("50.00");
+    }
+
+    /** Rewritten: rejecting returns the debt to the state its paid amount dictates (nothing paid: PENDING). */
+    @Test
     void aRejectedReportedPaymentReturnsTheDebtToPending() {
         Debt debt = pending("50.00");
-        debt.applyFullPayment(true);
+        debt.reportPayment(new BigDecimal("20.00"));
 
-        debt.rejectReportedPayment(new BigDecimal("50.00"));
+        debt.rejectReportedPayment();
 
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.PENDING);
         assertThat(debt.getPaidAmount()).isEqualByComparingTo("0.00");
@@ -285,12 +373,12 @@ class DebtTest {
     }
 
     @Test
-    void rejectingTheReportedPaymentOfALegacyPartialDebtRestoresThePreviousAmount() {
+    void rejectingAReportedPaymentOfAPartiallyPaidDebtReturnsItToPartiallyPaid() {
         Debt debt = pending("50.00");
         debt.applyPayment(new BigDecimal("20.00"));
-        debt.applyFullPayment(true);
+        debt.reportPayment(new BigDecimal("30.00"));
 
-        debt.rejectReportedPayment(new BigDecimal("30.00"));
+        debt.rejectReportedPayment();
 
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.PARTIALLY_PAID);
         assertThat(debt.getPaidAmount()).isEqualByComparingTo("20.00");
@@ -301,19 +389,26 @@ class DebtTest {
     void onlyReportedDebtsAcceptAConfirmationOrRejection() {
         Debt pendingDebt = pending("50.00");
 
-        assertThatThrownBy(pendingDebt::confirmReportedPayment)
+        assertThatThrownBy(() -> pendingDebt.confirmReportedPayment(new BigDecimal("10.00")))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> pendingDebt.rejectReportedPayment(new BigDecimal("50.00")))
+        assertThatThrownBy(pendingDebt::rejectReportedPayment)
                 .isInstanceOf(IllegalStateException.class);
         assertThat(pendingDebt.getStatus()).isEqualTo(DebtStatus.PENDING);
 
-        Debt reported = pending("50.00");
-        reported.applyFullPayment(true);
+        Debt settled = pending("50.00");
+        settled.applyPayment(new BigDecimal("50.00"));
 
-        assertThatThrownBy(() -> reported.rejectReportedPayment(null))
+        assertThatThrownBy(settled::rejectReportedPayment).isInstanceOf(IllegalStateException.class);
+        assertThat(settled.getStatus()).isEqualTo(DebtStatus.PAID);
+
+        Debt reported = pending("50.00");
+        reported.reportPayment(new BigDecimal("10.00"));
+
+        assertThatThrownBy(() -> reported.confirmReportedPayment(null))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> reported.rejectReportedPayment(new BigDecimal("0")))
+        assertThatThrownBy(() -> reported.confirmReportedPayment(new BigDecimal("50.01")))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(reported.getStatus()).isEqualTo(DebtStatus.PAYMENT_REPORTED);
+        assertThat(reported.getPaidAmount()).isEqualByComparingTo("0.00");
     }
 }

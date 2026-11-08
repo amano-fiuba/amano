@@ -1,4 +1,4 @@
--- V24__add_group_reminder_settings.sql
+-- V26__add_group_reminder_settings.sql
 -- 025 T004: configuración de recordatorios por grupo. El valor 5 es el
 -- predeterminado y también una elección explícita; el mensaje nulo usa el
 -- texto predeterminado.

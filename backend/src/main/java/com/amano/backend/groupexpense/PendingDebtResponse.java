@@ -9,7 +9,9 @@ import com.amano.backend.user.Currency;
  * and {@code currency} are the original debt values; {@code convertedAmount}
  * and {@code convertedCurrency} are present only when the origin expense has a
  * stored conversion, so the UI can show the original and converted amounts
- * together without inventing a rate.
+ * together without inventing a rate. {@code debtorUserId} (null for a simulated
+ * debtor) and {@code creditorUserId} are additive (T074): they let the UI tell
+ * whether the caller owes or is owed.
  */
 public record PendingDebtResponse(
         Long debtId,
@@ -23,5 +25,7 @@ public record PendingDebtResponse(
         Long shareId,
         Currency currency,
         BigDecimal convertedAmount,
-        Currency convertedCurrency) {
+        Currency convertedCurrency,
+        Long debtorUserId,
+        Long creditorUserId) {
 }

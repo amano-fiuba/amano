@@ -370,5 +370,24 @@ async function jsonRequest(url, method) {
   }
 }
 
+// 022 T069: read-only quote of `currency` into the group's currency on `date`
+// (aaaa-mm-dd). Resolves { ok, quote } or { ok: false, status, detail } / { network }.
+export async function getExchangeQuote(groupId, currency, date) {
+  try {
+    const params = new URLSearchParams({ currency, date })
+    const response = await fetch(`/api/groups/${groupId}/exchange-quote?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail }
+    }
+    return { ok: true, quote: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 export const GROUPS_NETWORK_ERROR_MESSAGE =
   'No se pudo conectar con el servidor. Intenta nuevamente'

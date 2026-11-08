@@ -1,23 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { getActivity } from '../../api/groupsClient'
-import { describeActivity, formatTime } from '../../pages/groups/activityDescriptions'
+import {
+  deletedExpenseIds,
+  describeActivity,
+  expenseLinkId,
+  formatTime,
+} from '../../pages/groups/activityDescriptions'
 import { formatActivityDate } from '../../pages/groups/groupDisplay'
 import GroupRowsSkeleton from './GroupRowsSkeleton'
 
 export const FEED_ERROR_MESSAGE = 'No se pudo cargar esta información'
-
-// Los eventos con gasto asociado abren su detalle, igual que en el historial.
-const LINKS_TO_EXPENSE = [
-  'EXPENSE_CREATED',
-  'PAYMENT_MADE',
-  'PAYMENT_REGISTERED',
-  'PAYMENT_CONFIRMED',
-  'PAYMENT_REJECTED',
-  'DEBT_OVERDUE',
-  'DEBT_REMINDER_SENT',
-  'PAYER_DUE_NOTICE_SENT',
-]
 
 /**
  * Últimos eventos del grupo para las tarjetas de su pantalla. `eventTypes` acota
@@ -46,11 +39,12 @@ export default function GroupFeed({ groupId, eventTypes, size = 5, emptyMessage,
   if (state.status === 'error') return <p className="group-feed__note">{FEED_ERROR_MESSAGE}</p>
   if (state.entries.length === 0) return <p className="group-feed__note">{emptyMessage}</p>
 
+  const deletedIds = deletedExpenseIds(state.entries)
   return (
     <ul className="group-feed">
       {state.entries.map((entry) => {
         const { actor, text } = describeActivity(entry)
-        const expenseId = LINKS_TO_EXPENSE.includes(entry.eventType) ? entry.details?.expenseId : null
+        const expenseId = expenseLinkId(entry, deletedIds)
         return (
           <li key={entry.id}>
             <span>

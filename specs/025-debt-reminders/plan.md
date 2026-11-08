@@ -22,7 +22,7 @@ El plan es una extensión acotada:
 
 **Primary Dependencies**: Spring Boot 4.1.1; Spring Mail (`JavaMailSender`), Spring Scheduling, Spring Data JPA, React, react-router, Vite. **Sin dependencias nuevas.**
 
-**Storage**: PostgreSQL con migraciones Flyway en `backend/src/main/resources/db/migration`. Se agregan tres migraciones nuevas (V24, V25 y V26); las ya integradas no se editan.
+**Storage**: PostgreSQL con migraciones Flyway en `backend/src/main/resources/db/migration`. Se agregan tres migraciones nuevas (V26, V27 y V28); las ya integradas no se editan.
 
 **Testing**: JUnit 5 + Mockito, Spring Boot Test + Testcontainers, GreenMail en proceso para el correo, Vitest + Testing Library. Umbrales JaCoCo y Vitest ≥ 85 %; no se bajan. Las pruebas nunca contactan un SMTP real.
 
@@ -74,7 +74,7 @@ Antes de implementar hay que confirmar estos puntos; si alguno cambia, se corrig
 3. `@EnableScheduling` está activo y existe un `Clock` inyectable en `TimeConfig`. Confirmado.
 4. `JavaMailSender` está configurado y los tests usan GreenMail. Confirmado.
 5. `ActivityEventService` escribe dentro de la transacción de negocio y el `CHECK` de `group_activity.event_type` se extiende con una migración nueva.
-6. La última migración integrada es `V23`; las nuevas son `V24`, `V25` y `V26`.
+6. La última migración integrada es `V25`; las nuevas son `V26`, `V27` y `V28`.
 7. `GroupMemberRepository` permite obtener miembros activos y administradores; si falta una consulta de administradores activos, se agrega sin cambiar datos.
 8. La pantalla de configuración del grupo ya muestra un panel solo para `ADMIN`; el panel de recordatorios se suma ahí.
 9. El frontend ya traduce los eventos del historial en `activityDescriptions.js`; los dos eventos nuevos se agregan ahí.
@@ -109,7 +109,7 @@ Los nombres salen de `User` (nombre y apellido o correo) o de `SimulatedProfile.
 
 **D9. Fallos de entrega.** `ReminderMailService` no usa `@Async` ni se traga las excepciones (a diferencia de los correos de 003/006). Si el envío falla, el recordatorio queda `FAILED`, no se reintenta, no se registra en el historial y se envía un correo a los administradores indicando el recordatorio y el destinatario. Un fallo no bloquea los demás envíos. Si el aviso a los administradores también falla, solo se registra en el log.
 
-**D10. Historial de actividad.** Se agregan dos tipos al enum y al `CHECK` de `group_activity` (V26): `DEBT_REMINDER_SENT` y `PAYER_DUE_NOTICE_SENT`. Se registran **solo los envíos exitosos**, en la misma transacción que marca `SENT`. Los detalles incluyen `reminderId`, `debtId` o `expenseId`, monto, moneda, deudor/pagador y fecha límite; para el aviso, también el concepto del gasto, los días restantes y el total pendiente del pagador. El frontend agrega las frases y el filtro correspondiente.
+**D10. Historial de actividad.** Se agregan dos tipos al enum y al `CHECK` de `group_activity` (V28): `DEBT_REMINDER_SENT` y `PAYER_DUE_NOTICE_SENT`. Se registran **solo los envíos exitosos**, en la misma transacción que marca `SENT`. Los detalles incluyen `reminderId`, `debtId` o `expenseId`, monto, moneda, deudor/pagador y fecha límite; para el aviso, también el concepto del gasto, los días restantes y el total pendiente del pagador. El frontend agrega las frases y el filtro correspondiente.
 
 **D11. Concurrencia e idempotencia.** Los índices únicos parciales impiden dos filas para la misma deuda o gasto. Las transiciones usan actualizaciones condicionales por estado y `claimed_at`, de modo que dos instancias no envían dos veces. La tarea se puede ejecutar varias veces con el mismo resultado.
 
@@ -168,9 +168,9 @@ backend/src/main/java/com/amano/backend/
 backend/src/main/resources/
 ├── application.properties                          # reminders.cron y zona
 └── db/migration/
-    ├── V24__add_group_reminder_settings.sql
-    ├── V25__create_reminders_table.sql
-    └── V26__extend_group_activity_event_types_for_reminders.sql
+    ├── V26__add_group_reminder_settings.sql
+    ├── V27__create_reminders_table.sql
+    └── V28__extend_group_activity_event_types_for_reminders.sql
 
 backend/src/test/java/com/amano/backend/groupexpense/reminder/   # pruebas espejo
 backend/src/test/java/com/amano/backend/groups/                  # pruebas de settings y actividad
@@ -201,9 +201,9 @@ No se agregan endpoints públicos para listar o forzar recordatorios. El envío 
 
 Son tres migraciones nuevas, versionadas e inmutables una vez integradas:
 
-1. **V24 — `groups`**: `reminder_send_days INTEGER NOT NULL DEFAULT 5` y `reminder_message VARCHAR(500) NULL`; `CHECK` de la lista fija y de la longitud del mensaje. Los grupos existentes quedan con los valores predeterminados.
-2. **V25 — `reminders`**: tabla con `kind`, `debt_id`, `expense_id`, `send_date`, `status`, `claimed_at`, `sent_at`, `subject`, `body`, `created_at` y `updated_at`; `CHECK` de coherencia entre `kind` y el objetivo; índices únicos parciales por deuda y por gasto; índice de barrido por `group_id`, `status` y `send_date`.
-3. **V26 — `group_activity`**: se recrea el `CHECK` de `event_type` para admitir `DEBT_REMINDER_SENT` y `PAYER_DUE_NOTICE_SENT` sin perder los eventos existentes.
+1. **V26 — `groups`**: `reminder_send_days INTEGER NOT NULL DEFAULT 5` y `reminder_message VARCHAR(500) NULL`; `CHECK` de la lista fija y de la longitud del mensaje. Los grupos existentes quedan con los valores predeterminados.
+2. **V27 — `reminders`**: tabla con `kind`, `debt_id`, `expense_id`, `send_date`, `status`, `claimed_at`, `sent_at`, `subject`, `body`, `created_at` y `updated_at`; `CHECK` de coherencia entre `kind` y el objetivo; índices únicos parciales por deuda y por gasto; índice de barrido por `group_id`, `status` y `send_date`.
+3. **V28 — `group_activity`**: se recrea el `CHECK` de `event_type` para admitir `DEBT_REMINDER_SENT` y `PAYER_DUE_NOTICE_SENT` sin perder los eventos existentes.
 
 No se edita ninguna migración ya integrada.
 

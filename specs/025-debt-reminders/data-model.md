@@ -207,7 +207,7 @@ La actualización es atómica: si la validación falla, no se guarda nada y la c
 
 ## SQL de las migraciones
 
-### V24 — configuración de recordatorios en `groups`
+### V26 — configuración de recordatorios en `groups`
 
 ```sql
 ALTER TABLE groups
@@ -225,7 +225,7 @@ ALTER TABLE groups
     CHECK (reminder_message IS NULL OR char_length(reminder_message) <= 500);
 ```
 
-### V25 — tabla `reminders`
+### V27 — tabla `reminders`
 
 ```sql
 CREATE TABLE reminders (
@@ -270,7 +270,7 @@ CREATE INDEX ix_reminders_due
     ON reminders (group_id, status, send_date);
 ```
 
-### V26 — tipos de evento del historial
+### V28 — tipos de evento del historial
 
 ```sql
 ALTER TABLE group_activity DROP CONSTRAINT group_activity_event_type_check;

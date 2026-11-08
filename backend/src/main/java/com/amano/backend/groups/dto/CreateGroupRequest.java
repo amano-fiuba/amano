@@ -21,6 +21,17 @@ public class CreateGroupRequest {
 
     private List<MemberInput> members;
 
+    /** 022 T068: optional group currency (ARS default). */
+    private String primaryCurrency;
+
+    public String getPrimaryCurrency() {
+        return primaryCurrency;
+    }
+
+    public void setPrimaryCurrency(String primaryCurrency) {
+        this.primaryCurrency = primaryCurrency;
+    }
+
     public static class MemberInput {
 
         /** REGISTERED | SIMULATED. */

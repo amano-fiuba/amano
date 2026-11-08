@@ -105,7 +105,9 @@ public class PendingDebtService {
                 debt.getShareId(),
                 debt.getCurrency(),
                 convertedAmount,
-                convertedCurrency);
+                convertedCurrency,
+                debt.getDebtorUserId(),
+                debt.getCreditorUserId());
     }
 
     private void requireActiveMember(Long callerId, Long groupId) {

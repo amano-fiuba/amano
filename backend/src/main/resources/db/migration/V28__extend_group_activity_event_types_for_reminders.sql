@@ -1,4 +1,4 @@
--- V26__extend_group_activity_event_types_for_reminders.sql
+-- V28__extend_group_activity_event_types_for_reminders.sql
 -- 025 T006: agrega los eventos de recordatorio de deuda y aviso al pagador al
 -- historial de actividad del grupo. La lista parte del CHECK vigente de V22.
 

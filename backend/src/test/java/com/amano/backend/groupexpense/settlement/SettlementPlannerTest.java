@@ -5,14 +5,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import com.amano.backend.groupexpense.Debt;
+import com.amano.backend.groupexpense.GroupExpense;
+import com.amano.backend.groupexpense.GroupExpenseShare;
+import com.amano.backend.groupexpense.balance.BalanceCalculator;
 import com.amano.backend.groupexpense.balance.MemberRef;
+import com.amano.backend.user.Currency;
 
 /**
  * 022 T015/D5: the greedy proposal is reproducible, read-only, has at most
@@ -198,5 +209,155 @@ class SettlementPlannerTest {
 
         assertThatThrownBy(() -> transfers.add(new Transfer(ANA, JUAN, BigDecimal.ONE)))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    private static Debt debtBetween(long shareId, long debtorUserId, long creditorUserId,
+            String amount, Currency currency) {
+        GroupExpense expense = new GroupExpense();
+        ReflectionTestUtils.setField(expense, "id", shareId);
+        expense.setGroupId(1L);
+        expense.setCreatedByUserId(creditorUserId);
+        expense.setPayerUserId(creditorUserId);
+        expense.setAmount(new BigDecimal(amount));
+        expense.setCurrency(currency);
+        expense.setExpenseDate(LocalDate.of(2026, 11, 5));
+        expense.setIdempotencyKey(UUID.randomUUID());
+
+        GroupExpenseShare share = GroupExpenseShare.registered(
+                shareId, 1, debtorUserId, "Deudor " + debtorUserId, new BigDecimal(amount));
+        ReflectionTestUtils.setField(share, "id", shareId);
+        Debt debt = Debt.pendingFor(expense, share, currency);
+        ReflectionTestUtils.setField(debt, "id", shareId);
+        return debt;
+    }
+
+    /**
+     * T086 (a): A owes B 100.00 and B owes A 50.00 → a single transfer of 50.00
+     * from A to B, transferCount = 1, totalTransferred = totalNetBalances = 50.00.
+     */
+    @Test
+    void t086CrossDebtsBetweenTwoMembersCompensateIntoOneTransfer() {
+        List<Debt> debts = List.of(
+                debtBetween(1L, ANA.id(), JUAN.id(), "100.00", Currency.ARS),
+                debtBetween(2L, JUAN.id(), ANA.id(), "50.00", Currency.ARS));
+
+        Map<MemberRef, BigDecimal> net = BalanceCalculator.calculate(debts).get(Currency.ARS);
+        List<Transfer> transfers = SettlementPlanner.plan(net);
+
+        assertThat(net.get(ANA)).isEqualByComparingTo("-50.00");
+        assertThat(net.get(JUAN)).isEqualByComparingTo("50.00");
+        assertThat(transfers).containsExactly(new Transfer(ANA, JUAN, new BigDecimal("50.00")));
+        assertThat(transfers).hasSize(1);
+        BigDecimal totalTransferred = transfers.stream()
+                .map(Transfer::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertThat(totalTransferred).isEqualByComparingTo("50.00");
+        assertThat(positiveTotal(net)).isEqualByComparingTo("50.00");
+    }
+
+    /** T086 (b): A owes B 100.00 and B owes A 100.00 → exact cancellation, no transfers. */
+    @Test
+    void t086EqualCrossDebtsBetweenTwoMembersCancelCompletelyWithNoTransfers() {
+        List<Debt> debts = List.of(
+                debtBetween(1L, ANA.id(), JUAN.id(), "100.00", Currency.ARS),
+                debtBetween(2L, JUAN.id(), ANA.id(), "100.00", Currency.ARS));
+
+        Map<MemberRef, BigDecimal> net = BalanceCalculator.calculate(debts).get(Currency.ARS);
+        List<Transfer> transfers = SettlementPlanner.plan(net);
+
+        assertThat(net.values()).allMatch(value -> value.signum() == 0);
+        assertThat(transfers).isEmpty();
+    }
+
+    /**
+     * T086 (c): several open debts in each direction between the same pair
+     * (A owes B 60.00 + 40.00, B owes A 30.00 + 20.00) → added up per direction
+     * and compensated into a single transfer of 50.00 from A to B.
+     */
+    @Test
+    void t086SeveralOpenDebtsInBothDirectionsBetweenPairCollapseIntoOneTransfer() {
+        List<Debt> debts = List.of(
+                debtBetween(1L, ANA.id(), JUAN.id(), "60.00", Currency.ARS),
+                debtBetween(2L, ANA.id(), JUAN.id(), "40.00", Currency.ARS),
+                debtBetween(3L, JUAN.id(), ANA.id(), "30.00", Currency.ARS),
+                debtBetween(4L, JUAN.id(), ANA.id(), "20.00", Currency.ARS));
+
+        Map<MemberRef, BigDecimal> net = BalanceCalculator.calculate(debts).get(Currency.ARS);
+        List<Transfer> transfers = SettlementPlanner.plan(net);
+
+        assertThat(transfers).containsExactly(new Transfer(ANA, JUAN, new BigDecimal("50.00")));
+    }
+
+    /**
+     * T086 (d): property with fixed seed — across generated cross-debt graphs,
+     * the proposal never contains two transfers in opposite directions (nor
+     * duplicate transfers in the same direction) between the same pair of members.
+     */
+    @Test
+    void t086ProposalNeverContainsOppositeTransfersBetweenTheSamePair() {
+        Random random = new Random(SEED);
+        long[] users = { ANA.id(), JUAN.id(), CARLA.id(), ALICE.id(), BOB.id(), CLAIRE.id() };
+        long shareId = 1000L;
+
+        for (int round = 0; round < 300; round++) {
+            int count = 2 + random.nextInt(25);
+            List<Debt> debts = new ArrayList<>(count);
+            for (int i = 0; i < count; i++) {
+                long debtor = users[random.nextInt(users.length)];
+                long creditor = users[random.nextInt(users.length)];
+                if (debtor == creditor) {
+                    continue;
+                }
+                String amount = BigDecimal.valueOf(random.nextInt(1, 50_000), 2).toPlainString();
+                debts.add(debtBetween(shareId++, debtor, creditor, amount, Currency.ARS));
+            }
+            Map<MemberRef, BigDecimal> net = BalanceCalculator.calculate(debts)
+                    .getOrDefault(Currency.ARS, Map.of());
+            List<Transfer> transfers = SettlementPlanner.plan(net);
+
+            Set<Set<MemberRef>> unorderedPairs = new HashSet<>();
+            for (Transfer transfer : transfers) {
+                Set<MemberRef> pair = Set.of(transfer.from(), transfer.to());
+                assertThat(unorderedPairs.add(pair))
+                        .as("Round %d (seed=%d) emitted more than one transfer for pair %s: %s",
+                                round, SEED, pair, transfers)
+                        .isTrue();
+            }
+        }
+    }
+
+    /**
+     * T086 (e): with a confirmed partial payment, cross-debt compensation uses
+     * the outstanding balance (amount − paidAmount).
+     */
+    @Test
+    void t086ConfirmedPartialPaymentReducesTheCrossDebtBeforeCompensation() {
+        Debt aToB = debtBetween(1L, ANA.id(), JUAN.id(), "100.00", Currency.ARS);
+        aToB.applyPayment(new BigDecimal("30.00")); // outstanding = 70.00
+        Debt bToA = debtBetween(2L, JUAN.id(), ANA.id(), "50.00", Currency.ARS);
+
+        Map<MemberRef, BigDecimal> net = BalanceCalculator.calculate(List.of(aToB, bToA)).get(Currency.ARS);
+        List<Transfer> transfers = SettlementPlanner.plan(net);
+
+        assertThat(aToB.getOutstanding()).isEqualByComparingTo("70.00");
+        assertThat(transfers).containsExactly(new Transfer(ANA, JUAN, new BigDecimal("20.00")));
+    }
+
+    /**
+     * T086 (f): cross-debts in different currencies are never compensated
+     * against each other.
+     */
+    @Test
+    void t086CrossDebtsInDifferentCurrenciesAreNotCompensatedAcrossCurrencies() {
+        List<Debt> debts = List.of(
+                debtBetween(1L, ANA.id(), JUAN.id(), "100.00", Currency.ARS),
+                debtBetween(2L, JUAN.id(), ANA.id(), "50.00", Currency.USD));
+
+        Map<Currency, Map<MemberRef, BigDecimal>> byCurrency = BalanceCalculator.calculate(debts);
+        List<Transfer> arsTransfers = SettlementPlanner.plan(byCurrency.get(Currency.ARS));
+        List<Transfer> usdTransfers = SettlementPlanner.plan(byCurrency.get(Currency.USD));
+
+        assertThat(arsTransfers).containsExactly(new Transfer(ANA, JUAN, new BigDecimal("100.00")));
+        assertThat(usdTransfers).containsExactly(new Transfer(JUAN, ANA, new BigDecimal("50.00")));
     }
 }

@@ -315,6 +315,41 @@ describe('GroupHistoryView (014)', () => {
     expect(within(entries[1]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
   })
 
+  it('muestra edición y borrado de gastos; el borrado no enlaza ni los eventos del gasto borrado (022 T076)', async () => {
+    getActivity.mockResolvedValue(page([
+      { id: 5, eventType: 'EXPENSE_DELETED', actor: ANA, details: { expenseId: 12 }, createdAt: '2026-11-04T16:00:00Z' },
+      { id: 4, eventType: 'EXPENSE_EDITED', actor: ANA, details: { expenseId: 12 }, createdAt: '2026-11-04T15:00:00Z' },
+      { id: 3, eventType: 'EXPENSE_CREATED', actor: ANA, details: { expenseId: 12, amount: '10.00', currency: 'ARS' }, createdAt: '2026-11-04T14:00:00Z' },
+      { id: 2, eventType: 'EXPENSE_EDITED', actor: ANA, details: { expenseId: 13 }, createdAt: '2026-11-04T13:00:00Z' },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries[0]).toHaveTextContent('eliminó un gasto')
+    expect(entries[1]).toHaveTextContent('editó un gasto')
+    for (const index of [0, 1, 2]) {
+      expect(within(entries[index]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
+    }
+    expect(within(entries[3]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/13')
+  })
+
+  it('un evento viejo sin los campos nuevos y un tipo desconocido no rompen la lista (022 T076)', async () => {
+    getActivity.mockResolvedValue(page([
+      { id: 3, eventType: 'DEBT_OVERDUE', actor: null, details: {}, createdAt: '2026-11-04T16:00:00Z' },
+      { id: 2, eventType: 'TIPO_NUEVO', actor: ANA, details: null, createdAt: '2026-11-04T15:00:00Z' },
+      { id: 1, eventType: 'EXPENSE_CREATED', actor: ANA, details: { amount: '10.00', currency: 'ARS' }, createdAt: '2026-11-04T14:00:00Z' },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries).toHaveLength(3)
+    expect(entries[0]).toHaveTextContent('Sistema venció una deuda')
+    expect(entries[1]).toHaveTextContent('realizó una acción en el grupo')
+    expect(entries[2]).toHaveTextContent('registró un gasto')
+  })
+
   it('?filter=EXPENSES abre el historial filtrado y un valor desconocido muestra todo (017 FR-024)', async () => {
     getActivity.mockResolvedValue(page([]))
     const { unmount } = render(
@@ -326,7 +361,11 @@ describe('GroupHistoryView (014)', () => {
     )
     expect(await screen.findByText(NO_FILTERED_ACTIVITY_MESSAGE)).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Mostrar' })).toHaveValue('EXPENSES')
-    expect(getActivity).toHaveBeenLastCalledWith('42', { page: 1, size: 20, eventTypes: ['EXPENSE_CREATED'] })
+    expect(getActivity).toHaveBeenLastCalledWith('42', {
+      page: 1,
+      size: 20,
+      eventTypes: ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'EXPENSE_DELETED'],
+    })
     unmount()
 
     render(
