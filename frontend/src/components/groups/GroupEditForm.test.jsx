@@ -78,7 +78,7 @@ describe('GroupEditForm', () => {
   describe('días para el vencimiento (022 T078)', () => {
     const admin = { ...group, currentUserRole: 'ADMIN', debtDueDays: 15 }
     const dueDays = () => screen.getByLabelText('Días para el vencimiento de las deudas')
-    const save = () => fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    const save = () => fireEvent.click(screen.getByRole('button', { name: 'Guardar' }))
 
     it('muestra el valor actual y la ayuda, solo a administradores', () => {
       const { unmount } = render(<GroupEditForm group={admin} onSaved={() => {}} onCancel={() => {}} />)
