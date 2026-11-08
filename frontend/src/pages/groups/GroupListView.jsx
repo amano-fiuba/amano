@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router'
+import { Link } from 'react-router'
 import { listGroups, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
 import { byLatestActivity, formatActivityDate, memberCountLabel } from './groupDisplay'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
@@ -14,11 +14,6 @@ function roleLabel(role) {
 }
 
 export default function GroupListView() {
-  const location = useLocation()
-  // Un usuario recién verificado llega desde /verify-email con state
-  // { verifiedWelcome: true }: más acá que al dashboard, porque el primer paso
-  // de la app es unirse o crear un grupo. El estado se limpia al recargar.
-  const verifiedWelcome = location.state?.verifiedWelcome === true
   const [groups, setGroups] = useState(null)
   const [error, setError] = useState('')
 
@@ -56,12 +51,6 @@ export default function GroupListView() {
           </Link>
         )}
       </header>
-      {verifiedWelcome && (
-        <p role="status" data-testid="groups-verified-welcome">
-          Cuenta verificada, ¡bienvenido! Creá tu primer grupo o esperá a que te
-          agreguen a uno.
-        </p>
-      )}
       {error && (
         <p role="alert" data-testid="groups-error">
           {error}
