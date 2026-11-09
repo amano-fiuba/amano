@@ -35,7 +35,7 @@ describe('GroupReminderSettingsPanel (T024/T035)', () => {
     expect(getReminderSettings).not.toHaveBeenCalled()
   })
 
-  it('ofrece 7, 5, 3 y 1 días y carga la configuración actual', async () => {
+  it('ofrece 7, 5, 3, 2 y 1 días y carga la configuración actual', async () => {
     getReminderSettings.mockResolvedValue({
       ok: true,
       settings: { ...SETTINGS, sendDays: 3, message: 'Pagá cuando puedas' },
@@ -46,7 +46,7 @@ describe('GroupReminderSettingsPanel (T024/T035)', () => {
     expect(await screen.findByLabelText('Cuándo enviar el recordatorio')).toHaveValue('3')
     const options = screen.getAllByRole('option')
     expect(options.map((option) => option.textContent)).toEqual([
-      '7 días antes', '5 días antes', '3 días antes', '1 día antes',
+      '7 días antes', '5 días antes', '3 días antes', '2 días antes', '1 día antes',
     ])
     expect(screen.getByLabelText('Mensaje personalizado (opcional)')).toHaveValue('Pagá cuando puedas')
   })

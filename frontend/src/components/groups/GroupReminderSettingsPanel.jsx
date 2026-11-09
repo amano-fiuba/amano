@@ -6,7 +6,7 @@ import {
 } from '../../api/groupsClient'
 import { useSnackbar } from '../Snackbar'
 
-const ALLOWED_SEND_DAYS = [7, 5, 3, 1]
+const ALLOWED_SEND_DAYS = [7, 5, 3, 2, 1]
 const DEFAULT_SEND_DAYS = 5
 const MAX_MESSAGE_LENGTH = 500
 
