@@ -51,7 +51,6 @@ public class ReminderMaterializer {
             cancelScheduled(group.getId(), ReminderKind.PAYER_NOTICE, now);
             return;
         }
-        int debtDueDays = group.getDebtDueDays();
         int reminderSendDays = group.getReminderSendDays() == null ? 5 : group.getReminderSendDays();
         List<Debt> debts = debtRepository.findByGroupId(group.getId());
         Map<Long, GroupExpense> expenses = new HashMap<>();
@@ -60,11 +59,11 @@ public class ReminderMaterializer {
             currentDebtIds.add(debt.getId());
             GroupExpense expense = expenses.computeIfAbsent(debt.getExpenseId(),
                     id -> groupExpenseRepository.findById(id).orElse(null));
-            if (expense == null || expense.getExpenseDate() == null) {
+            if (expense == null || expense.getDueDate() == null) {
                 cancelDebtReminder(debt.getId(), now);
                 continue;
             }
-            LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), debtDueDays);
+            LocalDate dueDate = expense.getDueDate();
             if (!ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate)) {
                 cancelDebtReminder(debt.getId(), now);
                 continue;
@@ -90,11 +89,11 @@ public class ReminderMaterializer {
             Long expenseId = entry.getKey();
             GroupExpense expense = expenses.computeIfAbsent(expenseId,
                     id -> groupExpenseRepository.findById(id).orElse(null));
-            if (expense == null || expense.getExpenseDate() == null) {
+            if (expense == null || expense.getDueDate() == null) {
                 cancelPayerNotice(expenseId, now);
                 continue;
             }
-            LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), debtDueDays);
+            LocalDate dueDate = expense.getDueDate();
             boolean hasEligibleDebt = entry.getValue().stream()
                     .filter(debt -> !ReminderSchedule.isPayerOwnDebt(expense, debt))
                     .anyMatch(debt -> ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate));

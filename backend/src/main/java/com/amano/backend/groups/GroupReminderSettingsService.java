@@ -33,8 +33,8 @@ import com.amano.backend.groups.dto.ReminderSettingsResponse;
 public class GroupReminderSettingsService {
 
     public static final int DEFAULT_SEND_DAYS = 5;
-    public static final List<Integer> ALLOWED_SEND_DAYS = List.of(7, 5, 3, 1);
-    static final String INVALID_SEND_DAYS = "El tiempo de envío debe ser 7, 5, 3 o 1 días antes";
+    public static final List<Integer> ALLOWED_SEND_DAYS = List.of(7, 5, 3, 2, 1);
+    static final String INVALID_SEND_DAYS = "El tiempo de envío debe ser 7, 5, 3, 2 o 1 días antes";
     static final String MESSAGE_TOO_LONG = "El mensaje no puede superar los 500 caracteres";
     static final int MAX_MESSAGE_LENGTH = 500;
 
@@ -134,10 +134,10 @@ public class GroupReminderSettingsService {
         for (Reminder reminder : reminderRepository.findByGroupIdAndStatusAndClaimedAtIsNull(group.getId(),
                 ReminderStatus.SCHEDULED)) {
             GroupExpense expense = expenseOf(reminder);
-            if (expense == null || expense.getExpenseDate() == null) {
+            if (expense == null || expense.getDueDate() == null) {
                 continue;
             }
-            LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+            LocalDate dueDate = expense.getDueDate();
             LocalDate sendDate = ReminderSchedule.sendDate(dueDate, sendDays);
             if (!sendDate.equals(reminder.getSendDate())) {
                 reminderRepository.reschedule(reminder.getId(), sendDate, now);

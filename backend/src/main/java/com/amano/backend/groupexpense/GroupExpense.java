@@ -125,6 +125,14 @@ public class GroupExpense {
     @Column(name = "recurrence_source_id")
     private Long recurrenceSourceId;
 
+    /**
+     * V33 / 028 FR-016: persisted deadline. Normal expenses and the first
+     * occurrence use {@code expense_date + groups.debt_due_days} at creation;
+     * generated occurrences use their own date. Never recalculated afterwards.
+     */
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -304,6 +312,14 @@ public class GroupExpense {
 
     public void setRecurrenceSourceId(Long recurrenceSourceId) {
         this.recurrenceSourceId = recurrenceSourceId;
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
     }
 
     /** A recurring series registered since this change (has a frequency). */

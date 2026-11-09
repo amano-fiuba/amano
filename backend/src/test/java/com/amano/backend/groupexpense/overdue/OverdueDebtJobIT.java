@@ -88,6 +88,12 @@ class OverdueDebtJobIT {
                     expense_date, description, idempotency_key)
                 VALUES (?, ?, ?, 100.00, 'ARS', ?, 'Job', gen_random_uuid()) RETURNING id
                 """, Long.class, groupId, creditorId, creditorId, java.sql.Date.valueOf(expenseDate));
+        jdbc.update("""
+                UPDATE group_expenses e
+                SET due_date = e.expense_date + g.debt_due_days
+                FROM groups g
+                WHERE g.id = e.group_id AND e.id = ? AND g.debt_due_days IS NOT NULL
+                """, expenseId);
         long shareId = jdbc.queryForObject("""
                 INSERT INTO group_expense_shares (expense_id, position, participant_type, user_id,
                     participant_name, amount)
@@ -181,6 +187,19 @@ class OverdueDebtJobIT {
         at("2026-11-10");
         job.markOverdueDebts();
 
+        assertThat(statusOf(debtId)).isEqualTo("OVERDUE");
+    }
+
+    @Test
+    void changingTheGroupDeadlineDoesNotMoveAnExistingDeadline() {
+        long groupId = group(5);
+        long debtId = debt(groupId, "2026-11-01", "PENDING", "0.00");
+
+        at("2026-11-07");
+        jdbc.update("UPDATE groups SET debt_due_days = 30 WHERE id = ?", groupId);
+        job.markOverdueDebts();
+
+        // El vencimiento persistido (2026-11-06) manda; recalcular con 30 lo dejaría PENDING.
         assertThat(statusOf(debtId)).isEqualTo("OVERDUE");
     }
 

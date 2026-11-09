@@ -344,6 +344,7 @@ public class GroupExpenseService {
         expense.setExpenseType(normalized.classification().type());
         expense.setPaymentMethod(normalized.classification().paymentMethod());
         expense.setExpenseDate(normalized.date());
+        expense.setDueDate(dueDateFor(groupId, normalized.date()));
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
         if (normalized.frequency() != null) {
@@ -372,6 +373,22 @@ public class GroupExpenseService {
         List<Debt> savedDebts = debtRepository.saveAll(debts);
 
         return new Persisted(saved, shares, savedDebts);
+    }
+
+    /**
+     * 028 FR-016/FR-019: deadline fixed at creation from the group's current
+     * {@code debtDueDays}. Friend expenses and groups without a deadline get
+     * {@code null}. The value is never recalculated by later reads.
+     */
+    private LocalDate dueDateFor(Long groupId, LocalDate expenseDate) {
+        if (groupId == null || groupRepository == null) {
+            return null;
+        }
+        return groupRepository.findById(groupId)
+                .map(Group::getDebtDueDays)
+                .filter(Objects::nonNull)
+                .map(days -> expenseDate.plusDays(days))
+                .orElse(null);
     }
 
     /**

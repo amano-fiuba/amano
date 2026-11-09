@@ -36,6 +36,14 @@ public class GroupRecurringExpenseService {
     /** Safety bound per series and run, as in personal recurrences. */
     private static final int MAX_OCCURRENCES_PER_RUN = 1000;
 
+    /**
+     * 028 FR-006: occurrences are generated up to this many days before their
+     * own date, so their debts already exist when 025 schedules the reminder
+     * ({@code dueDate - reminderSendDays}). It matches the largest option of the
+     * reminder-send catalog (7 days).
+     */
+    private static final int ANTICIPATION_DAYS = 7;
+
     private final GroupExpenseRepository expenseRepository;
     private final GroupExpenseShareRepository shareRepository;
     private final DebtRepository debtRepository;
@@ -62,20 +70,22 @@ public class GroupRecurringExpenseService {
     }
 
     /**
-     * Generates every due occurrence of the ACTIVE series up to {@code today}
-     * (inclusive) and advances their next date. Returns how many were created.
+     * Generates every due occurrence of the ACTIVE series up to the end of the
+     * anticipation window (028 FR-006) and advances their next date. Returns
+     * how many were created.
      */
     @Transactional
     public int generateDueOccurrences(LocalDate today) {
+        LocalDate windowEnd = today.plusDays(ANTICIPATION_DAYS);
         int created = 0;
         List<GroupExpense> due = expenseRepository
                 .findByRecurrenceStatusAndRecurrenceNextDateLessThanEqualOrderByIdAsc(
-                        RecurrenceStatus.ACTIVE, today);
+                        RecurrenceStatus.ACTIVE, windowEnd);
         for (GroupExpense series : due) {
             int generated = 0;
             LocalDate date = series.getRecurrenceNextDate();
             boolean advanced = false;
-            while (date != null && !date.isAfter(today) && generated < MAX_OCCURRENCES_PER_RUN) {
+            while (date != null && !date.isAfter(windowEnd) && generated < MAX_OCCURRENCES_PER_RUN) {
                 advanced = true;
                 if (expenseRepository.findByRecurrenceSourceIdAndExpenseDate(series.getId(), date).isEmpty()) {
                     createOccurrence(series, date);
@@ -112,6 +122,7 @@ public class GroupRecurringExpenseService {
         occurrence.setExpenseType(series.getExpenseType());
         occurrence.setPaymentMethod(series.getPaymentMethod());
         occurrence.setExpenseDate(date);
+        occurrence.setDueDate(date);
         occurrence.setDescription(series.getDescription());
         occurrence.setIdempotencyKey(occurrenceKey(series.getId(), date));
         occurrence.setRecurrenceSourceId(series.getId());

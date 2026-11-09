@@ -304,8 +304,65 @@ class GroupExpenseControllerIT {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM debts WHERE expense_id = ?",
                 Integer.class, occurrenceId)).isEqualTo(1);
         assertThat(expenseEvents()).isEqualTo(eventsBefore + 1);
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, occurrenceId)).isEqualTo(next);
         // Second run on the same date is a no-op.
         assertThat(recurringExpenseService.generateDueOccurrences(next)).isZero();
+    }
+
+    @Test
+    void aGroupExpenseStoresItsDeadlineFromTheGroupPaymentDays() throws Exception {
+        jdbc.update("UPDATE groups SET debt_due_days = 30 WHERE id = ?", groupId);
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, expenseId)).isEqualTo(today.plusDays(30));
+    }
+
+    @Test
+    void anExpenseInAGroupWithoutPaymentDaysHasNoDeadline() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, expenseId)).isNull();
+    }
+
+    @Test
+    void theJobAnticipatesTheOccurrenceWithinSevenDaysAndKeepsItsOwnDeadline() throws Exception {
+        jdbc.update("UPDATE groups SET debt_due_days = 30 WHERE id = ?", groupId);
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long seriesId = objectMapper.readTree(body).get("id").asLong();
+        LocalDate next = today.plusMonths(1);
+
+        recurringExpenseService.generateDueOccurrences(next.minusDays(8));
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM group_expenses
+                WHERE recurrence_source_id = ? AND expense_date = ?
+                """, Integer.class, seriesId, next)).isZero();
+
+        recurringExpenseService.generateDueOccurrences(next.minusDays(7));
+
+        Long occurrenceId = jdbc.queryForObject("""
+                SELECT id FROM group_expenses
+                WHERE recurrence_source_id = ? AND expense_date = ?
+                """, Long.class, seriesId, next);
+        assertThat(occurrenceId).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, occurrenceId)).isEqualTo(next);
     }
 
     @Test

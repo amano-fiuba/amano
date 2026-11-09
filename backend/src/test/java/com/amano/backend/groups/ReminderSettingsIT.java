@@ -89,7 +89,8 @@ class ReminderSettingsIT {
                 .andExpect(jsonPath("$.allowedSendDays[0]").value(7))
                 .andExpect(jsonPath("$.allowedSendDays[1]").value(5))
                 .andExpect(jsonPath("$.allowedSendDays[2]").value(3))
-                .andExpect(jsonPath("$.allowedSendDays[3]").value(1));
+                .andExpect(jsonPath("$.allowedSendDays[3]").value(2))
+                .andExpect(jsonPath("$.allowedSendDays[4]").value(1));
     }
 
     @Test
@@ -110,6 +111,32 @@ class ReminderSettingsIT {
 
         assertThatSendDate(debtId, "2026-11-13");
         assertThatSendDate(sentDebt, "2026-11-15");
+    }
+
+    @Test
+    void twoDaysBeforeIsAcceptedForEveryGroupAndReschedules() throws Exception {
+        mockMvc.perform(put("/api/groups/{id}/reminder-settings", groupId)
+                        .cookie(session(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("sendDays", 2))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sendDays").value(2));
+
+        assertThatSendDate(debtId, "2026-11-18");
+    }
+
+    @Test
+    void changingTheGroupPaymentDaysDoesNotMoveExistingDeadlines() throws Exception {
+        jdbc.update("UPDATE groups SET debt_due_days = 10 WHERE id = ?", groupId);
+
+        mockMvc.perform(put("/api/groups/{id}/reminder-settings", groupId)
+                        .cookie(session(adminId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("sendDays", 7))))
+                .andExpect(status().isOk());
+
+        // due_date de la fila sigue siendo 2026-11-20 (30 días al crear), no 2026-10-31.
+        assertThatSendDate(debtId, "2026-11-13");
     }
 
     @Test
@@ -164,7 +191,7 @@ class ReminderSettingsIT {
                         .content(json(Map.of("sendDays", 4))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.sendDays")
-                        .value("El tiempo de envío debe ser 7, 5, 3 o 1 días antes"));
+                        .value("El tiempo de envío debe ser 7, 5, 3, 2 o 1 días antes"));
     }
 
     @Test
@@ -215,11 +242,18 @@ class ReminderSettingsIT {
     }
 
     private long expense(long groupId, long payerId, String date, String description) {
-        return jdbc.queryForObject("""
+        long expenseId = jdbc.queryForObject("""
                 INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
                     expense_date, description, idempotency_key)
                 VALUES (?, ?, ?, 100.00, 'ARS', ?, ?, gen_random_uuid()) RETURNING id
                 """, Long.class, groupId, payerId, payerId, java.sql.Date.valueOf(date), description);
+        jdbc.update("""
+                UPDATE group_expenses e
+                SET due_date = e.expense_date + g.debt_due_days
+                FROM groups g
+                WHERE g.id = e.group_id AND e.id = ? AND g.debt_due_days IS NOT NULL
+                """, expenseId);
+        return expenseId;
     }
 
     private long debt(long groupId, long expenseId, long debtorId, long creditorId, String status) {

@@ -176,12 +176,19 @@ class ReminderFailureIT {
     }
 
     private long expense(long groupId, long payerId, String date, String description, String amount) {
-        return jdbc.queryForObject("""
+        long expenseId = jdbc.queryForObject("""
                 INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
                     expense_date, description, idempotency_key)
                 VALUES (?, ?, ?, ?, 'ARS', ?, ?, gen_random_uuid()) RETURNING id
                 """, Long.class, groupId, payerId, payerId, new BigDecimal(amount),
                 java.sql.Date.valueOf(date), description);
+        jdbc.update("""
+                UPDATE group_expenses e
+                SET due_date = e.expense_date + g.debt_due_days
+                FROM groups g
+                WHERE g.id = e.group_id AND e.id = ? AND g.debt_due_days IS NOT NULL
+                """, expenseId);
+        return expenseId;
     }
 
     private long debt(long groupId, long expenseId, long debtorId, long creditorId, String status,

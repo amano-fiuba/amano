@@ -63,12 +63,7 @@ public class OverdueDebtJob {
         LocalDate today = LocalDate.now(clock);
         OffsetDateTime now = OffsetDateTime.now(clock);
         for (Group group : groupRepository.findByDebtDueDaysIsNotNull()) {
-            Integer dueDays = group.getDebtDueDays();
-            if (dueDays == null) {
-                continue;
-            }
-            LocalDate before = today.minusDays(dueDays);
-            List<Debt> dueDebts = debtRepository.findPendingDueBefore(group.getId(), before);
+            List<Debt> dueDebts = debtRepository.findPendingDueBefore(group.getId(), today);
             if (dueDebts.isEmpty()) {
                 continue;
             }

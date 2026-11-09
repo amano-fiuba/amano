@@ -172,10 +172,10 @@ public class ReminderDispatcher {
             return false;
         }
         GroupExpense expense = groupExpenseRepository.findById(debt.getExpenseId()).orElse(null);
-        if (expense == null || expense.getExpenseDate() == null) {
+        if (expense == null || expense.getDueDate() == null) {
             return false;
         }
-        LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+        LocalDate dueDate = expense.getDueDate();
         return ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate);
     }
 
@@ -184,10 +184,10 @@ public class ReminderDispatcher {
             return false;
         }
         GroupExpense expense = groupExpenseRepository.findById(reminder.getExpenseId()).orElse(null);
-        if (expense == null || expense.getExpenseDate() == null) {
+        if (expense == null || expense.getDueDate() == null) {
             return false;
         }
-        LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+        LocalDate dueDate = expense.getDueDate();
         boolean hasEligibleDebt = debtRepository.findByExpenseId(expense.getId()).stream()
                 .filter(debt -> !ReminderSchedule.isPayerOwnDebt(expense, debt))
                 .anyMatch(debt -> ReminderSchedule.isDebtEligible(debt.getStatus(), today, dueDate));
@@ -203,10 +203,10 @@ public class ReminderDispatcher {
             return null;
         }
         GroupExpense expense = groupExpenseRepository.findById(debt.getExpenseId()).orElse(null);
-        if (expense == null || expense.getExpenseDate() == null) {
+        if (expense == null || expense.getDueDate() == null) {
             return null;
         }
-        LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+        LocalDate dueDate = expense.getDueDate();
         String email = recipients.emailOf(debt).orElse(null);
         String creditorName = creditorName(debt.getCreditorUserId());
         ReminderMessageBuilder.Mail mail = messageBuilder.debtReminder(group.getName(), debt.getDebtorName(),
@@ -221,7 +221,7 @@ public class ReminderDispatcher {
             return null;
         }
         GroupExpense expense = groupExpenseRepository.findById(reminder.getExpenseId()).orElse(null);
-        if (expense == null || expense.getExpenseDate() == null || expense.getPayerUserId() == null) {
+        if (expense == null || expense.getDueDate() == null || expense.getPayerUserId() == null) {
             return null;
         }
         User payer = userRepository.findById(expense.getPayerUserId()).orElse(null);
@@ -232,7 +232,7 @@ public class ReminderDispatcher {
         if (payerName == null) {
             payerName = payer.getEmail();
         }
-        LocalDate dueDate = ReminderSchedule.dueDate(expense.getExpenseDate(), group.getDebtDueDays());
+        LocalDate dueDate = expense.getDueDate();
         long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(clock), dueDate);
         List<Map<String, String>> pendingTotals = ReminderSchedule.pendingTotals(
                 debtRepository.findByGroupId(group.getId()), expense.getPayerUserId());
