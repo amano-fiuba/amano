@@ -62,6 +62,28 @@ export default function GroupInfoView() {
     refreshGroup()
   }
 
+  // Editar y Configuración son excluyentes: abrir uno cierra el otro (y el
+  // modal de deudas, que vive dentro de Configuración).
+  function toggleEdit() {
+    if (editing) {
+      setEditing(false)
+      return
+    }
+    setEditing(true)
+    setShowPermissions(false)
+    setShowDebtSettings(false)
+  }
+
+  function togglePermissions() {
+    if (showPermissions) {
+      setShowPermissions(false)
+      setShowDebtSettings(false)
+      return
+    }
+    setShowPermissions(true)
+    setEditing(false)
+  }
+
   const isAdmin = group?.currentUserRole === 'ADMIN'
   const canEditGroupData = isAdmin || Boolean(group?.permissions?.membersCanEditGroupData)
 
@@ -122,7 +144,7 @@ export default function GroupInfoView() {
                   data-testid="group-edit-button"
                   aria-expanded={editing}
                   aria-label={editing ? 'Cerrar edición' : undefined}
-                  onClick={() => setEditing(!editing)}
+                  onClick={toggleEdit}
                 >
                   {editing ? 'Cerrar' : <><PencilIcon /> Editar</>}
                 </button>
@@ -133,7 +155,7 @@ export default function GroupInfoView() {
                   className="group-action"
                   aria-expanded={showPermissions}
                   aria-label={showPermissions ? 'Cerrar configuración' : undefined}
-                  onClick={() => { setShowPermissions(!showPermissions) }}
+                  onClick={togglePermissions}
                 >
                   {showPermissions ? 'Cerrar' : <><GroupSettingsIcon /> Configuración</>}
                 </button>
@@ -163,6 +185,7 @@ export default function GroupInfoView() {
                   permissions={group.permissions ?? {}}
                   onSaved={() => {
                     setShowPermissions(false)
+                    setShowDebtSettings(false)
                     refreshGroup()
                   }}
                 />

@@ -236,6 +236,23 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
     expect(screen.getByLabelText('Cuándo enviar el recordatorio')).toHaveValue('2')
   })
 
+  it('Editar y Configuración no pueden estar abiertos a la vez', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: GROUP })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
+    expect(screen.getByTestId('edit-panel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Configuración' }))
+    expect(screen.queryByTestId('edit-panel')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('permissions-panel')).not.toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(screen.queryAllByTestId('permissions-panel')).toHaveLength(0)
+    expect(screen.getByTestId('edit-panel')).toBeInTheDocument()
+  })
+
   it('al guardar la configuración se cierra sola y vuelve a consultar el grupo', async () => {
     getGroup.mockResolvedValue({ ok: true, group: GROUP })
     updateGroup.mockResolvedValue({ ok: true, group: GROUP })
