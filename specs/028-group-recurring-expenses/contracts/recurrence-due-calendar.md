@@ -14,9 +14,9 @@ La fecha de vencimiento (`dueDate`) vive en la fila del `GroupExpense`:
 | Gasto normal del grupo o primera ocurrencia de la serie | `expense_date + groups.debt_due_days` vigente al crear (NULL si el grupo no tiene `debt_due_days`) |
 | Ocurrencia generada (`recurrence_source_id IS NOT NULL`) | su propia `expense_date` |
 
-El endpoint de detalle `GET /api/groups/{id}/expenses/{expenseId}` (17 US1) devuelve el
-gasto con su `dueDate` para que cualquier cliente pueda mostrar la fecha exacta sin
-recalcularla.
+El `dueDate` vive internamente en la `GroupExpense` y alimenta recordatorios y deudas
+vencidas; el contrato REST no lo expone por ahora. Si la UI necesita mostrarlo en el
+detalle del gasto, se agrega en una historia aparte.
 
 ## Recordatorios (025 US1/US3)
 

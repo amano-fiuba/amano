@@ -142,6 +142,6 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 ### Measurable Outcomes
 
 - **SC-001**: Un usuario puede registrar un gasto de grupo recurrente con frecuencia en una sola pasada del formulario.
-- **SC-002**: Al menos el 95 % de las series activas generan su ocurrencia en la primera ejecución del job posterior a la fecha programada.
+- **SC-002**: Al menos el 95 % de las series activas generan su ocurrencia en la primera ejecución del job que la incluya en su ventana de anticipación (hasta 7 días antes de su fecha programada).
 - **SC-003**: Ejecutar el job dos veces para la misma fecha no crea ocurrencias, deudas ni eventos duplicados.
 - **SC-004**: Las deudas de cada ocurrencia quedan disponibles para los flujos de pago, saldo, vencimiento y recordatorios sin pasos manuales.

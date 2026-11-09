@@ -78,7 +78,7 @@ description: "Task list for Calendario de vencimientos de gastos compartidos rec
 
 - [ ] T015 Ejecutar el recorrido de specs/028-group-recurring-expenses/quickstart.md end-to-end (grupo con `debt_due_days=7`, recordatorio de 2 días, primera y segunda ocurrencia con sus deudas, recordatorio en la fecha `dueDate - reminderSendDays`)
 - [ ] T016 [P] Actualizar specs/028-group-recurring-expenses/plan.md, research.md, data-model.md y contracts/ con cualquier ajuste que surja de la implementación (sin cambiar el alcance de la spec)
-- [ ] T017 Cobertura y calidad: `./mvnw verify` en backend y `npm run lint && npm test && npm run build` en frontend, con cobertura ≥ 85 % sin bajar umbrales
+- [ ] T017 Cobertura y calidad: `mvn -B verify` en `backend/` y `npm ci && npm run lint && npm run test:coverage && npm run build` en `frontend/`, con cobertura ≥ 85 % (JaCoCo + Vitest coverage), sin bajar umbrales
 
 ---
 
