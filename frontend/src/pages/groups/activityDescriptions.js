@@ -184,7 +184,13 @@ function payerDueNoticeSent(details) {
   return sentence
 }
 
-const SYSTEM_EVENTS = new Set(['DEBT_OVERDUE', 'DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
+const SYSTEM_EVENTS = new Set([
+  'DEBT_OVERDUE',
+  'DEBT_REMINDER_SENT',
+  'PAYER_DUE_NOTICE_SENT',
+  // 028: las ocurrencias recurrentes las genera el job, sin actor humano.
+  'EXPENSE_CREATED',
+])
 
 const DESCRIBERS = {
   MEMBER_ADDED: memberAdded,

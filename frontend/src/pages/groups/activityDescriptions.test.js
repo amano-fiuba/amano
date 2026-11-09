@@ -139,6 +139,10 @@ describe('describeActivity: gastos y pagos (014 US2 / 022 US8)', () => {
       .toBe('Sistema envió el aviso de vencimiento del gasto «Súper» a Ana López')
     expect(phrase('PAYER_DUE_NOTICE_SENT', {}, null))
       .toBe('Sistema envió el aviso de vencimiento de un gasto')
+
+    // 028: las ocurrencias de una serie las crea el job, sin actor humano.
+    expect(phrase('EXPENSE_CREATED', { amount: '1500.00', currency: 'ARS' }, null))
+      .toMatch(/^Sistema registró un gasto de \$\s?1\.500,00$/)
   })
 
   it('formatea montos y tolera monedas desconocidas o datos faltantes', () => {

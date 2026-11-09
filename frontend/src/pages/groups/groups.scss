@@ -542,6 +542,14 @@
   }
 }
 
+.group-expenses__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
 .group-admin-panel__subsection {
   margin-top: 1rem;
   padding-top: 1rem;
