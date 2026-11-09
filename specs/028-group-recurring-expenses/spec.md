@@ -30,7 +30,7 @@ Donde esta spec y una anterior difieran, vale esta.
 
 ### Session 2026-11-08
 
-- Q: Si los días para pagar del grupo cambian después de crear la serie, ¿qué plazo deben usar las ocurrencias que se generan después? → A: Usar el plazo vigente del grupo al generar cada ocurrencia.
+- Q: Si los días para pagar del grupo cambian después de crear la serie, ¿qué plazo usan los vencimientos? → A: Los vencimientos ya creados se conservan; los gastos de grupo (no recurrentes) y la primera ocurrencia usan el plazo vigente al crearse; las ocurrencias generadas vencen en su propia fecha (FR-016), independiente del plazo.
 - Q: ¿La opción de "2 días antes" de la configuración de recordatorios debe estar disponible para todos los grupos o solo para los recurrentes? → A: Disponible para todos los grupos.
 - Q: Si la ocurrencia se crea el mismo día que vence, ¿cómo puede salir un recordatorio de 2 días antes? → A: El job anticipa la generación con una ventana de 7 días; la ocurrencia y sus deudas existen antes de que llegue su vencimiento.
 
@@ -125,7 +125,7 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 - **FR-014**: La generación de ocurrencias NO MUST volver a validar permisos ni membresías: usa los datos congelados de la serie.
 - **FR-015**: Las series existentes sin frecuencia MUST seguir siendo válidas y MUST NOT generar ocurrencias.
 - **FR-016**: La primera ocurrencia MUST vencer según la regla vigente del grupo al crearse y las ocurrencias generadas MUST vencer en su propia fecha.
-- **FR-019**: Cuando cambie el plazo de pago del grupo, cada ocurrencia que se genere después MUST usar el valor vigente del grupo en ese momento; los vencimientos ya generados MUST NOT recalcularse.
+- **FR-019**: Cuando cambie el plazo de pago del grupo, los vencimientos ya creados MUST NOT recalcularse. La fecha de vencimiento de cada ocurrencia generada se fija al crearla (FR-016) y no vuelve a leerse ese plazo; los gastos nuevos no recurrentes y la primera ocurrencia lo usan en el momento de su creación.
 - **FR-017**: La configuración de recordatorios del grupo MUST incluir la opción de "2 días antes" para todos los grupos, y el recordatorio de cada ocurrencia MUST calcularse con la configuración vigente del grupo.
 - **FR-018**: Una ocurrencia sin deudas pendientes o ya saldadas MUST NOT disparar recordatorio.
 

@@ -65,12 +65,11 @@ el mismo día.
 
 ## Decisión 5: Cambio de plazo del grupo con la serie ya creada
 
-**Decisión** (clarificación 2026-11-08, punto 1, reinterpretada con FR-016):
-- La próxima ocurrencia generada se crea con la configuración vigente del grupo.
-- Algunos vencimientos **ya persistidos no se recalculan**. Como `dueDate` vive en la
-  fila del gasto, los cambios futuros de `debt_due_days` no la mueven.
-
-No hay job ni callback que re-vence gastos existentes cuando cambia la configuración.
+FR-019 (versión normalizada) dice: los vencimientos ya creados no se recalculan; los
+datos del grupo se usan sólo al crear un gasto (o la primera ocurrencia). Las
+ocurrencias generadas fijan su vencimiento al crearse (FR-016) y no vuelven a leer el
+plazo. Sin job ni callback que re-vence los vencimientos ya guardados cuando cambia
+la configuración.
 
 ## Decisión 6: Ventana de anticipación de 7 días
 
