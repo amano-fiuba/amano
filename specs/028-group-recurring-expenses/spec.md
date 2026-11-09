@@ -65,6 +65,24 @@ La serie recurrente no relaja las reglas del gasto de grupo: respeta permisos, p
 4. **Given** una serie cuyo único participante es el pagador, **When** se genera una ocurrencia, **Then** se crea el gasto sin deudas.
 5. **Given** un gasto con amigo, **When** se envía una frecuencia, **Then** la API responde `400` y no se crea una serie.
 
+### User Story 3 - Calendario de vencimientos y recordatorios (Priority: P1)
+
+Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera ocurrencia y no se genera otra para el mismo día. La primera ocurrencia vence como un gasto normal del grupo y sus recordatorios se calculan desde el vencimiento vigente; cada ocurrencia posterior se genera en su propia fecha, con sus deudas y su propio vencimiento.
+
+**Why this priority**: cierra el calendario completo de la recurrencia: primer pago, vencimientos y recordatorios por período sin duplicar el gasto.
+
+**Independent Test**: con un grupo con 7 días de plazo y recordatorio de 2 días antes, registrar hoy un gasto recurrente y validar el vencimiento y el recordatorio de la primera y segunda ocurrencia.
+
+**Acceptance Scenarios**:
+
+1. **Given** un usuario registra hoy un gasto de grupo recurrente, **When** guarda el gasto, **Then** el gasto creado es la primera ocurrencia, con fecha de hoy, y no se genera otra ocurrencia adicional para hoy.
+2. **Given** el grupo tiene `debt_due_days = 7`, **When** se crea la primera ocurrencia, **Then** las deudas vencen el 15/11/2026, igual que en un gasto normal.
+3. **Given** la configuración de recordatorios es "2 días antes", **When** llega el 13/11/2026 (viernes), **Then** los deudores con deuda pendiente reciben el recordatorio de la primera ocurrencia.
+4. **Given** la frecuencia es mensual y la primera ocurrencia fue el 08/11/2026, **When** llega el 08/12/2026, **Then** se genera la segunda ocurrencia con esa fecha, sus propias deudas y su propio vencimiento.
+5. **Given** la segunda ocurrencia es del 08/12/2026, **When** se calcula su vencimiento, **Then** vence el 08/12/2026, porque las ocurrencias generadas vencen en su propia fecha y no se les vuelve a sumar `debt_due_days`.
+6. **Given** la segunda ocurrencia vence el 08/12/2026 y la configuración de recordatorios es "2 días antes", **When** llega el 06/12/2026, **Then** los deudores con deuda pendiente reciben el recordatorio de la segunda ocurrencia.
+7. **Given** una ocurrencia sin deudas pendientes o ya saldadas, **When** llega la fecha de envío, **Then** no se envía recordatorio, según las reglas de 025.
+
 ### Edge Cases
 
 - El grupo no tiene `debt_due_days`: las ocurrencias se generan igual, pero 025 no crea recordatorios para sus deudas.
@@ -95,6 +113,9 @@ La serie recurrente no relaja las reglas del gasto de grupo: respeta permisos, p
 - **FR-013**: La frecuencia MUST usar el mismo catálogo y la misma aritmética de fechas que los gastos personales recurrentes (anclada a la fecha de inicio).
 - **FR-014**: La generación de ocurrencias NO MUST volver a validar permisos ni membresías: usa los datos congelados de la serie.
 - **FR-015**: Las series existentes sin frecuencia MUST seguir siendo válidas y MUST NOT generar ocurrencias.
+- **FR-016**: La primera ocurrencia MUST vencer según la regla vigente del grupo y las ocurrencias generadas MUST vencer en su propia fecha.
+- **FR-017**: El recordatorio de cada ocurrencia MUST calcularse con la configuración vigente del grupo, incluyendo la opción de "2 días antes".
+- **FR-018**: Una ocurrencia sin deudas pendientes o ya saldadas MUST NOT disparar recordatorio.
 
 ### Key Entities
 
