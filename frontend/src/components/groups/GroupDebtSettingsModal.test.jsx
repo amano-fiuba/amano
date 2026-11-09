@@ -207,13 +207,12 @@ describe('GroupDebtSettingsModal (028)', () => {
     expect(screen.getByTestId('debt-settings-error')).toHaveTextContent(/Revisá los datos/i)
   })
 
-  it('limita el mensaje a 500 caracteres y muestra el contador y la ayuda', async () => {
+  it('limita el mensaje a 500 caracteres y muestra el contador', async () => {
     renderModal()
 
     const textarea = await screen.findByLabelText('Mensaje personalizado (opcional)')
     expect(textarea).toHaveAttribute('maxLength', '500')
     expect(screen.getByTestId('reminder-message-counter')).toHaveTextContent('0/500')
-    expect(screen.getByText(/Vacío = mensaje predeterminado/i)).toBeInTheDocument()
 
     fireEvent.change(textarea, { target: { value: 'Hola' } })
     expect(screen.getByTestId('reminder-message-counter')).toHaveTextContent('4/500')

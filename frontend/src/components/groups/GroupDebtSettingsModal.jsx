@@ -209,12 +209,9 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
                 maxLength={MAX_MESSAGE_LENGTH}
                 rows={2}
                 value={message}
-                aria-describedby="reminder-message-help reminder-message-counter"
+                aria-describedby="reminder-message-counter"
                 onChange={(event) => setMessage(event.target.value)}
               />
-              <p id="reminder-message-help" className="field-help">
-                Vacío = mensaje predeterminado.
-              </p>
               <p id="reminder-message-counter" data-testid="reminder-message-counter">
                 {message.length}/{MAX_MESSAGE_LENGTH}
               </p>
