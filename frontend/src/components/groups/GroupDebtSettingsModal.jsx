@@ -121,6 +121,7 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
       errorTestId="debt-settings-error"
       testId="debt-settings-dialog"
       busy={saving}
+      wide
       describedByBody={false}
     >
       {loading && <p role="status">Cargando…</p>}
@@ -149,7 +150,7 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
               }}
             />
             <p className="field__hint" id="group-due-days-hint">
-              Dejalo vacío si las deudas nunca vencen. Aplica a los gastos nuevos.
+              Vacío = las deudas no vencen. Aplica a los gastos nuevos.
             </p>
             {dueDaysError && (
               <p role="alert" id="group-due-days-error" data-testid="group-due-days-error">
@@ -177,14 +178,13 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
           <textarea
             id="reminder-message"
             maxLength={MAX_MESSAGE_LENGTH}
-            rows={3}
+            rows={2}
             value={message}
             aria-describedby="reminder-message-help reminder-message-counter"
             onChange={(event) => setMessage(event.target.value)}
           />
           <p id="reminder-message-help" className="field-help">
-            Se incluye en el correo del recordatorio. Si lo dejás vacío se usa el mensaje
-            predeterminado.
+            Vacío = mensaje predeterminado.
           </p>
           <p id="reminder-message-counter" data-testid="reminder-message-counter">
             {message.length}/{MAX_MESSAGE_LENGTH}

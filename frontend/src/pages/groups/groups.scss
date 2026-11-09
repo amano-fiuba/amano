@@ -527,6 +527,21 @@
   font-weight: 700;
 }
 
+[data-testid='debt-settings-dialog'] {
+  .group-edit-form {
+    gap: 0.5rem;
+  }
+
+  h4 {
+    margin: 0.75rem 0 0.25rem;
+    font-size: 0.95rem;
+  }
+
+  .form-actions {
+    margin-top: 0.85rem;
+  }
+}
+
 .group-admin-panel__subsection {
   margin-top: 1rem;
   padding-top: 1rem;

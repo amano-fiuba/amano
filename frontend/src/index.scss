@@ -1133,6 +1133,11 @@ fieldset {
 .confirm-modal {
   position: relative;
   width: min(24rem, 100%);
+  // Un modal alto se scrollea dentro de la tarjeta en vez de salirse del
+  // viewport (028: configuración de deudas y recordatorios).
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 1.25rem;
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);

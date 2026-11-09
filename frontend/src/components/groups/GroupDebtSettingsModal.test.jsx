@@ -183,7 +183,7 @@ describe('GroupDebtSettingsModal (028)', () => {
     const textarea = await screen.findByLabelText('Mensaje personalizado (opcional)')
     expect(textarea).toHaveAttribute('maxLength', '500')
     expect(screen.getByTestId('reminder-message-counter')).toHaveTextContent('0/500')
-    expect(screen.getByText(/Si lo dejás vacío se usa el mensaje predeterminado/i)).toBeInTheDocument()
+    expect(screen.getByText(/Vacío = mensaje predeterminado/i)).toBeInTheDocument()
 
     fireEvent.change(textarea, { target: { value: 'Hola' } })
     expect(screen.getByTestId('reminder-message-counter')).toHaveTextContent('4/500')
