@@ -15,7 +15,7 @@ import {
 } from '../../api/groupsClient'
 import { SnackbarProvider } from '../Snackbar'
 import GroupDebtSettingsModal from './GroupDebtSettingsModal'
-import { DEBT_DUE_DAYS_INVALID } from './debtDueDays'
+import { DEBT_DUE_DAYS_INVALID, DEBT_DUE_DAYS_REQUIRED } from './debtDueDays'
 
 const GROUP = { id: 42, currentUserRole: 'ADMIN', debtDueDays: 15 }
 const SETTINGS = {
@@ -71,7 +71,8 @@ describe('GroupDebtSettingsModal (028)', () => {
 
     renderModal()
 
-    expect(await screen.findByLabelText('Días para el vencimiento de las deudas')).toHaveValue('15')
+    expect(await screen.findByLabelText('Las deudas tienen vencimiento')).toBeChecked()
+    expect(screen.getByLabelText('Días para el vencimiento de las deudas')).toHaveValue('15')
     expect(screen.getByText(/Aplica a los gastos nuevos/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Cuándo enviar el recordatorio')).toHaveValue('2')
     const options = screen.getAllByRole('option')
@@ -110,7 +111,7 @@ describe('GroupDebtSettingsModal (028)', () => {
     expect(updateGroup).not.toHaveBeenCalled()
   })
 
-  it('acepta 0 y vaciar el campo envía null', async () => {
+  it('acepta 0', async () => {
     const { onSaved } = renderModal()
     const input = await screen.findByLabelText('Días para el vencimiento de las deudas')
 
@@ -120,14 +121,43 @@ describe('GroupDebtSettingsModal (028)', () => {
     expect(onSaved).toHaveBeenCalled()
   })
 
-  it('con el campo vacío guarda null', async () => {
-    renderModal()
-    const input = await screen.findByLabelText('Días para el vencimiento de las deudas')
+  it('sin vencimiento oculta los recordatorios y guarda null', async () => {
+    const { onSaved } = renderModal()
 
-    fireEvent.change(input, { target: { value: '  ' } })
+    fireEvent.click(await screen.findByLabelText('Las deudas tienen vencimiento'))
+
+    expect(screen.queryByLabelText('Días para el vencimiento de las deudas')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Cuándo enviar el recordatorio')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Mensaje personalizado (opcional)')).not.toBeInTheDocument()
+    expect(screen.getByTestId('no-due-date-hint')).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() => expect(updateGroup).toHaveBeenCalledWith(42, { debtDueDays: null }))
+    expect(updateReminderSettings).not.toHaveBeenCalled()
+    expect(onSaved).toHaveBeenCalled()
+  })
+
+  it('sin vencimiento inicial pide los días al activarlo', async () => {
+    renderModal({ group: { ...GROUP, debtDueDays: null } })
+    const toggle = await screen.findByLabelText('Las deudas tienen vencimiento')
+
+    expect(toggle).not.toBeChecked()
+    expect(screen.queryByLabelText('Días para el vencimiento de las deudas')).not.toBeInTheDocument()
+
+    fireEvent.click(toggle)
+    const input = screen.getByLabelText('Días para el vencimiento de las deudas')
+    expect(input).toHaveValue('')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(screen.getByTestId('group-due-days-error')).toHaveTextContent(DEBT_DUE_DAYS_REQUIRED)
+    expect(updateGroup).not.toHaveBeenCalled()
+    expect(updateReminderSettings).not.toHaveBeenCalled()
+
+    fireEvent.change(input, { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(updateGroup).toHaveBeenCalledWith(42, { debtDueDays: 10 }))
+    expect(updateReminderSettings).toHaveBeenCalled()
   })
 
   it('rechaza negativos, decimales, texto y más de 3650 sin llamar a la API', async () => {

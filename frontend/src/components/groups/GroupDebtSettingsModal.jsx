@@ -7,7 +7,7 @@ import {
 } from '../../api/groupsClient'
 import ConfirmModal from '../ConfirmModal'
 import { useSnackbar } from '../Snackbar'
-import { DEBT_DUE_DAYS_INVALID, parseDueDays } from './debtDueDays'
+import { DEBT_DUE_DAYS_INVALID, DEBT_DUE_DAYS_REQUIRED, parseDueDays } from './debtDueDays'
 
 const FALLBACK_SEND_DAYS = [7, 5, 3, 2, 1]
 const MAX_MESSAGE_LENGTH = 500
@@ -27,6 +27,7 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
+  const [hasDueDate, setHasDueDate] = useState(group.debtDueDays != null)
   const [dueDays, setDueDays] = useState(group.debtDueDays == null ? '' : String(group.debtDueDays))
   const [dueDaysError, setDueDaysError] = useState('')
   const [sendDays, setSendDays] = useState(5)
@@ -73,7 +74,11 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
 
   async function handleSubmit(event) {
     event.preventDefault()
-    const days = parseDueDays(dueDays)
+    const days = hasDueDate ? parseDueDays(dueDays) : null
+    if (hasDueDate && days === null) {
+      setDueDaysError(DEBT_DUE_DAYS_REQUIRED)
+      return
+    }
     if (days === undefined) {
       setDueDaysError(DEBT_DUE_DAYS_INVALID)
       return
@@ -96,18 +101,21 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
       }
     }
 
-    const reminderResult = await updateReminderSettings(group.id, {
-      sendDays: Number(sendDays),
-      message,
-    })
-    setSaving(false)
-    if (!reminderResult.ok) {
-      setFieldErrors(reminderResult.fields ?? {})
-      setError(reminderResult.network
-        ? GROUPS_NETWORK_ERROR_MESSAGE
-        : reminderResult.detail || 'No se pudieron guardar los recordatorios')
-      return
+    if (hasDueDate) {
+      const reminderResult = await updateReminderSettings(group.id, {
+        sendDays: Number(sendDays),
+        message,
+      })
+      if (!reminderResult.ok) {
+        setSaving(false)
+        setFieldErrors(reminderResult.fields ?? {})
+        setError(reminderResult.network
+          ? GROUPS_NETWORK_ERROR_MESSAGE
+          : reminderResult.detail || 'No se pudieron guardar los recordatorios')
+        return
+      }
     }
+    setSaving(false)
 
     showSnackbar('Configuración de deudas actualizada')
     onSaved?.()
@@ -135,61 +143,84 @@ export default function GroupDebtSettingsModal({ group, isAdmin, onClose, onSave
       )}
       {!loading && !loadError && (
         <form className="group-edit-form" onSubmit={handleSubmit} data-testid="debt-settings-form">
-          <div className="field">
-            <label htmlFor="group-due-days">Días para el vencimiento de las deudas</label>
+          <label className="debt-settings__toggle" htmlFor="has-due-date">
             <input
-              id="group-due-days"
-              inputMode="numeric"
-              autoComplete="off"
-              value={dueDays}
-              aria-invalid={dueDaysError ? true : undefined}
-              aria-describedby={`group-due-days-hint${dueDaysError ? ' group-due-days-error' : ''}`}
+              id="has-due-date"
+              type="checkbox"
+              checked={hasDueDate}
               onChange={(event) => {
-                setDueDays(event.target.value)
+                setHasDueDate(event.target.checked)
                 setDueDaysError('')
               }}
             />
-            <p className="field__hint" id="group-due-days-hint">
-              Vacío = las deudas no vencen. Aplica a los gastos nuevos.
-            </p>
-            {dueDaysError && (
-              <p role="alert" id="group-due-days-error" data-testid="group-due-days-error">
-                {dueDaysError}
+            Las deudas tienen vencimiento
+          </label>
+
+          {hasDueDate ? (
+            <div className="field">
+              <label htmlFor="group-due-days">Días para el vencimiento de las deudas</label>
+              <input
+                id="group-due-days"
+                inputMode="numeric"
+                autoComplete="off"
+                value={dueDays}
+                aria-invalid={dueDaysError ? true : undefined}
+                aria-describedby={`group-due-days-hint${dueDaysError ? ' group-due-days-error' : ''}`}
+                onChange={(event) => {
+                  setDueDays(event.target.value)
+                  setDueDaysError('')
+                }}
+              />
+              <p className="field__hint" id="group-due-days-hint">
+                Días después de la fecha del gasto. Aplica a los gastos nuevos.
               </p>
-            )}
-          </div>
+              {dueDaysError && (
+                <p role="alert" id="group-due-days-error" data-testid="group-due-days-error">
+                  {dueDaysError}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="field__hint" data-testid="no-due-date-hint">
+              Las deudas no vencen y no se envían recordatorios.
+            </p>
+          )}
 
-          <h4>Recordatorios de deudas</h4>
-          <label htmlFor="reminder-send-days">Cuándo enviar el recordatorio</label>
-          <select
-            id="reminder-send-days"
-            value={sendDays}
-            onChange={(event) => setSendDays(Number(event.target.value))}
-          >
-            {allowedSendDays.map((days) => (
-              <option key={days} value={days}>
-                {sendDaysLabel(days)}
-              </option>
-            ))}
-          </select>
-          {fieldErrors.sendDays && <p role="alert">{fieldErrors.sendDays}</p>}
+          {hasDueDate && (
+            <>
+              <h4>Recordatorios de deudas</h4>
+              <label htmlFor="reminder-send-days">Cuándo enviar el recordatorio</label>
+              <select
+                id="reminder-send-days"
+                value={sendDays}
+                onChange={(event) => setSendDays(Number(event.target.value))}
+              >
+                {allowedSendDays.map((days) => (
+                  <option key={days} value={days}>
+                    {sendDaysLabel(days)}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.sendDays && <p role="alert">{fieldErrors.sendDays}</p>}
 
-          <label htmlFor="reminder-message">Mensaje personalizado (opcional)</label>
-          <textarea
-            id="reminder-message"
-            maxLength={MAX_MESSAGE_LENGTH}
-            rows={2}
-            value={message}
-            aria-describedby="reminder-message-help reminder-message-counter"
-            onChange={(event) => setMessage(event.target.value)}
-          />
-          <p id="reminder-message-help" className="field-help">
-            Vacío = mensaje predeterminado.
-          </p>
-          <p id="reminder-message-counter" data-testid="reminder-message-counter">
-            {message.length}/{MAX_MESSAGE_LENGTH}
-          </p>
-          {fieldErrors.message && <p role="alert">{fieldErrors.message}</p>}
+              <label htmlFor="reminder-message">Mensaje personalizado (opcional)</label>
+              <textarea
+                id="reminder-message"
+                maxLength={MAX_MESSAGE_LENGTH}
+                rows={2}
+                value={message}
+                aria-describedby="reminder-message-help reminder-message-counter"
+                onChange={(event) => setMessage(event.target.value)}
+              />
+              <p id="reminder-message-help" className="field-help">
+                Vacío = mensaje predeterminado.
+              </p>
+              <p id="reminder-message-counter" data-testid="reminder-message-counter">
+                {message.length}/{MAX_MESSAGE_LENGTH}
+              </p>
+              {fieldErrors.message && <p role="alert">{fieldErrors.message}</p>}
+            </>
+          )}
 
           <div className="form-actions">
             <button type="submit" className="group-action" disabled={saving}>

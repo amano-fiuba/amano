@@ -3,6 +3,7 @@
 export const MAX_DEBT_DUE_DAYS = 3650
 export const DEBT_DUE_DAYS_INVALID =
   `Los días para el vencimiento tienen que ser un número entero entre 0 y ${MAX_DEBT_DUE_DAYS}`
+export const DEBT_DUE_DAYS_REQUIRED = 'Indicá los días para el vencimiento de las deudas'
 
 /** '' → null (nunca vence); '15' → 15; cualquier otra cosa → undefined (inválido). */
 export function parseDueDays(raw) {
