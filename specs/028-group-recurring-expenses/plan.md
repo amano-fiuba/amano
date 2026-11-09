@@ -114,6 +114,21 @@ Limita también el backfill: si el job se atrasa, recupera fechas vencidas y cre
 próximas dentro de la ventana, respetando el límite de 1000 por serie y ejecución.
 Origen normativo de la ventana: `contracts/recurrence-due-calendar.md`.
 
+**D9. Administración de series desde la UI.**
+Se agregan `GET/PATCH /api/groups/{id}/recurring-expenses` y una pantalla
+`GroupRecurringExpensesPage`. Cualquier miembro lista; el creador, el pagador o un
+admin pausa/reactiva y cambia la frecuencia. La regla de permisos replica la edición
+de gastos de grupo (creador/pagador/admin).
+
+**D10. Actividad del sistema.**
+Las ocurrencias generadas registran `EXPENSE_CREATED` con `actorUserId = null`; el
+frontend ya interpreta los eventos del sistema y muestra "Sistema".
+
+**D11. Datos extra en el recordatorio.**
+`ReminderMessageBuilder` agrega categoría, tipo de gasto y medio de pago al correo.
+El medio de pago se omite cuando `GroupExpense.recurrenceSourceId != null` (ocurrencia
+creada por el sistema).
+
 ## Project Structure
 
 ### Documentation (this feature)
@@ -138,12 +153,16 @@ backend/src/main/java/com/amano/backend/
 ├── groupexpense/
 │   ├── GroupExpense.java                     # modificado: dueDate
 │   ├── GroupExpenseService.java              # modificado: asigna dueDate al crear
-│   ├── GroupRecurringExpenseService.java     # modificado: ventana de 7 días + dueDate de ocurrencias
+│   ├── GroupRecurringExpenseService.java     # modificado: ventana, dueDate y gestión de series
+│   ├── GroupRecurringExpenseController.java  # nuevo: GET/PATCH de series del grupo
+│   ├── RecurringGroupExpenseResponse.java    # nuevo: DTO de la pantalla de series
+│   ├── GroupExpenseRepository.java           # modificado: series del grupo, nuevas primero
 │   ├── DebtRepository.java                   # modificado: findPendingDueBefore usa e.dueDate
 │   ├── overdue/OverdueDebtJob.java           # modificado: pasa today y usa el vencimiento persistido
 │   └── reminder/
 │       ├── ReminderMaterializer.java         # modificado: lee expense.getDueDate()
-│       └── ReminderDispatcher.java           # modificado: lee expense.getDueDate()
+│       ├── ReminderDispatcher.java           # modificado: lee expense.getDueDate()
+│       └── ReminderMessageBuilder.java       # modificado: categoría, tipo y medio de pago
 └── groups/
     └── GroupReminderSettingsService.java     # modificado: ALLOWED_SEND_DAYS + reschedule por dueDate
 
@@ -160,7 +179,11 @@ frontend/src/
 ├── components/groups/GroupDebtSettingsModal.test.jsx
 ├── components/groups/debtDueDays.js                  # validación compartida del plazo
 ├── components/groups/GroupEditForm.jsx               # modificado: sin el plazo (se movió al modal)
-└── pages/groups/GroupInfoView.jsx                     # modificado: botón en Configuración
+├── components/groups/GroupExpensesCard.jsx           # modificado: botón "Gastos recurrentes"
+├── pages/groups/GroupInfoView.jsx                     # modificado: botón en Configuración
+├── pages/groups/GroupRecurringExpensesPage.jsx        # nuevo: lista y acciones de series
+├── pages/groups/activityDescriptions.js               # modificado: "Sistema" en ocurrencias
+└── api/groupsClient.js                                # modificado: list/update de series
 ```
 
 **Structure Decision**: continúa el monorepo backend/`frontend` vigente. No se agregan paquetes ni proyectos nuevos.

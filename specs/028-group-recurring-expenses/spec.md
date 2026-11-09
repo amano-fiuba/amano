@@ -20,8 +20,7 @@ Donde esta spec y una anterior difieran, vale esta.
 
 ## Fuera de alcance
 
-- Pausar, reanudar o finalizar una serie de gastos compartidos desde la UI.
-- Editar la frecuencia de una serie ya creada.
+- Finalizar una serie desde la UI (solo se pausa/reactiva o cambia la frecuencia).
 - Recurrencia de gastos con amigo.
 - Recalcular cotizaciones históricas para cada ocurrencia: la ocurrencia conserva los datos de conversión de la serie.
 - Generar ocurrencias anteriores a la fecha de registro de la serie.
@@ -91,6 +90,31 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 6. **Given** la segunda ocurrencia vence el 08/12/2026 y la configuración de recordatorios es "2 días antes", **When** llega el 06/12/2026, **Then** los deudores con deuda pendiente reciben el recordatorio de la segunda ocurrencia.
 7. **Given** una ocurrencia sin deudas pendientes o ya saldadas, **When** llega la fecha de envío, **Then** no se envía recordatorio, según las reglas de 025.
 
+### User Story 4 - Administrar las series recurrentes del grupo (Priority: P2)
+
+Un miembro entra desde la sección "Gastos" a la lista de gastos recurrentes del grupo.
+Puede ver todas las series con su estado, frecuencia y próxima fecha. Quien creó la
+serie, quien pagó o un administrador puede pausarla, reactivarla o cambiarle la
+frecuencia; el resto solo puede mirar.
+
+**Why this priority**: completa la recurrencia de grupo con el control operativo de
+las series sin depender de la base de datos.
+
+**Independent Test**: con dos series de un grupo, pausar una, reactivarla y cambiar
+su frecuencia; validar la próxima fecha y que otro miembro recibe 403 al intentar
+modificarla.
+
+**Acceptance Scenarios**:
+
+1. **Given** la sección "Gastos" del grupo, **When** el usuario la abre, **Then** ve el botón "Gastos recurrentes" a la izquierda de "Nuevo gasto".
+2. **Given** un grupo con series, **When** cualquier miembro activo entra a la pantalla, **Then** ve concepto, monto, moneda, categoría, frecuencia, estado y próxima fecha de cada serie.
+3. **Given** una serie activa, **When** el creador, el pagador o un admin la pausa, **Then** queda `PAUSED`, se conserva su próxima fecha y no se generan ocurrencias mientras esté pausada.
+4. **Given** una serie pausada, **When** se reactiva, **Then** queda `ACTIVE` y su próxima fecha se recalcula con la frecuencia y la fecha de hoy.
+5. **Given** una serie activa, **When** se cambia su frecuencia, **Then** se persiste la nueva frecuencia y se recalcula la próxima fecha.
+6. **Given** un miembro que no creó la serie, no es el pagador ni admin, **When** intenta modificarla, **Then** recibe 403 y nada cambia.
+7. **Given** el historial del grupo, **When** se muestra una ocurrencia generada por el job, **Then** figura como creada por "Sistema".
+8. **Given** un recordatorio de deuda, **When** se envía el correo, **Then** incluye categoría, tipo de gasto y medio de pago; en las ocurrencias generadas por el sistema no incluye el medio de pago.
+
 ### Edge Cases
 
 - El grupo no tiene `debt_due_days`: las ocurrencias se generan igual, pero 025 no crea recordatorios para sus deudas.
@@ -128,6 +152,11 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 - **FR-019**: Cuando cambie el plazo de pago del grupo, los vencimientos ya creados MUST NOT recalcularse. La fecha de vencimiento de cada ocurrencia generada se fija al crearla (FR-016) y no vuelve a leerse ese plazo; los gastos nuevos no recurrentes y la primera ocurrencia lo usan en el momento de su creación.
 - **FR-017**: La configuración de recordatorios del grupo MUST incluir la opción de "2 días antes" para todos los grupos, y el recordatorio de cada ocurrencia MUST calcularse con la configuración vigente del grupo.
 - **FR-018**: Una ocurrencia sin deudas pendientes o ya saldadas MUST NOT disparar recordatorio.
+- **FR-020**: La sección "Gastos" MUST ofrecer un acceso a la pantalla de gastos recurrentes; cualquier miembro activo MUST poder listar las series del grupo.
+- **FR-021**: El creador de la serie, el pagador o un administrador MUST poder pausarla, reactivarla y cambiar su frecuencia; cualquier otro miembro MUST recibir `403`.
+- **FR-022**: Cambiar la frecuencia de una serie ACTIVA MUST recalcular su próxima fecha con la nueva cadencia desde hoy; una serie PAUSADA MUST conservar su próxima fecha y recalcularla al reactivarse.
+- **FR-023**: Las ocurrencias generadas por el job MUST registrarse en el historial sin actor humano y mostrarse como "Sistema".
+- **FR-024**: El correo de recordatorio MUST incluir categoría, tipo de gasto y medio de pago; en las ocurrencias generadas por el sistema MUST omitir el medio de pago.
 
 ### Key Entities
 
