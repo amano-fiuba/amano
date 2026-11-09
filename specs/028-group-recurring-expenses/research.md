@@ -31,8 +31,9 @@ para construir la fecha al crear un gasto común o la primera ocurrencia.
 **Razón**: elimina la divergencia entre recordatorios y deudas vencidas, y deja un solo
 origen de verdad (plan D2).
 
-**El `OverdueDebtJob`** sigue su lógica de fechas ya existente basada en el vencimiento;
-si detecta la deuda vencida vía `GroupExpense`, debe usar `dueDate` guardada.
+**El `OverdueDebtJob`** usa `e.dueDate` guardada en la consulta
+`DebtRepository.findPendingDueBefore(groupId, today)` (`e.dueDate < today`), sin volver a
+derivar el vencimiento desde `groups.debt_due_days`.
 
 ## Decisión 3: Opción de recordatorio de 2 días antes
 

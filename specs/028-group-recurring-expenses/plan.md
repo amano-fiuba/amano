@@ -138,9 +138,14 @@ backend/src/main/java/com/amano/backend/
 ├── groupexpense/
 │   ├── GroupExpense.java                     # modificado: dueDate
 │   ├── GroupExpenseService.java              # modificado: asigna dueDate al crear
-│   └── GroupRecurringExpenseService.java     # modificado: asigna dueDate a ocurrencias
+│   ├── GroupRecurringExpenseService.java     # modificado: ventana de 7 días + dueDate de ocurrencias
+│   ├── DebtRepository.java                   # modificado: findPendingDueBefore usa e.dueDate
+│   ├── overdue/OverdueDebtJob.java           # modificado: pasa today y usa el vencimiento persistido
+│   └── reminder/
+│       ├── ReminderMaterializer.java         # modificado: lee expense.getDueDate()
+│       └── ReminderDispatcher.java           # modificado: lee expense.getDueDate()
 └── groups/
-    └── GroupReminderSettingsService.java     # modificado: extiende ALLOWED_SEND_DAYS con 2
+    └── GroupReminderSettingsService.java     # modificado: ALLOWED_SEND_DAYS + reschedule por dueDate
 
 backend/src/main/resources/db/migration/
 ├── V33__group_expense_due_date.sql           # nuevo
