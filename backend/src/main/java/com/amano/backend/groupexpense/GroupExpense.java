@@ -10,6 +10,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import com.amano.backend.expense.ExpenseCategory;
 import com.amano.backend.expense.ExpenseType;
 import com.amano.backend.expense.PaymentMethod;
+import com.amano.backend.expense.RecurrenceFrequency;
+import com.amano.backend.expense.RecurrenceStatus;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.CurrencyConversion;
 
@@ -96,7 +98,7 @@ public class GroupExpense {
     @Column(name = "category", length = 20)
     private ExpenseCategory category;
 
-    /** 027 FR-020: informative only; a RECURRING shared expense is never scheduled. */
+    /** 027 FR-020 classification; since V32 a RECURRING shared expense may be a series. */
     @Enumerated(EnumType.STRING)
     @Column(name = "expense_type", length = 20)
     private ExpenseType expenseType;
@@ -104,6 +106,24 @@ public class GroupExpense {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", length = 20)
     private PaymentMethod paymentMethod;
+
+    /** Recurring series only (V32): null for one-time expenses, occurrences and old rows. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_frequency", length = 10)
+    private RecurrenceFrequency recurrenceFrequency;
+
+    /** Series only; present exactly when the frequency is. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "recurrence_status", length = 10)
+    private RecurrenceStatus recurrenceStatus;
+
+    /** Next date to generate; set while ACTIVE/PAUSED, null once FINISHED. */
+    @Column(name = "recurrence_next_date")
+    private LocalDate recurrenceNextDate;
+
+    /** Series an occurrence was generated from; plain id to avoid loading it. */
+    @Column(name = "recurrence_source_id")
+    private Long recurrenceSourceId;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -252,6 +272,43 @@ public class GroupExpense {
 
     public void setPaymentMethod(PaymentMethod paymentMethod) {
         this.paymentMethod = paymentMethod;
+    }
+
+    public RecurrenceFrequency getRecurrenceFrequency() {
+        return recurrenceFrequency;
+    }
+
+    public void setRecurrenceFrequency(RecurrenceFrequency recurrenceFrequency) {
+        this.recurrenceFrequency = recurrenceFrequency;
+    }
+
+    public RecurrenceStatus getRecurrenceStatus() {
+        return recurrenceStatus;
+    }
+
+    public void setRecurrenceStatus(RecurrenceStatus recurrenceStatus) {
+        this.recurrenceStatus = recurrenceStatus;
+    }
+
+    public LocalDate getRecurrenceNextDate() {
+        return recurrenceNextDate;
+    }
+
+    public void setRecurrenceNextDate(LocalDate recurrenceNextDate) {
+        this.recurrenceNextDate = recurrenceNextDate;
+    }
+
+    public Long getRecurrenceSourceId() {
+        return recurrenceSourceId;
+    }
+
+    public void setRecurrenceSourceId(Long recurrenceSourceId) {
+        this.recurrenceSourceId = recurrenceSourceId;
+    }
+
+    /** A recurring series registered since this change (has a frequency). */
+    public boolean isRecurringSeries() {
+        return recurrenceFrequency != null;
     }
 
     public OffsetDateTime getCreatedAt() {

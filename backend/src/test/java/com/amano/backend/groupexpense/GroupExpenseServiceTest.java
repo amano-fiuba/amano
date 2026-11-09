@@ -342,6 +342,7 @@ class GroupExpenseServiceTest {
         CreateGroupExpenseRequest request = threeWay();
         request.setCategory("LEISURE");
         request.setType("RECURRING");
+        request.setFrequency("MONTHLY");
         request.setPaymentMethod("CREDIT_CARD");
 
         GroupExpenseResponse response = service.create(ANA, GROUP_ID, KEY, request).expense();
@@ -349,8 +350,12 @@ class GroupExpenseServiceTest {
         ArgumentCaptor<GroupExpense> captor = ArgumentCaptor.forClass(GroupExpense.class);
         verify(expenseRepository).save(captor.capture());
         assertThat(captor.getValue().getCategory()).isEqualTo(com.amano.backend.expense.ExpenseCategory.LEISURE);
-        // RECURRING is informative: it is stored, nothing is scheduled.
         assertThat(captor.getValue().getExpenseType()).isEqualTo(com.amano.backend.expense.ExpenseType.RECURRING);
+        assertThat(captor.getValue().getRecurrenceFrequency())
+                .isEqualTo(com.amano.backend.expense.RecurrenceFrequency.MONTHLY);
+        assertThat(captor.getValue().getRecurrenceStatus())
+                .isEqualTo(com.amano.backend.expense.RecurrenceStatus.ACTIVE);
+        assertThat(captor.getValue().getRecurrenceNextDate()).isNotNull();
         assertThat(captor.getValue().getPaymentMethod())
                 .isEqualTo(com.amano.backend.expense.PaymentMethod.CREDIT_CARD);
         assertThat(response.category()).isEqualTo("LEISURE");
@@ -380,12 +385,30 @@ class GroupExpenseServiceTest {
     }
 
     @Test
-    void aFrequencyIsNotAcceptedInASharedExpense() {
+    void aRecurringSharedExpenseRequiresAFrequency() {
         CreateGroupExpenseRequest request = threeWay();
         request.setType("RECURRING");
-        request.putUnknownProperty("frequency", "WEEKLY");
 
-        assertThat(fieldErrorsOf(request)).containsEntry("frequency", "No se permite informar este campo");
+        assertThat(fieldErrorsOf(request))
+                .containsEntry("frequency", GroupExpenseService.FREQUENCY_REQUIRED);
+    }
+
+    @Test
+    void aOneTimeSharedExpenseRejectsAFrequency() {
+        CreateGroupExpenseRequest request = threeWay();
+        request.setFrequency("WEEKLY");
+
+        assertThat(fieldErrorsOf(request))
+                .containsEntry("frequency", GroupExpenseService.FREQUENCY_NOT_ALLOWED);
+    }
+
+    @Test
+    void aRecurringSharedExpenseAcceptsACatalogFrequency() {
+        CreateGroupExpenseRequest request = threeWay();
+        request.setType("RECURRING");
+        request.setFrequency("MONTHLY");
+
+        assertThat(service.create(ANA, GROUP_ID, KEY, request).expense()).isNotNull();
     }
 
     @Test
