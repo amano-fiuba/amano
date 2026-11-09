@@ -78,6 +78,7 @@ description: "Task list for Calendario de vencimientos de gastos compartidos rec
 
 - [X] T015 Validar el recorrido de specs/028-group-recurring-expenses/quickstart.md con los IT equivalentes (GroupExpenseControllerIT para primera/segunda ocurrencia y ventana, ReminderDebtFlowIT/PayerNoticeIT para envíos, OverdueDebtJobIT para vencimiento y ReminderSettingsIT para la opción de 2 días): cubre grupo con `debt_due_days`, recordatorio de 2 días y recordatorio en `dueDate - reminderSendDays`
 - [X] T016 [P] Actualizar specs/028-group-recurring-expenses/plan.md, research.md, data-model.md y contracts/ con cualquier ajuste que surja de la implementación (sin cambiar el alcance de la spec)
+- [X] T018 Centralizar el plazo de pago y los campos de recordatorio en un único modal de la configuración del grupo (`GroupDebtSettingsModal`), quitar el plazo de `GroupEditForm` y retirar el panel inline de recordatorios
 - [X] T017 Cobertura y calidad: `mvn -B verify` en `backend/` y `npm ci && npm run lint && npm run test:coverage && npm run build` en `frontend/`, con cobertura ≥ 85 % (JaCoCo + Vitest coverage), sin bajar umbrales
 
 ---

@@ -156,8 +156,11 @@ backend/src/test/java/com/amano/backend/
 └── groups/...                                # pruebas de reminder settings
 
 frontend/src/
-├── components/groups/GroupReminderSettingsPanel.jsx
-└── components/groups/GroupReminderSettingsPanel.test.jsx
+├── components/groups/GroupDebtSettingsModal.jsx      # nuevo: modal central de deudas y recordatorios
+├── components/groups/GroupDebtSettingsModal.test.jsx
+├── components/groups/debtDueDays.js                  # validación compartida del plazo
+├── components/groups/GroupEditForm.jsx               # modificado: sin el plazo (se movió al modal)
+└── pages/groups/GroupInfoView.jsx                     # modificado: botón en Configuración
 ```
 
 **Structure Decision**: continúa el monorepo backend/`frontend` vigente. No se agregan paquetes ni proyectos nuevos.
