@@ -71,7 +71,7 @@ Fuera de alcance (spec): personalizar frecuencias de recurrentes; ver, editar, b
 
 **D1. Monedas: enum ampliado + catálogo en vivo** (R1–R3, [currencies-api](./contracts/currencies-api.md)). 32 constantes con `bcraCode()`; `GET /api/currencies` cruza `Maestros/Divisas` con el enum, caché 24 h, `503` sin caché. `BcraExchangeRateClient` busca por `bcraCode()`. `CHECK` de moneda ampliados salvo `groups.primary_currency`; `Currency.GROUP_PRIMARY` restringe la moneda principal en `GroupService.java:127-132` (verificado en T004: solo el alta la setea).
 
-**D2. Campos de 007 en gasto compartido** (R4). Columnas nullable; el servicio las exige en altas (grupo y amigo) y en `PATCH` de gasto personal de grupo las acepta. `RECURRING` es informativo.
+**D2. Campos de 007 en gasto compartido** (R4). Columnas nullable; el servicio las exige en altas (grupo y amigo) y en `PATCH` de gasto personal de grupo las acepta. Desde V32, `RECURRING` en un gasto de grupo acepta `frequency` y crea una serie; en un gasto con amigo sigue siendo solo informativo.
 
 **D3. Gasto con amigo sobre el modelo de grupo** Sin conversión de moneda por FR-034. (R5, [shared-expenses-api](./contracts/shared-expenses-api.md)). `group_id NULL` + `friend_user_id`, CHECK de exclusión. Alta en `POST /api/users/me/friends/{friendId}/expenses`, verifica amistad (`FriendshipRequestRepository`/servicio de 013), participantes = {yo, amigo}, sin conversión. `DebtDirectDebtAdapter` implementa `DirectDebtPort` y desplaza a `NoOpDirectDebtPort` (que se elimina o queda `@ConditionalOnMissingBean`). El alta se hace con el mismo núcleo que grupos: `GroupExpenseService` extrae `register(context, ...)` donde `context` es grupo o amigo (moneda destino, validador de participantes, permisos).
 

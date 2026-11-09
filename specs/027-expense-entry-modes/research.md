@@ -67,7 +67,7 @@ El catálogo crudo **no se puede ofrecer tal cual**:
 
 **Decisión**: tres columnas nuevas en `group_expenses`: `category`, `expense_type`, `payment_method` (`VARCHAR`, nullable, con `CHECK` sobre los mismos valores que `expenses`). El backend las exige en altas nuevas (400 si faltan) y las deja `NULL` en los gastos anteriores. Se reutilizan los enums `ExpenseCategory`, `ExpenseType` y `PaymentMethod` del paquete `expense` y sus mensajes de error del 007.
 
-**Motivo**: nullable evita inventar valores para datos históricos (Principio VI); la obligatoriedad se aplica en el servicio, igual que en 007. El "Recurrente" de un gasto compartido es informativo (supuesto de la spec): no se agrega `frequency` ni se programa nada.
+**Motivo**: nullable evita inventar valores para datos históricos (Principio VI); la obligatoriedad se aplica en el servicio, igual que en 007. Desde V32, un gasto de grupo `RECURRING` acepta `frequency` y se convierte en serie (misma semántica que 009); en un gasto con amigo sigue siendo informativo.
 
 **Alternativas**: `NOT NULL` con valores por defecto (`OTHER`, `ONE_TIME`, `OTHER`). Descartada: fabricaría datos que el usuario nunca eligió.
 
