@@ -32,6 +32,7 @@ Donde esta spec y una anterior difieran, vale esta.
 
 - Q: Si los días para pagar del grupo cambian después de crear la serie, ¿qué plazo deben usar las ocurrencias que se generan después? → A: Usar el plazo vigente del grupo al generar cada ocurrencia.
 - Q: ¿La opción de "2 días antes" de la configuración de recordatorios debe estar disponible para todos los grupos o solo para los recurrentes? → A: Disponible para todos los grupos.
+- Q: Si la ocurrencia se crea el mismo día que vence, ¿cómo puede salir un recordatorio de 2 días antes? → A: El job anticipa la generación con una ventana de 7 días; la ocurrencia y sus deudas existen antes de que llegue su vencimiento.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -49,7 +50,7 @@ Ana registra un gasto en el grupo "Depto", marca el tipo "Recurrente" y elige "M
 2. **Given** el formulario con tipo "Recurrente", **When** el usuario intenta guardar sin elegir frecuencia, **Then** ve "La frecuencia es obligatoria" y no se guarda nada.
 3. **Given** el formulario con tipo "Único", **When** se muestra, **Then** no aparece el selector "Frecuencia" y el backend rechaza una frecuencia enviada.
 4. **Given** un alta de grupo con tipo "Recurrente" y frecuencia "Mensual", **When** se guarda, **Then** responde `201`, la fila queda con `recurrence_frequency = MONTHLY`, `recurrence_status = ACTIVE` y `recurrence_next_date` igual al primer período posterior a la fecha del gasto.
-5. **Given** una serie activa cuya próxima fecha es D, **When** corre el job con fecha D o posterior, **Then** se crea una ocurrencia con fecha D, el mismo monto, moneda, pagador, participantes, reparto, categoría, tipo, medio de pago y descripción, y se enlaza con `recurrence_source_id`.
+5. **Given** una serie activa cuya próxima fecha es D, **When** corre el job en cualquier día de la ventana de anticipación (hasta 7 días antes de D, incluida D), **Then** se crea una ocurrencia con fecha D, el mismo monto, moneda, pagador, participantes, reparto, categoría, tipo, medio de pago y descripción, y se enlaza con `recurrence_source_id`.
 6. **Given** la ocurrencia creada, **When** se consultan sus deudas, **Then** tiene deudas `PENDING` por cada participante distinto del pagador, con la misma división de la serie.
 7. **Given** una ocurrencia creada, **When** se consulta el historial, **Then** aparece un evento `EXPENSE_CREATED` para esa ocurrencia.
 8. **Given** el job ejecutado dos veces para la misma fecha, **When** se vuelve a ejecutar, **Then** no crea duplicados: hay como máximo una ocurrencia por serie y fecha.
@@ -74,7 +75,7 @@ La serie recurrente no relaja las reglas del gasto de grupo: respeta permisos, p
 
 ### User Story 3 - Calendario de vencimientos y recordatorios (Priority: P1)
 
-Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera ocurrencia y no se genera otra para el mismo día. La primera ocurrencia vence como un gasto normal del grupo y sus recordatorios se calculan desde el vencimiento vigente; cada ocurrencia posterior se genera en su propia fecha, con sus deudas y su propio vencimiento.
+Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera ocurrencia y no se genera otra para el mismo día. La primera ocurrencia vence como un gasto normal del grupo y sus recordatorios se calculan desde el vencimiento vigente; cada ocurrencia posterior se genera hasta 7 días antes de su propia fecha, con sus deudas y su propio vencimiento.
 
 **Why this priority**: cierra el calendario completo de la recurrencia: primer pago, vencimientos y recordatorios por período sin duplicar el gasto.
 
@@ -85,7 +86,7 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 1. **Given** un usuario registra hoy un gasto de grupo recurrente, **When** guarda el gasto, **Then** el gasto creado es la primera ocurrencia, con fecha de hoy, y no se genera otra ocurrencia adicional para hoy.
 2. **Given** el grupo tiene `debt_due_days = 7`, **When** se crea la primera ocurrencia, **Then** las deudas vencen el 15/11/2026, igual que en un gasto normal.
 3. **Given** la configuración de recordatorios es "2 días antes", **When** llega el 13/11/2026 (viernes), **Then** los deudores con deuda pendiente reciben el recordatorio de la primera ocurrencia.
-4. **Given** la frecuencia es mensual y la primera ocurrencia fue el 08/11/2026, **When** llega el 08/12/2026, **Then** se genera la segunda ocurrencia con esa fecha, sus propias deudas y su propio vencimiento.
+4. **Given** la frecuencia es mensual y la primera ocurrencia fue el 08/11/2026, **When** corre el job dentro de la ventana de anticipación de 7 días previos a la próxima fecha (por ejemplo, el 01/12/2026), **Then** se genera la segunda ocurrencia con fecha 08/12/2026, sus propias deudas y su propio vencimiento.
 5. **Given** la segunda ocurrencia es del 08/12/2026, **When** se calcula su vencimiento, **Then** vence el 08/12/2026, porque las ocurrencias generadas vencen en su propia fecha y no se les vuelve a sumar `debt_due_days`.
 6. **Given** la segunda ocurrencia vence el 08/12/2026 y la configuración de recordatorios es "2 días antes", **When** llega el 06/12/2026, **Then** los deudores con deuda pendiente reciben el recordatorio de la segunda ocurrencia.
 7. **Given** una ocurrencia sin deudas pendientes o ya saldadas, **When** llega la fecha de envío, **Then** no se envía recordatorio, según las reglas de 025.
@@ -98,6 +99,7 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 - La serie se creó antes de esta feature como `RECURRING` sin frecuencia: sigue siendo un gasto informativo y no genera ocurrencias.
 - Un participante deja el grupo después de crear la serie: la ocurrencia conserva los participantes originales, porque replica la serie y no vuelve a validar la membresía.
 - La fecha de la ocurrencia ya tiene una fila para esa serie (por ejemplo, tras un corte): el job la saltea y avanza la próxima fecha.
+- La ocurrencia se genera dentro de su ventana de anticipación de 7 días: el gasto queda fechado en su día programado (futuro), con sus deudas pendientes; 025 programa el recordatorio desde que la deuda existe, calculando el envío desde la fecha de vencimiento propia de la ocurrencia.
 - El guardado de una serie falla después de crear el gasto: la transacción no deja series ni ocurrencias parciales.
 - La frecuencia no está en el catálogo: se rechaza con el error de frecuencia y no se guarda nada.
 - El plazo de pago del grupo cambia entre períodos: la próxima ocurrencia usa el valor vigente del grupo en el momento de generarse; las ocurrencias ya creadas conservan su vencimiento.
@@ -112,7 +114,7 @@ Un miembro registra hoy un gasto recurrente en un grupo. Ese gasto es la primera
 - **FR-003**: Un gasto con amigo MUST rechazar `frequency`; la recurrencia compartida aplica solo a grupos.
 - **FR-004**: El backend MUST persistir `recurrence_frequency`, `recurrence_status`, `recurrence_next_date` y `recurrence_source_id` en `group_expenses`.
 - **FR-005**: Al crear una serie activa, `recurrence_next_date` MUST ser la primera fecha de la frecuencia estrictamente posterior a la fecha del gasto y a hoy, con la misma semántica que 009.
-- **FR-006**: Un job diario MUST generar las ocurrencias cuyo `recurrence_next_date` sea menor o igual a hoy.
+- **FR-006**: Un job diario MUST generar las ocurrencias cuyo `recurrence_next_date` quede dentro de la ventana de anticipación de 7 días o ya esté atrasado, creando cada una con su fecha programada (ventana de anticipación para que el recordatorio exista antes del vencimiento de la ocurrencia).
 - **FR-007**: Cada ocurrencia MUST copiar monto, moneda, conversión, pagador, participantes, reparto, categoría, tipo, medio de pago y descripción de la serie.
 - **FR-008**: Cada ocurrencia MUST crear sus propias deudas `PENDING` para los participantes distintos del pagador.
 - **FR-009**: Cada ocurrencia MUST registrar el evento `EXPENSE_CREATED` en el historial del grupo.

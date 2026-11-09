@@ -72,6 +72,24 @@ el mismo día.
 
 No hay job ni callback que re-vence gastos existentes cuando cambia la configuración.
 
+## Decisión 6: Ventana de anticipación de 7 días
+
+**Decisión**: el job de recurrencia genera la ocurrencia cuando
+`recurrence_next_date <= today + 7` (máximo del catálogo de `reminder_send_days`).
+
+**Razón**: tal como estaba, la ocurrencia se creaba el mismo día que vencía; el
+recordatorio de "2 días antes" (o de 7/5/3) no podría programarse porque
+`ReminderMaterializer` solo arma recordatorios para deudas que ya existen
+(ReminderMaterializer.java:62) y `sendDate = dueDate - sendDays` ya estaría en el
+pasado. Con la ventana, la ocurrencia y sus deudas existen antes del vencimiento y el
+envío se programa para la fecha correcta (ejemplo: vencimiento `08/12/2026` con recordatorio `2 días antes` → envío `06/12/2026`).
+
+**Consecuencias**:
+- La ocurrencia queda con `expense_date` futura (~7 días visibles antes de su fecha).
+- El `OverdueDebtJob` no considera vencidas deudas cuya `dueDate` es futura; sin cambio.
+- El backfill sigue recuperando fechas atrasadas (hasta hoy) y, además, crea las que
+  entran en la ventana, aunque el límite de 1000 por serie y ejecución se mantiene.
+
 ## Riesgos observados
 
 1. **Divergencia entre dos caminos que calculaban el due date por separado**
@@ -80,3 +98,6 @@ No hay job ni callback que re-vence gastos existentes cuando cambia la configura
    mejor estimación; luego quedan inmutables.
 3. **Grupos sin `debt_due_days`**: `dueDate` queda NULL; sin recordatorio ni vencido.
    Cubre el caso ya contemplado en 025.
+4. **Ventana vs. opción cambiante**: el margen de anticipación queda fijo en 7 días
+   (máximo del catálogo); si el grupo baja su opción de recordatorio, la deuda ya
+   existe y no hay problema; si sube, la ocurrencia ya se generó dentro de la ventana.

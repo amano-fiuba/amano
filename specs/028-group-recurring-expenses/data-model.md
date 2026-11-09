@@ -41,6 +41,14 @@ Columnas de recurrencia existentes (V32, sin cambios): `recurrence_frequency`,
 - `groups.debt_due_days` sigue existiendo, pero se usa solo al crear el vencimiento del
   gasto/primera ocurrencia, no al leerlo.
 
+## Ventana de anticipación
+
+- El job de recurrencia genera la ocurrencia cuando `recurrence_next_date <= today + 7`
+  (máximo del catálogo de `reminder_send_days`); la fila nace con `expense_date` futura
+  y sus deudas `PENDING` ya disponibles para 025.
+- `due_date` de la ocurrencia no depende de esa ventana: queda en su propia fecha de
+  programación desde que la fila existe.
+
 ## Invariants
 
 1. `due_date` es constante por fila desde su creación (o el backfill de V33) hasta que

@@ -15,7 +15,11 @@ cerrar su calendario por período:
    cuando cambian los días del grupo.
 2. **Recordatorio de 2 días antes.** La lista de días de envío de recordatorios se
    extiende a `2` para **todos** los grupos, heredando el flujo ya existente de 025.
-3. **Nada cambia en la lógica base de serie, ocurrencias, deudas o pagos.** El job de
+3. **Ventana de anticipación de 7 días.** El job de recurrencia genera cada ocurrencia
+   dentro de los 7 días previos a su fecha programada, para que sus deudas existan
+   antes de su propio vencimiento y el recordatorio "2 días antes" (o de cualquier
+   opción del catálogo) pueda programarse y enviarse a tiempo.
+4. **Nada cambia en la lógica base de serie, ocurrencias, deudas o pagos.** El job de
    vencimiento y el de recordatorios pasan a usar el vencimiento ya calculado.
 
 ## Technical Context
@@ -41,7 +45,7 @@ cerrar su calendario por período:
 - Las ocurrencias generadas **no** vuelven a validar membreza, reparto ni conversión.
 - El vencimiento de cada gasto **ya se guarda**, así cambios de configuración futuros no lo recalculan.
 
-**Scale/Scope** (estimado): backend con 2 migraciones nuevas, 1 helper de vencimiento, 2 modificaciones de `GroupExpense`/`ReminderSchedule` y ajustes en los jobs existentes. Frontend con 1 const de opciones y 1 test delabels. No se agregan endpoints nuevos; la configuración de recordatorios sigue usando el endpoint de 025.
+**Scale/Scope** (estimado): backend con 2 migraciones nuevas, 1 helper de vencimiento, 2 modificaciones de `GroupExpense`/`ReminderSchedule` y ajustes en los jobs existentes. Frontend con 1 const de opciones y 1 test de labels. No se agregan endpoints nuevos; la configuración de recordatorios sigue usando el endpoint de 025.
 
 ## Constitution Check
 
@@ -74,7 +78,7 @@ Se agrega `group_expenses.due_date DATE NULL`. Así:
 - un cambio posterior en `debtDueDays` del grupo **no** recalcula vencimientos ya creados.
 
 **D2. Un único origen de vencimiento.**
-`ReminderMaterializer` y `ReminderDispatcher` dejan de recalculaph `expenseDate + group.debtDueDays` y usan el vencimiento ya guardado. El `OverdueDebtJob` usa el mismo criterio para detectar deudas vencidas.
+`ReminderMaterializer` y `ReminderDispatcher` dejan de recalcula `expenseDate + group.debtDueDays` y usan el vencimiento ya guardado. El `OverdueDebtJob` usa el mismo criterio para detectar deudas vencidas.
 
 **D3. La primera ocurrencia es el gasto original.**
 No se genera otra ocurrencia para el día de registro. La serie guarda `recurrence_next_date` en el período siguiente y la primera ocurrencia queda lista para deuda/recordatorio como un gasto normal.
@@ -94,6 +98,19 @@ La configuración de recordatorios reutiliza `PUT /api/groups/{id}/reminder-sett
 - Grupo sin `debtDueDays`: no se crean recordatorios.
 - Grupo que cambia `debtDueDays`: la próxima ocurrencia se genera con el valor vigente, pero el vencimiento ya creado del gasto/ocurrencia no cambia.
 - La primera y segunda ocurrencia siempre son dos gastos distintos, con su propia deuda y su propio vencimiento.
+
+**D8. Ventana de anticipación de 7 días (por qué no alcanza con "el día que llega").**
+Hoy la ocurrencia se crea cuándo su fecha llega; para que el recordatorio de `2 días
+antes` (o de 7, 5, 3) pueda salir a tiempo, el job genera la ocurrencia y sus deudas
+cuando `recurrence_next_date <= today + 7`. El margen `7` es el máximo del catálogo de
+días de recordatorio (independiente de la opción vigente del grupo) y no cambia la
+semántica de `dueDate` (sigue siendo la propia fecha de la ocurrencia):
+- la ocurrencia queda fechada en su día programado (futuro visible en la lista),
+- sus deudas nacen `PENDING` antes de vencer,
+- `ReminderMaterializer` programa el envío para `dueDate - reminderSendDays` desde que
+  la deuda existe.
+Limita también el backfill: si el job se atrasa, recupera fechas vencidas y crea las
+próximas dentro de la ventana, aunque el límite de 1000 por serie y ejecución.
 
 ## Project Structure
 

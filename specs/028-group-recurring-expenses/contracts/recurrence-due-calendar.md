@@ -36,7 +36,10 @@ recalcularla.
 ## Cascada de generación de ocurrencias
 
 - `GroupRecurringExpenseService.generateOccurrence` crea la `GroupExpense` de la
-  repetición con `dueDate = expenseDate` (FR-016).
+  repetición con `dueDate = expenseDate` (FR-016) y la deudas correspondientes.
+- El job **anticipa** la generación: corre cuando `recurrence_next_date <= today + 7`
+  (ventana de anticipación, máx del catálogo de días de recordatorio). Así la deuda
+  existe antes de `sendDate = dueDate - reminderSendDays` y 025 puede programar el envío.
 - `recurrence_next_date` de la serie avanza conforme a la frecuencia (V32, ya vigente).
 - Cada ocurrencia genera sus `Debts` con los mismos estados que un gasto normal; la
   `dueDate` visible por los recordatorios es la de la `GroupExpense` generada.

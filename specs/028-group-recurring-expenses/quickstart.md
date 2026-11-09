@@ -59,9 +59,10 @@ Esperado:
 
 ## 5. Segunda ocurrencia
 
-- El `08/12/2026` se genera automáticamente la siguiente ocurrencia
-  (`recurrence_source_id` apunta a la serie, `recurrence_frequency NULL`).
-- Su `dueDate` es el propio `08/12/2026`.
+- Dentro de la ventana de anticipación de 7 días (a partir del `01/12/2026`) el job
+  genera la siguiente ocurrencia (`recurrence_source_id` apunta a la serie,
+  `recurrence_frequency NULL`), fechada en el `08/12/2026`.
+- Su `dueDate` es el propio `08/12/2026` (y no se recalculan cuando cambian los días del grupo).
 - Con `reminderSendDays = 2` el recordatorio sale el `06/12/2026`.
 
 ## 6. Deuda vencida
