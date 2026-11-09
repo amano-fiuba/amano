@@ -9,7 +9,7 @@ import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupEditForm from '../../components/groups/GroupEditForm'
 import { GroupSettingsIcon, PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
-import GroupReminderSettingsPanel from '../../components/groups/GroupReminderSettingsPanel'
+import GroupDebtSettingsModal from '../../components/groups/GroupDebtSettingsModal'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
 import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
@@ -28,6 +28,7 @@ export default function GroupInfoView() {
   const [error, setError] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [showPermissions, setShowPermissions] = useState(false)
+  const [showDebtSettings, setShowDebtSettings] = useState(false)
   const [editing, setEditing] = useState(false)
   // Bumped after an alta so MemberListView re-fetches (fix 2026-11-04).
   const [membersVersion, setMembersVersion] = useState(0)
@@ -165,7 +166,17 @@ export default function GroupInfoView() {
                     refreshGroup()
                   }}
                 />
-                <GroupReminderSettingsPanel groupId={group.id} isAdmin={isAdmin} />
+                <div className="group-admin-panel__subsection">
+                  <button
+                    type="button"
+                    className="group-action"
+                    data-testid="debt-settings-button"
+                    aria-haspopup="dialog"
+                    onClick={() => setShowDebtSettings(true)}
+                  >
+                    Configurar deudas y recordatorios
+                  </button>
+                </div>
               </div>
             )}
           </header>
@@ -218,6 +229,18 @@ export default function GroupInfoView() {
               permissions={group.permissions ?? {}}
               onAdded={handleMemberAdded}
               onClose={() => setShowAddMember(false)}
+            />
+          )}
+
+          {showDebtSettings && (
+            <GroupDebtSettingsModal
+              group={group}
+              isAdmin={isAdmin}
+              onClose={() => setShowDebtSettings(false)}
+              onSaved={() => {
+                setShowDebtSettings(false)
+                refreshGroup()
+              }}
             />
           )}
         </>

@@ -13,10 +13,19 @@ vi.mock('../../api/groupsClient', async (importOriginal) => ({
   getMembers: vi.fn(),
   addMember: vi.fn(),
   getActivity: vi.fn(),
+  getReminderSettings: vi.fn(),
   updateGroup: vi.fn(),
 }))
 
-import { addMember, getActivity, getGroup, getMembers, leaveGroup, updateGroup } from '../../api/groupsClient'
+import {
+  addMember,
+  getActivity,
+  getGroup,
+  getMembers,
+  getReminderSettings,
+  leaveGroup,
+  updateGroup,
+} from '../../api/groupsClient'
 import GroupInfoView from './GroupInfoView'
 import { AuthProvider } from '../../auth/AuthContext'
 
@@ -28,6 +37,11 @@ beforeEach(() => {
   getMembers.mockResolvedValue({ ok: true, members: [] })
   getActivity.mockReset()
   getActivity.mockResolvedValue({ ok: true, content: [] })
+  getReminderSettings.mockReset()
+  getReminderSettings.mockResolvedValue({
+    ok: true,
+    settings: { sendDays: 2, message: null, defaultSendDays: 5, allowedSendDays: [7, 5, 3, 2, 1] },
+  })
 })
 
 const GROUP = {
@@ -206,6 +220,20 @@ describe('GroupInfoView (US6 read view + US5 panel)', () => {
 
     expect(screen.queryByTestId('edit-panel')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Editar' })).toBeInTheDocument()
+  })
+
+  it('abre el modal de deudas y recordatorios debajo de los permisos', async () => {
+    getGroup.mockResolvedValue({ ok: true, group: { ...GROUP, debtDueDays: 7 } })
+
+    renderView()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Configuración' }))
+    expect(screen.getByRole('heading', { name: 'Permisos de los miembros' })).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('debt-settings-button'))
+
+    expect(await screen.findByRole('dialog', { name: 'Deudas y recordatorios' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Días para el vencimiento de las deudas')).toHaveValue('7')
+    expect(screen.getByLabelText('Cuándo enviar el recordatorio')).toHaveValue('2')
   })
 
   it('al guardar la configuración se cierra sola y vuelve a consultar el grupo', async () => {
