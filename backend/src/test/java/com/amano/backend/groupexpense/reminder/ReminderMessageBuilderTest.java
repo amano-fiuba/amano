@@ -9,7 +9,11 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
+import com.amano.backend.expense.ExpenseCategory;
+import com.amano.backend.expense.ExpenseType;
+import com.amano.backend.expense.PaymentMethod;
 import com.amano.backend.groupexpense.DebtStatus;
+import com.amano.backend.groupexpense.GroupExpense;
 import com.amano.backend.user.Currency;
 
 /** 025 T012/T028: pure rendering of the reminder and payer notice mails. */
@@ -34,6 +38,34 @@ class ReminderMessageBuilderTest {
                 .contains("3333.33 ARS")
                 .contains("«Súper»")
                 .contains("20/11/2026");
+    }
+
+    @Test
+    void defaultDebtBodyIncludesCategoryTypeAndPaymentMethod() {
+        ReminderMessageBuilder.Mail mail = debtMail("Súper", DebtStatus.PENDING, null);
+        assertThat(mail.body())
+                .contains("Categoría: Alimentos")
+                .contains("Tipo de gasto: Recurrente")
+                .contains("Medio de pago: Efectivo");
+    }
+
+    @Test
+    void customMessageBodyIncludesCategoryTypeAndPaymentMethod() {
+        ReminderMessageBuilder.Mail mail = debtMail("Súper", DebtStatus.PENDING, "Te esperamos");
+        assertThat(mail.body())
+                .contains("Categoría: Alimentos")
+                .contains("Tipo de gasto: Recurrente")
+                .contains("Medio de pago: Efectivo");
+    }
+
+    @Test
+    void systemOccurrenceOmitsThePaymentMethod() {
+        ReminderMessageBuilder.Mail mail = builder.debtReminder("Grupo Amigos", "Juan Pérez", "Súper",
+                new BigDecimal("3333.33"), Currency.ARS, DUE_DATE, DebtStatus.PENDING, null, expense(99L));
+        assertThat(mail.body())
+                .contains("Categoría: Alimentos")
+                .contains("Tipo de gasto: Recurrente")
+                .doesNotContain("Medio de pago:");
     }
 
     @Test
@@ -114,14 +146,14 @@ class ReminderMessageBuilderTest {
     @Test
     void zeroRemainingDaysIsRenderedAsSingularDay() {
         ReminderMessageBuilder.Mail mail = builder.payerNotice("Grupo Amigos", "Ana López", "Súper",
-                DUE_DATE, 0, List.of());
+                DUE_DATE, 0, List.of(), expense(null));
         assertThat(mail.body()).contains("0 días restantes");
     }
 
     @Test
     void oneRemainingDayIsRenderedInSingular() {
         ReminderMessageBuilder.Mail mail = builder.payerNotice("Grupo Amigos", "Ana López", "Súper",
-                DUE_DATE, 1, List.of());
+                DUE_DATE, 1, List.of(), expense(null));
         assertThat(mail.body()).contains("1 día restante");
     }
 
@@ -140,10 +172,20 @@ class ReminderMessageBuilderTest {
 
     private ReminderMessageBuilder.Mail debtMail(String concept, DebtStatus status, String customMessage) {
         return builder.debtReminder("Grupo Amigos", "Juan Pérez", concept,
-                new BigDecimal("3333.33"), Currency.ARS, DUE_DATE, status, customMessage);
+                new BigDecimal("3333.33"), Currency.ARS, DUE_DATE, status, customMessage, expense(null));
     }
 
     private ReminderMessageBuilder.Mail payerMail(List<Map<String, String>> pendingTotals) {
-        return builder.payerNotice("Grupo Amigos", "Ana López", "Súper", DUE_DATE, 5, pendingTotals);
+        return builder.payerNotice("Grupo Amigos", "Ana López", "Súper", DUE_DATE, 5, pendingTotals,
+                expense(null));
+    }
+
+    private static GroupExpense expense(Long recurrenceSourceId) {
+        GroupExpense expense = new GroupExpense();
+        expense.setCategory(ExpenseCategory.FOOD);
+        expense.setExpenseType(ExpenseType.RECURRING);
+        expense.setPaymentMethod(PaymentMethod.CASH);
+        expense.setRecurrenceSourceId(recurrenceSourceId);
+        return expense;
     }
 }

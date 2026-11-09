@@ -25,6 +25,9 @@ public interface GroupExpenseRepository extends JpaRepository<GroupExpense, Long
     /** Backstop of the deterministic occurrence key (V32 unique constraint). */
     Optional<GroupExpense> findByRecurrenceSourceIdAndExpenseDate(Long recurrenceSourceId, LocalDate expenseDate);
 
+    /** 028: recurring series of a group, newest first (management screen). */
+    List<GroupExpense> findByGroupIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(Long groupId);
+
     /** 027 US4: an expense with a friend whose two participants are {@code a} and {@code b}. */
     @Query("""
             SELECT e FROM GroupExpense e

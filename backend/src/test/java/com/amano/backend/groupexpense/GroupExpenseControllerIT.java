@@ -306,6 +306,12 @@ class GroupExpenseControllerIT {
         assertThat(expenseEvents()).isEqualTo(eventsBefore + 1);
         assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
                 LocalDate.class, occurrenceId)).isEqualTo(next);
+        // 028: la ocurrencia la crea el sistema, sin actor humano.
+        assertThat(jdbc.queryForObject("""
+                SELECT actor_user_id FROM group_activity
+                WHERE group_id = ? AND event_type = 'EXPENSE_CREATED'
+                  AND details_json::jsonb->>'expenseId' = ?
+                """, Long.class, groupId, occurrenceId.toString())).isNull();
         // Second run on the same date is a no-op.
         assertThat(recurringExpenseService.generateDueOccurrences(next)).isZero();
     }

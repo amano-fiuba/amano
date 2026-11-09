@@ -4,7 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -12,10 +14,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.expense.RecurrenceFrequency;
 import com.amano.backend.expense.RecurrenceStatus;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.ExpenseActivityDetails;
 import com.amano.backend.groups.Group;
+import com.amano.backend.groups.GroupMember;
+import com.amano.backend.groups.GroupMemberRepository;
+import com.amano.backend.groups.GroupNotFoundException;
+import com.amano.backend.groups.GroupPermissionDeniedException;
 import com.amano.backend.groups.GroupRepository;
 import com.amano.backend.user.Currency;
 
@@ -44,10 +52,16 @@ public class GroupRecurringExpenseService {
      */
     private static final int ANTICIPATION_DAYS = 7;
 
+    public static final String RECURRENCE_EDIT_EMPTY = "Enviá al menos un campo para editar";
+    public static final String RECURRENCE_STATUS_INVALID = "El estado debe ser ACTIVE o PAUSED";
+    public static final String RECURRENCE_FREQUENCY_INVALID = "La frecuencia no es válida";
+    public static final String NOT_ALLOWED_TO_EDIT_RECURRENCE = "No podés modificar este gasto recurrente";
+
     private final GroupExpenseRepository expenseRepository;
     private final GroupExpenseShareRepository shareRepository;
     private final DebtRepository debtRepository;
     private final GroupRepository groupRepository;
+    private final GroupMemberRepository groupMemberRepository;
     private final ActivityEventService activityEventService;
     private final Clock clock;
 
@@ -55,18 +69,97 @@ public class GroupRecurringExpenseService {
             GroupExpenseShareRepository shareRepository,
             DebtRepository debtRepository,
             GroupRepository groupRepository,
+            GroupMemberRepository groupMemberRepository,
             ActivityEventService activityEventService,
             Clock clock) {
         this.expenseRepository = expenseRepository;
         this.shareRepository = shareRepository;
         this.debtRepository = debtRepository;
         this.groupRepository = groupRepository;
+        this.groupMemberRepository = groupMemberRepository;
         this.activityEventService = activityEventService;
         this.clock = clock;
     }
 
     public LocalDate today() {
         return LocalDate.now(clock);
+    }
+
+    /** 028: recurring series of the group, newest first, visible to any member. */
+    @Transactional(readOnly = true)
+    public List<RecurringGroupExpenseResponse> listSeries(Long callerId, Long groupId) {
+        requireMember(callerId, groupId);
+        return expenseRepository
+                .findByGroupIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(groupId)
+                .stream()
+                .map(RecurringGroupExpenseResponse::from)
+                .toList();
+    }
+
+    /**
+     * 028: pause/resume or change the frequency of a group series. The creator,
+     * the payer or an admin may do it. Reactivating or changing the frequency of
+     * an active series recomputes the next date from the new cadence and today.
+     */
+    @Transactional
+    public RecurringGroupExpenseResponse updateSeries(Long callerId, Long groupId, Long expenseId,
+            Map<String, String> fields) {
+        GroupMember member = requireMember(callerId, groupId);
+        GroupExpense series = expenseRepository.findByIdAndGroupId(expenseId, groupId)
+                .filter(GroupExpense::isRecurringSeries)
+                .orElseThrow(() -> new GroupNotFoundException(GroupExpenseService.EXPENSE_NOT_FOUND));
+        boolean allowed = callerId.equals(series.getCreatedByUserId())
+                || callerId.equals(series.getPayerUserId())
+                || GroupMember.ROLE_ADMIN.equals(member.getRole());
+        if (!allowed) {
+            throw new GroupPermissionDeniedException(NOT_ALLOWED_TO_EDIT_RECURRENCE);
+        }
+        if (fields == null || fields.isEmpty()) {
+            throw new FieldValidationException(Map.of("body", RECURRENCE_EDIT_EMPTY));
+        }
+
+        Map<String, String> errors = new LinkedHashMap<>();
+        RecurrenceStatus targetStatus = series.getRecurrenceStatus();
+        if (fields.containsKey("status")) {
+            String raw = fields.get("status");
+            if ("ACTIVE".equals(raw) || "PAUSED".equals(raw)) {
+                targetStatus = RecurrenceStatus.valueOf(raw);
+            }
+            else {
+                errors.put("status", RECURRENCE_STATUS_INVALID);
+            }
+        }
+        RecurrenceFrequency targetFrequency = series.getRecurrenceFrequency();
+        if (fields.containsKey("frequency")) {
+            try {
+                targetFrequency = RecurrenceFrequency.valueOf(
+                        fields.get("frequency") == null ? "" : fields.get("frequency").trim().toUpperCase());
+            }
+            catch (IllegalArgumentException exception) {
+                errors.put("frequency", RECURRENCE_FREQUENCY_INVALID);
+            }
+        }
+        if (!errors.isEmpty()) {
+            throw new FieldValidationException(errors);
+        }
+
+        boolean statusChanged = targetStatus != series.getRecurrenceStatus();
+        boolean frequencyChanged = targetFrequency != series.getRecurrenceFrequency();
+        series.setRecurrenceFrequency(targetFrequency);
+        if (targetStatus == RecurrenceStatus.ACTIVE && (statusChanged || frequencyChanged)) {
+            series.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+            series.setRecurrenceNextDate(targetFrequency.firstOnOrAfter(series.getExpenseDate(), today()));
+        }
+        else if (statusChanged) {
+            series.setRecurrenceStatus(targetStatus);
+        }
+        return RecurringGroupExpenseResponse.from(expenseRepository.save(series));
+    }
+
+    private GroupMember requireMember(Long callerId, Long groupId) {
+        return groupMemberRepository.findByIdGroupIdAndIdUserId(groupId, callerId)
+                .filter(member -> member.getLeftAt() == null)
+                .orElseThrow(() -> new GroupNotFoundException(GroupExpenseService.NOT_MEMBER));
     }
 
     /**
@@ -155,7 +248,8 @@ public class GroupRecurringExpenseService {
                     .map(GroupExpenseShare::getParticipantName)
                     .findFirst()
                     .orElse(null);
-            activityEventService.recordExpenseCreated(saved.getGroupId(), saved.getCreatedByUserId(),
+            // 028: la ocurrencia la crea el sistema, no la persona que creó la serie.
+            activityEventService.recordExpenseCreated(saved.getGroupId(), null,
                     new ExpenseActivityDetails(saved.getId(), saved.getAmount(),
                             saved.getCurrency().name(), saved.getDescription(), saved.getPayerUserId(),
                             payerName));

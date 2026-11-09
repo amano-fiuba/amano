@@ -9,7 +9,11 @@ import java.util.Map;
 
 import org.springframework.stereotype.Component;
 
+import com.amano.backend.expense.ExpenseCategory;
+import com.amano.backend.expense.ExpenseType;
+import com.amano.backend.expense.PaymentMethod;
 import com.amano.backend.groupexpense.DebtStatus;
+import com.amano.backend.groupexpense.GroupExpense;
 import com.amano.backend.user.Currency;
 
 /**
@@ -27,12 +31,35 @@ public class ReminderMessageBuilder {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
+    private static final Map<ExpenseCategory, String> CATEGORY_LABELS = Map.of(
+            ExpenseCategory.FOOD, "Alimentos",
+            ExpenseCategory.TRANSPORT, "Transporte",
+            ExpenseCategory.HOUSING, "Vivienda",
+            ExpenseCategory.SERVICES, "Servicios",
+            ExpenseCategory.HEALTH, "Salud",
+            ExpenseCategory.EDUCATION, "Educación",
+            ExpenseCategory.LEISURE, "Ocio",
+            ExpenseCategory.SHOPPING, "Compras",
+            ExpenseCategory.PETS, "Mascotas",
+            ExpenseCategory.OTHER, "Otros");
+    private static final Map<ExpenseType, String> TYPE_LABELS = Map.of(
+            ExpenseType.RECURRING, "Recurrente",
+            ExpenseType.ONE_TIME, "Único");
+    private static final Map<PaymentMethod, String> PAYMENT_METHOD_LABELS = Map.of(
+            PaymentMethod.CASH, "Efectivo",
+            PaymentMethod.DEBIT_CARD, "Tarjeta de débito",
+            PaymentMethod.CREDIT_CARD, "Tarjeta de crédito",
+            PaymentMethod.TRANSFER, "Transferencia",
+            PaymentMethod.VIRTUAL_WALLET, "Billetera virtual",
+            PaymentMethod.OTHER, "Otro");
+
     /** Subject and body of a mail, ready to be sent. */
     public record Mail(String subject, String body) {
     }
 
     public Mail debtReminder(String groupName, String debtorName, String concept, BigDecimal amount,
-            Currency currency, LocalDate dueDate, DebtStatus status, String customMessage) {
+            Currency currency, LocalDate dueDate, DebtStatus status, String customMessage,
+            GroupExpense expense) {
         String subject = "Recordatorio de deuda - " + groupName;
         String conceptText = concept(concept);
         String money = money(amount, currency);
@@ -45,6 +72,7 @@ public class ReminderMessageBuilder {
                     .append("Concepto: ").append(conceptText).append('\n')
                     .append("Monto: ").append(money).append('\n')
                     .append("Fecha límite: ").append(due).append('\n');
+            appendExpenseDetails(body, expense);
             if (reported) {
                 body.append('\n').append(PAYMENT_REPORTED_LEGEND).append('\n');
             }
@@ -55,6 +83,7 @@ public class ReminderMessageBuilder {
                     .append("» tenés una deuda pendiente\n")
                     .append("de ").append(money).append(" por «").append(conceptText)
                     .append("», con fecha límite ").append(due).append(".\n");
+            appendExpenseDetails(body, expense);
             if (reported) {
                 body.append('\n').append(PAYMENT_REPORTED_LEGEND).append('\n');
             }
@@ -63,7 +92,7 @@ public class ReminderMessageBuilder {
     }
 
     public Mail payerNotice(String groupName, String payerName, String concept, LocalDate dueDate,
-            long daysRemaining, List<Map<String, String>> pendingTotals) {
+            long daysRemaining, List<Map<String, String>> pendingTotals, GroupExpense expense) {
         String subject = "Aviso de vencimiento - " + groupName;
         String conceptText = concept(concept);
         StringBuilder body = new StringBuilder();
@@ -73,6 +102,7 @@ public class ReminderMessageBuilder {
                 .append(dueDate.format(DATE_FORMAT)).append(": ")
                 .append(daysRemaining).append(daysRemaining == 1 ? " día restante" : " días restantes")
                 .append(" para el vencimiento.\n");
+        appendExpenseDetails(body, expense);
         if (pendingTotals == null || pendingTotals.isEmpty()) {
             body.append("\nNo tenés deudas pendientes en el grupo.\n");
         }
@@ -102,6 +132,29 @@ public class ReminderMessageBuilder {
                 """.formatted(type, groupName, recipientName, recipientEmail,
                 dueDate.format(DATE_FORMAT), money(amount, currency));
         return new Mail(subject, body);
+    }
+
+    /**
+     * 028: categoría, tipo y medio de pago del gasto. El medio de pago se omite
+     * en las ocurrencias que genera el sistema ({@code recurrenceSourceId}).
+     */
+    private static void appendExpenseDetails(StringBuilder body, GroupExpense expense) {
+        if (expense == null) {
+            return;
+        }
+        String category = expense.getCategory() == null ? null : CATEGORY_LABELS.get(expense.getCategory());
+        if (category != null) {
+            body.append("Categoría: ").append(category).append('\n');
+        }
+        String type = expense.getExpenseType() == null ? null : TYPE_LABELS.get(expense.getExpenseType());
+        if (type != null) {
+            body.append("Tipo de gasto: ").append(type).append('\n');
+        }
+        String paymentMethod = expense.getPaymentMethod() == null
+                ? null : PAYMENT_METHOD_LABELS.get(expense.getPaymentMethod());
+        if (paymentMethod != null && expense.getRecurrenceSourceId() == null) {
+            body.append("Medio de pago: ").append(paymentMethod).append('\n');
+        }
     }
 
     static String concept(String concept) {

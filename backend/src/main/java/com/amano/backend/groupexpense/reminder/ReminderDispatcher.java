@@ -211,7 +211,7 @@ public class ReminderDispatcher {
         String creditorName = creditorName(debt.getCreditorUserId());
         ReminderMessageBuilder.Mail mail = messageBuilder.debtReminder(group.getName(), debt.getDebtorName(),
                 expense.getDescription(), debt.getAmount(), debt.getCurrency(), dueDate, debt.getStatus(),
-                group.getReminderMessage());
+                group.getReminderMessage(), expense);
         return new Target(debt.getDebtorName(), email, dueDate, debt.getAmount(), debt.getCurrency(),
                 mail, debt, expense, creditorName, null, null, 0, List.of());
     }
@@ -238,7 +238,7 @@ public class ReminderDispatcher {
                 debtRepository.findByGroupId(group.getId()), expense.getPayerUserId());
         String email = recipients.payerEmail(expense).orElse(null);
         ReminderMessageBuilder.Mail mail = messageBuilder.payerNotice(group.getName(), payerName,
-                expense.getDescription(), dueDate, daysRemaining, pendingTotals);
+                expense.getDescription(), dueDate, daysRemaining, pendingTotals, expense);
         return new Target(payerName, email, dueDate, expense.getAmount(), expense.getCurrency(), mail,
                 null, expense, null, payerName, expense.getDescription(), daysRemaining, pendingTotals);
     }
