@@ -545,8 +545,14 @@
   }
 
   h4 {
-    margin: 0.75rem 0 0.25rem;
+    margin: 0.25rem 0 0;
     font-size: 0.95rem;
+  }
+
+  // El `.field` global trae margin-bottom 1rem; con el gap del formulario
+  // dejaba un hueco grande antes de "Recordatorios de deudas".
+  .group-edit-form .field {
+    margin-bottom: 0;
   }
 
   .form-actions {
