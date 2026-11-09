@@ -45,7 +45,8 @@ Columnas de recurrencia existentes (V32, sin cambios): `recurrence_frequency`,
 
 - El job de recurrencia genera la ocurrencia cuando `recurrence_next_date <= today + 7`
   (máximo del catálogo de `reminder_send_days`); la fila nace con `expense_date` futura
-  y sus deudas `PENDING` ya disponibles para 025.
+  y sus deudas `PENDING` ya disponibles para 025. Detalle normativo en
+  `contracts/recurrence-due-calendar.md`.
 - `due_date` de la ocurrencia no depende de esa ventana: queda en su propia fecha de
   programación desde que la fila existe.
 
@@ -55,7 +56,8 @@ Columnas de recurrencia existentes (V32, sin cambios): `recurrence_frequency`,
    el gasto se elimine.
 2. `due_date` de una ocurrencia generada (`recurrence_source_id IS NOT NULL`) es
    `expense_date` de esa fila.
-3. Si `debt_due_days` del grupo es NULL o 0 y el gasto no es ocurrencia generada,
+3. Si `debt_due_days` del grupo es NULL o 0 (valor válido según la validación del
+   grupo, hasta `MAX_DEBT_DUE_DAYS`) y el gasto no es ocurrencia generada,
    `due_date` es NULL y no hay recordatorio ni vencimiento.
 4. `groups.reminder_send_days ∈ {7, 5, 3, 2, 1}`; el valor 2 es válido para grupos
    recurrentes y no recurrentes.

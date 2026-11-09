@@ -87,7 +87,11 @@ envío se programa para la fecha correcta (ejemplo: vencimiento `08/12/2026` con
 - La ocurrencia queda con `expense_date` futura (~7 días visibles antes de su fecha).
 - El `OverdueDebtJob` no considera vencidas deudas cuya `dueDate` es futura; sin cambio.
 - El backfill sigue recuperando fechas atrasadas (hasta hoy) y, además, crea las que
-  entran en la ventana, aunque el límite de 1000 por serie y ejecución se mantiene.
+  entran en la ventana, respetando el límite de 1000 por serie y ejecución.
+
+**Origen normativo**: `contracts/recurrence-due-calendar.md` (Cascada de generación de
+ocurrencias). Los demás documentos lo citan a modo de contexto y no definen home la
+regla por su cuenta.
 
 ## Riesgos observados
 

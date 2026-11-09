@@ -55,7 +55,7 @@ description: "Task list for Calendario de vencimientos de gastos compartidos rec
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T006 [P] [US3] Tests de rematerialización de recordatorios en backend/src/test/java/com/amano/backend/groupexpense/reminder/ usando `expense.getDueDate()` en lugar de `expenseDate + debtDueDays` (casos primera ocurrencia, ocurrencia generada con fecha futura y grupo sin `debt_due_days`); fallan antes de T009
+- [ ] T006 [P] [US3] Tests de materialización de recordatorios en backend/src/test/java/com/amano/backend/groupexpense/reminder/ usando `expense.getDueDate()` en lugar de `expenseDate + debtDueDays` (casos primera ocurrencia, ocurrencia generada con fecha futura y grupo sin `debt_due_days`); fallan antes de T009
 - [ ] T007 [P] [US3] Tests de `OverdueDebtJob`/`DebtRepository.findPendingDueBefore` basados en `e.dueDate < :today` (deuda vence hoy, deuda vencida, deuda cuya serie aún no vence aunque `expenseDate` sea pasada); fallan antes de T010
 
 ### Implementation for User Story 3
@@ -114,14 +114,14 @@ description: "Task list for Calendario de vencimientos de gastos compartidos rec
 
 1. Completar Phase 1 y Phase 2
 2. Completar T008 → T009 → T010 → T011
-3. Completar T012 → T013 → T014 (opción opción 2 (solo afecta recordatorios))
+3. Completar T012 → T013 → T014 (opción 2, solo afecta recordatorios)
 4. **STOP and VALIDATE**: correr quickstart
 5. Deploy/demo si está listo
 
 ### Incremental Delivery
 
 1. Migraciones + entidad → `dueDate` disponible
-2. Ventana de anticipación y dueDate de ocurrencia → fr-006/FR-016/FR-019 listos
+2. Ventana de anticipación y dueDate de ocurrencia → FR-006/FR-011/FR-016/FR-019 listos
 3. Recordatorios y deudas vencidas leen el vencimiento persistido → FR-017/FR-018 listos
 4. Opción de 2 días → FR-017 completa para todos los grupos
 

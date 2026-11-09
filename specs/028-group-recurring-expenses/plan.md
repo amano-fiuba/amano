@@ -18,7 +18,8 @@ cerrar su calendario por período:
 3. **Ventana de anticipación de 7 días.** El job de recurrencia genera cada ocurrencia
    dentro de los 7 días previos a su fecha programada, para que sus deudas existan
    antes de su propio vencimiento y el recordatorio "2 días antes" (o de cualquier
-   opción del catálogo) pueda programarse y enviarse a tiempo.
+   opción del catálogo) pueda programarse y enviarse a tiempo
+   (origen normativo: `contracts/recurrence-due-calendar.md`).
 4. **Nada cambia en la lógica base de serie, ocurrencias, deudas o pagos.** El job de
    vencimiento y el de recordatorios pasan a usar el vencimiento ya calculado.
 
@@ -78,7 +79,7 @@ Se agrega `group_expenses.due_date DATE NULL`. Así:
 - un cambio posterior en `debtDueDays` del grupo **no** recalcula vencimientos ya creados.
 
 **D2. Un único origen de vencimiento.**
-`ReminderMaterializer` y `ReminderDispatcher` dejan de recalcula `expenseDate + group.debtDueDays` y usan el vencimiento ya guardado. El `OverdueDebtJob` usa el mismo criterio para detectar deudas vencidas.
+`ReminderMaterializer` y `ReminderDispatcher` dejan de recalcular `expenseDate + group.debtDueDays` y usan el vencimiento ya guardado. El `OverdueDebtJob` usa el mismo criterio para detectar deudas vencidas.
 
 **D3. La primera ocurrencia es el gasto original.**
 No se genera otra ocurrencia para el día de registro. La serie guarda `recurrence_next_date` en el período siguiente y la primera ocurrencia queda lista para deuda/recordatorio como un gasto normal.
@@ -110,7 +111,8 @@ semántica de `dueDate` (sigue siendo la propia fecha de la ocurrencia):
 - `ReminderMaterializer` programa el envío para `dueDate - reminderSendDays` desde que
   la deuda existe.
 Limita también el backfill: si el job se atrasa, recupera fechas vencidas y crea las
-próximas dentro de la ventana, aunque el límite de 1000 por serie y ejecución.
+próximas dentro de la ventana, respetando el límite de 1000 por serie y ejecución.
+Origen normativo de la ventana: `contracts/recurrence-due-calendar.md`.
 
 ## Project Structure
 
