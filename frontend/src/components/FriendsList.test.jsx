@@ -31,6 +31,7 @@ const ANA = {
   // 02:00 UTC on 31/10 is still 30/10 in Argentina (UTC-3): the date is shown
   // in Argentina's timezone, not the browser's (research.md D6).
   friendsSince: '2026-10-31T02:00:00Z',
+  cbuCvu: '0000003100010000000002',
 }
 const BRUNO = {
   id: 8,
@@ -120,6 +121,27 @@ describe('FriendsList (feature 013)', () => {
     expect(within(list).getByText('Bruno')).toBeInTheDocument()
     // El contador sigue mostrando el total, no los filtrados.
     expect(screen.getByText('2 amigos')).toBeInTheDocument()
+  })
+
+  it('permite copiar el CBU/CVU del amigo; sin CBU no muestra el icono', async () => {
+    friendsClient.listFriends.mockResolvedValue({ ok: true, friends: [ANA, BRUNO] })
+    const user = userEvent.setup()
+    // Después de setup(): userEvent instala su propio navigator.clipboard.
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    render(ui())
+
+    const copy = await screen.findByTestId('copy-cbu-friend-12')
+    expect(screen.queryByTestId('copy-cbu-friend-8')).not.toBeInTheDocument()
+
+    await user.click(copy)
+
+    expect(writeText).toHaveBeenCalledWith('0000003100010000000002')
+    expect(screen.getByText('¡Copiado!')).toBeInTheDocument()
+    delete navigator.clipboard
   })
 
   it('ordena por nombre (A–Z por defecto, o Z–A) y por fecha más reciente o más antigua', async () => {
