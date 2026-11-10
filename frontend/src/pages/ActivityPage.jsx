@@ -32,6 +32,15 @@ export default function ActivityPage() {
               </span>
               <span className="main-expense__amount">
                 {expense.currency} {formatAmount(expense.amount)}
+                {Array.isArray(expense.conversions) &&
+                  expense.conversions.map((conversion) => (
+                    <small
+                      key={conversion.currency}
+                      className="main-expense__conversion"
+                    >
+                      ≈ {conversion.currency} {formatAmount(conversion.amount)}
+                    </small>
+                  ))}
               </span>
             </li>
           ))}

@@ -138,6 +138,42 @@ Reglas:
    coincide, `422` si difiere). El índice único es el punto de serialización, por lo que **no
    se usa `409`** (ver research.md §D1).
 
+## `GET /api/expenses`
+
+Historial de la pantalla **Actividad personal** (015): hasta 200 gastos del usuario de la
+sesión, ordenados por `createdAt` e `id` descendentes. Requiere sesión verificada; sin sesión
+⇒ `401`.
+
+Cada elemento mantiene la forma de `ExpenseResponse` de 007/009 y agrega `conversions`: los
+equivalentes del gasto en cada **moneda preferida** del usuario (las de su perfil; si no
+configuró ninguna, `ARS`). Se omite la conversión a la propia moneda del gasto. El importe
+convertido usa la cotización histórica de la fecha del gasto y se redondea a 2 decimales
+(HALF_UP). Si no hay cotización para un par/fecha, esa conversión se omite: la pantalla nunca
+falla por una cotización faltante. El campo solo se envía en este endpoint; en el resto de las
+respuestas (`POST`, `/recent`, recurrentes) se omite por la política `NON_NULL`.
+
+```json
+[
+  {
+    "id": 42,
+    "amount": "10.00",
+    "currency": "USD",
+    "date": "2026-11-02",
+    "category": "FOOD",
+    "type": "ONE_TIME",
+    "paymentMethod": "CASH",
+    "createdAt": "2026-11-02T18:03:11.482-03:00",
+    "conversions": [
+      { "currency": "ARS", "amount": "15000.00" },
+      { "currency": "EUR", "amount": "9.50" }
+    ]
+  }
+]
+```
+
+`conversions` es un arreglo (posiblemente vacío) de `{ currency, amount }`, con `amount`
+canónico de 2 decimales, en el orden del catálogo de monedas (`ARS`, `USD`, `EUR`, …).
+
 ## Contrato del frontend con este endpoint
 
 - **Ruta**: `/expenses/new`, protegida con `ProtectedRoute` (FR-001/FR-002). Sin sesión ⇒
