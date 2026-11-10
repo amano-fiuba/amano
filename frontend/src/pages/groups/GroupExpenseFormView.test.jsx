@@ -64,7 +64,7 @@ import GroupExpenseFormView, {
 } from './GroupExpenseFormView'
 import { CUSTOM_AMOUNT_INVALID, CUSTOM_SUM_INVALID } from './splitCustom'
 import { PERCENTAGE_SUM_INVALID } from './splitPercentage'
-import { REST_IN_ORDER_NOTE, REST_TO_PAYER_NOTE } from '../../components/groups/ExpenseSharePreview'
+import { REST_TO_PAYER_NOTE } from '../../components/groups/ExpenseSharePreview'
 
 // 027: "Guardar" opens the final summary; confirm it when it shows up (valid form).
 async function saveForm(user, button = screen.getByRole('button', { name: 'Guardar' })) {
@@ -163,7 +163,7 @@ describe('GroupExpenseFormView (017)', () => {
     expect(getMembers).toHaveBeenCalledWith('3')
   })
 
-  it('la vista previa sigue al monto, al pagador y a los participantes', async () => {
+  it('la vista previa sigue al monto y a los participantes; el pagador no se puede quitar', async () => {
     const user = userEvent.setup()
     renderView()
     await fillAmount(user, '10.000')
@@ -174,21 +174,25 @@ describe('GroupExpenseFormView (017)', () => {
     expect(rows[0]).toHaveTextContent('$ 3.333,34')
     expect(screen.getByText(REST_TO_PAYER_NOTE)).toBeInTheDocument()
 
+    // En partes iguales el pagador también está bloqueado.
+    expect(participantBox('Ana López')).toBeDisabled()
     await user.click(participantBox('Ana López'))
+    expect(participantBox('Ana López')).toBeChecked()
+    expect(shareRows()).toHaveLength(3)
+
+    await user.click(participantBox('Juan Pérez'))
     await fillAmount(user, '100')
     rows = shareRows()
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toHaveTextContent('Juan Pérez')
+    expect(rows[0]).toHaveTextContent('Ana López (pagó)')
     expect(rows[0]).toHaveTextContent('$ 50,00')
+    expect(rows[1]).toHaveTextContent('Abuela')
+    expect(rows[1]).toHaveTextContent('$ 50,00')
 
-    await user.click(participantBox('Ana López'))
     await user.selectOptions(screen.getByLabelText('¿Quién pagó?'), 'u:15')
-    await user.click(participantBox('Juan Pérez'))
-    rows = shareRows()
-    expect(rows[0]).toHaveTextContent('$ 50,00')
-    await fillAmount(user, '100,01')
-    expect(screen.getByText(REST_IN_ORDER_NOTE)).toBeInTheDocument()
-    expect(shareRows()[0]).toHaveTextContent('$ 50,01')
+    expect(participantBox('Juan Pérez')).toBeChecked()
+    expect(participantBox('Juan Pérez')).toBeDisabled()
+    expect(shareRows()).toHaveLength(3)
   })
 
   it('un MEMBER sin la casilla no puede elegir otro pagador', async () => {
@@ -905,7 +909,8 @@ describe('GroupExpenseFormView: reparto (022 T072)', () => {
     await chooseSplit(user, 'EQUAL')
 
     expect(screen.queryByLabelText(/^Importe de /)).not.toBeInTheDocument()
-    expect(participantBox('Ana López')).toBeEnabled()
+    // Quien pagó sigue bloqueado en partes iguales (022 FR-003).
+    expect(participantBox('Ana López')).toBeDisabled()
     expect(save()).toBeEnabled()
     await saveForm(user, save())
     await screen.findByText('Detalle del gasto')
