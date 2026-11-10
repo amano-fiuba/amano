@@ -38,6 +38,32 @@ describe('ActivityPage', () => {
     expect(screen.getByText(/ARS/)).toBeInTheDocument()
   })
 
+  it('muestra la conversión a las monedas preferidas debajo del importe original', async () => {
+    listExpenseHistory.mockResolvedValue({
+      ok: true,
+      expenses: [
+        {
+          id: 1,
+          description: 'Hotel',
+          category: 'HOUSING',
+          date: '2026-11-02',
+          currency: 'USD',
+          amount: '100.00',
+          conversions: [
+            { currency: 'ARS', amount: '150000.00' },
+            { currency: 'EUR', amount: '95.00' },
+          ],
+        },
+      ],
+    })
+
+    renderPage()
+
+    expect(await screen.findByText('Hotel')).toBeInTheDocument()
+    expect(screen.getByText('≈ ARS 150.000,00')).toBeInTheDocument()
+    expect(screen.getByText('≈ EUR 95,00')).toBeInTheDocument()
+  })
+
   it('sin gastos ofrece registrar el primero', async () => {
     listExpenseHistory.mockResolvedValue({ ok: true, expenses: [] })
 

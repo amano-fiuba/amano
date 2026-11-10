@@ -1,11 +1,13 @@
 package com.amano.backend.expense;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,11 +16,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
+import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
+import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.user.Currency;
+import com.amano.backend.user.User;
+import com.amano.backend.user.UserRepository;
 
 /**
  * Registration of a personal expense (US1, contracts/expenses-api.md). The owner
@@ -53,9 +61,20 @@ public class ExpenseService {
             "splits", "divisions", "shares", "debts", "friends", "groups");
 
     private final ExpenseRepository expenseRepository;
+    private final UserRepository userRepository;
+    private final ExchangeRateProvider exchangeRateProvider;
 
+    /** Kept for the unit tests that only exercise registration. */
     public ExpenseService(ExpenseRepository expenseRepository) {
+        this(expenseRepository, null, null);
+    }
+
+    @Autowired
+    public ExpenseService(ExpenseRepository expenseRepository, UserRepository userRepository,
+            ExchangeRateProvider exchangeRateProvider) {
         this.expenseRepository = expenseRepository;
+        this.userRepository = userRepository;
+        this.exchangeRateProvider = exchangeRateProvider;
     }
 
     /** Result of a registration: the representation plus whether a row was inserted. */
@@ -75,12 +94,63 @@ public class ExpenseService {
                 .toList();
     }
 
-    /** Personal activity screen: the user's last 200 expenses, newest first. */
+    /**
+     * Personal activity screen: the user's last 200 expenses, newest first. Each
+     * expense also carries its equivalent in the user's preferred currencies
+     * (ARS when none is configured), skipping its own currency. A missing quote
+     * only omits that conversion, it never fails the page.
+     */
     @Transactional(readOnly = true)
     public List<ExpenseResponse> listHistory(Long userId) {
+        Set<Currency> preferred = preferredCurrencies(userId);
         return expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
-                .map(ExpenseResponse::from)
+                .map(expense -> ExpenseResponse.from(expense, conversionsOf(expense, preferred)))
                 .toList();
+    }
+
+    /** Preferred currencies of the account, defaulting to ARS at read time (002 FR-011). */
+    private Set<Currency> preferredCurrencies(Long userId) {
+        if (userRepository == null) {
+            return Set.of(Currency.ARS);
+        }
+        return userRepository.findById(userId)
+                .map(User::getCurrencies)
+                .filter(currencies -> !currencies.isEmpty())
+                .orElse(Set.of(Currency.ARS));
+    }
+
+    /**
+     * Converts the expense to every preferred currency except its own. Currencies
+     * are visited in enum order so the list is stable; an unavailable quote for one
+     * target is skipped without affecting the others.
+     */
+    private List<ExpenseResponse.Conversion> conversionsOf(Expense expense,
+            Set<Currency> preferred) {
+        List<ExpenseResponse.Conversion> conversions = new ArrayList<>();
+        if (exchangeRateProvider == null) {
+            return conversions;
+        }
+        for (Currency target : Currency.values()) {
+            if (!preferred.contains(target) || target == expense.getCurrency()) {
+                continue;
+            }
+            try {
+                ExchangeRateQuote quote = exchangeRateProvider.getQuote(
+                        expense.getCurrency(), target, expense.getExpenseDate());
+                if (quote == null || quote.rate() == null) {
+                    continue;
+                }
+                BigDecimal converted = expense.getAmount()
+                        .multiply(quote.rate())
+                        .setScale(2, RoundingMode.HALF_UP);
+                conversions.add(new ExpenseResponse.Conversion(target.name(),
+                        converted.toPlainString()));
+            }
+            catch (ExchangeRateUnavailableException unavailable) {
+                // No quote for this pair/date: silently omit this conversion.
+            }
+        }
+        return conversions;
     }
 
     /**
