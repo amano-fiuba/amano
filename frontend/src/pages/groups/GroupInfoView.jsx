@@ -9,6 +9,7 @@ import GroupPhotoPanel from '../../components/groups/GroupPhotoPanel'
 import GroupEditForm from '../../components/groups/GroupEditForm'
 import { GroupSettingsIcon, PencilIcon } from '../../components/NavIcons'
 import GroupPermissionsPanel from '../../components/groups/GroupPermissionsPanel'
+import GroupDebtSettingsModal from '../../components/groups/GroupDebtSettingsModal'
 import GroupRowsSkeleton from '../../components/groups/GroupRowsSkeleton'
 import AddMemberView from './AddMemberView'
 import GroupExpensesCard from '../../components/groups/GroupExpensesCard'
@@ -27,6 +28,7 @@ export default function GroupInfoView() {
   const [error, setError] = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
   const [showPermissions, setShowPermissions] = useState(false)
+  const [showDebtSettings, setShowDebtSettings] = useState(false)
   const [editing, setEditing] = useState(false)
   // Bumped after an alta so MemberListView re-fetches (fix 2026-11-04).
   const [membersVersion, setMembersVersion] = useState(0)
@@ -58,6 +60,28 @@ export default function GroupInfoView() {
   function handleMemberAdded() {
     setMembersVersion((version) => version + 1)
     refreshGroup()
+  }
+
+  // Editar y Configuración son excluyentes: abrir uno cierra el otro (y el
+  // modal de deudas, que vive dentro de Configuración).
+  function toggleEdit() {
+    if (editing) {
+      setEditing(false)
+      return
+    }
+    setEditing(true)
+    setShowPermissions(false)
+    setShowDebtSettings(false)
+  }
+
+  function togglePermissions() {
+    if (showPermissions) {
+      setShowPermissions(false)
+      setShowDebtSettings(false)
+      return
+    }
+    setShowPermissions(true)
+    setEditing(false)
   }
 
   const isAdmin = group?.currentUserRole === 'ADMIN'
@@ -120,7 +144,7 @@ export default function GroupInfoView() {
                   data-testid="group-edit-button"
                   aria-expanded={editing}
                   aria-label={editing ? 'Cerrar edición' : undefined}
-                  onClick={() => setEditing(!editing)}
+                  onClick={toggleEdit}
                 >
                   {editing ? 'Cerrar' : <><PencilIcon /> Editar</>}
                 </button>
@@ -131,7 +155,7 @@ export default function GroupInfoView() {
                   className="group-action"
                   aria-expanded={showPermissions}
                   aria-label={showPermissions ? 'Cerrar configuración' : undefined}
-                  onClick={() => { setShowPermissions(!showPermissions) }}
+                  onClick={togglePermissions}
                 >
                   {showPermissions ? 'Cerrar' : <><GroupSettingsIcon /> Configuración</>}
                 </button>
@@ -161,9 +185,21 @@ export default function GroupInfoView() {
                   permissions={group.permissions ?? {}}
                   onSaved={() => {
                     setShowPermissions(false)
+                    setShowDebtSettings(false)
                     refreshGroup()
                   }}
                 />
+                <div className="group-admin-panel__subsection">
+                  <button
+                    type="button"
+                    className="group-action"
+                    data-testid="debt-settings-button"
+                    aria-haspopup="dialog"
+                    onClick={() => setShowDebtSettings(true)}
+                  >
+                    Configurar deudas y recordatorios
+                  </button>
+                </div>
               </div>
             )}
           </header>
@@ -216,6 +252,18 @@ export default function GroupInfoView() {
               permissions={group.permissions ?? {}}
               onAdded={handleMemberAdded}
               onClose={() => setShowAddMember(false)}
+            />
+          )}
+
+          {showDebtSettings && (
+            <GroupDebtSettingsModal
+              group={group}
+              isAdmin={isAdmin}
+              onClose={() => setShowDebtSettings(false)}
+              onSaved={() => {
+                setShowDebtSettings(false)
+                refreshGroup()
+              }}
             />
           )}
         </>

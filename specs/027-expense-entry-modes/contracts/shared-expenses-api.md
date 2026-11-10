@@ -10,9 +10,10 @@ Cuerpo: el de 017/022 más tres propiedades **obligatorias**:
 |---|---|---|---|
 | `category` | string | Códigos de `ExpenseCategory` (007) | `400` en `category`, mensaje de 007 |
 | `type` | string | `ONE_TIME`, `RECURRING` | `400` en `type`, mensaje de 007 |
+| `frequency` | string | `WEEKLY`, `MONTHLY`, `YEARLY` | Obligatoria si `type = RECURRING`; prohibida si `ONE_TIME` |
 | `paymentMethod` | string | Códigos de `PaymentMethod` (007) | `400` en `paymentMethod`, mensaje de 007 |
 
-`frequency` sigue siendo una propiedad desconocida (`400` "No se permite informar este campo"): un gasto compartido `RECURRING` es solo informativo.
+Un gasto de grupo `RECURRING` con `frequency` crea una serie que genera sus próximas ocurrencias (V32). `frequency` no se acepta en un gasto con amigo.
 
 **Compatibilidad**: es un cambio que exige los campos nuevos. El único cliente es el frontend del repo, que se actualiza en el mismo release (Principio VII). Se documenta en el PR.
 

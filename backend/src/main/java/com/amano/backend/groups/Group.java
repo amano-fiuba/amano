@@ -57,6 +57,21 @@ public class Group {
     @Column(name = "debt_due_days")
     private Integer debtDueDays;
 
+    /**
+     * 025: days before the deadline at which the reminder is sent (7, 5, 3 or
+     * 1). The DB column is NOT NULL DEFAULT 5, but the Java default is set too
+     * because the JPA INSERT does not apply the DB default.
+     */
+    @Column(name = "reminder_send_days", nullable = false)
+    private Integer reminderSendDays = 5;
+
+    /**
+     * 025: optional custom message that accompanies the debt data in the next
+     * reminders. Null (or blank, normalized by the service) uses the default.
+     */
+    @Column(name = "reminder_message", length = 500)
+    private String reminderMessage;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -107,6 +122,22 @@ public class Group {
 
     public void setDebtDueDays(Integer debtDueDays) {
         this.debtDueDays = debtDueDays;
+    }
+
+    public Integer getReminderSendDays() {
+        return reminderSendDays;
+    }
+
+    public void setReminderSendDays(Integer reminderSendDays) {
+        this.reminderSendDays = reminderSendDays;
+    }
+
+    public String getReminderMessage() {
+        return reminderMessage;
+    }
+
+    public void setReminderMessage(String reminderMessage) {
+        this.reminderMessage = reminderMessage;
     }
 
     public OffsetDateTime getCreatedAt() {

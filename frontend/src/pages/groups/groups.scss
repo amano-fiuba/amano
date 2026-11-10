@@ -205,7 +205,7 @@
     font-weight: 600;
   }
 
-  input:not([type='file']),
+  input:not([type='file']):not([type='checkbox']):not([type='radio']),
   textarea {
     width: 100%;
     padding: 0.6rem 0.75rem;
@@ -525,6 +525,53 @@
   color: var(--color-acento-oscuro);
   font-size: 0.875rem;
   font-weight: 700;
+}
+
+[data-testid='debt-settings-dialog'] {
+  .group-edit-form {
+    gap: 0.5rem;
+  }
+
+  .group-edit-form .debt-settings__toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .debt-settings__toggle input[type='checkbox'] {
+    width: auto;
+    margin: 0;
+    accent-color: var(--color-acento);
+  }
+
+  h4 {
+    margin: 0.25rem 0 0;
+    font-size: 0.95rem;
+  }
+
+  // El `.field` global trae margin-bottom 1rem; con el gap del formulario
+  // dejaba un hueco grande antes de "Recordatorios de deudas".
+  .group-edit-form .field {
+    margin-bottom: 0;
+  }
+
+  .form-actions {
+    margin-top: 0.85rem;
+  }
+}
+
+.group-expenses__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.group-admin-panel__subsection {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-borde);
 }
 
 .group-admin-panel {

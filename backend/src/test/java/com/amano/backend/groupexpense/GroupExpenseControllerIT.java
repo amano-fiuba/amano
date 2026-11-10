@@ -20,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -98,6 +99,12 @@ class GroupExpenseControllerIT {
     @Autowired
     private ExchangeRateProvider exchangeRateProvider;
 
+    @Autowired
+    private GroupRecurringExpenseService recurringExpenseService;
+
+    @Autowired
+    private Clock clock;
+
     private long ana;
     private long juan;
     private long outsider;
@@ -150,6 +157,15 @@ class GroupExpenseControllerIT {
                 INSERT INTO users (first_name, last_name, email, password_hash, terms_accepted_at, email_verified_at)
                 VALUES (?, ?, ?, 'x', now(), now()) RETURNING id
                 """, Long.class, first, last, email);
+    }
+
+    private String recurringBody(String date, String frequency) {
+        return """
+                {"amount": "100.00", "currency": "ARS", "date": "%s", "category": "FOOD", "type": "RECURRING",
+                 "frequency": "%s", "paymentMethod": "CASH", "payerUserId": %d,
+                 "participants": [{"type": "REGISTERED", "userId": %d},
+                                  {"type": "REGISTERED", "userId": %d}]}
+                """.formatted(date, frequency, ana, ana, juan);
     }
 
     private String threeWayBody(String amount) {
@@ -226,6 +242,133 @@ class GroupExpenseControllerIT {
                 java.math.BigDecimal.class, created.get("id").asLong())).isEqualByComparingTo("10000.00");
         assertThat(jdbc.queryForList("SELECT status FROM debts WHERE expense_id = ?", String.class,
                 created.get("id").asLong())).containsOnly("PENDING").hasSize(2);
+    }
+
+    @Test
+    void aRecurringGroupExpenseStoresItsFrequencyStatusAndNextDate() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("SELECT recurrence_frequency FROM group_expenses WHERE id = ?",
+                String.class, expenseId)).isEqualTo("MONTHLY");
+        assertThat(jdbc.queryForObject("SELECT recurrence_status FROM group_expenses WHERE id = ?",
+                String.class, expenseId)).isEqualTo("ACTIVE");
+        assertThat(jdbc.queryForObject("SELECT recurrence_next_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, expenseId)).isEqualTo(today.plusMonths(1));
+    }
+
+    @Test
+    void recurringRequiresFrequencyAndOneTimeRejectsIt() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        postExpense(anaSession, UUID.randomUUID().toString(), recurringBody(today.toString(), ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.frequency")
+                        .value(GroupExpenseService.FREQUENCY_REQUIRED));
+
+        String oneTime = threeWayBody("100.00").replace(
+                "\"type\": \"ONE_TIME\"", "\"type\": \"ONE_TIME\", \"frequency\": \"MONTHLY\"");
+        postExpense(anaSession, UUID.randomUUID().toString(), oneTime)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.frequency")
+                        .value(GroupExpenseService.FREQUENCY_NOT_ALLOWED));
+    }
+
+    @Test
+    void theJobGeneratesTheNextOccurrenceWithSharesDebtsAndHistory() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long seriesId = objectMapper.readTree(body).get("id").asLong();
+        LocalDate next = today.plusMonths(1);
+        int expensesBefore = count("group_expenses");
+        int eventsBefore = expenseEvents();
+
+        assertThat(recurringExpenseService.generateDueOccurrences(next)).isEqualTo(1);
+
+        Long occurrenceId = jdbc.queryForObject("""
+                SELECT id FROM group_expenses
+                WHERE recurrence_source_id = ? AND expense_date = ?
+                """, Long.class, seriesId, next);
+        assertThat(occurrenceId).isNotNull();
+        assertThat(count("group_expenses")).isEqualTo(expensesBefore + 1);
+        assertThat(jdbc.queryForObject("SELECT recurrence_frequency FROM group_expenses WHERE id = ?",
+                String.class, occurrenceId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM group_expense_shares WHERE expense_id = ?",
+                Integer.class, occurrenceId)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM debts WHERE expense_id = ?",
+                Integer.class, occurrenceId)).isEqualTo(1);
+        assertThat(expenseEvents()).isEqualTo(eventsBefore + 1);
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, occurrenceId)).isEqualTo(next);
+        // 028: la ocurrencia la crea el sistema, sin actor humano.
+        assertThat(jdbc.queryForObject("""
+                SELECT actor_user_id FROM group_activity
+                WHERE group_id = ? AND event_type = 'EXPENSE_CREATED'
+                  AND details_json::jsonb->>'expenseId' = ?
+                """, Long.class, groupId, occurrenceId.toString())).isNull();
+        // Second run on the same date is a no-op.
+        assertThat(recurringExpenseService.generateDueOccurrences(next)).isZero();
+    }
+
+    @Test
+    void aGroupExpenseStoresItsDeadlineFromTheGroupPaymentDays() throws Exception {
+        jdbc.update("UPDATE groups SET debt_due_days = 30 WHERE id = ?", groupId);
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, expenseId)).isEqualTo(today.plusDays(30));
+    }
+
+    @Test
+    void anExpenseInAGroupWithoutPaymentDaysHasNoDeadline() throws Exception {
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long expenseId = objectMapper.readTree(body).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, expenseId)).isNull();
+    }
+
+    @Test
+    void theJobAnticipatesTheOccurrenceWithinSevenDaysAndKeepsItsOwnDeadline() throws Exception {
+        jdbc.update("UPDATE groups SET debt_due_days = 30 WHERE id = ?", groupId);
+        LocalDate today = LocalDate.now(clock);
+        String body = postExpense(anaSession, UUID.randomUUID().toString(),
+                recurringBody(today.toString(), "MONTHLY"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long seriesId = objectMapper.readTree(body).get("id").asLong();
+        LocalDate next = today.plusMonths(1);
+
+        recurringExpenseService.generateDueOccurrences(next.minusDays(8));
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM group_expenses
+                WHERE recurrence_source_id = ? AND expense_date = ?
+                """, Integer.class, seriesId, next)).isZero();
+
+        recurringExpenseService.generateDueOccurrences(next.minusDays(7));
+
+        Long occurrenceId = jdbc.queryForObject("""
+                SELECT id FROM group_expenses
+                WHERE recurrence_source_id = ? AND expense_date = ?
+                """, Long.class, seriesId, next);
+        assertThat(occurrenceId).isNotNull();
+        assertThat(jdbc.queryForObject("SELECT due_date FROM group_expenses WHERE id = ?",
+                LocalDate.class, occurrenceId)).isEqualTo(next);
     }
 
     @Test
@@ -554,8 +697,9 @@ class GroupExpenseControllerIT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.currency").value("La moneda no es válida"))
                 .andExpect(jsonPath("$.properties.fields.date").value("La fecha no puede ser posterior a hoy"))
-                // 027: category is a field now; a frequency is still rejected in a shared expense.
-                .andExpect(jsonPath("$.properties.fields.frequency").value("No se permite informar este campo"));
+                // A frequency only belongs to a RECURRING shared expense.
+                .andExpect(jsonPath("$.properties.fields.frequency")
+                        .value(GroupExpenseService.FREQUENCY_NOT_ALLOWED));
 
         String tooSmall = threeWayBody("0.02");
         postExpense(anaSession, UUID.randomUUID().toString(), tooSmall)

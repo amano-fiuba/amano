@@ -115,6 +115,54 @@ export async function updateGroup(groupId, payload) {
 }
 
 /**
+ * GET /api/groups/{id}/reminder-settings: admin-only reminder configuration
+ * (025 US2). Returns { ok, settings } or { ok: false, status, detail }.
+ */
+export async function getReminderSettings(groupId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/reminder-settings`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail, fields: {} }
+    }
+    return { ok: true, settings: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * PUT /api/groups/{id}/reminder-settings: partial update, only the fields
+ * present are changed (025 US2/US4).
+ */
+export async function updateReminderSettings(groupId, payload) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/reminder-settings`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      const fields = body?.properties?.fields ? safeFields(body.properties.fields) : {}
+      return {
+        ok: false,
+        status: response.status,
+        fields: Object.keys(fields).length ? { ...fields } : {},
+        detail: body?.detail,
+      }
+    }
+    return { ok: true, settings: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
  * GET /api/groups/{id}/candidates?q=: only the caller's friends (server-side
  * restriction; never the whole user base).
  */
@@ -343,3 +391,51 @@ export async function getExchangeQuote(groupId, currency, date) {
 
 export const GROUPS_NETWORK_ERROR_MESSAGE =
   'No se pudo conectar con el servidor. Intenta nuevamente'
+
+/**
+ * GET /api/groups/{id}/recurring-expenses (028): the recurring series of the
+ * group, newest first. Any active member can list them.
+ */
+export async function listGroupRecurringExpenses(groupId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/recurring-expenses`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      return { ok: false, status: response.status, detail: body?.detail, fields: {} }
+    }
+    return { ok: true, series: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * PATCH /api/groups/{id}/recurring-expenses/{expenseId} (028): pause/resume or
+ * change the frequency of a series. Only the fields present are changed.
+ */
+export async function updateGroupRecurringExpense(groupId, expenseId, payload) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/recurring-expenses/${expenseId}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => null)
+      const fields = body?.properties?.fields ? safeFields(body.properties.fields) : {}
+      return {
+        ok: false,
+        status: response.status,
+        fields: Object.keys(fields).length ? { ...fields } : {},
+        detail: body?.detail,
+      }
+    }
+    return { ok: true, series: await response.json() }
+  } catch {
+    return { ok: false, network: true }
+  }
+}

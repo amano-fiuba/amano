@@ -91,7 +91,7 @@ public class PaymentService {
         if (request.getDebtId() == null) {
             Map<String, String> fieldErrors = new LinkedHashMap<>();
             fieldErrors.put("debtId", DEBT_REQUIRED);
-            validateInput(request, null, fieldErrors);
+            validateInput(request, ExpenseRule.NONE, fieldErrors);
             throw new FieldValidationException(fieldErrors);
         }
         // The FIRST read takes the lock: a managed Debt read earlier without it
@@ -106,7 +106,7 @@ public class PaymentService {
                 debt.getCreditorUserId())) {
             throw new GroupPermissionDeniedException(NOT_ALLOWED);
         }
-        NormalizedPayment normalized = normalize(request, expenseDateOf(debt));
+        NormalizedPayment normalized = normalize(request, expenseRuleOf(debt));
 
         Optional<Payment> existing =
                 paymentRepository.findByRegisteredByUserIdAndIdempotencyKey(callerId, idempotencyKey);
@@ -171,7 +171,7 @@ public class PaymentService {
                 .orElseThrow(() -> new IllegalStateException("Idempotency conflict without a persisted winner"));
         Debt debt = debtRepository.findById(winner.getDebtId()).orElseThrow(DebtNotFoundException::new);
         GroupMember caller = activeMembership(callerId, debt.getGroupId());
-        NormalizedPayment normalized = normalize(request, expenseDateOf(debt));
+        NormalizedPayment normalized = normalize(request, expenseRuleOf(debt));
         return replay(winner, normalized, caller);
     }
 
@@ -191,13 +191,24 @@ public class PaymentService {
                 .orElseThrow(DebtNotFoundException::new);
     }
 
-    private LocalDate expenseDateOf(Debt debt) {
-        return expenseRepository.findById(debt.getExpenseId()).map(GroupExpense::getExpenseDate).orElse(null);
+    /**
+     * 028: an anticipated recurring occurrence has a future expense date but its
+     * debts already exist, so the payment may be dated before that expense date.
+     */
+    private ExpenseRule expenseRuleOf(Debt debt) {
+        return expenseRepository.findById(debt.getExpenseId())
+                .map(expense -> new ExpenseRule(expense.getExpenseDate(),
+                        expense.getRecurrenceSourceId() != null))
+                .orElse(ExpenseRule.NONE);
     }
 
-    private NormalizedPayment normalize(RegisterPaymentRequest request, LocalDate expenseDate) {
+    private record ExpenseRule(LocalDate date, boolean allowBeforeDate) {
+        static final ExpenseRule NONE = new ExpenseRule(null, false);
+    }
+
+    private NormalizedPayment normalize(RegisterPaymentRequest request, ExpenseRule rule) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
-        LocalDate date = validateInput(request, expenseDate, fieldErrors);
+        LocalDate date = validateInput(request, rule, fieldErrors);
         if (!fieldErrors.isEmpty()) {
             throw new FieldValidationException(fieldErrors);
         }
@@ -206,14 +217,14 @@ public class PaymentService {
     }
 
     /** Amount and date with the 007 rules, the minimum date of the expense and unknown fields (D4). */
-    private static LocalDate validateInput(RegisterPaymentRequest request, LocalDate expenseDate,
+    private static LocalDate validateInput(RegisterPaymentRequest request, ExpenseRule rule,
             Map<String, String> fieldErrors) {
         String amountError = ExpenseAmountNormalizer.validationError(request.getAmount());
         if (amountError != null) {
             fieldErrors.put("amount", amountError);
         }
         LocalDate date = parseDate(request.getDate(), request.getDeviceTimeZone(), fieldErrors);
-        if (date != null && expenseDate != null && date.isBefore(expenseDate)) {
+        if (date != null && rule.date() != null && !rule.allowBeforeDate() && date.isBefore(rule.date())) {
             fieldErrors.put("date", BEFORE_EXPENSE);
         }
         for (String unknown : request.getUnknownProperties().keySet()) {

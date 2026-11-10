@@ -20,6 +20,7 @@ import UsersSearchPage from './pages/UsersSearchPage'
 import FriendsPage from './pages/FriendsPage'
 import NewExpensePage from './pages/NewExpensePage'
 import RecurringExpensesPage from './pages/RecurringExpensesPage'
+import GroupRecurringExpensesPage from './pages/groups/GroupRecurringExpensesPage'
 import GroupListView from './pages/groups/GroupListView'
 import CreateGroupView from './pages/groups/CreateGroupView'
 import GroupInfoView from './pages/groups/GroupInfoView'
@@ -155,6 +156,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <GroupDebtsView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/groups/:id/recurring-expenses"
+        element={
+          <ProtectedRoute>
+            <GroupRecurringExpensesPage />
           </ProtectedRoute>
         }
       />

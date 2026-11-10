@@ -2,7 +2,9 @@ package com.amano.backend.groupexpense;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +29,8 @@ import com.amano.backend.expense.ExpenseClassification;
 import com.amano.backend.expense.ExpenseCategory;
 import com.amano.backend.expense.ExpenseType;
 import com.amano.backend.expense.PaymentMethod;
+import com.amano.backend.expense.RecurrenceFrequency;
+import com.amano.backend.expense.RecurrenceStatus;
 import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.ExpenseDescriptionNormalizer;
@@ -100,6 +104,10 @@ public class GroupExpenseService {
     static final String CURRENCY_REQUIRED = "La moneda es obligatoria";
     static final String CURRENCY_INVALID = "La moneda no es válida";
     static final String DATE_FORMAT = "La fecha debe tener el formato aaaa-mm-dd";
+    static final String FREQUENCY_REQUIRED = "La frecuencia es obligatoria";
+    static final String FREQUENCY_INVALID = "La frecuencia no es válida";
+    static final String FREQUENCY_NOT_ALLOWED = "La frecuencia solo aplica a un gasto recurrente";
+    static final String FREQUENCY_NOT_ALLOWED_FOR_FRIEND = "La frecuencia no aplica a un gasto con un amigo";
 
     private final GroupExpenseRepository expenseRepository;
     private final GroupExpenseShareRepository shareRepository;
@@ -112,6 +120,7 @@ public class GroupExpenseService {
     private final UserRepository userRepository;
     private final ActivityEventService activityEventService;
     private final ExchangeRateProvider exchangeRateProvider;
+    private final Clock clock;
 
     @Autowired
     public GroupExpenseService(GroupExpenseRepository expenseRepository,
@@ -124,7 +133,8 @@ public class GroupExpenseService {
             SimulatedProfileRepository simulatedProfileRepository,
             UserRepository userRepository,
             ActivityEventService activityEventService,
-            ExchangeRateProvider exchangeRateProvider) {
+            ExchangeRateProvider exchangeRateProvider,
+            Clock clock) {
         this.expenseRepository = expenseRepository;
         this.shareRepository = shareRepository;
         this.debtRepository = debtRepository;
@@ -136,6 +146,7 @@ public class GroupExpenseService {
         this.userRepository = userRepository;
         this.activityEventService = activityEventService;
         this.exchangeRateProvider = exchangeRateProvider;
+        this.clock = clock;
     }
 
     /** 017 constructor kept for existing unit tests without multi-currency mocks. */
@@ -150,7 +161,8 @@ public class GroupExpenseService {
             ActivityEventService activityEventService) {
         this(expenseRepository, shareRepository, debtRepository, null, groupMemberRepository,
                 groupPermissionsRepository, permissionChecker, simulatedProfileRepository,
-                userRepository, activityEventService, null);
+                userRepository, activityEventService, null,
+                Clock.system(ZoneId.of("America/Argentina/Buenos_Aires")));
     }
 
     /** Result of a registration: the representation plus whether rows were inserted. */
@@ -168,7 +180,7 @@ public class GroupExpenseService {
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date, String description,
             Long payerUserId, String payerName, List<ResolvedParticipant> participants, int payerIndex,
             SplitMethod splitMethod, List<BigDecimal> customAmounts, List<BigDecimal> percentages,
-            ExpenseClassification classification) {
+            ExpenseClassification classification, RecurrenceFrequency frequency) {
     }
 
     /** Parsed values of the requested split; both lists are null when any participant is invalid. */
@@ -223,7 +235,7 @@ public class GroupExpenseService {
     public Registration createWithFriend(Long callerId, Long friendId, Map<Long, String> pairNames,
             UUID idempotencyKey, CreateGroupExpenseRequest request) {
         NormalizedExpense normalized = normalize(request, pairNames, Map.of(),
-                friendRules(callerId, friendId, request));
+                friendRules(callerId, friendId, request), false);
         Optional<GroupExpense> existing =
                 expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey);
         if (existing.isPresent()) {
@@ -239,7 +251,7 @@ public class GroupExpenseService {
     public Registration resolveConcurrentFriendRegistration(Long callerId, Long friendId, Map<Long, String> pairNames,
             UUID idempotencyKey, CreateGroupExpenseRequest request) {
         NormalizedExpense normalized = normalize(request, pairNames, Map.of(),
-                friendRules(callerId, friendId, request));
+                friendRules(callerId, friendId, request), false);
         GroupExpense winner = expenseRepository.findByCreatedByUserIdAndIdempotencyKey(callerId, idempotencyKey)
                 .orElseThrow(() -> new IllegalStateException(
                         "Idempotency conflict without a persisted winner"));
@@ -332,8 +344,15 @@ public class GroupExpenseService {
         expense.setExpenseType(normalized.classification().type());
         expense.setPaymentMethod(normalized.classification().paymentMethod());
         expense.setExpenseDate(normalized.date());
+        expense.setDueDate(dueDateFor(groupId, normalized.date()));
         expense.setDescription(normalized.description());
         expense.setIdempotencyKey(idempotencyKey);
+        if (normalized.frequency() != null) {
+            expense.setRecurrenceFrequency(normalized.frequency());
+            expense.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+            expense.setRecurrenceNextDate(
+                    normalized.frequency().firstAfter(normalized.date(), LocalDate.now(clock)));
+        }
         GroupExpense saved = expenseRepository.save(expense);
 
         List<GroupExpenseShare> shares = new ArrayList<>();
@@ -354,6 +373,22 @@ public class GroupExpenseService {
         List<Debt> savedDebts = debtRepository.saveAll(debts);
 
         return new Persisted(saved, shares, savedDebts);
+    }
+
+    /**
+     * 028 FR-016/FR-019: deadline fixed at creation from the group's current
+     * {@code debtDueDays}. Friend expenses and groups without a deadline get
+     * {@code null}. The value is never recalculated by later reads.
+     */
+    private LocalDate dueDateFor(Long groupId, LocalDate expenseDate) {
+        if (groupId == null || groupRepository == null) {
+            return null;
+        }
+        return groupRepository.findById(groupId)
+                .map(Group::getDebtDueDays)
+                .filter(Objects::nonNull)
+                .map(days -> expenseDate.plusDays(days))
+                .orElse(null);
     }
 
     /**
@@ -529,6 +564,12 @@ public class GroupExpenseService {
         expense.setCategory(newCategory);
         expense.setExpenseType(newType);
         expense.setPaymentMethod(newPaymentMethod);
+        // A series can stop being recurring; the DB constraints require clearing it.
+        if (newType != ExpenseType.RECURRING && expense.getRecurrenceFrequency() != null) {
+            expense.setRecurrenceFrequency(null);
+            expense.setRecurrenceStatus(null);
+            expense.setRecurrenceNextDate(null);
+        }
         expense.setConvertedAmount(convertedAmount);
         expense.setExchangeRate(exchangeRate);
         expense.setRateDate(rateDate);
@@ -615,6 +656,7 @@ public class GroupExpenseService {
                 || existing.getCategory() != normalized.classification().category()
                 || existing.getExpenseType() != normalized.classification().type()
                 || existing.getPaymentMethod() != normalized.classification().paymentMethod()
+                || existing.getRecurrenceFrequency() != normalized.frequency()
                 || shares.size() != normalized.participants().size()) {
             return false;
         }
@@ -702,7 +744,7 @@ public class GroupExpenseService {
     private NormalizedExpense validateAndNormalize(Long groupId, CreateGroupExpenseRequest request) {
         Map<Long, SimulatedProfile> profiles = simulatedProfileRepository.findByGroupId(groupId).stream()
                 .collect(Collectors.toMap(SimulatedProfile::getId, Function.identity()));
-        return normalize(request, activeMemberNames(groupId), profiles, Map.of());
+        return normalize(request, activeMemberNames(groupId), profiles, Map.of(), true);
     }
 
     /**
@@ -711,7 +753,7 @@ public class GroupExpenseService {
      * (027 US4 uses them for the friend rules).
      */
     private NormalizedExpense normalize(CreateGroupExpenseRequest request, Map<Long, String> activeMemberNames,
-            Map<Long, SimulatedProfile> profiles, Map<String, String> overrides) {
+            Map<Long, SimulatedProfile> profiles, Map<String, String> overrides, boolean allowRecurrence) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();
 
         String amountError = ExpenseAmountNormalizer.validationError(request.getAmount());
@@ -738,6 +780,8 @@ public class GroupExpenseService {
         // 027 FR-020: same catalogs and messages as a personal expense (007).
         ExpenseClassification classification = ExpenseClassification.parse(request.getCategory(),
                 request.getType(), request.getPaymentMethod(), fieldErrors);
+        RecurrenceFrequency frequency = parseFrequency(request.getFrequency(), classification.type(),
+                allowRecurrence, fieldErrors);
         int payerIndex = payerIndex(participants, payer);
         List<BigDecimal> customAmounts = null;
         List<BigDecimal> percentages = null;
@@ -788,7 +832,41 @@ public class GroupExpenseService {
         return new NormalizedExpense(ExpenseAmountNormalizer.normalize(request.getAmount()), currency, date,
                 ExpenseDescriptionNormalizer.normalize(request.getDescription()), payer,
                 activeMemberNames.get(payer), participants, payerIndex, splitMethod, customAmounts, percentages,
-                classification);
+                classification, frequency);
+    }
+
+    /**
+     * Recurring group expenses follow the personal-expense rule: RECURRING requires
+     * a catalog frequency and ONE_TIME rejects it. Friend expenses never recur.
+     */
+    private static RecurrenceFrequency parseFrequency(String raw, ExpenseType type, boolean allowRecurrence,
+            Map<String, String> fieldErrors) {
+        boolean absent = raw == null || raw.isBlank();
+        if (!allowRecurrence) {
+            if (!absent) {
+                fieldErrors.put("frequency", FREQUENCY_NOT_ALLOWED_FOR_FRIEND);
+            }
+            return null;
+        }
+        if (type == ExpenseType.ONE_TIME) {
+            if (!absent) {
+                fieldErrors.put("frequency", FREQUENCY_NOT_ALLOWED);
+            }
+            return null;
+        }
+        if (absent) {
+            if (type == ExpenseType.RECURRING) {
+                fieldErrors.put("frequency", FREQUENCY_REQUIRED);
+            }
+            return null;
+        }
+        try {
+            return RecurrenceFrequency.valueOf(raw);
+        }
+        catch (IllegalArgumentException exception) {
+            fieldErrors.put("frequency", FREQUENCY_INVALID);
+            return null;
+        }
     }
 
     private static SplitMethod parseSplitMethod(String raw, Map<String, String> fieldErrors) {

@@ -1,6 +1,6 @@
--- V28__group_expense_classification.sql
+-- V30__group_expense_classification.sql
 -- Feature 027 (formas de registrar un gasto), ver specs/027-expense-entry-modes/data-model.md.
--- Va aparte de V27 porque V27 ya estaba aplicada (US2); una migración aplicada no se edita.
+-- Va aparte de V29 porque V29 ya estaba aplicada (US2); una migración aplicada no se edita.
 --
 -- US3 (FR-020): el gasto de grupo guarda categoría, tipo de gasto y medio
 -- de pago con los catálogos de 007 (mismos valores y tamaños que V4). Nullable: los

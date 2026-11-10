@@ -37,6 +37,9 @@ services:
       BCRA_BASE_URL: ${BCRA_BASE_URL:-https://api.bcra.gob.ar}
       # Job de vencimiento de deudas (feature 022, D7): cron de 6 campos.
       OVERDUE_CRON: "${OVERDUE_CRON:-0 30 0 * * *}"
+      # Job de recordatorios de deudas (feature 025): cron de 6 campos,
+      # después del job de vencimiento.
+      REMINDERS_CRON: "${REMINDERS_CRON:-0 45 0 * * *}"
     depends_on:
       db:
         condition: service_healthy

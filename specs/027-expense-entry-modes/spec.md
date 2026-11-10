@@ -178,7 +178,7 @@ El usuario elige "Gasto con amigo", selecciona un único amigo de su lista y com
 - El aspecto del submenú toma como referencia el submenú "Elementos de creación" de Google Docs (panel lateral con ícono + texto), adaptado al estilo de A Mano.
 - Los formularios de gasto (personal, grupal y con amigo) son páginas con ruta propia, como hoy (`/expenses/new`, `/groups/:id/expenses/new` y la nueva `/friends/:friendId/expenses/new`). Los modales se usan solo para pasos intermedios cortos: elegir grupo, elegir amigo y "Ver más" monedas. Decisión confirmada por el usuario el 2026-11-08.
 - El formulario de grupo conserva el interruptor "Gasto compartido" de 024 (apagado = gasto personal del grupo); solo se quita del formulario personal.
-- El tipo de gasto "Recurrente" en un gasto de grupo o con amigo se guarda como dato informativo; la repetición automática de gastos compartidos queda fuera de alcance.
+- El tipo de gasto "Recurrente" en un gasto de grupo permite elegir frecuencia y genera las próximas ocurrencias (V32); en un gasto con amigo se guarda como dato informativo y no se repite.
 - El selector de grupo muestra solo grupos activos de los que el usuario es miembro.
 - El selector de amigo reutiliza la lista de amigos de 013.
 - En móvil, las dos columnas del formulario de grupo se apilan y la regla de altura fija (FR-023) aplica solo en escritorio.

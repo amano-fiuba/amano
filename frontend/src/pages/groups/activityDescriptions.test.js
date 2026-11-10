@@ -130,6 +130,19 @@ describe('describeActivity: gastos y pagos (014 US2 / 022 US8)', () => {
       .toBe('Ana López generó una propuesta de liquidación (1 transferencia)')
     expect(phrase('LIQUIDATION_PROPOSED', { transferCount: 0, currency: 'ARS' }))
       .toBe('Ana López generó una propuesta de liquidación')
+
+    expect(phrase('DEBT_REMINDER_SENT', { amount: '500', currency: 'ARS', fromName: 'Juan Pérez' }, null))
+      .toMatch(/^Sistema envió el recordatorio de la deuda de \$\s?500,00 a Juan Pérez$/)
+    expect(phrase('DEBT_REMINDER_SENT', {}, null)).toBe('Sistema envió un recordatorio de deuda')
+
+    expect(phrase('PAYER_DUE_NOTICE_SENT', { concept: 'Súper', payerName: 'Ana López' }, null))
+      .toBe('Sistema envió el aviso de vencimiento del gasto «Súper» a Ana López')
+    expect(phrase('PAYER_DUE_NOTICE_SENT', {}, null))
+      .toBe('Sistema envió el aviso de vencimiento de un gasto')
+
+    // 028: las ocurrencias de una serie las crea el job, sin actor humano.
+    expect(phrase('EXPENSE_CREATED', { amount: '1500.00', currency: 'ARS' }, null))
+      .toMatch(/^Sistema registró un gasto de \$\s?1\.500,00$/)
   })
 
   it('formatea montos y tolera monedas desconocidas o datos faltantes', () => {
@@ -168,7 +181,7 @@ describe('agrupación por día (014 FR-015)', () => {
 
   it('expone los filtros del contrato', () => {
     expect(ACTIVITY_FILTERS.map((option) => option.label)).toEqual([
-      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Cambios del grupo',
+      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Recordatorios', 'Cambios del grupo',
     ])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMOVED').eventTypes)
       .toEqual(['MEMBER_REMOVED', 'MEMBER_LEFT'])
@@ -179,6 +192,8 @@ describe('agrupación por día (014 FR-015)', () => {
       'PAYMENT_MADE', 'PAYMENT_REGISTERED', 'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED',
       'DEBT_OVERDUE', 'LIQUIDATION_PROPOSED',
     ])
+    expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMINDERS').eventTypes)
+      .toEqual(['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
   })
 })
 
@@ -217,7 +232,8 @@ describe('expenseLinkId / deletedExpenseIds (022 T076)', () => {
 
   it('enlaza los eventos con gasto asociado que traen expenseId', () => {
     for (const type of ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'PAYMENT_MADE', 'PAYMENT_REGISTERED',
-      'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED', 'DEBT_OVERDUE']) {
+      'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED', 'DEBT_OVERDUE', 'DEBT_REMINDER_SENT',
+      'PAYER_DUE_NOTICE_SENT']) {
       expect(expenseLinkId(entry(type, { expenseId: 12 }))).toBe(12)
     }
   })

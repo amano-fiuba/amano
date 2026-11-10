@@ -53,20 +53,20 @@ public interface DebtRepository extends JpaRepository<Debt, Long> {
     List<Debt> findOpenForUserInGroup(@Param("groupId") Long groupId, @Param("userId") Long userId);
 
     /**
-     * 022 D7/T063/T049: PENDING debts of a group whose origin expense is older
-     * than {@code before}, read before the conditional bulk transition so only
-     * the debts actually transitioned by this run get a {@code DEBT_OVERDUE}
-     * activity event.
+     * 022 D7/T063/T049 + 028 US3: PENDING debts of a group whose persisted
+     * expense deadline (V33 {@code due_date}) is before {@code today}, read
+     * before the conditional bulk transition so only the debts actually
+     * transitioned by this run get a {@code DEBT_OVERDUE} activity event.
      */
     @Query("""
             SELECT d FROM Debt d
             WHERE d.status = com.amano.backend.groupexpense.DebtStatus.PENDING
               AND d.groupId = :groupId
               AND EXISTS (SELECT 1 FROM GroupExpense e
-                          WHERE e.id = d.expenseId AND e.expenseDate < :before)
+                          WHERE e.id = d.expenseId AND e.dueDate < :today)
             ORDER BY d.id
             """)
-    List<Debt> findPendingDueBefore(@Param("groupId") Long groupId, @Param("before") LocalDate before);
+    List<Debt> findPendingDueBefore(@Param("groupId") Long groupId, @Param("today") LocalDate today);
 
     /**
      * 022 D7/T063: idempotent conditional transition PENDING → OVERDUE for a

@@ -43,6 +43,8 @@ public class CreateGroupExpenseRequest {
     private String category;
     private String type;
     private String paymentMethod;
+    /** Required for RECURRING, forbidden for ONE_TIME (same rule as personal expenses). */
+    private String frequency;
 
     private final Map<String, Object> unknownProperties = new LinkedHashMap<>();
 
@@ -132,6 +134,14 @@ public class CreateGroupExpenseRequest {
 
     public void setPaymentMethod(String paymentMethod) {
         this.paymentMethod = paymentMethod;
+    }
+
+    public String getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(String frequency) {
+        this.frequency = frequency;
     }
 
     @JsonAnySetter

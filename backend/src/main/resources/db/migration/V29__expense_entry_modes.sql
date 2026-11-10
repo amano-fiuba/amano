@@ -1,4 +1,4 @@
--- V27__expense_entry_modes.sql
+-- V29__expense_entry_modes.sql
 -- Feature 027 (formas de registrar un gasto), ver specs/027-expense-entry-modes/data-model.md.
 --
 -- Parte 1 (US2, FR-014): gastos, deudas, pagos y preferencias aceptan las 32 monedas

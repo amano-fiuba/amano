@@ -158,6 +158,8 @@ describe('GroupExpensesCard (017)', () => {
     renderCard({ currentUserRole: 'ADMIN', expensesCount: 2, permissions: {} })
     expect(screen.getByTestId('group-expenses-count')).toHaveTextContent('2 gastos registrados')
     expect(screen.getByRole('link', { name: 'Nuevo gasto' })).toHaveAttribute('href', '/groups/3/expenses/new')
+    expect(screen.getByRole('link', { name: 'Gastos recurrentes' }))
+      .toHaveAttribute('href', '/groups/3/recurring-expenses')
     expect(screen.getByRole('link', { name: 'Ver gastos en el historial' }))
       .toHaveAttribute('href', '/groups/3/history?filter=EXPENSES')
   })

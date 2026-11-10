@@ -132,6 +132,22 @@ describe('RegisterPaymentView (018)', () => {
     expect(registerPayment).not.toHaveBeenCalled()
   })
 
+  it('permite pagar antes de la fecha de una ocurrencia futura (028)', async () => {
+    const user = userEvent.setup()
+    getGroupExpense.mockResolvedValue({
+      ok: true,
+      expense: { id: 12, groupId: 3, date: '2026-11-16', debts: [DEBT] },
+    })
+    registerPayment.mockResolvedValue({ ok: true, payment: { id: 54, status: 'CONFIRMED' }, created: true })
+    await readyForm()
+
+    await setField(user, 'Fecha', '31/10/2026')
+    await user.click(screen.getByRole('button', { name: 'Registrar pago' }))
+
+    await waitFor(() => expect(registerPayment).toHaveBeenCalled())
+    expect(screen.queryByText(PAYMENT_BEFORE_EXPENSE)).not.toBeInTheDocument()
+  })
+
   it('201 con pago confirmado muestra "Pago registrado" y vuelve al detalle del gasto', async () => {
     const user = userEvent.setup()
     registerPayment.mockResolvedValue({ ok: true, payment: { id: 54, status: 'CONFIRMED' }, created: true })

@@ -21,11 +21,16 @@ export default function GroupExpensesCard({ groupId, group, reloadKey = 0 }) {
     <section className="group-detail__section" aria-label="Gastos del grupo">
       <div className="group-detail__section-header">
         <h2>Gastos</h2>
-        {canCreateExpenses && (
-          <Link to={`/groups/${groupId}/expenses/new`} className="group-action">
-            Nuevo gasto
+        <div className="group-expenses__actions">
+          <Link to={`/groups/${groupId}/recurring-expenses`} className="group-action">
+            Gastos recurrentes
           </Link>
-        )}
+          {canCreateExpenses && (
+            <Link to={`/groups/${groupId}/expenses/new`} className="group-action">
+              Nuevo gasto
+            </Link>
+          )}
+        </div>
       </div>
       <div className="group-expenses__summary">
         <p data-testid="group-expenses-count">{countLabel(group?.expensesCount)}</p>

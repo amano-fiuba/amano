@@ -61,7 +61,7 @@ Fuera de alcance (spec): personalizar frecuencias de recurrentes; ver, editar, b
 
 ## Verificaciones previas (primera tarea)
 
-1. Que `V27` siga libre en `main` y en las ramas de 025/026; si no, renumerar.
+1. Que `V29`, `V30` y `V31` sigan libres en `main` y en las ramas de 025/026; si no, renumerar.
 2. Que `debts.group_id` y `group_expenses.group_id` tengan o no FK a `groups` (afecta solo al texto de la migración).
 3. Que ningún otro `Repository` haga consultas sobre `debts` o `group_expenses` sin filtrar por grupo (`grep` de `FROM Debt`, `FROM GroupExpense`, `findAll`).
 4. Que el formulario de grupo no envíe ya `category` u otros campos (evitar el `400` por propiedad desconocida al migrar en partes).
@@ -71,7 +71,7 @@ Fuera de alcance (spec): personalizar frecuencias de recurrentes; ver, editar, b
 
 **D1. Monedas: enum ampliado + catálogo en vivo** (R1–R3, [currencies-api](./contracts/currencies-api.md)). 32 constantes con `bcraCode()`; `GET /api/currencies` cruza `Maestros/Divisas` con el enum, caché 24 h, `503` sin caché. `BcraExchangeRateClient` busca por `bcraCode()`. `CHECK` de moneda ampliados salvo `groups.primary_currency`; `Currency.GROUP_PRIMARY` restringe la moneda principal en `GroupService.java:127-132` (verificado en T004: solo el alta la setea).
 
-**D2. Campos de 007 en gasto compartido** (R4). Columnas nullable; el servicio las exige en altas (grupo y amigo) y en `PATCH` de gasto personal de grupo las acepta. `RECURRING` es informativo.
+**D2. Campos de 007 en gasto compartido** (R4). Columnas nullable; el servicio las exige en altas (grupo y amigo) y en `PATCH` de gasto personal de grupo las acepta. Desde V32, `RECURRING` en un gasto de grupo acepta `frequency` y crea una serie; en un gasto con amigo sigue siendo solo informativo.
 
 **D3. Gasto con amigo sobre el modelo de grupo** Sin conversión de moneda por FR-034. (R5, [shared-expenses-api](./contracts/shared-expenses-api.md)). `group_id NULL` + `friend_user_id`, CHECK de exclusión. Alta en `POST /api/users/me/friends/{friendId}/expenses`, verifica amistad (`FriendshipRequestRepository`/servicio de 013), participantes = {yo, amigo}, sin conversión. `DebtDirectDebtAdapter` implementa `DirectDebtPort` y desplaza a `NoOpDirectDebtPort` (que se elimina o queda `@ConditionalOnMissingBean`). El alta se hace con el mismo núcleo que grupos: `GroupExpenseService` extrae `register(context, ...)` donde `context` es grupo o amigo (moneda destino, validador de participantes, permisos).
 
@@ -105,7 +105,7 @@ Hasta que existan los pasos 3 y 4, las opciones "Gasto grupal" y "Gasto con amig
 - `FriendExpenseIT` (Testcontainers): alta 201/200 idempotente/422; no amigo 404; participantes y pagador inválidos 400; deuda `PENDING` con `group_id NULL`; sin conversión; `DELETE` de amistad bloqueado; saldos, deudas pendientes y vencimiento de grupo no incluyen la deuda directa.
 - `UserAccountServiceTest`: preferencias con monedas nuevas; mensaje "Moneda no soportada".
 - `GroupServiceTest`: moneda principal fuera de ARS/USD/EUR → 400.
-- Migración: IT que aplica `V27` sobre datos existentes y verifica los `CHECK`.
+- Migración: IT que aplica `V29`, `V30` y `V31` sobre datos existentes y verifica los `CHECK`.
 
 **Frontend**
 
@@ -162,7 +162,7 @@ backend/src/main/java/com/amano/backend/
 ├── friendship/NoOpDirectDebtPort.java      # MOD/DEL: reemplazado por el adaptador
 └── common/ProblemDetailExceptionHandler.java # MOD: 503 CURRENCY_CATALOG_UNAVAILABLE
 
-backend/src/main/resources/db/migration/V27__expense_entry_modes.sql   # NUEVO
+backend/src/main/resources/db/migration/V29__expense_entry_modes.sql   # NUEVO
 
 frontend/src/
 ├── api/currencyClient.js                   # NUEVO

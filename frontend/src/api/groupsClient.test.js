@@ -13,6 +13,8 @@ import {
   leaveGroup,
   grantAdminRole,
   revokeAdminRole,
+  getReminderSettings,
+  updateReminderSettings,
   getExchangeQuote,
   GROUPS_NETWORK_ERROR_MESSAGE,
 } from './groupsClient'
@@ -251,6 +253,56 @@ describe('groupsClient', () => {
 
     const failure = await grantAdminRole(3, 15)
     expect(failure.detail).toBe('Sos el último')
+  })
+
+  it('getReminderSettings devuelve la configuración y mapea el error del backend', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        sendDays: 7, message: null, defaultSendDays: 5, allowedSendDays: [7, 5, 3, 1],
+      }))
+      .mockResolvedValueOnce(jsonResponse({ detail: 'Solo un administrador puede ver la configuración de recordatorios' }, 403))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await getReminderSettings(3)).toEqual({
+      ok: true,
+      settings: { sendDays: 7, message: null, defaultSendDays: 5, allowedSendDays: [7, 5, 3, 1] },
+    })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/groups/3/reminder-settings')
+
+    const failure = await getReminderSettings(3)
+    expect(failure.ok).toBe(false)
+    expect(failure.status).toBe(403)
+    expect(failure.detail).toBe('Solo un administrador puede ver la configuración de recordatorios')
+  })
+
+  it('updateReminderSettings manda el payload parcial y mapea fields', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        sendDays: 3, message: 'Hola', defaultSendDays: 5, allowedSendDays: [7, 5, 3, 1],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        detail: 'Revisá los datos',
+        properties: { fields: { sendDays: 'El tiempo de envío debe ser 7, 5, 3 o 1 días antes' } },
+      }, 400))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const ok = await updateReminderSettings(3, { sendDays: 3 })
+    expect(ok.ok).toBe(true)
+    expect(ok.settings.sendDays).toBe(3)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/groups/3/reminder-settings')
+    expect(fetchMock.mock.calls[0][1].method).toBe('PUT')
+    expect(fetchMock.mock.calls[0][1].body).toBe(JSON.stringify({ sendDays: 3 }))
+
+    const failure = await updateReminderSettings(3, { sendDays: 4 })
+    expect(failure.ok).toBe(false)
+    expect(failure.fields.sendDays).toBe('El tiempo de envío debe ser 7, 5, 3 o 1 días antes')
+  })
+
+  it('los endpoints de recordatorios devuelven network cuando el fetch se corta', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
+
+    expect(await getReminderSettings(1)).toEqual({ ok: false, network: true })
+    expect(await updateReminderSettings(1, { sendDays: 5 })).toEqual({ ok: false, network: true })
   })
 
   it('los endpoints de groups devuelven network cuando el fetch se corta', async () => {

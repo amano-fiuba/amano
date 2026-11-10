@@ -48,6 +48,7 @@ export const ACTIVITY_FILTERS = [
       'LIQUIDATION_PROPOSED',
     ],
   },
+  { value: 'REMINDERS', label: 'Recordatorios', eventTypes: ['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'] },
   { value: 'SETTINGS', label: 'Cambios del grupo', eventTypes: ['PERMISSION_CHANGED', 'PHOTO_CHANGED'] },
 ]
 
@@ -165,6 +166,32 @@ function liquidationProposed(details) {
   return 'generó una propuesta de liquidación'
 }
 
+function debtReminderSent(details) {
+  const money = formatMoney(details.amount, details.currency)
+  const debtor = text(details.fromName)
+  let sentence = money ? `envió el recordatorio de la deuda de ${money}` : 'envió un recordatorio de deuda'
+  if (debtor) sentence += ` a ${debtor}`
+  return sentence
+}
+
+function payerDueNoticeSent(details) {
+  const concept = text(details.concept)
+  const payer = text(details.payerName)
+  let sentence = concept
+    ? `envió el aviso de vencimiento del gasto «${concept}»`
+    : 'envió el aviso de vencimiento de un gasto'
+  if (payer) sentence += ` a ${payer}`
+  return sentence
+}
+
+const SYSTEM_EVENTS = new Set([
+  'DEBT_OVERDUE',
+  'DEBT_REMINDER_SENT',
+  'PAYER_DUE_NOTICE_SENT',
+  // 028: las ocurrencias recurrentes las genera el job, sin actor humano.
+  'EXPENSE_CREATED',
+])
+
 const DESCRIBERS = {
   MEMBER_ADDED: memberAdded,
   MEMBER_REMOVED: memberRemoved,
@@ -180,6 +207,8 @@ const DESCRIBERS = {
   PAYMENT_REJECTED: paymentRejected,
   DEBT_OVERDUE: debtOverdue,
   LIQUIDATION_PROPOSED: liquidationProposed,
+  DEBT_REMINDER_SENT: debtReminderSent,
+  PAYER_DUE_NOTICE_SENT: payerDueNoticeSent,
 }
 
 // Eventos que abren el detalle del gasto: el gasto mismo (017, 022 edición) y sus
@@ -192,6 +221,8 @@ const LINKS_TO_EXPENSE = [
   'PAYMENT_CONFIRMED',
   'PAYMENT_REJECTED',
   'DEBT_OVERDUE',
+  'DEBT_REMINDER_SENT',
+  'PAYER_DUE_NOTICE_SENT',
 ]
 
 /** Ids (texto) de los gastos que tienen un EXPENSE_DELETED entre las entradas. */
@@ -221,7 +252,7 @@ export function expenseLinkId(entry, deleted = new Set()) {
 export function describeActivity(entry) {
   const details = entry?.details && typeof entry.details === 'object' ? entry.details : {}
   const describe = DESCRIBERS[entry?.eventType]
-  const actor = entry?.eventType === 'DEBT_OVERDUE' && !entry?.actor ? 'Sistema' : actorName(entry?.actor)
+  const actor = SYSTEM_EVENTS.has(entry?.eventType) && !entry?.actor ? 'Sistema' : actorName(entry?.actor)
   return {
     actor,
     text: describe ? describe(details, entry?.actor) : 'realizó una acción en el grupo',

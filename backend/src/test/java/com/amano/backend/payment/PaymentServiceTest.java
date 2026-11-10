@@ -33,6 +33,7 @@ import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
 import com.amano.backend.groupexpense.DebtStatus;
+import com.amano.backend.groupexpense.GroupExpense;
 import com.amano.backend.groupexpense.GroupExpenseRepository;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.GroupMember;
@@ -219,6 +220,15 @@ class PaymentServiceTest {
                 .containsEntry("date", ExpenseDateValidator.FUTURE_MESSAGE);
         assertThat(fieldErrorsOf(JUAN, request(31L, "10.00", "2026-10-31")))
                 .containsEntry("date", PaymentService.BEFORE_EXPENSE);
+    }
+
+    @Test
+    void anAnticipatedSystemOccurrenceCanBePaidBeforeItsExpenseDate() {
+        GroupExpense occurrence = com.amano.backend.payment.PaymentFixtures.expense();
+        occurrence.setRecurrenceSourceId(EXPENSE_ID + 1);
+        when(expenseRepository.findById(EXPENSE_ID)).thenReturn(Optional.of(occurrence));
+
+        assertThat(service.register(JUAN, KEY, request(31L, "10.00", "2026-10-31")).created()).isTrue();
     }
 
     @Test

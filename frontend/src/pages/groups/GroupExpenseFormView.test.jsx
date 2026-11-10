@@ -43,6 +43,7 @@ import GroupExpenseFormView, {
   EDIT_SUCCESS_MESSAGE,
   EXPENSE_GONE_MESSAGE,
   FORM_LOAD_ERROR_MESSAGE,
+  FREQUENCY_REQUIRED_MESSAGE,
   GROUP_EXPENSE_SUCCESS_MESSAGE,
   NOT_A_MEMBER_MESSAGE,
   ONLY_OWN_PAYMENTS_MESSAGE,
@@ -1318,7 +1319,7 @@ describe('GroupExpenseFormView: datos de 007 y diseño (027 US3)', () => {
     debts: [],
   }
 
-  it('el alta envía categoría, tipo y medio de pago', async () => {
+  it('el alta envía categoría, tipo, frecuencia y medio de pago', async () => {
     const user = userEvent.setup()
     createGroupExpense.mockResolvedValue({ ok: true, expense: { id: 99 } })
     renderView()
@@ -1326,6 +1327,8 @@ describe('GroupExpenseFormView: datos de 007 y diseño (027 US3)', () => {
     await fillAmount(user, '300')
     await user.selectOptions(screen.getByLabelText('Categoría'), 'LEISURE')
     await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'RECURRING')
+    // Una serie compartida pide la misma frecuencia que un gasto personal.
+    await user.selectOptions(screen.getByLabelText('Frecuencia'), 'MONTHLY')
     await saveForm(user)
 
     await waitFor(() => expect(createGroupExpense).toHaveBeenCalledTimes(1))
@@ -1333,8 +1336,35 @@ describe('GroupExpenseFormView: datos de 007 y diseño (027 US3)', () => {
       ...CLASSIFICATION,
       category: 'LEISURE',
       type: 'RECURRING',
+      frequency: 'MONTHLY',
     })
-    // Un gasto compartido "Recurrente" es informativo: no se pide ni se envía frecuencia.
+  })
+
+  it('un gasto recurrente compartido exige la frecuencia', async () => {
+    const user = userEvent.setup()
+    renderView()
+
+    await fillAmount(user, '300')
+    await user.selectOptions(screen.getByLabelText('Categoría'), 'LEISURE')
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'RECURRING')
+    await user.selectOptions(screen.getByLabelText('Medio de pago'), 'CASH')
+    await saveForm(user)
+
+    expect(await screen.findByText(FREQUENCY_REQUIRED_MESSAGE)).toBeInTheDocument()
+    expect(createGroupExpense).not.toHaveBeenCalled()
+  })
+
+  it('un gasto único no muestra ni envía frecuencia', async () => {
+    const user = userEvent.setup()
+    createGroupExpense.mockResolvedValue({ ok: true, expense: { id: 99 } })
+    renderView()
+
+    await fillAmount(user, '300')
+    await user.selectOptions(screen.getByLabelText('Categoría'), 'LEISURE')
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
+    await saveForm(user)
+
+    await waitFor(() => expect(createGroupExpense).toHaveBeenCalledTimes(1))
     expect(screen.queryByLabelText('Frecuencia')).not.toBeInTheDocument()
     expect(createGroupExpense.mock.calls[0][1]).not.toHaveProperty('frequency')
   })

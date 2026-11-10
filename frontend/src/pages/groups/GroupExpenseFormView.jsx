@@ -26,6 +26,7 @@ import { useSnackbar } from '../../components/Snackbar'
 import useCurrentDate, { deviceTimeZone } from '../../hooks/useCurrentDate'
 import {
   CATEGORY_OPTIONS,
+  FREQUENCY_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   TYPE_OPTIONS,
   currencyLabel,
@@ -94,8 +95,10 @@ export const EXPENSE_GONE_MESSAGE = 'No existe el gasto solicitado o no sos miem
 export const NOT_A_FRIEND_MESSAGE = 'No sos amigo de ese usuario'
 export const FRIEND_LOAD_ERROR_MESSAGE = 'No se pudo cargar a tu amigo. Intentá nuevamente'
 export const FRIEND_SUCCESS_PREFIX = 'Gasto registrado con'
+// Recurring shared expenses: same frequency catalog as personal expenses.
+export const FREQUENCY_REQUIRED_MESSAGE = 'La frecuencia es obligatoria'
 
-const SERVER_FIELDS = ['amount', 'currency', 'date', 'description', 'category', 'type', 'paymentMethod']
+const SERVER_FIELDS = ['amount', 'currency', 'date', 'description', 'category', 'type', 'paymentMethod', 'frequency']
 
 // 027 (FR-020): the 007 classification, with the personal-expense messages.
 const REQUIRED_SELECT_MESSAGES = {
@@ -172,11 +175,18 @@ export default function GroupExpenseFormView({ mode = 'group' }) {
       category: '',
       type: '',
       paymentMethod: '',
+      frequency: '',
     },
   })
   const amountValue = useWatch({ control, name: 'amount' })
   const currencyValue = useWatch({ control, name: 'currency' })
   const dateValue = useWatch({ control, name: 'date' })
+  const typeValue = useWatch({ control, name: 'type' })
+
+  // A frequency only belongs to a recurring shared expense.
+  useEffect(() => {
+    if (typeValue !== 'RECURRING') setValue('frequency', '')
+  }, [typeValue, setValue])
 
   useEffect(() => {
     if (!isFriend) return undefined
@@ -580,6 +590,7 @@ export default function GroupExpenseFormView({ mode = 'group' }) {
       category: values.category,
       type: values.type,
       paymentMethod: values.paymentMethod,
+      ...(values.type === 'RECURRING' && !isFriend ? { frequency: values.frequency } : {}),
       payerUserId: userIdOf(payerKey),
       splitMethod: method,
       participants: orderedSelection.map((key) => {
@@ -610,6 +621,9 @@ export default function GroupExpenseFormView({ mode = 'group' }) {
       { label: 'Fecha', value: values.date },
       { label: 'Categoría', value: labelOf(CATEGORY_OPTIONS, payload.category) },
       { label: 'Tipo de gasto', value: labelOf(TYPE_OPTIONS, payload.type) },
+      ...(payload.frequency
+        ? [{ label: 'Frecuencia', value: labelOf(FREQUENCY_OPTIONS, payload.frequency) }]
+        : []),
       { label: 'Medio de pago', value: labelOf(PAYMENT_METHOD_OPTIONS, payload.paymentMethod) },
       ...(payload.description ? [{ label: 'Descripción', value: payload.description }] : []),
       { label: '¿Quién pagó?', value: nameOf(payerKey) },
@@ -820,6 +834,17 @@ export default function GroupExpenseFormView({ mode = 'group' }) {
               error={errors.type?.message}
               {...register('type', { validate: requiredSelect('type', isEdit) })}
             />
+
+            {!isEdit && !isFriend && typeValue === 'RECURRING' && (
+              <SelectField
+                label="Frecuencia"
+                options={FREQUENCY_OPTIONS}
+                error={errors.frequency?.message}
+                {...register('frequency', {
+                  validate: (value) => (value ? true : FREQUENCY_REQUIRED_MESSAGE),
+                })}
+              />
+            )}
 
             <SelectField
               label="Medio de pago"

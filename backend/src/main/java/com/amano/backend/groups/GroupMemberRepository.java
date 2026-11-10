@@ -54,4 +54,12 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
             WHERE m.id.groupId = :groupId AND m.role = 'ADMIN' AND m.leftAt IS NULL
             """)
     long countActiveAdminsByGroupId(@Param("groupId") Long groupId);
+
+    /** 025: user ids of the active admins, the recipients of a delivery failure notice. */
+    @Query("""
+            SELECT m.id.userId FROM GroupMember m
+            WHERE m.id.groupId = :groupId AND m.role = 'ADMIN' AND m.leftAt IS NULL
+            ORDER BY m.id.userId
+            """)
+    List<Long> findActiveAdminUserIds(@Param("groupId") Long groupId);
 }
