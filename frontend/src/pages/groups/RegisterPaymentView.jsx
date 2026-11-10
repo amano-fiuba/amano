@@ -94,6 +94,10 @@ export default function RegisterPaymentView() {
 
   const { debt, expenseDate } = load
   const todayIso = parseArgentineDate(today).iso
+  // 028: una ocurrencia recurrente anticipada tiene fecha futura, pero sus
+  // deudas ya existen: se permite pagarla antes de esa fecha. Para gastos
+  // normales se mantiene el mínimo de la fecha del gasto.
+  const minimumExpenseDate = expenseDate && expenseDate <= todayIso ? expenseDate : null
   const parsedAmount = parseArgentineAmount(amountValue)
 
   const onSubmit = async (values) => {
@@ -244,7 +248,7 @@ export default function RegisterPaymentView() {
             autoComplete="off"
             error={errors.date?.message}
             {...register('date', {
-              validate: (value) => validatePaymentDate(value, todayIso, expenseDate),
+              validate: (value) => validatePaymentDate(value, todayIso, minimumExpenseDate),
             })}
           />
 
