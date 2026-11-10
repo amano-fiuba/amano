@@ -80,6 +80,24 @@ describe('MainPage (015, US1)', () => {
     await screen.findByText('Todavía no sos miembro de ningún grupo')
   })
 
+  it('copia el CBU/CVU desde la tarjeta de perfil', async () => {
+    const user = userEvent.setup()
+    // Después de setup(): userEvent instala su propio navigator.clipboard.
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    renderPage()
+
+    const profile = section('Ana Pérez')
+    await user.click(within(profile).getByRole('button', { name: 'Copiar CBU/CVU' }))
+
+    expect(writeText).toHaveBeenCalledWith(USER.cbuCvu)
+    expect(await within(profile).findByText('¡Copiado!')).toBeInTheDocument()
+    delete navigator.clipboard
+  })
+
   it('aplica los valores por defecto del perfil', async () => {
     useAuth.mockReturnValue({
       user: { id: 7, firstName: 'Ana', lastName: null, email: 'a@b.c', currencies: [] },
@@ -89,6 +107,7 @@ describe('MainPage (015, US1)', () => {
 
     const profile = section('Ana')
     expect(within(profile).getByText('No informado')).toBeInTheDocument()
+    expect(within(profile).queryByRole('button', { name: 'Copiar CBU/CVU' })).not.toBeInTheDocument()
     expect(within(profile).getByText('ARS')).toBeInTheDocument()
     expect(profile.querySelector('img')).toHaveAttribute('src', '/avatar-default.png')
     await screen.findByText('Todavía no registraste gastos')

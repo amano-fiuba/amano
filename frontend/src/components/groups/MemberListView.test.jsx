@@ -21,9 +21,9 @@ beforeEach(() => {
 })
 
 const MEMBERS = [
-  { userId: 7, name: 'Ana López', avatar: null, role: 'ADMIN' },
-  { userId: 15, name: 'Carla Gómez', avatar: null, role: 'MEMBER' },
-  { userId: null, simulatedProfileId: 33, name: 'Juan Simulado', avatar: null, role: 'MEMBER' },
+  { userId: 7, name: 'Ana López', avatar: null, role: 'ADMIN', cbuCvu: '0000003100010000000001' },
+  { userId: 15, name: 'Carla Gómez', avatar: null, role: 'MEMBER', cbuCvu: '0000003100010000000002' },
+  { userId: null, simulatedProfileId: 33, name: 'Juan Simulado', avatar: null, role: 'MEMBER', cbuCvu: null },
 ]
 
 async function openActions(key) {
@@ -109,13 +109,57 @@ describe('MemberListView (T079/T077, US6)', () => {
     expect(screen.getByTestId('member-role-sim-33')).toHaveTextContent(/Miembro/)
   })
 
-  it('sin ser admin no muestra las acciones por fila', async () => {
+  it('sin ser admin ve el icono de copiar junto al nombre pero no acciones de rol', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 
     render(<MemberListView groupId={3} currentUserId={7} isAdmin={false} />)
 
-    await waitFor(() => expect(screen.getByText('Juan Simulado')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Carla Gómez')).toBeInTheDocument())
+    expect(screen.getByTestId('copy-cbu-user-15')).toBeInTheDocument()
     expect(screen.queryByTestId('member-actions-user-15')).not.toBeInTheDocument()
+  })
+
+  it('copia el CBU/CVU del miembro desde el icono junto a su nombre', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    fireEvent.click(await screen.findByTestId('copy-cbu-user-15'))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('0000003100010000000002'))
+    expect(screen.getByText('¡Copiado!')).toBeInTheDocument()
+    delete navigator.clipboard
+  })
+
+  it('no ofrece copiar el CBU/CVU de un perfil simulado ni de quien no lo informó', async () => {
+    getMembers.mockResolvedValue({
+      ok: true,
+      members: [
+        MEMBERS[0],
+        { userId: 15, name: 'Carla Gómez', avatar: null, role: 'MEMBER', cbuCvu: null },
+        MEMBERS[2],
+      ],
+    })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await waitFor(() => expect(screen.getByText('Carla Gómez')).toBeInTheDocument())
+    expect(screen.queryByTestId('copy-cbu-user-15')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('copy-cbu-sim-33')).not.toBeInTheDocument()
+  })
+
+  it('no muestra el icono de copiar sobre el propio usuario', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} />)
+
+    await waitFor(() => expect(screen.getByTestId('member-current')).toBeInTheDocument())
+    expect(screen.queryByTestId('copy-cbu-user-7')).not.toBeInTheDocument()
   })
 
   it('muestra primero al usuario actual', async () => {

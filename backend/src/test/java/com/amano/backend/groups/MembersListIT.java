@@ -103,6 +103,8 @@ class MembersListIT {
     void listsActiveMembersAndSimulatedProfilesForAMemberOfTheGroup() throws Exception {
         Cookie admin = verifiedSessionOf("members-admin@example.com");
         verifiedSessionOf("friend@example.com");
+        jdbcTemplate.update("UPDATE users SET cbu = ? WHERE email = ?",
+                "0000003100010000000001", "members-admin@example.com");
         long groupId = createGroup(admin);
         addSimulated(admin, groupId, "juan");
 
@@ -122,9 +124,12 @@ class MembersListIT {
             }
         }
         assertThat(adminRow.path("role").asText()).isEqualTo("ADMIN");
+        // Group members can copy the CBU/CVU of a registered member to transfer.
+        assertThat(adminRow.path("cbuCvu").asText()).isEqualTo("0000003100010000000001");
         assertThat(simulated.path("name").asText()).isEqualTo("Juan Simulado");
         assertThat(simulated.path("role").asText()).isEqualTo("MEMBER");
         assertThat(simulated.path("userId").isNull()).isTrue(); // no group_members row
+        assertThat(simulated.path("cbuCvu").isNull()).isTrue(); // simulated → no CBU
     }
 
     @Test

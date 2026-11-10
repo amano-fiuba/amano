@@ -5,6 +5,7 @@ import {
   revokeAdminRole,
   GROUPS_NETWORK_ERROR_MESSAGE,
 } from '../../api/groupsClient'
+import CopyCbuButton from '../CopyCbuButton'
 import GroupRowsSkeleton from './GroupRowsSkeleton'
 import MemberActionsMenu from './MemberActionsMenu'
 import MemberBalance from './MemberBalance'
@@ -16,9 +17,12 @@ const DEFAULT_AVATAR = '/avatar-default.png'
 /**
  * Members list (US6, T079): every ACTIVE member — registered users and
  * simulated profiles — with name, avatar (NULL → gray default) and role.
- * The caller comes first. When they are ADMIN (US4/US10), every other row
- * carries a menu with the role actions (assign/revoke, blocked for the last
- * admin) and the removal dialog with its confirmation. Changing a role or removing someone re-fetches
+ * The caller comes first. Registered members who informed their CBU/CVU show
+ * a copy icon on the row's right edge (same height as "⋯") so any group member
+ * can transfer to them.
+ * When the caller is ADMIN (US4/US10), every other row carries a menu with the
+ * role actions (assign/revoke, blocked for the last admin) and the removal
+ * action with its confirmation. Changing a role or removing someone re-fetches
  * the list and notifies `onChanged`, so the screen updates without a manual
  * refresh (fix 2026-11-04); changing `reloadKey` (e.g. after an alta) also
  * re-fetches. The backend identifies simulated profiles with
@@ -163,55 +167,65 @@ export default function MemberListView({
                 </span>
                 {!isYou && <MemberBalance balances={member.balances} payUrl={member.payUrl} />}
               </span>
-              {isAdmin && !isYou && (
-                <MemberActionsMenu memberName={member.name} testId={`member-actions-${key}`}>
-                  {(close) => (
-                    <>
-                      {!isSimulated && !isAdminTarget && (
+              <span className="member-row__actions">
+                {!isYou && !isSimulated && member.cbuCvu && (
+                  <CopyCbuButton
+                    value={member.cbuCvu}
+                    iconOnly
+                    ariaLabel={`Copiar CBU/CVU de ${member.name}`}
+                    testId={`copy-cbu-${key}`}
+                  />
+                )}
+                {isAdmin && !isYou && (
+                  <MemberActionsMenu memberName={member.name} testId={`member-actions-${key}`}>
+                    {(close) => (
+                      <>
+                        {!isSimulated && !isAdminTarget && (
+                          <button
+                            type="button"
+                            className="member-menu__item"
+                            data-testid={`grant-admin-${key}`}
+                            onClick={() => {
+                              close()
+                              changeRole(member, 'grant')
+                            }}
+                          >
+                            Hacer admin
+                          </button>
+                        )}
+                        {revokeable && (
+                          <button
+                            type="button"
+                            className="member-menu__item"
+                            data-testid={`revoke-admin-${key}`}
+                            onClick={() => {
+                              close()
+                              changeRole(member, 'revoke')
+                            }}
+                          >
+                            Quitarle admin
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className="member-menu__item"
-                          data-testid={`grant-admin-${key}`}
+                          className="member-menu__item member-menu__item--danger"
+                          data-testid={`remove-member-${key}`}
                           onClick={() => {
                             close()
-                            changeRole(member, 'grant')
+                            setRemovalTarget(
+                              isSimulated
+                                ? { simulatedProfile: { profileId: simulatedId, name: member.name } }
+                                : { member: { userId: member.userId, name: member.name, role: member.role } },
+                            )
                           }}
                         >
-                          Hacer admin
+                          {isSimulated ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
                         </button>
-                      )}
-                      {revokeable && (
-                        <button
-                          type="button"
-                          className="member-menu__item"
-                          data-testid={`revoke-admin-${key}`}
-                          onClick={() => {
-                            close()
-                            changeRole(member, 'revoke')
-                          }}
-                        >
-                          Quitarle admin
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="member-menu__item member-menu__item--danger"
-                        data-testid={`remove-member-${key}`}
-                        onClick={() => {
-                          close()
-                          setRemovalTarget(
-                            isSimulated
-                              ? { simulatedProfile: { profileId: simulatedId, name: member.name } }
-                              : { member: { userId: member.userId, name: member.name, role: member.role } },
-                          )
-                        }}
-                      >
-                        {isSimulated ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
-                      </button>
-                    </>
-                  )}
-                </MemberActionsMenu>
-              )}
+                      </>
+                    )}
+                  </MemberActionsMenu>
+                )}
+              </span>
             </li>
           )
         })}

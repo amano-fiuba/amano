@@ -195,10 +195,12 @@ This module defines the API contracts for the groups-management feature. All end
 
 ```json
 [
-  { "userId": 7, "simulatedProfileId": null, "name": "Ana López", "avatar": "/api/users/7/avatar", "role": "ADMIN" },
-  { "userId": null, "simulatedProfileId": 33, "name": "Abuela", "avatar": null, "role": "MEMBER" }
+  { "userId": 7, "simulatedProfileId": null, "name": "Ana López", "avatar": "/api/users/7/avatar", "role": "ADMIN", "cbuCvu": "0000003100010000000001" },
+  { "userId": null, "simulatedProfileId": 33, "name": "Abuela", "avatar": null, "role": "MEMBER", "cbuCvu": null }
 ]
 ```
+
+**Notas para el frontend (copiar CBU/CVU)**: `cbuCvu` se expone a los integrantes activos del grupo para poder transferir; es `null` si el miembro no lo informó o si es un perfil simulado. La interfaz solo ofrece "Copiar CBU/CVU" cuando el valor está presente.
 
 **Notas para el frontend (fix 2026-11-04)**: una fila es un perfil simulado si y solo si `simulatedProfileId` no es `null`. A esas filas la interfaz **no** les ofrece "Hacer admin" ni "Quitarle admin" (un perfil simulado no tiene cuenta y siempre es MEMBER) y su baja usa `DELETE /api/groups/{id}/simulated-profiles/{simulatedProfileId}`, nunca `DELETE /members/{userId}`.
 

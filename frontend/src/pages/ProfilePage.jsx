@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
+import CopyCbuButton from '../components/CopyCbuButton'
 import HomeLink from '../components/HomeLink'
 
 // Pantalla "Mi perfil" (specs/002-user-profile): los datos provienen
@@ -88,8 +89,11 @@ export default function ProfilePage() {
         </span>
       </p>
       {/* FR-009 de 001: el CBU/CVU es privado; aquí solo ve la sesión propia. */}
-      <p>
-        CBU/CVU: <span data-testid="profile-cbu">{user.cbuCvu ?? 'No informado'}</span>
+      <p className="profile-cbu-line">
+        <span>
+          CBU/CVU: <span data-testid="profile-cbu">{user.cbuCvu ?? 'No informado'}</span>
+        </span>
+        <CopyCbuButton value={user.cbuCvu} iconOnly />
       </p>
       <p>
         Monedas: <span data-testid="profile-currencies">{currencies.join(', ')}</span>

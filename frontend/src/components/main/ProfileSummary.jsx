@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
 import { userAvatarUrl } from '../../auth/userAvatar'
+import CopyCbuButton from '../CopyCbuButton'
 
 // Resumen de perfil: datos propios de la sesión (mismas reglas que ProfilePage).
 export default function ProfileSummary() {
@@ -19,7 +20,10 @@ export default function ProfileSummary() {
         </div>
         <div>
           <dt>CBU/CVU</dt>
-          <dd>{user.cbuCvu ?? 'No informado'}</dd>
+          <dd>
+            {user.cbuCvu ?? 'No informado'}
+            <CopyCbuButton value={user.cbuCvu} iconOnly />
+          </dd>
         </div>
         <div>
           <dt>Monedas</dt>
