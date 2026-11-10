@@ -106,7 +106,7 @@ class FriendListIT {
     }
 
     @Test
-    void exposesOnlyIdNamesEmailAndTheAcceptanceDate() throws Exception {
+    void exposesOnlyIdNamesEmailTheAcceptanceDateAndTheCbu() throws Exception {
         long me = verified("Privacidad", "Dos");
         long friend = verified("Amiga", "Dos");
         friends(me, friend);
@@ -119,7 +119,8 @@ class FriendListIT {
                 .andExpect(jsonPath("$[0].email").exists())
                 .andExpect(jsonPath("$[0].friendsSince").exists())
                 .andExpect(jsonPath("$[0].cbu").doesNotExist())
-                .andExpect(jsonPath("$[0].cbuCvu").doesNotExist())
+                // Friends can copy it to transfer (null when not informed).
+                .andExpect(jsonPath("$[0].cbuCvu").value("0000003100010000000001"))
                 .andExpect(jsonPath("$[0].currencies").doesNotExist())
                 .andExpect(jsonPath("$[0].passwordHash").doesNotExist())
                 .andExpect(jsonPath("$[0].emailVerifiedAt").doesNotExist())
