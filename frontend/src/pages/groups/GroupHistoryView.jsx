@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { getActivity } from '../../api/groupsClient'
 import { useAuth } from '../../auth/AuthContext'
 import {
   ACTIVITY_FILTERS,
+  deletedExpenseIds,
   describeActivity,
+  expenseLinkId,
   formatTime,
   groupByDay,
 } from './activityDescriptions'
@@ -17,13 +19,21 @@ export const NO_FILTERED_ACTIVITY_MESSAGE = 'No hay actividad de este tipo en el
 export const HISTORY_ERROR_MESSAGE = 'No se pudo cargar el historial. Intentá nuevamente'
 export const NOT_A_MEMBER_MESSAGE = 'No existe el grupo solicitado o no sos miembro'
 
+function initialFilter(value) {
+  return ACTIVITY_FILTERS.some((option) => option.value === value) ? value : 'ALL'
+}
+
 // Historial de actividad del grupo (010 US9; 014 US1–US3): frases completas
 // agrupadas por día, filtro "Mostrar", paginación y estados de carga, vacío y
 // error. Una respuesta vieja nunca pisa a la consulta más reciente.
+
 export default function GroupHistoryView({ groupId }) {
   const auth = useAuth()
   const setUser = auth?.setUser
-  const [filter, setFilter] = useState('ALL')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // 017 FR-024: "?filter=EXPENSES" opens the history already filtered; unknown
+  // values fall back to all the activity.
+  const [filter, setFilter] = useState(() => initialFilter(searchParams.get('filter')))
   const [page, setPage] = useState(1)
   const [retryToken, setRetryToken] = useState(0)
   const [state, setState] = useState({ status: 'loading', entries: [], totalPages: 0, error: '' })
@@ -68,11 +78,13 @@ export default function GroupHistoryView({ groupId }) {
     reload(() => {
       setFilter(value)
       setPage(1)
+      setSearchParams(value === 'ALL' ? {} : { filter: value }, { replace: true })
     })
   }
 
   const { status, entries, totalPages, error, retryable } = state
   const days = groupByDay(entries)
+  const deletedIds = deletedExpenseIds(entries)
   const lastPage = Math.max(totalPages, 1)
 
   return (
@@ -127,6 +139,7 @@ export default function GroupHistoryView({ groupId }) {
               <ol className="group-history__entries">
                 {day.entries.map((entry) => {
                   const { actor, text } = describeActivity(entry)
+                  const linkedExpenseId = expenseLinkId(entry, deletedIds)
                   return (
                     <li
                       key={entry.id}
@@ -136,6 +149,14 @@ export default function GroupHistoryView({ groupId }) {
                       <p>
                         <strong>{actor}</strong> {text}
                       </p>
+                      {linkedExpenseId != null && (
+                        <Link
+                          to={`/groups/${groupId}/expenses/${linkedExpenseId}`}
+                          className="group-history__expense-link"
+                        >
+                          Ver gasto
+                        </Link>
+                      )}
                       <time dateTime={entry.createdAt}>{formatTime(entry.createdAt)}</time>
                     </li>
                   )

@@ -8,6 +8,7 @@ import {
 } from '../validation/registerValidation'
 import { RESET_PASSWORD_NETWORK_ERROR_MESSAGE, resetPassword } from '../api/authClient'
 import AuthPage from '../components/AuthPage'
+import { useSnackbar } from '../components/Snackbar'
 import SubmitButton from '../components/SubmitButton'
 import TextField from '../components/TextField'
 
@@ -28,6 +29,7 @@ export const RESET_SUCCESS_MESSAGE = 'Tu contraseña fue actualizada. Ya puedes 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const showSnackbar = useSnackbar()
   const token = searchParams.get('token')
 
   const {
@@ -45,10 +47,8 @@ export default function ResetPasswordPage() {
     const result = await resetPassword(token, values.password, values.confirmPassword)
 
     if (result.ok) {
-      navigate('/login', {
-        replace: true,
-        state: { notice: result.message || RESET_SUCCESS_MESSAGE },
-      })
+      showSnackbar(result.message || RESET_SUCCESS_MESSAGE)
+      navigate('/login', { replace: true })
       return
     }
     if (result.network) {

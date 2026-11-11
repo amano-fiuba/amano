@@ -7,9 +7,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.amano.backend.groups.GroupPermissions;
 
 /**
- * {@code GET /api/groups/{id}} detail (contracts/api-contracts.md). Expenses
- * are out of this module's scope in this phase, so {@code expensesCount} is
- * reported as 0 — a later story may join the expenses module.
+ * {@code GET /api/groups/{id}} detail (contracts/api-contracts.md). Since 017
+ * (FR-027), {@code expensesCount} is the real number of group expenses of the
+ * group ({@code group_expenses}); the shape of the contract is unchanged.
  */
 public class GroupDetailResponse {
 
@@ -25,6 +25,37 @@ public class GroupDetailResponse {
     private GroupPermissions permissions;
     private Object lastActivity;
     private long expensesCount;
+    private boolean lastMember;
+    private boolean lastAdmin;
+    private String primaryCurrency;
+    private Integer debtDueDays;
+
+    /** 022 T078: days until a pending debt is overdue; null = never. */
+    public Integer getDebtDueDays() { return debtDueDays; }
+    public void setDebtDueDays(Integer debtDueDays) { this.debtDueDays = debtDueDays; }
+
+    public String getPrimaryCurrency() { return primaryCurrency; }
+    public void setPrimaryCurrency(String primaryCurrency) { this.primaryCurrency = primaryCurrency; }
+
+    /** True when the caller is an ADMIN and the only active admin of the group. */
+    @JsonProperty("isLastAdmin")
+    public boolean isLastAdmin() {
+        return lastAdmin;
+    }
+
+    public void setLastAdmin(boolean lastAdmin) {
+        this.lastAdmin = lastAdmin;
+    }
+
+    /** True when the caller is the only registered member left in the group. */
+    @JsonProperty("isLastMember")
+    public boolean isLastMember() {
+        return lastMember;
+    }
+
+    public void setLastMember(boolean lastMember) {
+        this.lastMember = lastMember;
+    }
 
     public Long getId() {
         return id;

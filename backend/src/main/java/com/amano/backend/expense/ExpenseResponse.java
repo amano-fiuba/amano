@@ -1,6 +1,7 @@
 package com.amano.backend.expense;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -12,6 +13,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * Feature 009 appends {@code frequency}, {@code status} and
  * {@code nextOccurrenceDate}, present only on recurring series, so a one-time
  * expense keeps the exact 007 shape.
+ *
+ * <p>The personal activity screen also wants the amount in the user's preferred
+ * currencies: {@link #conversions} is only attached by
+ * {@link ExpenseService#listHistory(Long)} and stays {@code null} (thus omitted)
+ * everywhere else, so the other responses keep their previous shape.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ExpenseResponse(
@@ -26,9 +32,18 @@ public record ExpenseResponse(
         OffsetDateTime createdAt,
         String frequency,
         String status,
-        String nextOccurrenceDate) {
+        String nextOccurrenceDate,
+        List<Conversion> conversions) {
+
+    /** One preferred-currency equivalent of an expense, canonical 2-decimal string. */
+    public record Conversion(String currency, String amount) {
+    }
 
     public static ExpenseResponse from(Expense expense) {
+        return from(expense, null);
+    }
+
+    public static ExpenseResponse from(Expense expense, List<Conversion> conversions) {
         return new ExpenseResponse(
                 expense.getId(),
                 expense.getAmount().toPlainString(),
@@ -42,7 +57,8 @@ public record ExpenseResponse(
                 nameOf(expense.getRecurrenceFrequency()),
                 nameOf(expense.getRecurrenceStatus()),
                 expense.getRecurrenceNextDate() == null
-                        ? null : expense.getRecurrenceNextDate().toString());
+                        ? null : expense.getRecurrenceNextDate().toString(),
+                conversions);
     }
 
     private static String nameOf(Enum<?> value) {

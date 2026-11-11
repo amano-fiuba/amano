@@ -239,4 +239,155 @@ describe('GroupHistoryView (014)', () => {
 
     expect(await screen.findByText('Pantalla del grupo')).toBeInTheDocument()
   })
+
+  it('"Ver gasto" también aparece en los pagos que traen expenseId (018 FR-022)', async () => {
+    getActivity.mockResolvedValue(page([
+      {
+        id: 3,
+        eventType: 'PAYMENT_MADE',
+        actor: ANA,
+        details: { paymentId: 54, amount: '1000.00', currency: 'ARS', fromName: 'Juan', toName: 'Ana', expenseId: 12, debtId: 31 },
+        createdAt: '2026-11-03T16:00:00Z',
+      },
+      {
+        id: 2,
+        eventType: 'PAYMENT_MADE',
+        actor: ANA,
+        details: { paymentId: 3, amount: '500.00', currency: 'ARS', fromName: 'Juan', toName: 'Ana' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries[0]).toHaveTextContent('registró un pago de')
+    expect(within(entries[0]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/12')
+    expect(within(entries[1]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
+  })
+
+  it('los eventos de recordatorios enlazan al detalle del gasto (025 T033)', async () => {
+    getActivity.mockResolvedValue(page([
+      {
+        id: 2,
+        eventType: 'DEBT_REMINDER_SENT',
+        actor: null,
+        details: { reminderId: 1, debtId: 4, expenseId: 12, amount: '500.00', currency: 'ARS', fromName: 'Juan' },
+        createdAt: '2026-11-03T16:00:00Z',
+      },
+      {
+        id: 1,
+        eventType: 'PAYER_DUE_NOTICE_SENT',
+        actor: null,
+        details: { reminderId: 2, expenseId: 13, payerName: 'Ana', concept: 'Súper' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(within(entries[0]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/12')
+    expect(within(entries[1]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/13')
+  })
+
+  it('"Ver gasto" enlaza al detalle solo cuando la entrada trae expenseId (017 FR-024)', async () => {    getActivity.mockResolvedValue(page([
+      {
+        id: 2,
+        eventType: 'EXPENSE_CREATED',
+        actor: ANA,
+        details: { expenseId: 12, amount: '1500.00', currency: 'ARS', description: 'Súper' },
+        createdAt: '2026-11-03T15:00:00Z',
+      },
+      {
+        id: 1,
+        eventType: 'EXPENSE_CREATED',
+        actor: ANA,
+        details: { amount: '10.00', currency: 'ARS' },
+        createdAt: '2026-11-03T14:00:00Z',
+      },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(within(entries[0]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/12')
+    expect(within(entries[1]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
+  })
+
+  it('muestra edición y borrado de gastos; el borrado no enlaza ni los eventos del gasto borrado (022 T076)', async () => {
+    getActivity.mockResolvedValue(page([
+      { id: 5, eventType: 'EXPENSE_DELETED', actor: ANA, details: { expenseId: 12 }, createdAt: '2026-11-04T16:00:00Z' },
+      { id: 4, eventType: 'EXPENSE_EDITED', actor: ANA, details: { expenseId: 12 }, createdAt: '2026-11-04T15:00:00Z' },
+      { id: 3, eventType: 'EXPENSE_CREATED', actor: ANA, details: { expenseId: 12, amount: '10.00', currency: 'ARS' }, createdAt: '2026-11-04T14:00:00Z' },
+      { id: 2, eventType: 'EXPENSE_EDITED', actor: ANA, details: { expenseId: 13 }, createdAt: '2026-11-04T13:00:00Z' },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries[0]).toHaveTextContent('eliminó un gasto')
+    expect(entries[1]).toHaveTextContent('editó un gasto')
+    for (const index of [0, 1, 2]) {
+      expect(within(entries[index]).queryByRole('link', { name: 'Ver gasto' })).not.toBeInTheDocument()
+    }
+    expect(within(entries[3]).getByRole('link', { name: 'Ver gasto' })).toHaveAttribute('href', '/groups/42/expenses/13')
+  })
+
+  it('un evento viejo sin los campos nuevos y un tipo desconocido no rompen la lista (022 T076)', async () => {
+    getActivity.mockResolvedValue(page([
+      { id: 3, eventType: 'DEBT_OVERDUE', actor: null, details: {}, createdAt: '2026-11-04T16:00:00Z' },
+      { id: 2, eventType: 'TIPO_NUEVO', actor: ANA, details: null, createdAt: '2026-11-04T15:00:00Z' },
+      { id: 1, eventType: 'EXPENSE_CREATED', actor: ANA, details: { amount: '10.00', currency: 'ARS' }, createdAt: '2026-11-04T14:00:00Z' },
+    ]))
+
+    renderView()
+
+    const entries = await screen.findAllByTestId('activity-entry')
+    expect(entries).toHaveLength(3)
+    expect(entries[0]).toHaveTextContent('Sistema venció una deuda')
+    expect(entries[1]).toHaveTextContent('realizó una acción en el grupo')
+    expect(entries[2]).toHaveTextContent('registró un gasto')
+  })
+
+  it('?filter=EXPENSES abre el historial filtrado y un valor desconocido muestra todo (017 FR-024)', async () => {
+    getActivity.mockResolvedValue(page([]))
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/groups/42/history?filter=EXPENSES']}>
+        <Routes>
+          <Route path="/groups/:id/history" element={<GroupHistoryView groupId="42" />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(NO_FILTERED_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mostrar' })).toHaveValue('EXPENSES')
+    expect(getActivity).toHaveBeenLastCalledWith('42', {
+      page: 1,
+      size: 20,
+      eventTypes: ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'EXPENSE_DELETED'],
+    })
+    unmount()
+
+    render(
+      <MemoryRouter initialEntries={['/groups/42/history?filter=CUALQUIERA']}>
+        <Routes>
+          <Route path="/groups/:id/history" element={<GroupHistoryView groupId="42" />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText(NO_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Mostrar' })).toHaveValue('ALL')
+  })
+
+  it('cambiar el filtro actualiza el parámetro y volver a "Toda la actividad" lo quita (017)', async () => {
+    const user = userEvent.setup()
+    getActivity.mockResolvedValue(page([]))
+    renderView()
+    await screen.findByText(NO_ACTIVITY_MESSAGE)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Mostrar' }), 'Gastos')
+    expect(await screen.findByText(NO_FILTERED_ACTIVITY_MESSAGE)).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Mostrar' }), 'Toda la actividad')
+    expect(await screen.findByText(NO_ACTIVITY_MESSAGE)).toBeInTheDocument()
+  })
 })

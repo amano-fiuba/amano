@@ -97,6 +97,47 @@ export async function listRecurringExpenses() {
   }
 }
 
+export const RECENT_EXPENSES_ERROR_MESSAGE =
+  'No se pudieron cargar tus últimos gastos. Intentá nuevamente'
+
+/**
+ * GET /api/expenses/recent (specs/015-main-screen): { ok: true, expenses } on
+ * 200, { ok: false, status } on 4xx and { ok: false, network: true } on 5xx or
+ * network failures.
+ */
+/** GET /api/expenses: últimos 200 gastos propios, para la pantalla de actividad. */
+export async function listExpenseHistory() {
+  try {
+    const response = await fetch('/api/expenses', { credentials: 'include' })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, expenses: Array.isArray(body) ? body : [] }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return { ok: false, status: response.status }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+export async function listRecentExpenses() {
+  try {
+    const response = await fetch('/api/expenses/recent', { credentials: 'include' })
+    if (response.ok) {
+      const body = await response.json()
+      return { ok: true, expenses: Array.isArray(body) ? body : [] }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return { ok: false, status: response.status }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 /**
  * PATCH /api/expenses/{id}/status with { status } (ACTIVE | PAUSED | FINISHED):
  * { ok: true, expense } on 200, { ok: false, status, detail, code } on 4xx (400

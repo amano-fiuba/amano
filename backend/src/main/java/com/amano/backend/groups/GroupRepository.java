@@ -24,4 +24,15 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
     List<Group> findActiveGroupsOfUser(@Param("userId") Long userId);
 
     Optional<Group> findById(Long id);
+
+    /** 022 D7/T063: groups that configure a deadline; null means "never overdue". */
+    List<Group> findByDebtDueDaysIsNotNull();
+
+    /**
+     * 017 FR-027: number of group expenses of the group, for {@code expensesCount}
+     * of the detail. JPQL over the {@code GroupExpense} entity (017 research.md D8)
+     * so {@link GroupService} needs no new dependency.
+     */
+    @Query("SELECT COUNT(e) FROM GroupExpense e WHERE e.groupId = :groupId")
+    long countGroupExpenses(@Param("groupId") Long groupId);
 }

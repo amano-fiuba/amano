@@ -70,7 +70,7 @@ class GroupLeaveServiceTest {
     void userWithoutBalancesLeavesTheGroupAndTheRowIsSoftDeleted() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
 
         com.amano.backend.groups.dto.LeaveGroupResponse response = service.leaveGroup(USER_ID, GROUP_ID);
 
@@ -84,7 +84,7 @@ class GroupLeaveServiceTest {
     void leavingIsBlockedByPendingBalances() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(true);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(true);
 
         var exception = catchThrowableOfType(() -> service.leaveGroup(USER_ID, GROUP_ID),
                 PendingDebtsException.class);
@@ -99,7 +99,8 @@ class GroupLeaveServiceTest {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_ADMIN)));
         when(groupMemberRepository.countActiveAdminsByGroupId(GROUP_ID)).thenReturn(1L);
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(false);
+        when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(2L);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
 
         var exception = catchThrowableOfType(() -> service.leaveGroup(USER_ID, GROUP_ID),
                 LastAdminException.class);
@@ -110,15 +111,45 @@ class GroupLeaveServiceTest {
     }
 
     @Test
+    void theLastMemberLeavesEvenIfTheyAreTheOnlyAdmin() {
+        when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
+                .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_ADMIN)));
+        when(groupMemberRepository.countActiveAdminsByGroupId(GROUP_ID)).thenReturn(1L);
+        when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(1L);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
+
+        var response = service.leaveGroup(USER_ID, GROUP_ID);
+
+        assertThat(response.isGroupDeleted()).isTrue();
+        verify(groupMemberRepository).save(any(GroupMember.class));
+        Mockito.verify(groupRepository, Mockito.never()).deleteById(any()); // spec 020: soft baja only
+    }
+
+    @Test
+    void pendingBalancesAlsoBlockTheLastMember() {
+        when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
+                .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_ADMIN)));
+        when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(1L);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(true);
+
+        var exception = catchThrowableOfType(() -> service.leaveGroup(USER_ID, GROUP_ID),
+                PendingDebtsException.class);
+
+        assertThat(exception).isNotNull();
+        verify(groupMemberRepository, Mockito.never()).save(any(GroupMember.class));
+    }
+
+    @Test
     void theGroupPersistsForTheRemainingMembers() {
         when(groupMemberRepository.findByIdGroupIdAndIdUserId(GROUP_ID, USER_ID))
                 .thenReturn(Optional.of(new GroupMember(USER_ID, GROUP_ID, GroupMember.ROLE_MEMBER)));
-        when(debtPort.hasPendingDebts(GROUP_ID, USER_ID)).thenReturn(false);
+        when(debtPort.hasPendingDebtsForUser(GROUP_ID, USER_ID)).thenReturn(false);
         when(simulatedProfileRepository.countByGroupId(GROUP_ID)).thenReturn(2L);
         when(groupMemberRepository.countActiveByGroupId(GROUP_ID)).thenReturn(3L);
 
-        service.leaveGroup(USER_ID, GROUP_ID);
+        var response = service.leaveGroup(USER_ID, GROUP_ID);
 
+        assertThat(response.isGroupDeleted()).isFalse();
         // no dissolution: the group row is never deleted by leaving
         Mockito.verify(groupRepository, Mockito.never()).deleteById(any());
     }

@@ -1,29 +1,26 @@
 import { useState } from 'react'
 import { removeMember, removeSimulatedProfile, GROUPS_NETWORK_ERROR_MESSAGE } from '../../api/groupsClient'
+import { useSnackbar } from '../Snackbar'
+import ConfirmModal from '../ConfirmModal'
 
 const ADMIN_TARGET_MESSAGE =
   'No podés eliminar directamente a otro administrador: primero quitale el rol'
 
 /**
- * Confirmation dialog before removal (FR-009): distinct handling for another
+ * Confirmation modal before removal (FR-009): distinct handling for another
  * admin ("revoke the role first"), pending-debts and simulated-profile cases.
- * The dialog is rendered by the group views with either a registered member
- * (`member` prop) or a `simulatedProfile` — both share the confirm step.
- * On success it closes and calls `onRemoved` so the list updates by itself.
+ * The group views render it with either a registered member (`member` prop)
+ * or a `simulatedProfile` — both share the confirm step. Built on
+ * ConfirmModal: another admin only gets the close button. On success it calls
+ * `onRemoved` (the list updates by itself) and then `onClose`.
  */
-export default function RemoveMemberDialog({ groupId, member, simulatedProfile, onRemoved }) {
-  const [open, setOpen] = useState(false)
-  const [confirmation, setConfirmation] = useState('')
+export default function RemoveMemberDialog({ groupId, member, simulatedProfile, onRemoved, onClose }) {
+  const showSnackbar = useSnackbar()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const isAdminTarget = member?.role === 'ADMIN'
-
-  function openDialog() {
-    setConfirmation('')
-    setError('')
-    setOpen(true)
-  }
+  const targetName = simulatedProfile?.name ?? member?.name ?? ''
 
   async function confirmRemove() {
     setBusy(true)
@@ -34,53 +31,35 @@ export default function RemoveMemberDialog({ groupId, member, simulatedProfile, 
     if (!result || result.network) {
       setError(GROUPS_NETWORK_ERROR_MESSAGE)
     } else if (result.ok) {
-      setConfirmation(simulatedProfile ? 'Perfil simulado eliminado' : 'Miembro eliminado del grupo')
-      setOpen(false)
+      showSnackbar(`${targetName} ya no forma parte del grupo`)
       // the parent list re-fetches itself: no manual refresh (fix 2026-11-04)
       onRemoved?.()
+      onClose?.()
+      return
     } else {
       setError(result.detail || 'No se pudo eliminar')
     }
     setBusy(false)
   }
 
-  const targetName = simulatedProfile?.name ?? member?.name ?? ''
+  const title = simulatedProfile ? 'Eliminar perfil simulado' : 'Eliminar miembro'
+  const message = isAdminTarget
+    ? ADMIN_TARGET_MESSAGE
+    : `¿Seguro que querés eliminar ${simulatedProfile ? 'al perfil simulado' : 'a'} ${targetName}?`
 
   return (
-    <section data-testid="remove-member">
-      <button type="button" onClick={openDialog}>
-        {simulatedProfile ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
-      </button>
-      {confirmation && <p role="status">{confirmation}</p>}
-      {error && (
-        <p role="alert" data-testid="remove-member-error">
-          {error}
-        </p>
-      )}
-      {open && (
-        <div
-          role="dialog"
-          aria-label={`Eliminar a ${targetName}`}
-          data-testid="remove-member-dialog"
-        >
-          <p>
-            ¿Seguro que querés eliminar {simulatedProfile ? `al perfil simulado` : 'a'} {targetName}?
-          </p>
-          {isAdminTarget && (
-            <p role="alert" data-testid="remove-member-admin-hint">
-              {ADMIN_TARGET_MESSAGE}
-            </p>
-          )}
-          {!isAdminTarget && (
-            <button type="button" onClick={confirmRemove} disabled={busy}>
-              Confirmar
-            </button>
-          )}
-          <button type="button" onClick={() => setOpen(false)}>
-            Cancelar
-          </button>
-        </div>
-      )}
-    </section>
+    <ConfirmModal
+      title={title}
+      busy={busy}
+      error={error}
+      onClose={onClose}
+      onConfirm={isAdminTarget ? undefined : confirmRemove}
+      testId="remove-member-dialog"
+      errorTestId="remove-member-error"
+    >
+      <p data-testid={isAdminTarget ? 'remove-member-admin-hint' : 'remove-member-message'}>
+        {message}
+      </p>
+    </ConfirmModal>
   )
 }

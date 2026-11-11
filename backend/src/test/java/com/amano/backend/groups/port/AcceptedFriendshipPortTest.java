@@ -31,8 +31,8 @@ class AcceptedFriendshipPortTest {
         repository = Mockito.mock(FriendshipRequestRepository.class);
         port = new AcceptedFriendshipPort(repository);
         when(repository.findFriendsOf(7L)).thenReturn(List.of(
-                new FriendResponse(9L, "Beto", null, "beto@example.com", OffsetDateTime.now()),
-                new FriendResponse(10L, "Carla", "Díaz", "Carla@Example.com", OffsetDateTime.now())));
+                new FriendResponse(9L, "Beto", null, "beto@example.com", OffsetDateTime.now(), null, null),
+                new FriendResponse(10L, "Carla", "Díaz", "Carla@Example.com", OffsetDateTime.now(), null, null)));
     }
 
     @Test

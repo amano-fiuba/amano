@@ -5,17 +5,24 @@ import {
   revokeAdminRole,
   GROUPS_NETWORK_ERROR_MESSAGE,
 } from '../../api/groupsClient'
+import CopyCbuButton from '../CopyCbuButton'
+import GroupRowsSkeleton from './GroupRowsSkeleton'
+import MemberActionsMenu from './MemberActionsMenu'
+import MemberBalance from './MemberBalance'
 import RemoveMemberDialog from './RemoveMemberDialog'
+import { useSnackbar } from '../Snackbar'
 
 const DEFAULT_AVATAR = '/avatar-default.png'
-const LAST_ADMIN = 'Sos el último administrador: asigná otro administrador antes de salir'
 
 /**
  * Members list (US6, T079): every ACTIVE member — registered users and
  * simulated profiles — with name, avatar (NULL → gray default) and role.
- * When the caller is ADMIN (US4/US10), each row also carries the role
- * actions (assign/revoke, blocked for the last admin) and the removal
- * dialog with its confirmation. Changing a role or removing someone re-fetches
+ * The caller comes first. Registered members who informed their CBU/CVU show
+ * a copy icon on the row's right edge (same height as "⋯") so any group member
+ * can transfer to them.
+ * When the caller is ADMIN (US4/US10), every other row carries a menu with the
+ * role actions (assign/revoke, blocked for the last admin) and the removal
+ * action with its confirmation. Changing a role or removing someone re-fetches
  * the list and notifies `onChanged`, so the screen updates without a manual
  * refresh (fix 2026-11-04); changing `reloadKey` (e.g. after an alta) also
  * re-fetches. The backend identifies simulated profiles with
@@ -34,7 +41,10 @@ export default function MemberListView({
 }) {
   const [members, setMembers] = useState(null)
   const [error, setError] = useState('')
-  const [status, setStatus] = useState('')
+  // Who the removal modal is open for (null → closed). It lives here, not in
+  // the "⋯" panel, so closing the panel does not unmount the modal.
+  const [removalTarget, setRemovalTarget] = useState(null)
+  const showSnackbar = useSnackbar()
   // Only the latest request may update the list (no stale responses).
   const requestId = useRef(0)
 
@@ -65,14 +75,12 @@ export default function MemberListView({
     if (current === requestId.current) apply(result)
   }
 
-  async function handleRemoved(name) {
-    setStatus(`${name} ya no forma parte del grupo`)
+  async function handleRemoved() {
     await reload()
     onChanged?.()
   }
 
   async function changeRole(member, action) {
-    setStatus('')
     const result = action === 'grant'
       ? await grantAdminRole(groupId, member.userId)
       : await revokeAdminRole(groupId, member.userId)
@@ -85,7 +93,7 @@ export default function MemberListView({
       return
     }
     setError('')
-    setStatus(
+    showSnackbar(
       action === 'grant'
         ? `${member.name} ahora es administrador del grupo`
         : `${member.name} volvió a ser miembro del grupo`,
@@ -105,74 +113,132 @@ export default function MemberListView({
   const adminIds = new Set(
     (members ?? []).filter((m) => m.role === 'ADMIN').map((m) => m.userId),
   )
-  const isLastAdmin = adminIds.size <= 1
+
+  const isCurrentUser = (member) => member.userId != null && member.userId === currentUserId
+  const ordered = [...(members ?? [])].sort(
+    (a, b) => Number(isCurrentUser(b)) - Number(isCurrentUser(a)),
+  )
 
   return (
     <section data-testid="members-list">
-      <h3>Miembros del grupo</h3>
-      {status && <p role="status" data-testid="members-status">{status}</p>}
-      {status === '' && isAdmin && isLastAdmin && adminIds.size === 1 && (
-        <p role="alert" data-testid="members-last-admin-hint">
-          {LAST_ADMIN}
-        </p>
-      )}
-      {members === null && <p aria-busy="true">Cargando…</p>}
-      <ul>
-        {members?.map((member) => {
+      {members === null && <GroupRowsSkeleton rows={2} />}
+      <ul className="member-rows">
+        {ordered.map((member) => {
           const simulatedId = simulatedIdOf(member)
           const isSimulated = simulatedId != null
           const key = isSimulated ? `sim-${simulatedId}` : `user-${member.userId}`
-          const isCurrentUser = !isSimulated && member.userId === currentUserId
+          const isYou = isCurrentUser(member)
           const isAdminTarget = member.role === 'ADMIN'
           const revokeable = !isSimulated && isAdminTarget && adminIds.size > 1
           return (
-            <li key={key} data-testid={isCurrentUser ? 'member-current' : `member-row-${key}`}>
+            <li
+              key={key}
+              className="member-row"
+              data-testid={isYou ? 'member-current' : `member-row-${key}`}
+            >
               <img
+                className="member-row__avatar"
                 src={member.avatar || DEFAULT_AVATAR}
                 alt=""
-                width={36}
-                height={36}
+                width={40}
+                height={40}
                 data-testid={`member-avatar-${key}`}
               />
-              <span className="member-name">{member.name}</span>
-              {isCurrentUser && <span data-testid="member-you">Vos</span>}
-              <span data-testid={`member-role-${key}`}>{roleLabel(member.role)}</span>
-              {isAdmin && !isCurrentUser && !isSimulated && !isAdminTarget && (
-                <button
-                  type="button"
-                  data-testid={`grant-admin-${key}`}
-                  onClick={() => changeRole(member, 'grant')}
-                >
-                  Hacer admin
-                </button>
-              )}
-              {isAdmin && !isCurrentUser && revokeable && (
-                <button
-                  type="button"
-                  data-testid={`revoke-admin-${key}`}
-                  onClick={() => changeRole(member, 'revoke')}
-                >
-                  Quitarle admin
-                </button>
-              )}
-              {isAdmin && !isSimulated && (
-                <RemoveMemberDialog
-                  groupId={groupId}
-                  member={{ userId: member.userId, name: member.name, role: member.role }}
-                  onRemoved={() => handleRemoved(member.name)}
-                />
-              )}
-              {isAdmin && isSimulated && (
-                <RemoveMemberDialog
-                  groupId={groupId}
-                  simulatedProfile={{ profileId: simulatedId, name: member.name }}
-                  onRemoved={() => handleRemoved(member.name)}
-                />
-              )}
+              <span className="member-row__body">
+                <span className="member-name">{member.name}</span>
+                <span className="member-row__chips">
+                  {isYou && (
+                    <span className="role-chip role-chip--you" data-testid="member-you">Yo</span>
+                  )}
+                  {isSimulated && (
+                    <span
+                      className="role-chip role-chip--simulated"
+                      data-testid={`member-simulated-${key}`}
+                    >
+                      Simulado
+                    </span>
+                  )}
+                  <span
+                    className={`role-chip role-chip--${member.role.toLowerCase()}`}
+                    data-testid={`member-role-${key}`}
+                  >
+                    {roleLabel(member.role)}
+                  </span>
+                </span>
+                {!isYou && <MemberBalance balances={member.balances} payUrl={member.payUrl} />}
+              </span>
+              <span className="member-row__actions">
+                {!isYou && !isSimulated && member.cbuCvu && (
+                  <CopyCbuButton
+                    value={member.cbuCvu}
+                    iconOnly
+                    ariaLabel={`Copiar CBU/CVU de ${member.name}`}
+                    testId={`copy-cbu-${key}`}
+                  />
+                )}
+                {isAdmin && !isYou && (
+                  <MemberActionsMenu memberName={member.name} testId={`member-actions-${key}`}>
+                    {(close) => (
+                      <>
+                        {!isSimulated && !isAdminTarget && (
+                          <button
+                            type="button"
+                            className="member-menu__item"
+                            data-testid={`grant-admin-${key}`}
+                            onClick={() => {
+                              close()
+                              changeRole(member, 'grant')
+                            }}
+                          >
+                            Hacer admin
+                          </button>
+                        )}
+                        {revokeable && (
+                          <button
+                            type="button"
+                            className="member-menu__item"
+                            data-testid={`revoke-admin-${key}`}
+                            onClick={() => {
+                              close()
+                              changeRole(member, 'revoke')
+                            }}
+                          >
+                            Quitarle admin
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="member-menu__item member-menu__item--danger"
+                          data-testid={`remove-member-${key}`}
+                          onClick={() => {
+                            close()
+                            setRemovalTarget(
+                              isSimulated
+                                ? { simulatedProfile: { profileId: simulatedId, name: member.name } }
+                                : { member: { userId: member.userId, name: member.name, role: member.role } },
+                            )
+                          }}
+                        >
+                          {isSimulated ? 'Eliminar perfil simulado' : 'Eliminar miembro'}
+                        </button>
+                      </>
+                    )}
+                  </MemberActionsMenu>
+                )}
+              </span>
             </li>
           )
         })}
       </ul>
+      {removalTarget && (
+        <RemoveMemberDialog
+          groupId={groupId}
+          member={removalTarget.member}
+          simulatedProfile={removalTarget.simulatedProfile}
+          onRemoved={handleRemoved}
+          onClose={() => setRemovalTarget(null)}
+        />
+      )}
     </section>
   )
 }

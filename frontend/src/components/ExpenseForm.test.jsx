@@ -1,7 +1,17 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+vi.mock('../api/currencyClient', () => ({
+  getCurrencyQuote: vi.fn(),
+  listCurrencies: vi.fn().mockResolvedValue({
+    ok: true,
+    currencies: [
+      { code: 'ARS', bcraName: 'PESO' },
+      { code: 'BRL', bcraName: 'REAL' },
+    ],
+  }),
+}))
 vi.mock('../api/expenseClient', () => ({
   EXPENSE_NETWORK_ERROR_MESSAGE:
     'No se pudo guardar el gasto. Intenta nuevamente',
@@ -9,12 +19,17 @@ vi.mock('../api/expenseClient', () => ({
 }))
 
 import { createExpense } from '../api/expenseClient'
+import { getCurrencyQuote } from '../api/currencyClient'
+import { SNACKBAR_VISIBLE_MS } from './Snackbar'
 import ExpenseForm, {
+  EXPENSE_DISCARD_CONFIRM,
+  PERSONAL_QUOTE_ERROR,
+  PERSONAL_QUOTE_LOADING,
+  PERSONAL_QUOTE_NOTE,
   EXPENSE_REUSED_KEY_MESSAGE,
   FREQUENCY_REQUIRED_MESSAGE,
   EXPENSE_SESSION_EXPIRED_MESSAGE,
   EXPENSE_SUCCESS_MESSAGE,
-  SUCCESS_VISIBLE_MS,
 } from './ExpenseForm'
 import {
   AMOUNT_DECIMALS,
@@ -43,12 +58,26 @@ async function completeRequired(user) {
   await user.type(screen.getByLabelText('Descripción'), 'Almuerzo')
 }
 
+// The form's submit button (027: "Guardar"; it opens the final summary).
 function submitButton() {
-  return screen.getByRole('button', { name: /guardar gasto|guardando/i })
+  return screen.getByRole('button', { name: /^(guardar|guardando…)$/i, hidden: false })
+}
+
+// "Guardar" and, when the summary opens (the form was valid), "Confirmar".
+async function save(user) {
+  await user.click(submitButton())
+  const confirm = await screen
+    .findByRole('button', { name: 'Confirmar' }, { timeout: 200 })
+    .catch(() => null)
+  if (confirm) {
+    await user.click(confirm)
+  }
 }
 
 beforeEach(() => {
   createExpense.mockReset()
+  getCurrencyQuote.mockReset()
+  getCurrencyQuote.mockResolvedValue({ ok: true, quote: { rate: 1500, rateSource: 'BCRA' } })
 })
 
 afterEach(() => {
@@ -62,7 +91,7 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
     const [payload, key] = createExpense.mock.calls[0]
@@ -86,7 +115,7 @@ describe('ExpenseForm (T029/T030)', () => {
     expect(screen.getByLabelText('Categoría')).toHaveValue('')
     expect(screen.getByLabelText('Tipo de gasto')).toHaveValue('')
     expect(screen.getByLabelText('Medio de pago')).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Guardar gasto' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar' })).toBeInTheDocument()
   })
 
   it('cierra la notificación automáticamente a los 5 s (FR-031)', async () => {
@@ -95,8 +124,10 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
+    await user.click(submitButton())
+    const confirm = await screen.findByRole('button', { name: 'Confirmar' })
     vi.useFakeTimers()
-    fireEvent.click(submitButton())
+    fireEvent.click(confirm)
     await act(async () => {
       await Promise.resolve()
       await Promise.resolve()
@@ -105,7 +136,7 @@ describe('ExpenseForm (T029/T030)', () => {
     expect(screen.getByRole('status')).toHaveTextContent(EXPENSE_SUCCESS_MESSAGE)
 
     act(() => {
-      vi.advanceTimersByTime(SUCCESS_VISIBLE_MS - 1)
+      vi.advanceTimersByTime(SNACKBAR_VISIBLE_MS - 1)
     })
     expect(screen.getByRole('status')).toBeInTheDocument()
 
@@ -121,7 +152,7 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
     await screen.findByRole('status')
 
     await user.click(screen.getByRole('button', { name: 'Cerrar notificación' }))
@@ -138,10 +169,12 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
-    const pending = screen.getByRole('button', { name: 'Guardando…' })
-    expect(pending).toBeDisabled()
+    // The form button and the summary's "Confirmar" both wait, disabled.
+    const pending = screen.getAllByRole('button', { name: 'Guardando…' })
+    expect(pending).toHaveLength(2)
+    pending.forEach((button) => expect(button).toBeDisabled())
 
     await act(async () => {
       resolveRequest({ ok: true, expense: { id: 1 } })
@@ -160,9 +193,9 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
     await screen.findByTestId('expense-error')
-    await user.click(submitButton())
+    await save(user)
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(2))
 
     const firstKey = createExpense.mock.calls[0][1]
@@ -171,7 +204,7 @@ describe('ExpenseForm (T029/T030)', () => {
     // Los datos se conservan ante el fallo.
     expect(screen.getByLabelText('Monto')).toHaveValue('1.234,56')
 
-    await user.click(submitButton())
+    await save(user)
     await screen.findByRole('status')
     // La operación exitosa todavía usa la clave conservada; la renovación
     // aplica a la SIGUIENTE operación, ya con el formulario reseteado.
@@ -179,7 +212,7 @@ describe('ExpenseForm (T029/T030)', () => {
     expect(successKey).toBe(firstKey)
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(4))
     expect(createExpense.mock.calls[3][1]).not.toBe(firstKey)
   })
@@ -197,7 +230,7 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByTestId('expense-error')).toHaveTextContent(
       EXPENSE_REUSED_KEY_MESSAGE,
@@ -205,7 +238,7 @@ describe('ExpenseForm (T029/T030)', () => {
     expect(screen.getByLabelText('Monto')).toHaveValue('1.234,56')
     expect(screen.getByLabelText('Categoría')).toHaveValue('FOOD')
 
-    await user.click(submitButton())
+    await save(user)
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(2))
     expect(createExpense.mock.calls[1][1]).not.toBe(createExpense.mock.calls[0][1])
   })
@@ -219,10 +252,11 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
     await fillValidRequired(user)
 
-    await user.dblClick(submitButton())
+    await user.click(submitButton())
+    await user.dblClick(await screen.findByRole('button', { name: 'Confirmar' }))
 
     expect(createExpense).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
+    screen.getAllByRole('button', { name: 'Guardando…' }).forEach((button) => expect(button).toBeDisabled())
     await act(async () => {
       resolveRequest({ ok: true, expense: { id: 1 } })
       await Promise.resolve()
@@ -241,7 +275,7 @@ describe('ExpenseForm (T029/T030)', () => {
     renderForm()
 
     await completeRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'El monto no puede tener más de dos decimales',
@@ -373,7 +407,7 @@ describe('ExpenseForm validación (T034/T036)', () => {
     await fillValidRequired(user)
     apply()
 
-    await user.click(submitButton())
+    await save(user)
 
     const alert = await screen.findByText(message)
     expect(createExpense).not.toHaveBeenCalled()
@@ -397,7 +431,7 @@ describe('ExpenseForm validación (T034/T036)', () => {
     await fillValidRequired(user)
     changeValue('Categoría', '')
 
-    await user.click(submitButton())
+    await save(user)
     expect(await screen.findByText('La categoría es obligatoria')).toBeInTheDocument()
     expect(createExpense).not.toHaveBeenCalled()
 
@@ -406,7 +440,7 @@ describe('ExpenseForm validación (T034/T036)', () => {
       expect(screen.queryByText('La categoría es obligatoria')).not.toBeInTheDocument()
     })
 
-    await user.click(submitButton())
+    await save(user)
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
   })
 
@@ -419,7 +453,7 @@ describe('ExpenseForm validación (T034/T036)', () => {
     changeValue('Fecha', TODAY)
     changeValue('Descripción', 'a'.repeat(200))
 
-    await user.click(submitButton())
+    await save(user)
 
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
     const [payload] = createExpense.mock.calls[0]
@@ -438,7 +472,7 @@ describe('ExpenseForm validación (T034/T036)', () => {
     })
     renderForm()
     await fillValidRequired(user)
-    await user.click(submitButton())
+    await save(user)
     await screen.findByText('El monto debe ser mayor a cero')
 
     expect(document.body).not.toHaveTextContent(
@@ -471,7 +505,7 @@ describe('ExpenseForm errores del backend (T035/T037)', () => {
       })
       renderForm()
       await fillValidRequired(user)
-      await user.click(submitButton())
+      await save(user)
 
       expect(await screen.findByText(message)).toBeInTheDocument()
       expect(screen.getByLabelText(label)).toHaveAttribute('aria-invalid', 'true')
@@ -488,7 +522,7 @@ describe('ExpenseForm errores del backend (T035/T037)', () => {
     })
     renderForm()
     await fillValidRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByTestId('expense-error')).toHaveTextContent(
       'La solicitud contiene campos inválidos',
@@ -502,7 +536,7 @@ describe('ExpenseForm resiliencia (T045/T046)', () => {
     createExpense.mockResolvedValue({ ok: false, status: 401, fields: {}, detail: '' })
     renderForm()
     await fillValidRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByTestId('expense-error')).toHaveTextContent(
       EXPENSE_SESSION_EXPIRED_MESSAGE,
@@ -524,7 +558,7 @@ describe('ExpenseForm resiliencia (T045/T046)', () => {
     createExpense.mockResolvedValue({ ok: false, network: true })
     renderForm()
     await fillValidRequired(user)
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByTestId('expense-error')).toHaveTextContent(
       'No se pudo guardar el gasto. Intenta nuevamente',
@@ -555,7 +589,14 @@ describe('ExpenseForm accesibilidad y móvil (T047)', () => {
     for (const label of order) {
       await user.tab()
       expect(screen.getByLabelText(label)).toHaveFocus()
+      if (label === 'Fecha') {
+        // 027 (FR-010): the calendar button follows the date field.
+        await user.tab()
+        expect(screen.getByRole('button', { name: 'Abrir calendario' })).toHaveFocus()
+      }
     }
+    await user.tab()
+    expect(screen.getByRole('button', { name: 'Cancelar' })).toHaveFocus()
     await user.tab()
     expect(submitButton()).toHaveFocus()
   })
@@ -606,7 +647,7 @@ describe('ExpenseForm frecuencia de gastos recurrentes (009, FR-001/FR-002)', ()
     renderForm()
 
     await completeRecurring(user)
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByText(FREQUENCY_REQUIRED_MESSAGE)).toBeInTheDocument()
     expect(createExpense).not.toHaveBeenCalled()
@@ -619,7 +660,7 @@ describe('ExpenseForm frecuencia de gastos recurrentes (009, FR-001/FR-002)', ()
 
     await completeRecurring(user)
     await user.selectOptions(screen.getByLabelText('Frecuencia'), 'MONTHLY')
-    await user.click(submitButton())
+    await save(user)
 
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
     expect(createExpense.mock.calls[0][0]).toMatchObject({
@@ -639,7 +680,7 @@ describe('ExpenseForm frecuencia de gastos recurrentes (009, FR-001/FR-002)', ()
     await completeRecurring(user)
     await user.selectOptions(screen.getByLabelText('Frecuencia'), 'WEEKLY')
     await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
-    await user.click(submitButton())
+    await save(user)
 
     await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
     expect(createExpense.mock.calls[0][0]).not.toHaveProperty('frequency')
@@ -658,10 +699,208 @@ describe('ExpenseForm frecuencia de gastos recurrentes (009, FR-001/FR-002)', ()
 
     await completeRecurring(user)
     await user.selectOptions(screen.getByLabelText('Frecuencia'), 'YEARLY')
-    await user.click(submitButton())
+    await save(user)
 
     expect(await screen.findByText('La frecuencia no es válida')).toBeInTheDocument()
     expect(screen.getByLabelText('Frecuencia')).toHaveValue('YEARLY')
   })
 })
 
+
+describe('ExpenseForm: correcciones del gasto personal (027, US2)', () => {
+  it('va en una tarjeta celeste, sin "Gasto compartido", con Cancelar y Guardar al pie', () => {
+    const { container } = renderForm()
+
+    expect(container.querySelector('.group-card.expense-form__card')).toContainElement(
+      screen.getByLabelText('Monto'),
+    )
+    expect(screen.queryByText(/gasto compartido/i)).not.toBeInTheDocument()
+    const actions = container.querySelector('.expense-actions')
+    const buttons = actions.querySelectorAll('button')
+    expect(buttons[0]).toHaveTextContent('Cancelar')
+    expect(buttons[1]).toHaveTextContent('Guardar')
+    expect(container.querySelector('.expense-form__card')).not.toContainElement(actions)
+  })
+
+  it('"Cancelar" sin cambios sale directo', async () => {
+    const onCancel = vi.fn()
+    const confirm = vi.spyOn(window, 'confirm')
+    const user = userEvent.setup()
+    renderForm({ onCancel })
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(confirm).not.toHaveBeenCalled()
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  it('"Cancelar" con datos cargados pide confirmación y solo sale si se acepta', async () => {
+    const onCancel = vi.fn()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    const user = userEvent.setup()
+    renderForm({ onCancel })
+    await user.type(screen.getByLabelText('Monto'), '10')
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(confirm).toHaveBeenCalledWith(EXPENSE_DISCARD_CONFIRM)
+    expect(onCancel).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    confirm.mockRestore()
+  })
+
+  it('la fecha se elige con el calendario, que no permite días futuros', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Abrir calendario' }))
+    expect(screen.getByRole('button', { name: '22 de octubre de 2026' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Mes anterior' }))
+    await user.click(screen.getByRole('button', { name: '30 de septiembre de 2026' }))
+
+    expect(screen.getByLabelText('Fecha')).toHaveValue('30/09/2026')
+  })
+
+  it('lista las monedas del usuario y permite enviar una elegida en "Ver más"', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 1 } })
+    renderForm({ initialCurrency: 'ARS', preferredCurrencies: ['ARS', 'USD'] })
+
+    const select = screen.getByLabelText('Moneda')
+    expect(within(select).getByRole('option', { name: 'Dólar estadounidense' })).toBeInTheDocument()
+    await user.selectOptions(select, 'Ver más…')
+    await user.click(await screen.findByLabelText('Real brasileño (BRL)'))
+    await user.click(screen.getByRole('button', { name: 'Elegir' }))
+    await completeRequired(user)
+    await save(user)
+
+    await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
+    expect(createExpense.mock.calls[0][0].currency).toBe('BRL')
+  })
+})
+
+describe('ExpenseForm: monto estimado en pesos (027, FR-035)', () => {
+  it('en otra moneda muestra el monto estimado en pesos con el aviso', async () => {
+    const user = userEvent.setup()
+    getCurrencyQuote.mockResolvedValue({ ok: true, quote: { rate: 1545.5, rateSource: 'BCRA' } })
+    renderForm()
+
+    await user.type(screen.getByLabelText('Monto'), '100')
+
+    expect(await screen.findByText(PERSONAL_QUOTE_NOTE)).toBeInTheDocument()
+    expect(getCurrencyQuote).toHaveBeenCalledWith('USD', '2026-10-21')
+    expect(screen.getByTestId('personal-quote')).toHaveTextContent('154.550,00 ARS')
+  })
+
+  it('en pesos o con un monto inválido no pide cotización', async () => {
+    const user = userEvent.setup()
+    renderForm({ initialCurrency: 'ARS' })
+
+    await user.type(screen.getByLabelText('Monto'), '100')
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(getCurrencyQuote).not.toHaveBeenCalled()
+    expect(screen.getByTestId('personal-quote')).toBeEmptyDOMElement()
+
+    renderForm()
+    const amounts = screen.getAllByLabelText('Monto')
+    await user.type(amounts[1], 'abc')
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(getCurrencyQuote).not.toHaveBeenCalled()
+  })
+
+  it('mientras espera muestra "Calculando…" y si falla avisa sin bloquear el guardado', async () => {
+    const user = userEvent.setup()
+    let resolve
+    getCurrencyQuote.mockReturnValueOnce(new Promise((r) => { resolve = r }))
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 1 } })
+    renderForm()
+
+    await user.type(screen.getByLabelText('Monto'), '100')
+    expect(screen.getByText(PERSONAL_QUOTE_LOADING)).toBeInTheDocument()
+    resolve({ ok: false, status: 503 })
+    expect(await screen.findByText(PERSONAL_QUOTE_ERROR)).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByLabelText('Categoría'), 'FOOD')
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
+    await user.selectOptions(screen.getByLabelText('Medio de pago'), 'CASH')
+    await save(user)
+    await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
+    // The expense keeps its own currency: nothing of the preview is sent.
+    expect(createExpense.mock.calls[0][0]).toMatchObject({ currency: 'USD', amount: '100.00' })
+    expect(createExpense.mock.calls[0][0]).not.toHaveProperty('convertedAmount')
+  })
+})
+
+describe('ExpenseForm: resumen final antes de guardar (027)', () => {
+  it('"Guardar" muestra el resumen y no guarda hasta confirmar', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 1 } })
+    renderForm()
+    await completeRequired(user)
+
+    await user.click(submitButton())
+
+    const dialog = await screen.findByRole('dialog', { name: 'Confirmá el gasto' })
+    expect(createExpense).not.toHaveBeenCalled()
+    const summary = within(dialog)
+    expect(summary.getByText('Monto').nextSibling).toHaveTextContent('$ 1.234,56 USD')
+    expect(summary.getByText('Moneda').nextSibling).toHaveTextContent('Dólar estadounidense')
+    expect(summary.getByText('Fecha').nextSibling).toHaveTextContent(TODAY)
+    expect(summary.getByText('Categoría').nextSibling).toHaveTextContent('Alimentos')
+    expect(summary.getByText('Tipo de gasto').nextSibling).toHaveTextContent('Único')
+    expect(summary.getByText('Medio de pago').nextSibling).toHaveTextContent('Efectivo')
+    expect(summary.getByText('Descripción').nextSibling).toHaveTextContent('Almuerzo')
+    expect(summary.getByRole('button', { name: 'Confirmar' })).toHaveFocus()
+
+    await user.click(summary.getByRole('button', { name: 'Confirmar' }))
+
+    await waitFor(() => expect(createExpense).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('"Volver" o Escape cierran el resumen sin guardar y conservan lo cargado', async () => {
+    const user = userEvent.setup()
+    renderForm()
+    await completeRequired(user)
+
+    await user.click(submitButton())
+    await user.click(await screen.findByRole('button', { name: 'Volver' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(submitButton())
+    await screen.findByRole('dialog', { name: 'Confirmá el gasto' })
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(createExpense).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Monto')).toHaveValue('1.234,56')
+  })
+
+  it('incluye la frecuencia de un recurrente y el estimado en pesos de otra moneda', async () => {
+    const user = userEvent.setup()
+    getCurrencyQuote.mockResolvedValue({ ok: true, quote: { rate: 1000 } })
+    renderForm()
+    await completeRequired(user)
+    await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'RECURRING')
+    await user.selectOptions(screen.getByLabelText('Frecuencia'), 'MONTHLY')
+    await screen.findByText(PERSONAL_QUOTE_NOTE)
+
+    await user.click(submitButton())
+
+    const summary = within(await screen.findByRole('dialog', { name: 'Confirmá el gasto' }))
+    expect(summary.getByText('Frecuencia').nextSibling).toHaveTextContent('Mensual')
+    expect(summary.getByText('Estimado en pesos').nextSibling).toHaveTextContent('$ 1.234.560,00 ARS')
+  })
+
+  it('con datos inválidos no abre el resumen', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.click(submitButton())
+
+    expect(await screen.findByText('La categoría es obligatoria')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})

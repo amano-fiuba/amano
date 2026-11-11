@@ -6,6 +6,10 @@ import SiteNav from './SiteNav'
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
 
 vi.mock('../auth/AuthContext', () => ({ useAuth }))
+vi.mock('../api/friendsClient', () => ({
+  FRIEND_REQUESTS_CHANGED_EVENT: 'changed',
+  listReceivedFriendshipRequests: () => Promise.resolve({ ok: true, requests: [] }),
+}))
 
 beforeEach(() => {
   useAuth.mockReturnValue({ user: null, loading: false })
@@ -41,72 +45,51 @@ describe('SiteNav', () => {
     expect(screen.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
   })
 
-  it('muestra los accesos de la app con sesión iniciada', () => {
+  it('con sesión muestra la barra de la app y no los accesos públicos (015, FR-003)', () => {
     useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
     renderNav()
 
     expect(
-      screen.getByRole('navigation', { name: 'Navegación principal' }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Mi perfil' })).toHaveAttribute(
-      'href',
-      '/profile',
-    )
-    expect(screen.getByRole('link', { name: 'Registrar gasto' })).toHaveAttribute(
-      'href',
-      '/expenses/new',
-    )
-    expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveAttribute(
-      'href',
-      '/users/search',
-    )
-    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).toHaveAttribute(
-      'href',
-      '/expenses/recurring',
-    )
-    expect(screen.getByRole('link', { name: 'Grupos' })).toHaveAttribute(
-      'href',
-      '/groups',
-    )
+      screen.getByRole('link', { name: /a mano, ir al inicio/i }),
+    ).toHaveAttribute('href', '/')
+    expect(screen.getByRole('searchbox', { name: 'Buscar personas y grupos' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Mi perfil' })).toHaveAttribute('href', '/profile')
+    expect(screen.getByRole('link', { name: 'Mis grupos' })).toHaveAttribute('href', '/groups')
+    expect(screen.getByRole('link', { name: 'Actividad personal' })).toHaveAttribute('href', '/activity')
+    expect(screen.getByRole('link', { name: 'Amigos' })).toHaveAttribute('href', '/friends')
+    expect(screen.getByRole('link', { name: 'Preguntas frecuentes' })).toHaveAttribute('href', '/faq')
+    expect(screen.getByRole('link', { name: 'Ajustes' })).toHaveAttribute('href', '/settings')
+    expect(screen.getByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Registrarse' })).not.toBeInTheDocument()
+  })
+
+  it('muestra la foto de perfil en el acceso a Mi perfil', () => {
+    useAuth.mockReturnValue({
+      user: { id: 7, hasCustomAvatar: true, avatarUrl: '/api/users/7/avatar?v=3' },
+      loading: false,
+    })
+    renderNav()
+
     expect(
-      screen.queryByRole('link', { name: 'Registrarse' }),
-    ).not.toBeInTheDocument()
+      screen.getByRole('link', { name: 'Mi perfil' }).querySelector('img'),
+    ).toHaveAttribute('src', '/api/users/7/avatar?v=3')
+  })
+
+  it('sin foto propia usa el avatar por defecto', () => {
+    useAuth.mockReturnValue({ user: { id: 7, hasCustomAvatar: false }, loading: false })
+    renderNav()
+
+    expect(
+      screen.getByRole('link', { name: 'Mi perfil' }).querySelector('img'),
+    ).toHaveAttribute('src', '/avatar-default.png')
   })
 
   it('resalta el acceso de la ruta actual', () => {
     useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
-    renderNav('/expenses/new')
+    renderNav('/friends')
 
-    expect(screen.getByRole('link', { name: 'Registrar gasto' })).toHaveClass(
-      'is-active',
-    )
-    expect(screen.getByRole('link', { name: 'Mi perfil' })).not.toHaveClass(
-      'is-active',
-    )
-  })
-
-  it('resalta el buscador cuando se está en /users/search (008)', () => {
-    useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
-    renderNav('/users/search')
-
-    expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveClass('is-active')
-    expect(screen.getByRole('link', { name: 'Registrar gasto' })).not.toHaveClass('is-active')
-  })
-
-  it('resalta los gastos recurrentes cuando se está en /expenses/recurring (009)', () => {
-    useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
-    renderNav('/expenses/recurring')
-
-    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).toHaveClass('is-active')
-    expect(screen.getByRole('link', { name: 'Registrar gasto' })).not.toHaveClass('is-active')
-  })
-
-  it('resalta grupos cuando se está en /groups (010)', () => {
-    useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
-    renderNav('/groups')
-
-    expect(screen.getByRole('link', { name: 'Grupos' })).toHaveClass('is-active')
-    expect(screen.getByRole('link', { name: 'Gastos recurrentes' })).not.toHaveClass('is-active')
+    expect(screen.getByRole('link', { name: 'Amigos' })).toHaveClass('is-active')
+    expect(screen.getByRole('link', { name: 'Mi perfil' })).not.toHaveClass('is-active')
   })
 
   it('resalta el inicio en la landing pública', () => {

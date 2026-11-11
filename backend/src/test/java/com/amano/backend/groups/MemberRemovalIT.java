@@ -35,9 +35,9 @@ import tools.jackson.databind.ObjectMapper;
  * applies the soft baja and records MEMBER_REMOVED, rejects a member-of-the-group
  * caller (403), rejects removing another ADMIN ("primero quitale el rol"), and
  * {@code DELETE /api/groups/{id}/simulated-profiles/{profileId}} physically
- * deletes the row (by admin, or by member when the casilla is on). Pending
- * debts cannot happen end-to-end with the NoOp DebtPort stub (always zero
- * debts) — that case is covered by unit tests mocking the port (T055).
+ * deletes the row (by admin, or by member when the casilla is on). Groups
+ * here have no expenses, so nobody has debts; the end-to-end blocking by
+ * pending debts (017 US2) lives in {@link GroupDebtBlockingIT}.
  */
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"

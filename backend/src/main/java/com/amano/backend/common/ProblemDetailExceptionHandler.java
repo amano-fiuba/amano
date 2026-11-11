@@ -21,9 +21,11 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.friendship.AlreadyFriendsException;
+import com.amano.backend.friendship.FriendNotFoundException;
 import com.amano.backend.friendship.FriendshipRecipientNotFoundException;
 import com.amano.backend.friendship.FriendshipRequestAlreadyRespondedException;
 import com.amano.backend.friendship.FriendshipRequestNotFoundException;
+import com.amano.backend.friendship.PendingDirectDebtException;
 import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
@@ -260,6 +262,25 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
+    /** Not friends or friendship already deleted (feature 016, FR-025): neutral 404. */
+    @ExceptionHandler(FriendNotFoundException.class)
+    public ProblemDetail handleFriendNotFound(FriendNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /** Pending direct debt (feature 016, FR-011..FR-013): 403, friendship unchanged. */
+    @ExceptionHandler(PendingDirectDebtException.class)
+    public ProblemDetail handlePendingDirectDebt(PendingDirectDebtException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación bloqueada por deuda pendiente");
+        problem.setProperty("properties", Map.of("code", PendingDirectDebtException.CODE));
+        return problem;
+    }
+
     /** Service-level validations after normalization (Q3/Q4): same 400 shape (FR-018). */
     @ExceptionHandler(FieldValidationException.class)
     public ProblemDetail handleFieldValidation(FieldValidationException exception) {
@@ -292,6 +313,87 @@ public class ProblemDetailExceptionHandler {
                 HttpStatus.FORBIDDEN, exception.getMessage());
         problem.setTitle("Operación bloqueada por deudas pendientes");
         problem.setProperty("properties", Map.of("code", "PENDING_DEBTS"));
+        return problem;
+    }
+
+    /** 018 FR-003: debt that does not exist or belongs to a group the caller is not in — neutral 404. */
+    @ExceptionHandler(com.amano.backend.payment.DebtNotFoundException.class)
+    public ProblemDetail handleDebtNotFound(com.amano.backend.payment.DebtNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Deuda no encontrada");
+        return problem;
+    }
+
+    /** 018 FR-006: payment on a PAID debt — 409 with a machine-readable code. */
+    @ExceptionHandler(com.amano.backend.payment.DebtAlreadyPaidException.class)
+    public ProblemDetail handleDebtAlreadyPaid(com.amano.backend.payment.DebtAlreadyPaidException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("La deuda ya está pagada");
+        problem.setProperty("properties", Map.of("code", com.amano.backend.payment.DebtAlreadyPaidException.CODE));
+        return problem;
+    }
+
+    /** 022 D6: the debt already has a reported or settled payment — 409. */
+    @ExceptionHandler(com.amano.backend.payment.DebtAlreadyHasPaymentException.class)
+    public ProblemDetail handleDebtAlreadyHasPayment(
+            com.amano.backend.payment.DebtAlreadyHasPaymentException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("La deuda ya tiene un pago registrado");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.payment.DebtAlreadyHasPaymentException.CODE));
+        return problem;
+    }
+
+    /** 022 US5: unknown payment, payment of another group or caller outside the group — neutral 404. */
+    @ExceptionHandler(com.amano.backend.payment.PaymentNotFoundException.class)
+    public ProblemDetail handlePaymentNotFound(com.amano.backend.payment.PaymentNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Pago no encontrado");
+        return problem;
+    }
+
+    /** 022 US5: already decided, legacy or debt no longer reported — 409 with a code. */
+    @ExceptionHandler(com.amano.backend.payment.PaymentNotDecidableException.class)
+    public ProblemDetail handlePaymentNotDecidable(
+            com.amano.backend.payment.PaymentNotDecidableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("El pago no se puede decidir");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.payment.PaymentNotDecidableException.CODE));
+        return problem;
+    }
+
+    /** 022 D8/US9: BCRA exchange rate unavailable within the 7-day lookback window — 503. */
+    @ExceptionHandler(com.amano.backend.groupexpense.GroupExpenseConflictException.class)
+    public ProblemDetail handleGroupExpenseConflict(
+            com.amano.backend.groupexpense.GroupExpenseConflictException exception) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setTitle("Conflicto");
+        problem.setDetail(exception.getMessage());
+        problem.setProperty("properties", Map.of("code", exception.getCode()));
+        return problem;
+    }
+
+    @ExceptionHandler(com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException.class)
+    public ProblemDetail handleExchangeRateUnavailable(
+            com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        problem.setTitle("Cotización no disponible");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException.CODE));
+        return problem;
+    }
+
+    /** 027 (contracts/currencies-api.md): BCRA catalog unavailable and nothing cached. */
+    @ExceptionHandler(com.amano.backend.currency.CurrencyCatalogUnavailableException.class)
+    public ProblemDetail handleCurrencyCatalogUnavailable(
+            com.amano.backend.currency.CurrencyCatalogUnavailableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        problem.setTitle("Catálogo de monedas no disponible");
+        problem.setProperty("properties",
+                Map.of("code", com.amano.backend.currency.CurrencyCatalogUnavailableException.CODE));
         return problem;
     }
 

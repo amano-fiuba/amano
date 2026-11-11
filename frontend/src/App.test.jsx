@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { AppRoutes } from './App'
@@ -16,11 +16,11 @@ afterEach(() => {
 })
 
 describe('App (T015)', () => {
-  it('renderiza la landing pública en / con las llamadas a la acción', () => {
+  it('renderiza la landing pública en / con las llamadas a la acción', async () => {
     render(<App />)
 
     expect(
-      screen.getByRole('heading', {
+      await screen.findByRole('heading', {
         name: /compartí gastos sin fricción ni cuentas complicadas/i,
       }),
     ).toBeInTheDocument()
@@ -32,6 +32,63 @@ describe('App (T015)', () => {
     expect(
       within(main).getByRole('link', { name: /iniciar sesión/i }),
     ).toHaveAttribute('href', '/login')
+  })
+})
+
+describe('App / con sesión (specs/015-main-screen)', () => {
+  const PROFILE = {
+    id: 7,
+    firstName: 'Ana',
+    email: 'ana@example.com',
+    currencies: [],
+    hasCustomAvatar: false,
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(url === '/api/users/me' ? PROFILE : []),
+        }),
+      ),
+    )
+  })
+
+  function renderAt(path) {
+    return render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+  }
+
+  it('muestra la pantalla principal y no la landing (FR-001)', async () => {
+    renderAt('/')
+
+    expect(await screen.findByRole('heading', { name: 'Ana' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /empezar gratis/i })).not.toBeInTheDocument()
+  })
+
+  it('/dashboard redirige a la pantalla principal (FR-002)', async () => {
+    renderAt('/dashboard')
+
+    expect(await screen.findByRole('heading', { name: 'Grupos' })).toBeInTheDocument()
+  })
+
+  it('/faq y /settings son pantallas protegidas disponibles (FR-009)', async () => {
+    const { unmount } = renderAt('/faq')
+    expect(await screen.findByText('Próximamente')).toBeInTheDocument()
+    unmount()
+
+    renderAt('/settings')
+    expect(await screen.findByRole('heading', { name: 'Ajustes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /cambiar a modo/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
   })
 })
 
@@ -253,5 +310,40 @@ describe('App ruta del buscador (specs/008-user-search)', () => {
     expect(
       await screen.findByRole('heading', { name: 'Buscar usuarios' }),
     ).toBeInTheDocument()
+  })
+})
+
+describe('rutas de gastos de grupo (017)', () => {
+  const PERFIL = { id: 7, email: 'ana@example.com', firstName: 'Ana', lastName: 'López', currencies: [] }
+
+  it.each(['/groups/3/expenses/new', '/groups/3/expenses/12', '/groups/3/expenses/12/debts/31/payment'])('%s sin sesión redirige al login', async (path) => {
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: /iniciar sesión/i })).toBeInTheDocument()
+  })
+
+  it('/groups/:id/history con sesión pasa el id del grupo al historial', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(PERFIL) }),
+    )
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/groups/3/history?filter=EXPENSES']}>
+          <AppRoutes />
+        </MemoryRouter>
+      </AuthProvider>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Historial de actividad' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/api/groups/3/activity'), expect.anything()),
+    )
   })
 })

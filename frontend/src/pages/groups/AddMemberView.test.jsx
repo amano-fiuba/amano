@@ -1,137 +1,189 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router'
 
 vi.mock('../../api/groupsClient', async (importOriginal) => ({
   ...await importOriginal(),
-  searchCandidates: vi.fn(),
   addMember: vi.fn(),
+  getMembers: vi.fn(),
+}))
+vi.mock('../../api/friendsClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  listFriends: vi.fn(),
 }))
 
-import { addMember, searchCandidates } from '../../api/groupsClient'
-import AddMemberView from './AddMemberView'
+import { addMember, getMembers } from '../../api/groupsClient'
+import { listFriends } from '../../api/friendsClient'
+import { SnackbarProvider } from '../../components/Snackbar'
+import AddMemberView, { NO_FRIEND_MATCHES_MESSAGE } from './AddMemberView'
 
 const GROUP = { id: 42, name: 'Amigos para viajar' }
+const BETO = { id: 15, firstName: 'Beto', lastName: 'Pérez', email: 'beto@example.com', avatarUrl: null }
+const JOSE = { id: 16, firstName: 'José', lastName: null, email: 'jose@correo.com', avatarUrl: '/api/users/16/avatar' }
+const CARLA = { id: 17, firstName: 'Carla', lastName: 'Gómez', email: 'carla@example.com', avatarUrl: null }
 
 beforeEach(() => {
-  searchCandidates.mockReset()
   addMember.mockReset()
+  getMembers.mockReset()
+  listFriends.mockReset()
+  listFriends.mockResolvedValue({ ok: true, friends: [BETO, JOSE, CARLA] })
+  // Carla (17) ya es miembro.
+  getMembers.mockResolvedValue({ ok: true, members: [{ userId: 17, name: 'Carla Gómez', role: 'MEMBER' }] })
 })
 
-describe('AddMemberView (T049/T043)', () => {
-  it('la búsqueda se limita a los amigos del caller', async () => {
-    searchCandidates.mockResolvedValue({
-      ok: true,
-      content: [{ id: 15, firstName: 'Beto', lastName: 'Pérez', email: 'beto@example.com' }],
-    })
+function renderModal(props = {}) {
+  return render(
+    <MemoryRouter>
+      <SnackbarProvider>
+        <AddMemberView group={GROUP} permissions={{ membersCannotInvite: false }} {...props} />
+      </SnackbarProvider>
+    </MemoryRouter>,
+  )
+}
 
-    render(<AddMemberView group={GROUP} permissions={{ membersCannotInvite: false }} />)
+const row = (friend) => screen.getByTestId(`add-friend-${friend.id}`)
 
-    fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), {
-      target: { value: 'bet' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
-    expect(await screen.findAllByText(/beto@example\.com/)).not.toHaveLength(0)
-    expect(searchCandidates).toHaveBeenCalledWith(42, 'bet')
-  })
+describe('AddMemberView: modal "Agregar amigos a {grupo}"', () => {
+  it('es un modal con el nombre del grupo que lista a todos los amigos', async () => {
+    renderModal()
 
-  it('envía el alta del amigo registrado y muestra el éxito', async () => {
-    searchCandidates.mockResolvedValue({
-      ok: true,
-      content: [{ id: 15, firstName: 'Beto', lastName: 'Pérez', email: 'beto@example.com' }],
-    })
-    addMember.mockResolvedValue({
-      ok: true,
-      member: { id: 15, type: 'REGISTERED', name: 'Beto', email: 'beto@example.com', role: 'MEMBER' },
-    })
-
-    render(<AddMemberView group={GROUP} permissions={{ membersCannotInvite: false }} />)
-
-    fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: 'bet' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Agregar a beto@example\.com/i }))
-
-    await waitFor(() =>
-      expect(addMember).toHaveBeenCalledWith(42, {
-        memberType: 'REGISTERED',
-        identifier: 'beto@example.com',
-      }),
+    expect(screen.getByRole('dialog', { name: 'Agregar amigos a Amigos para viajar' })).toHaveAttribute(
+      'aria-modal',
+      'true',
     )
-    expect(await screen.findByRole('status')).toHaveTextContent(/Miembro agregado/i)
+    const list = await screen.findByRole('list', { name: 'Tus amigos' })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(3)
+    expect(within(row(BETO)).getByText('Beto Pérez')).toBeInTheDocument()
+    expect(within(row(BETO)).getByText('beto@example.com')).toBeInTheDocument()
+    expect(row(BETO).querySelector('img')).toHaveAttribute('src', '/avatar-default.png')
+    expect(row(JOSE).querySelector('img')).toHaveAttribute('src', '/api/users/16/avatar')
+    // El botón dice solo "Agregar", sin el mail.
+    expect(within(row(BETO)).getByRole('button', { name: 'Agregar a Beto Pérez' })).toHaveTextContent(/^Agregar$/)
   })
 
-  it('valida el formulario del perfil simulado antes de llamar a la API', async () => {
-    render(<AddMemberView group={GROUP} permissions={{ membersCannotInvite: false }} />)
+  it('quien ya es miembro figura sombreado con "Agregado" y sin botón', async () => {
+    renderModal()
 
-    fireEvent.click(screen.getByRole('radio', { name: /Perfil simulado/i }))
-    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
-
-    expect(await screen.findByText(/Ingresá nombre y correo/i)).toBeInTheDocument()
-    expect(addMember).not.toHaveBeenCalled()
-
-    fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), {
-      target: { value: 'Juan Simulado' },
-    })
-    fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), {
-      target: { value: 'simulado@ejemplo.com' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
-
-    await waitFor(() =>
-      expect(addMember).toHaveBeenCalledWith(42, {
-        memberType: 'SIMULATED',
-        identifier: 'simulado@ejemplo.com',
-        name: 'Juan Simulado',
-      }),
-    )
+    await screen.findByRole('list', { name: 'Tus amigos' })
+    expect(row(CARLA)).toHaveClass('is-member')
+    expect(within(row(CARLA)).getByText('Agregado')).toBeInTheDocument()
+    expect(within(row(CARLA)).queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('muestra el motivo de rechazo cuando la persona ya es miembro', async () => {
-    searchCandidates.mockResolvedValue({
-      ok: true,
-      content: [{ id: 15, firstName: 'Beto', lastName: 'Pérez', email: 'beto@example.com' }],
-    })
-    addMember.mockResolvedValue({
-      ok: false,
-      status: 400,
-      detail: 'Esa persona ya es miembro del grupo',
-    })
+  it('el buscador filtra por nombre o mail mientras se escribe, sin botón Buscar', async () => {
+    const user = userEvent.setup()
+    renderModal()
 
-    render(<AddMemberView group={GROUP} permissions={{ membersCannotInvite: false }} />)
+    const search = await screen.findByRole('searchbox', { name: 'Buscar entre tus amigos' })
+    expect(search).toHaveAttribute('placeholder', 'Buscá por nombre o mail')
+    expect(screen.queryByRole('button', { name: 'Buscar' })).not.toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: 'bet' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Agregar a beto@example\.com/i }))
+    await user.type(search, 'jose')
+    expect(within(screen.getByRole('list', { name: 'Tus amigos' })).getAllByRole('listitem')).toHaveLength(1)
+    expect(screen.getByText('José')).toBeInTheDocument()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/ya es miembro del grupo/i)
+    await user.clear(search)
+    await user.type(search, 'carla@')
+    expect(within(screen.getByRole('list', { name: 'Tus amigos' })).getAllByRole('listitem')).toHaveLength(1)
+
+    await user.clear(search)
+    await user.type(search, 'zzz')
+    expect(screen.getByText(NO_FRIEND_MATCHES_MESSAGE)).toBeInTheDocument()
   })
 
-  it('avisa con onAdded tras un alta exitosa, registrada o simulada (fix 2026-11-04)', async () => {
+  it('agrega a un amigo: la fila pasa a "Agregado", avisa y el modal sigue abierto', async () => {
     const onAdded = vi.fn()
-    searchCandidates.mockResolvedValue({
-      ok: true,
-      content: [{ id: 15, firstName: 'Beto', lastName: 'Pérez', email: 'beto@example.com' }],
-    })
+    const onClose = vi.fn()
     addMember.mockResolvedValue({ ok: true, member: { id: 15 } })
+    renderModal({ onAdded, onClose })
 
-    render(<AddMemberView group={GROUP} permissions={{}} onAdded={onAdded} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Beto Pérez' }))
 
-    fireEvent.change(screen.getByLabelText('Buscar entre tus amigos'), { target: { value: 'bet' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Agregar a beto@example\.com/i }))
-    await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(addMember).toHaveBeenCalledWith(42, { memberType: 'REGISTERED', identifier: 'beto@example.com' }),
+    )
+    expect(await within(row(BETO)).findByText('Agregado')).toBeInTheDocument()
+    expect(row(BETO)).toHaveClass('is-member')
+    expect(screen.getByTestId('snackbar')).toHaveTextContent('Miembro agregado: Beto Pérez')
+    expect(onAdded).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
 
-    fireEvent.click(screen.getByRole('radio', { name: /Perfil simulado/i }))
-    fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
-    fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
-    await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(2))
+  it('muestra el motivo de rechazo dentro del modal y no avisa', async () => {
+    const onAdded = vi.fn()
+    addMember.mockResolvedValue({ ok: false, status: 400, detail: 'Esa persona ya es miembro del grupo' })
+    renderModal({ onAdded })
 
-    // a rejected alta does not notify
-    addMember.mockResolvedValueOnce({ ok: false, status: 400, detail: 'Esa persona ya es miembro del grupo' })
-    fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
-    fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
-    fireEvent.click(screen.getByRole('button', { name: /Agregar perfil simulado/i }))
-    expect(await screen.findByTestId('add-member-error')).toBeInTheDocument()
-    expect(onAdded).toHaveBeenCalledTimes(2)
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar a Beto Pérez' }))
+
+    expect(await screen.findByTestId('add-member-error')).toHaveTextContent(/ya es miembro del grupo/i)
+    expect(within(row(BETO)).getByRole('button', { name: 'Agregar a Beto Pérez' })).toBeInTheDocument()
+    expect(onAdded).not.toHaveBeenCalled()
+  })
+
+  it('la equis y Escape cierran el modal', async () => {
+    const onClose = vi.fn()
+    renderModal({ onClose })
+
+    await screen.findByRole('list', { name: 'Tus amigos' })
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('sin permiso de invitar avisa y deshabilita "Agregar"', async () => {
+    renderModal({ permissions: { membersCannotInvite: true } })
+
+    expect(await screen.findByText('No podés invitar gente a este grupo')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Agregar a Beto Pérez' })).toBeDisabled()
+  })
+
+  it('sin amigos sugiere buscar usuarios', async () => {
+    listFriends.mockResolvedValue({ ok: true, friends: [] })
+    renderModal()
+
+    expect(await screen.findByText(/Todavía no tenés amigos/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Buscar usuarios' })).toHaveAttribute('href', '/users/search')
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
+
+  it('si falla la carga de amigos permite reintentar', async () => {
+    listFriends
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValueOnce({ ok: true, friends: [BETO] })
+    renderModal()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reintentar' }))
+    expect(await screen.findByText('Beto Pérez')).toBeInTheDocument()
+  })
+
+  describe('perfil simulado al pie', () => {
+    it('valida y envía el alta', async () => {
+      const onAdded = vi.fn()
+      addMember.mockResolvedValue({ ok: true, member: { id: 9 } })
+      renderModal({ onAdded })
+
+      await screen.findByRole('list', { name: 'Tus amigos' })
+      fireEvent.click(screen.getByRole('button', { name: 'Agregar perfil simulado' }))
+      fireEvent.click(within(screen.getByTestId('simulated-form')).getByRole('button', { name: 'Agregar perfil simulado' }))
+      expect(await screen.findByText(/Ingresá nombre y correo/i)).toBeInTheDocument()
+      expect(addMember).not.toHaveBeenCalled()
+
+      fireEvent.change(screen.getByLabelText('Nombre del perfil simulado'), { target: { value: 'Abuela' } })
+      fireEvent.change(screen.getByLabelText('Correo del perfil simulado'), { target: { value: 'abuela@example.com' } })
+      fireEvent.click(within(screen.getByTestId('simulated-form')).getByRole('button', { name: 'Agregar perfil simulado' }))
+
+      await waitFor(() =>
+        expect(addMember).toHaveBeenCalledWith(42, {
+          memberType: 'SIMULATED',
+          identifier: 'abuela@example.com',
+          name: 'Abuela',
+        }),
+      )
+      await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1))
+      expect(screen.getByTestId('snackbar')).toHaveTextContent('Miembro agregado: Abuela')
+    })
   })
 })

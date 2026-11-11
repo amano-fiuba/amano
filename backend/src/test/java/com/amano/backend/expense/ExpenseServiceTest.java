@@ -187,7 +187,7 @@ class ExpenseServiceTest {
     @Test
     void manipulatedCatalogValuesAreAccumulatedInOnePass() {
         RegisterExpenseRequest request = validRequest();
-        request.setCurrency("GBP");
+        request.setCurrency("XAU");
         request.setCategory("PARTY");
         request.setType("WEEKLY");
         request.setPaymentMethod("BITCOIN");
@@ -298,7 +298,7 @@ class ExpenseServiceTest {
     void everyInvalidFieldIsAccumulatedInOnePassAndNothingIsSaved() {
         RegisterExpenseRequest request = validRequest();
         request.setAmount("1E+2");
-        request.setCurrency("GBP");
+        request.setCurrency("XAU");
         request.setDate(LocalDate.now(ZoneOffset.UTC).plusDays(2).toString());
         request.setCategory("PARTY");
         request.setType("WEEKLY");

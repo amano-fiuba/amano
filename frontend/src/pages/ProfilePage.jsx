@@ -2,14 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { me } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
-
-/**
- * Aviso de éxito de 005 (FR-009 enmendado): el botón "Guardar cambios" de la
- * edición marca esta clave de sessionStorage antes de navegar a /profile; esta
- * pantalla la consume y la remueve en el mismo montaje, así el mensaje aparece
- * una única vez tras guardar y no reaparece al refrescar o volver a entrar.
- */
-export const PROFILE_SAVED_KEY = 'amano.profile.saved'
+import CopyCbuButton from '../components/CopyCbuButton'
+import HomeLink from '../components/HomeLink'
 
 // Pantalla "Mi perfil" (specs/002-user-profile): los datos provienen
 // únicamente del contrato de sesión GET /api/users/me vía me();
@@ -21,16 +15,6 @@ export const PROFILE_SAVED_KEY = 'amano.profile.saved'
 export default function ProfilePage() {
   const { user, setUser } = useAuth()
   const [error, setError] = useState(false)
-  // One-shot (FR-009 enmendado): se consume en el montaje vía lazy init de
-  // estado (sin setState dentro de un efecto, React Compiler Friendly) —
-  // leer y remover la clave hace el aviso único y no repetible en refresco.
-  const [savedNotice] = useState(() => {
-    const saved = sessionStorage.getItem(PROFILE_SAVED_KEY) === 'true'
-    if (saved) {
-      sessionStorage.removeItem(PROFILE_SAVED_KEY)
-    }
-    return saved
-  })
 
   useEffect(() => {
     let cancelled = false
@@ -60,6 +44,7 @@ export default function ProfilePage() {
     if (error) {
       return (
         <main className="page">
+          <HomeLink />
           <h1>Mi perfil</h1>
           <p role="alert">No se pudo cargar el perfil. Intenta nuevamente</p>
         </main>
@@ -77,17 +62,13 @@ export default function ProfilePage() {
 
   return (
     <main className="page">
+      <HomeLink />
       <img
         src={avatarUrl}
         alt={`Avatar de ${user.firstName}`}
         className="app-avatar"
       />
       <h1>Mi perfil</h1>
-      {savedNotice && (
-        <p role="status" data-testid="profile-saved" className="form-success">
-          Los cambios se guardaron correctamente
-        </p>
-      )}
       <p>
         Nombre: <span data-testid="profile-name">{user.firstName}</span>
       </p>
@@ -108,8 +89,11 @@ export default function ProfilePage() {
         </span>
       </p>
       {/* FR-009 de 001: el CBU/CVU es privado; aquí solo ve la sesión propia. */}
-      <p>
-        CBU/CVU: <span data-testid="profile-cbu">{user.cbuCvu ?? 'No informado'}</span>
+      <p className="profile-cbu-line">
+        <span>
+          CBU/CVU: <span data-testid="profile-cbu">{user.cbuCvu ?? 'No informado'}</span>
+        </span>
+        <CopyCbuButton value={user.cbuCvu} iconOnly />
       </p>
       <p>
         Monedas: <span data-testid="profile-currencies">{currencies.join(', ')}</span>

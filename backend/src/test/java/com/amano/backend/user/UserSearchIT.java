@@ -81,6 +81,63 @@ class UserSearchIT {
         return new Cookie("amano_auth", jwtService.issueToken(userId));
     }
 
+    private void withAvatar(long userId) {
+        jdbcTemplate.update("INSERT INTO user_avatars (user_id, content_type, data) VALUES (?, 'image/png', ?)",
+                userId, new byte[] {1, 2, 3});
+    }
+
+    private void request(long sender, long recipient, String status) {
+        jdbcTemplate.update("""
+                INSERT INTO friendship_requests (sender_id, recipient_id, status, responded_at)
+                VALUES (?, ?, ?, CASE WHEN ? = 'PENDING' THEN NULL ELSE now() END)
+                """, sender, recipient, status, status);
+    }
+
+    private void avatarUrlInSearch(long caller, String email, long owner, boolean expected) throws Exception {
+        var result = mockMvc.perform(get("/api/users/search").param("q", email).cookie(sessionOf(caller)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+        if (expected) {
+            result.andExpect(jsonPath("$[0].avatarUrl").value("/api/users/" + owner + "/avatar"));
+            mockMvc.perform(get("/api/users/" + owner + "/avatar").cookie(sessionOf(caller)))
+                    .andExpect(status().isOk());
+        }
+        else {
+            result.andExpect(jsonPath("$[0].avatarUrl").doesNotExist());
+            mockMvc.perform(get("/api/users/" + owner + "/avatar").cookie(sessionOf(caller)))
+                    .andExpect(status().isNotFound());
+        }
+    }
+
+    /** 023 SC-008: the search never shows a photo that the avatar endpoint would deny. */
+    @Test
+    void theSearchFollowsTheSameRuleAsTheAvatarEndpoint() throws Exception {
+        long me = registerVerified("Quien", "Busca", "foto.quien@example.com");
+        long friend = registerVerified("Foto", "Amiga", "foto.amiga@example.com");
+        long mate = registerVerified("Foto", "Companera", "foto.companera@example.com");
+        long sender = registerVerified("Foto", "Remitente", "foto.remitente@example.com");
+        long recipient = registerVerified("Foto", "Destinataria", "foto.destinataria@example.com");
+        long stranger = registerVerified("Foto", "Ajena", "foto.ajena@example.com");
+        for (long owner : List.of(friend, mate, sender, recipient, stranger)) {
+            withAvatar(owner);
+        }
+        request(me, friend, "ACCEPTED");
+        request(sender, me, "PENDING");
+        request(me, recipient, "PENDING");
+        long group = jdbcTemplate.queryForObject(
+                "INSERT INTO groups (name) VALUES ('Fotos') RETURNING id", Long.class);
+        for (long member : List.of(me, mate)) {
+            jdbcTemplate.update("INSERT INTO group_members (user_id, group_id, role) VALUES (?, ?, 'MEMBER')",
+                    member, group);
+        }
+
+        avatarUrlInSearch(me, "foto.amiga@example.com", friend, true);
+        avatarUrlInSearch(me, "foto.companera@example.com", mate, true);
+        avatarUrlInSearch(me, "foto.remitente@example.com", sender, true);
+        avatarUrlInSearch(me, "foto.destinataria@example.com", recipient, false);
+        avatarUrlInSearch(me, "foto.ajena@example.com", stranger, false);
+    }
+
     @Test
     void findsByFirstNameLastNameOrEmailIgnoringCaseAndOuterSpaces() throws Exception {
         long caller = registerVerified("Buscadora", "Uno", "buscadora.uno@example.com");

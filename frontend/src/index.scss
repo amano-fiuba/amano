@@ -1,4 +1,4 @@
-// Tema global (derivado de inicial.scss): paleta cálida beige/verde, Montserrat.
+// Tema global: paleta turquesa/petróleo y naranja tomada del logo, Montserrat.
 :root {
   font-family: "Montserrat", "Segoe UI", Arial, sans-serif;
   color: var(--color-texto);
@@ -11,36 +11,46 @@
   color-scheme: light;
 }
 
-/* Azul cielo — variables base */
+/* Turquesa del logo — variables base */
 :root {
   color-scheme: light;
-  --color-fondo: #edf4fc;
+  --color-fondo: #eaf5f4;
   --color-superficie: #ffffff;
-  --color-superficie-fuerte: #dce8f7;
-  --color-texto: #1c2e45;
-  --color-texto-suave: #5c6f87;
-  --color-borde: #c5d5e9;
-  --color-acento: #4b80c5;
-  --color-acento-oscuro: #28548c;
+  --color-superficie-fuerte: #d3ebe8;
+  --color-texto: #12343b;
+  --color-texto-suave: #4f6f72;
+  --color-borde: #bcdcd8;
+  --color-acento: #0b7f82;
+  --color-acento-oscuro: #0a5f66;
   --color-oliva: #668b83;
   --color-error: #b42336;
   // Tono base fijo: si apuntara a var(--color-acento), el modo oscuro
   // (que redefiniría --color-acento en función del tono) crearía una
   // referencia circular entre variables y las invalidaría a todas.
-  --color-acento-tono: #4b80c5;
+  --color-acento-tono: #0b7f82;
   --color-error-tono: #b42336;
+  --color-barra: #0a5f66;
+  // Sombras teñidas con el petróleo del logo en vez de gris azulado.
+  --color-sombra: rgb(8 40 44);
+  // Esquinas de toda la app: cambiar estos dos valores alcanza.
+  --radio-tarjeta: 8px;
+  --radio-control: 6px;
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-fondo: #161e2a;
-  --color-superficie: #202c3b;
-  --color-superficie-fuerte: #2b3a4d;
-  --color-texto: #edf4ff;
-  --color-texto-suave: #a8b8ce;
-  --color-borde: #3b4d64;
-  --color-acento: color-mix(in srgb, var(--color-acento-tono) 78%, white);
+  --color-fondo: #0e1b22;
+  --color-superficie: #16262f;
+  --color-superficie-fuerte: #1f343f;
+  --color-texto: #e8f3f5;
+  --color-texto-suave: #a0b9c0;
+  --color-borde: #2e4652;
+  --color-acento: #2fb3c0;
   --color-acento-oscuro: var(--color-acento);
+  // Lo usa el botón "+" de acciones rápidas: petróleo con texto blanco legible.
+  --color-acento-tono: #127a8a;
   --color-error: color-mix(in srgb, var(--color-error-tono) 72%, white);
+  --color-barra: #0b2a35;
+  --color-sombra: rgb(0 0 0);
 }
 * {
   box-sizing: border-box;
@@ -90,7 +100,7 @@ button,
   align-items: center;
   gap: 0.5rem;
   border: 1px solid var(--color-texto);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   padding: 0.7rem 1rem;
   color: var(--color-superficie);
   background: var(--color-texto);
@@ -122,7 +132,7 @@ table {
   border-collapse: collapse;
   overflow: hidden;
   border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   background: var(--color-superficie);
 }
 
@@ -153,7 +163,7 @@ input[type="file"] {
   &::file-selector-button {
     margin-right: 0.6rem;
     border: 1px solid var(--color-texto);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
     padding: 0.45rem 0.8rem;
     color: var(--color-superficie);
     background: var(--color-texto);
@@ -236,7 +246,7 @@ ul {
   display: block;
   height: 2rem;
   width: auto;
-  border-radius: 0.375rem;
+  border-radius: var(--radio-control);
   object-fit: contain;
 }
 
@@ -251,7 +261,7 @@ ul {
 .site-nav__link {
   padding: 0.45rem 0.8rem;
   border: 1px solid transparent;
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   color: var(--color-texto);
 
   &:hover {
@@ -301,7 +311,7 @@ ul {
   padding: 2rem;
   background: var(--color-superficie);
   border: 1px solid var(--color-borde);
-  border-radius: 1rem;
+  border-radius: var(--radio-tarjeta);
 
   h1 {
     font-size: clamp(1.7rem, 3.5vw, 2.3rem);
@@ -334,8 +344,27 @@ ul {
   margin-bottom: 1rem;
 }
 
+// 027 (FR-019): pie de los formularios de gasto, Cancelar a la izquierda y
+// Guardar gasto a la derecha, fuera de la tarjeta celeste.
+.expense-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.expense-form__card > .field:last-child {
+  margin-bottom: 0;
+}
+
 // FR-011 enmendada de 005: "Guardar cambios" se ve deshabilitado (gris, cursor
 // bloqueado) mientras no haya modificaciones pendientes por confirmar.
+// Cancelar en el borde izquierdo y la acción principal en el derecho.
+.form-actions--split {
+  justify-content: space-between;
+}
+
 .form-actions button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -366,7 +395,7 @@ ul {
     min-width: 0;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--color-borde);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
     background: var(--color-fondo);
     color: var(--color-texto);
     font: inherit;
@@ -429,7 +458,7 @@ p[role="alert"] {
   margin: 0;
   padding: 1rem;
   border: 1px solid color-mix(in srgb, var(--color-oliva) 45%, var(--color-borde));
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-oliva) 10%, var(--color-superficie));
   color: var(--color-texto);
 
@@ -468,7 +497,7 @@ p[role="alert"] {
 
 fieldset {
   border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   padding: 0.75rem 1rem;
   margin: 0 0 1rem;
 
@@ -529,7 +558,7 @@ fieldset {
   gap: 0.35rem;
   padding: 1rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
 
   p {
@@ -635,12 +664,6 @@ fieldset {
   }
 }
 
-.users-search-form__submit {
-  flex: 0 0 auto;
-  padding-block: 0.6rem;
-  white-space: nowrap;
-}
-
 .users-search-form__hint {
   margin: 0.45rem 0 0;
   color: var(--color-texto-suave);
@@ -655,7 +678,7 @@ fieldset {
   margin-top: 1.25rem;
   padding: 1rem;
   border: 1px dashed var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-fondo) 65%, var(--color-superficie));
   color: var(--color-texto-suave);
 
@@ -672,7 +695,7 @@ fieldset {
   margin-top: 1.25rem;
   padding: 1rem;
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie));
 
   strong {
@@ -707,7 +730,7 @@ fieldset {
   margin-top: 1.5rem;
   padding: 2rem 1.25rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-fondo) 60%, var(--color-superficie));
   text-align: center;
 
@@ -782,12 +805,6 @@ fieldset {
   font-size: 0.85rem;
   font-weight: 600;
 
-  &--success {
-    border: 1px solid color-mix(in srgb, var(--color-oliva) 45%, var(--color-borde));
-    color: var(--color-texto);
-    background: color-mix(in srgb, var(--color-oliva) 14%, var(--color-superficie));
-  }
-
   &--error {
     border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
     color: var(--color-error);
@@ -808,7 +825,7 @@ fieldset {
   gap: 0.8rem;
   padding: 0.85rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-fondo);
 }
 
@@ -851,7 +868,7 @@ fieldset {
   flex: 0 0 auto;
   gap: 0.35rem;
   border: 1px solid var(--color-acento);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   padding: 0.45rem 0.65rem;
   color: var(--color-acento-oscuro);
   background: transparent;
@@ -880,10 +897,6 @@ fieldset {
     align-items: stretch;
   }
 
-  .users-search-form__submit {
-    justify-content: center;
-  }
-
   .user-card {
     flex-wrap: wrap;
   }
@@ -898,18 +911,150 @@ fieldset {
   }
 }
 
-.friends-page h1 {
-  margin-bottom: 0.4rem;
+// Pantalla de Amigos: tarjetas separadas como la pantalla principal.
+//   [               Amigos               ]
+//   [ Mis amigos ] [ Solicitudes pendientes ]
+// En pantallas angostas las tarjetas se apilan (amigos arriba).
+.friends-page {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  width: calc(100% - 2rem);
+  max-width: 64rem;
+  margin: 1.25rem auto 5.5rem;
+}
+
+.friends-page__header,
+.friends-page .friends-list,
+.friends-page .friends-requests {
+  min-width: 0;
+  margin: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+}
+
+.friends-page__header {
+  h1 {
+    margin: 0 0 0.4rem;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
 }
 
 .friends-page__lead {
-  max-width: 42ch;
-  margin: 0 0 1.5rem;
+  max-width: 60ch;
+  margin: 0;
   font-size: 0.95rem;
 }
 
-.friends-requests {
-  margin-top: 0.5rem;
+.friends-page__columns {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .friends-page__columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// Buscador de cada tarjeta (ListSearch), justo debajo del título. Si lleva un
+// selector de orden al lado, en pantallas angostas el selector baja de línea.
+.list-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.85rem;
+}
+
+.list-search__sort {
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: -2px;
+  }
+}
+
+.list-search__input {
+  display: block;
+  flex: 1 1 12rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font: inherit;
+  font-size: 0.9rem;
+
+  &::placeholder {
+    color: var(--color-texto-suave);
+  }
+
+  // Hacia adentro: el contenedor recorta lo que sobresale (ver abajo).
+  &:focus-visible {
+    outline: 2px solid var(--color-acento);
+    outline-offset: -2px;
+  }
+}
+
+// Scroll dentro de cada tarjeta: con dos columnas, cada lista muestra unas cinco
+// personas (la siguiente asoma, así se nota que hay más) y el resto se scrollea.
+// En pantallas bajas el tope pasa a ser el 60% del alto para que la tarjeta
+// entre en pantalla. En una sola columna (celular) no hay scroll interno: se
+// scrollea la página, que es más cómodo con el dedo.
+// El buscador reserva el mismo hueco de barra que la lista (overflow hidden +
+// scrollbar-gutter), así buscador y tarjetas miden siempre lo mismo, con o sin
+// scroll y sea cual sea el ancho de la barra del navegador.
+@media (min-width: 960px) {
+  .friends-page .friends-requests__list,
+  .friends-page .list-search {
+    padding-right: 0.35rem;
+    scrollbar-gutter: stable;
+  }
+
+  .friends-page .friends-requests__list {
+    max-height: min(27rem, 60vh);
+    margin: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .friends-page .list-search {
+    overflow-y: hidden;
+  }
+}
+
+// En la columna de solicitudes conviven dos botones: la identidad cede antes
+// de mandarlos a una segunda línea (solo pasa en pantallas muy angostas).
+.friends-requests .friend-request-card__identity {
+  flex-basis: 8rem;
+}
+
+@media (max-width: 420px) {
+  .friends-page {
+    width: calc(100% - 1rem);
+    margin-top: 1rem;
+  }
+
+  .friends-page__header,
+  .friends-page .friends-list,
+  .friends-page .friends-requests {
+    padding: 1rem;
+  }
 }
 
 // ---- Mis amigos (specs/013-friends-list) ----
@@ -935,22 +1080,152 @@ fieldset {
   font-weight: 700;
 }
 
+// "Amigos desde …": tercera línea de la identidad, debajo del correo.
 .friend-card__since {
-  flex: 0 0 auto;
-  margin-left: auto;
   color: var(--color-texto-suave);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
-@media (max-width: 480px) {
-  .friend-card {
-    flex-wrap: wrap;
+// Delete action of each friend (feature 016): outlined danger button that
+// leaves the card visible while the deletion is in progress. Sits at the right
+// of the card, where "Amigos desde" used to be.
+.friend-card__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.friend-card__delete {
+  padding: 0.45rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-error) 55%, var(--color-borde));
+  border-radius: var(--radio-control);
+  color: var(--color-error);
+  background: transparent;
+  font-size: 0.8rem;
+  font-weight: 700;
+
+  &:hover:enabled {
+    color: var(--color-superficie);
+    background: var(--color-error);
   }
 
-  .friend-card__since {
-    width: 100%;
-    margin-left: 3.4rem;
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+  }
+}
+
+// Base de todos los modales de confirmación (ConfirmModal). La "×" es la única
+// forma de cancelar; Confirmar es rojo, porque confirma una acción destructiva
+// (023 FR-002). Sus estilos de tecla viven en
+// detalles.scss.
+.confirm-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, var(--color-texto) 45%, transparent);
+}
+
+.confirm-modal {
+  position: relative;
+  width: min(24rem, 100%);
+  // Un modal alto se scrollea dentro de la tarjeta en vez de salirse del
+  // viewport (028: configuración de deudas y recordatorios).
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.25rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+  box-shadow: 0 18px 45px color-mix(in srgb, var(--color-texto) 25%, transparent);
+
+  h3 {
+    margin: 0 2.25rem 0.5rem 0;
+    font-size: 1.1rem;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+}
+
+.confirm-modal--wide {
+  width: min(32rem, 100%);
+}
+
+.confirm-modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radio-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-texto-suave);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease;
+
+  // Sin fondo ni círculo: solo la "×" se pinta de naranja (claro y oscuro).
+  &:hover:enabled,
+  &:active:enabled {
+    background: transparent;
+    color: var(--color-naranja);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-naranja);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+.confirm-modal__error {
+  margin-top: 0.75rem !important;
+  color: var(--color-error);
+}
+
+.confirm-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+.confirm-modal__confirm {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radio-control);
+  background: var(--color-error);
+  color: var(--color-superficie);
+  font-size: 0.85rem;
+  font-weight: 700;
+
+  &:hover:enabled {
+    border-color: color-mix(in srgb, var(--color-error) 80%, black);
+    background: color-mix(in srgb, var(--color-error) 80%, black);
+    color: var(--color-superficie);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
   }
 }
 
@@ -981,7 +1256,7 @@ fieldset {
   gap: 0.65rem;
   padding: 1rem;
   border: 1px dashed var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-fondo) 65%, var(--color-superficie));
   color: var(--color-texto-suave);
 
@@ -999,7 +1274,7 @@ fieldset {
   gap: 0.75rem;
   padding: 1rem;
   border: 1px solid color-mix(in srgb, var(--color-error) 35%, var(--color-borde));
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-error) 8%, var(--color-superficie));
 
   p {
@@ -1011,7 +1286,7 @@ fieldset {
 
 .friends-requests__retry {
   border: 1px solid var(--color-acento);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   padding: 0.45rem 0.75rem;
   color: var(--color-acento-oscuro);
   background: transparent;
@@ -1028,7 +1303,7 @@ fieldset {
   margin: 0;
   padding: 2rem 1.25rem;
   border: 1px dashed var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: color-mix(in srgb, var(--color-fondo) 60%, var(--color-superficie));
   color: var(--color-texto-suave);
   text-align: center;
@@ -1053,7 +1328,7 @@ fieldset {
   gap: 0.8rem;
   padding: 0.85rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   background: var(--color-fondo);
 }
 
@@ -1094,27 +1369,18 @@ fieldset {
   }
 }
 
-.friend-request-card__status {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  color: var(--color-acento-oscuro);
-  background: color-mix(in srgb, var(--color-acento) 14%, transparent);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-// Response actions of each pending request (feature 012, FR-012).
+// Response actions of each pending request (feature 012, FR-012): a la
+// derecha de la tarjeta, en la misma línea que el nombre.
 .friend-request-card__actions {
   display: flex;
   flex: 0 0 auto;
+  margin-left: auto;
   gap: 0.4rem;
 
   button {
     padding: 0.45rem 0.75rem;
     border: 1px solid var(--color-acento);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
     font-size: 0.8rem;
     font-weight: 700;
   }
@@ -1147,19 +1413,13 @@ fieldset {
   }
 }
 
-// Notice of the outcome of a response (feature 012, FR-013..FR-016): success,
-// conflict (409/404) and network error keep the row visible when it applies.
+// Notice of a failed response (feature 012, FR-014..FR-016): conflict (409/404)
+// and network error keep the row visible when it applies.
 .friends-requests__notice {
   margin: 0;
   padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   font-size: 0.9rem;
-
-  &--success {
-    border: 1px solid color-mix(in srgb, var(--color-oliva) 35%, var(--color-borde));
-    background: color-mix(in srgb, var(--color-oliva) 12%, var(--color-superficie));
-    color: var(--color-texto);
-  }
 
   &--conflict,
   &--error {
@@ -1194,7 +1454,7 @@ fieldset {
 .group-card {
   background: var(--color-superficie-fuerte);
   border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   padding: 1.25rem;
 
   h3 {
@@ -1219,32 +1479,9 @@ fieldset {
     gap: 0.6rem;
     padding: 0.5rem 0.65rem;
     border: 1px solid var(--color-borde);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
     background: var(--color-superficie);
   }
-}
-
-.group-page__header {
-  background: var(--color-superficie-fuerte);
-  border: 1px solid var(--color-borde);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
-
-  h2 {
-    margin: 0 0 0.35rem;
-  }
-
-  p {
-    margin: 0;
-    color: var(--color-texto-suave);
-  }
-}
-
-.group-page__identity {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
 }
 
 .group-description {
@@ -1253,53 +1490,6 @@ fieldset {
   p {
     margin: 0;
   }
-}
-
-.group-photo {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-
-  img {
-    border-radius: 50%;
-    object-fit: cover;
-    border: 2px solid var(--color-borde);
-    background: var(--color-superficie);
-  }
-}
-
-.group-photo--compact {
-  flex-shrink: 0;
-}
-
-// Fila de acciones (historial + abandonar): sin quedar pegados.
-.group-actions-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.75rem;
-
-  a {
-    color: var(--color-acento-oscuro);
-  }
-}
-
-.group-admin-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-}
-
-.group-admin-panel {
-  border-top: 1px dashed var(--color-borde);
-  padding-top: 1rem;
-}
-
-// Elemento actual ("Vos"): acento sutil de fondo sin dejar de leerse.
-li:has(> [data-testid="member-you"]) {
-  border-color: var(--color-acento);
 }
 
 // Accesibilidad: etiquetas solo para lectores de pantalla.
@@ -1313,11 +1503,6 @@ li:has(> [data-testid="member-you"]) {
 }
 
 @media (max-width: 480px) {
-  .group-page__identity {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .group-card {
     padding: 1rem;
   }
@@ -1349,7 +1534,7 @@ li:has(> [data-testid="member-you"]) {
     min-width: 12rem;
     padding: 0.45rem 0.6rem;
     border: 1px solid var(--color-borde);
-    border-radius: 0.5rem;
+    border-radius: var(--radio-control);
     background: var(--color-superficie);
     color: var(--color-texto);
     font: inherit;
@@ -1366,7 +1551,7 @@ li:has(> [data-testid="member-you"]) {
 .group-history__empty {
   padding: 1.25rem;
   border: 1px dashed var(--color-borde);
-  border-radius: 0.75rem;
+  border-radius: var(--radio-tarjeta);
   text-align: center;
   color: var(--color-texto-suave);
 }
@@ -1408,7 +1593,7 @@ li:has(> [data-testid="member-you"]) {
   gap: 0.6rem;
   padding: 0.5rem 0.65rem;
   border: 1px solid var(--color-borde);
-  border-radius: 0.5rem;
+  border-radius: var(--radio-control);
   background: var(--color-superficie);
   // fila: frase a la izquierda, hora a la derecha; marca de color por tipo
   justify-content: space-between;
@@ -1456,4 +1641,24 @@ li:has(> [data-testid="member-you"]) {
     align-items: flex-start;
     gap: 0.25rem;
   }
+}
+
+// Ajustes (specs/015-main-screen, FR-009)
+.settings-page {
+  h2 {
+    margin: 1.5rem 0 0.6rem;
+    font-size: 1.1rem;
+  }
+
+  .theme-toggle {
+    position: static;
+  }
+}
+
+// Enlace "Ir a Pantalla principal" sobre el título de cada sección.
+.home-link {
+  display: inline-block;
+  margin-bottom: 0.35rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }

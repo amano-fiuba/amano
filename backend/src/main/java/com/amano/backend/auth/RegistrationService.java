@@ -209,7 +209,7 @@ public class RegistrationService {
                     .collect(java.util.stream.Collectors.toSet());
         }
         catch (IllegalArgumentException invalidCurrency) {
-            fieldErrors.put("currencies", "Las monedas deben ser ARS, USD o EUR");
+            fieldErrors.put("currencies", "Moneda no soportada");
             return Set.of();
         }
     }

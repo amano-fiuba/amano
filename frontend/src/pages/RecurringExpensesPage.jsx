@@ -13,6 +13,8 @@ import {
   labelOf,
 } from '../validation/expenseCatalog'
 import { formatAmount, formatIsoDate } from '../validation/expenseFormat'
+import { useSnackbar } from '../components/Snackbar'
+import HomeLink from '../components/HomeLink'
 
 // Exact messages of specs/009-pause-recurring-expense (FR-012..FR-014), exported
 // for the tests.
@@ -53,7 +55,7 @@ export default function RecurringExpensesPage() {
   const [reloadToken, setReloadToken] = useState(0)
   const [pending, setPending] = useState(null)
   const [confirmingId, setConfirmingId] = useState(null)
-  const [notice, setNotice] = useState('')
+  const showSnackbar = useSnackbar()
   const [error, setError] = useState('')
   const [sessionExpired, setSessionExpired] = useState(false)
 
@@ -84,7 +86,6 @@ export default function RecurringExpensesPage() {
 
   const changeStatus = async (expense, target) => {
     setPending({ id: expense.id, target })
-    setNotice('')
     setError('')
     setSessionExpired(false)
 
@@ -99,7 +100,7 @@ export default function RecurringExpensesPage() {
           item.id === result.expense.id ? result.expense : item,
         ),
       }))
-      setNotice(SUCCESS_MESSAGES[target])
+      showSnackbar(SUCCESS_MESSAGES[target])
       return
     }
     if (result.network) {
@@ -124,13 +125,9 @@ export default function RecurringExpensesPage() {
 
   return (
     <main className="page recurring-page">
+      <HomeLink />
       <h1>Gastos recurrentes</h1>
 
-      {notice && (
-        <p role="status" data-testid="recurring-notice" className="form-success">
-          {notice}
-        </p>
-      )}
       {error && (
         <p role="alert" data-testid="recurring-error">
           {error}

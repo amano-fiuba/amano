@@ -1,9 +1,14 @@
 package com.amano.backend.groups;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +24,7 @@ import com.amano.backend.groups.dto.UpdateGroupRequest;
 import com.amano.backend.groups.port.DebtPort;
 import com.amano.backend.groups.port.FriendshipPort;
 import com.amano.backend.user.User;
+import com.amano.backend.user.Currency;
 import com.amano.backend.user.UserAvatar;
 import com.amano.backend.user.UserAvatarRepository;
 import com.amano.backend.user.UserRepository;
@@ -31,6 +37,12 @@ import com.amano.backend.user.UserRepository;
  */
 @Service
 public class GroupService {
+
+    static final int MAX_DEBT_DUE_DAYS = 3650;
+    static final String DEBT_DUE_DAYS_INVALID =
+            "Los días para el vencimiento tienen que ser un número entero entre 0 y " + MAX_DEBT_DUE_DAYS;
+    static final String DEBT_DUE_DAYS_ADMIN_ONLY =
+            "Solo un administrador puede configurar el vencimiento de las deudas";
 
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
@@ -78,57 +90,90 @@ public class GroupService {
             throw new FieldValidationException(Map.of("name", "El nombre del grupo es obligatorio"));
         }
 
-        CreateGroupRequest.MemberInput memberInput = request.getMember();
-        if (memberInput == null) {
+        List<CreateGroupRequest.MemberInput> memberInputs = memberInputsOf(request);
+        if (memberInputs.isEmpty()) {
             throw new FieldValidationException(Map.of("member",
                     "Agregá al menos un miembro adicional (amigo registrado o perfil simulado)"));
         }
 
         // Everything is validated/resolved BEFORE any insert: a failure leaves
         // no partial rows even without depending on the rollback (atomicity).
-        String memberType = nullToBlank(memberInput.getMemberType());
-        if (!"SIMULATED".equalsIgnoreCase(memberType) && !"REGISTERED".equalsIgnoreCase(memberType)) {
-            throw new FieldValidationException(Map.of("member", "El tipo de miembro no es válido"));
-        }
-        User friend = null;
-        if ("REGISTERED".equalsIgnoreCase(memberType)) {
-            friend = resolveRegisterdFriend(creatorId, memberInput.getIdentifier());
-        }
-        else {
-            validateSimulatedMember(memberInput);
+        Map<Long, User> friends = new LinkedHashMap<>();
+        List<CreateGroupRequest.MemberInput> simulatedInputs = new ArrayList<>();
+        Set<String> simulatedEmails = new HashSet<>();
+        for (CreateGroupRequest.MemberInput memberInput : memberInputs) {
+            String memberType = memberInput == null ? "" : nullToBlank(memberInput.getMemberType());
+            if ("REGISTERED".equalsIgnoreCase(memberType)) {
+                User friend = resolveRegisterdFriend(creatorId, memberInput.getIdentifier());
+                friends.putIfAbsent(friend.getId(), friend);
+            }
+            else if ("SIMULATED".equalsIgnoreCase(memberType)) {
+                validateSimulatedMember(memberInput);
+                if (!simulatedEmails.add(memberInput.getIdentifier().trim().toLowerCase(Locale.ROOT))) {
+                    throw new FieldValidationException(Map.of("member",
+                            "No podés repetir el correo de un perfil simulado"));
+                }
+                simulatedInputs.add(memberInput);
+            }
+            else {
+                throw new FieldValidationException(Map.of("member", "El tipo de miembro no es válido"));
+            }
         }
 
         Group group = new Group();
         group.setName(name);
         group.setDescription(trimOrNull(request.getDescription()));
+        Currency currency = Currency.ARS;
+        if (request.getPrimaryCurrency() != null && !request.getPrimaryCurrency().isBlank()) {
+            try {
+                currency = Currency.valueOf(request.getPrimaryCurrency().trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
+            }
+            // 027 R3: expenses accept the whole BCRA catalog, the primary currency does not.
+            if (!Currency.GROUP_PRIMARY.contains(currency)) {
+                throw new FieldValidationException(Map.of("primaryCurrency", "La moneda no es válida"));
+            }
+        }
+        group.setPrimaryCurrency(currency);
         Group savedGroup = groupRepository.save(group);
 
         groupMemberRepository.save(new GroupMember(creatorId, savedGroup.getId(), GroupMember.ROLE_ADMIN));
 
-        Map<String, Object> initialMemberDetails;
-        if (friend == null) {
+        List<Map<String, Object>> initialMembersDetails = new ArrayList<>();
+        for (User friend : friends.values()) {
+            groupMemberRepository.save(new GroupMember(friend.getId(), savedGroup.getId(), GroupMember.ROLE_MEMBER));
+            initialMembersDetails.add(ActivityEventService.registeredMemberDetails(friend));
+        }
+        for (CreateGroupRequest.MemberInput memberInput : simulatedInputs) {
             SimulatedProfile profile = new SimulatedProfile();
             profile.setGroupId(savedGroup.getId());
             profile.setName(memberInput.getName().trim());
             profile.setEmail(memberInput.getIdentifier().trim());
             SimulatedProfile savedProfile = simulatedProfileRepository.save(profile);
-            initialMemberDetails = ActivityEventService.simulatedMemberDetails(
-                    savedProfile == null ? profile : savedProfile);
-        }
-        else {
-            groupMemberRepository.save(new GroupMember(friend.getId(), savedGroup.getId(), GroupMember.ROLE_MEMBER));
-            initialMemberDetails = ActivityEventService.registeredMemberDetails(friend);
+            initialMembersDetails.add(ActivityEventService.simulatedMemberDetails(
+                    savedProfile == null ? profile : savedProfile));
         }
 
         groupPermissionsRepository.save(defaultPermissions(savedGroup.getId()));
 
-        // alta of the initial member, in the same transaction (014 FR-002)
-        initialMemberDetails.put("atCreation", true);
-        activityEventService.record(savedGroup.getId(), GroupActivity.GroupActivityType.MEMBER_ADDED,
-                creatorId, initialMemberDetails);
+        // alta of the initial members, in the same transaction (014 FR-002)
+        for (Map<String, Object> memberDetails : initialMembersDetails) {
+            memberDetails.put("atCreation", true);
+            activityEventService.record(savedGroup.getId(), GroupActivity.GroupActivityType.MEMBER_ADDED,
+                    creatorId, memberDetails);
+        }
 
         User creator = userRepository.findById(creatorId).orElseThrow();
-        return buildResponse(savedGroup, creator, 2);
+        return buildResponse(savedGroup, creator, 1 + initialMembersDetails.size());
+    }
+
+    /** {@code members} wins over the single {@code member} (spec 023 FR-028). */
+    private static List<CreateGroupRequest.MemberInput> memberInputsOf(CreateGroupRequest request) {
+        if (request.getMembers() != null && !request.getMembers().isEmpty()) {
+            return request.getMembers();
+        }
+        return request.getMember() == null ? List.of() : List.of(request.getMember());
     }
 
     private User resolveRegisterdFriend(Long creatorId, String identifier) {
@@ -163,6 +208,7 @@ public class GroupService {
     private static GroupPermissions defaultPermissions(Long groupId) {
         GroupPermissions permissions = new GroupPermissions();
         permissions.setGroupId(groupId);
+        permissions.setMembersCanGenerateExpensesForOthers(true);
         return permissions;
     }
 
@@ -190,14 +236,15 @@ public class GroupService {
                 creator.getLastName(), creator.getEmail()));
         response.setMembersCount(membersCount);
         response.setCreatorRole(GroupMember.ROLE_ADMIN);
+        response.setPrimaryCurrency(group.getPrimaryCurrency() == null ? null : group.getPrimaryCurrency().name());
         return response;
     }
 
     /**
      * T037/T039 (US2): partial update of name, description and the permission
      * casillas. Authorization always goes through {@link GroupPermissionChecker}
-     * (ADMIN always; MEMBER only when members_cannot_edit_settings = false);
-     * server-side enforcement so calling the endpoint directly cannot bypass the
+     * (casillas: ADMIN only; name and description: ADMIN always, MEMBER only when
+     * members_can_edit_group_data = true); server-side enforcement so calling the endpoint directly cannot bypass the
      * casillas. Unspecified casillas keep their stored value.
      */
     @Transactional
@@ -209,12 +256,18 @@ public class GroupService {
         GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId)
                 .orElseGet(() -> defaultPermissions(groupId));
 
-        if (!permissionChecker.canEditSettings(membership.getRole(), permissions)) {
-            throw new GroupPermissionDeniedException("No podés editar los ajustes de este grupo");
-        }
-
         if (request == null) {
             throw new FieldValidationException(Map.of("name", "El nombre del grupo es obligatorio"));
+        }
+        // Casillas: ADMIN-only. Name/description: ADMIN, or members when the
+        // "Pueden editar datos del grupo" casilla is on.
+        if (request.getPermissions() != null
+                && !permissionChecker.canManagePermissions(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException("Solo un administrador puede editar los permisos del grupo");
+        }
+        if ((request.getName() != null || request.getDescription() != null)
+                && !permissionChecker.canEditGroupData(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException("No podés editar los datos de este grupo");
         }
 
         boolean permissionsChanged = false;
@@ -230,11 +283,6 @@ public class GroupService {
                 permissions.setMembersCannotInvite(input.getMembersCannotInvite());
                 permissionsChanged = true;
             }
-            if (input.getMembersCannotEditSettings() != null
-                    && input.getMembersCannotEditSettings() != permissions.isMembersCannotEditSettings()) {
-                permissions.setMembersCannotEditSettings(input.getMembersCannotEditSettings());
-                permissionsChanged = true;
-            }
             if (input.getMembersCanManageSimulatedProfiles() != null
                     && input.getMembersCanManageSimulatedProfiles() != permissions
                             .isMembersCanManageSimulatedProfiles()) {
@@ -248,6 +296,11 @@ public class GroupService {
                         input.getMembersCanGenerateExpensesForOthers());
                 permissionsChanged = true;
             }
+            if (input.getMembersCanEditGroupData() != null
+                    && input.getMembersCanEditGroupData() != permissions.isMembersCanEditGroupData()) {
+                permissions.setMembersCanEditGroupData(input.getMembersCanEditGroupData());
+                permissionsChanged = true;
+            }
             if (input.getPaymentsRequireValidation() != null
                     && input.getPaymentsRequireValidation() != permissions.isPaymentsRequireValidation()) {
                 permissions.setPaymentsRequireValidation(input.getPaymentsRequireValidation());
@@ -255,6 +308,16 @@ public class GroupService {
             }
         }
 
+        if (request.isDebtDueDaysPresent()) {
+            if (!GroupMember.ROLE_ADMIN.equals(membership.getRole())) {
+                throw new GroupPermissionDeniedException(DEBT_DUE_DAYS_ADMIN_ONLY);
+            }
+            Integer days = request.getDebtDueDays();
+            if (days != null && (days < 0 || days > MAX_DEBT_DUE_DAYS)) {
+                throw new FieldValidationException(Map.of("debtDueDays", DEBT_DUE_DAYS_INVALID));
+            }
+            group.setDebtDueDays(days);
+        }
         if (request.getDescription() != null) {
             group.setDescription(trimOrNull(request.getDescription()));
         }
@@ -279,7 +342,8 @@ public class GroupService {
      * T078 (US6): active members of the group (group_members with left_at
      * NULL + the simulated profiles, which are members by group_id alone)
      * with display name, avatar URL (existing user-avatar mechanism; NULL →
-     * the UI renders the gray default) and the per-group role. Viewed by both
+     * the UI renders the gray default), the per-group role and the CBU/CVU
+     * (so members can copy it to transfer; NULL when not informed). Viewed by both
      * roles — the decision goes through {@link GroupPermissionChecker#canViewMembers}.
      */
     @Transactional(readOnly = true)
@@ -307,11 +371,11 @@ public class GroupService {
                     .<String>map(stored -> "/api/users/" + user.getId() + "/avatar")
                     .orElse(null); // no custom avatar → NULL → gray default in the UI
             members.add(new GroupMemberView(user.getId(), null, fullName, avatarUrl,
-                    row.getRole()));
+                    row.getRole(), user.getCbu()));
         }
         for (SimulatedProfile simulated : simulatedProfileRepository.findByGroupId(groupId)) {
             members.add(new GroupMemberView(null, simulated.getId(), simulated.getName(),
-                    null, GroupMember.ROLE_MEMBER));
+                    null, GroupMember.ROLE_MEMBER, null));
         }
         return members;
     }
@@ -336,7 +400,7 @@ public class GroupService {
         GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId).orElse(null);
         if (!permissionChecker.canManagePhoto(membership.getRole(), permissions)) {
             throw new GroupPermissionDeniedException(
-                    "Solo un administrador puede cambiar la foto del grupo");
+                    "No tenés permiso para cambiar la foto del grupo");
         }
         if (photo == null || photo.isEmpty()) {
             throw new com.amano.backend.common.FieldValidationException(java.util.Map.of("photo",
@@ -361,6 +425,27 @@ public class GroupService {
         activityEventService.record(groupId, GroupActivity.GroupActivityType.PHOTO_CHANGED,
                 userId, Map.of());
         return new com.amano.backend.groups.dto.GroupPhotoResponse(url, saved.getUpdatedAt());
+    }
+
+    /** Removes the custom photo: the group goes back to the default one. */
+    @Transactional
+    public void deletePhoto(Long userId, Long groupId) {
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(
+                        "No existe el grupo solicitado o no sos miembro"));
+        GroupMember membership = activeMembership(userId, groupId);
+        GroupPermissions permissions = groupPermissionsRepository.findByGroupId(groupId).orElse(null);
+        if (!permissionChecker.canManagePhoto(membership.getRole(), permissions)) {
+            throw new GroupPermissionDeniedException(
+                    "No tenés permiso para cambiar la foto del grupo");
+        }
+        if (groupPhotoRepository.existsById(groupId)) {
+            groupPhotoRepository.deleteById(groupId);
+            group.setPhoto(null);
+            groupRepository.save(group);
+            activityEventService.record(groupId, GroupActivity.GroupActivityType.PHOTO_CHANGED,
+                    userId, Map.of());
+        }
     }
 
     /** Served bytes for GET /api/groups/{id}/photo: members only (neutral 404 otherwise). */
@@ -388,7 +473,10 @@ public class GroupService {
      * {@link DebtPort} (spec motive 2, own wording) or by the last-admin guard
      * (spec motive 4). Success completes left_at (soft baja; the row is
      * preserved), records MEMBER_LEFT (NOT MEMBER_REMOVED) and the group is
-     * NEVER dissolved — it persists for the remaining members.
+     * never dissolved. When the caller is the last registered member the same
+     * soft baja applies, without the last-admin guard (spec 020): no group record
+     * is deleted, the group just stops showing up because nobody is active in it.
+     * {@code groupDeleted} reports that outcome, not a deletion.
      */
     @Transactional
     public LeaveGroupResponse leaveGroup(Long userId, Long groupId) {
@@ -396,11 +484,13 @@ public class GroupService {
                 .orElseThrow(() -> new GroupNotFoundException(
                         "No existe el grupo solicitado o no sos miembro"));
         GroupMember membership = activeMembership(userId, groupId);
-        if (debtPort.hasPendingDebts(groupId, userId)) {
+        if (debtPort.hasPendingDebtsForUser(groupId, userId)) {
             throw new PendingDebtsException(
                     "No podés abandonar el grupo: tenés saldos pendientes con otros miembros");
         }
-        if (GroupMember.ROLE_ADMIN.equals(membership.getRole())
+        // Nobody is left to hand the admin role to, so the guard does not apply.
+        boolean lastMember = groupMemberRepository.countActiveByGroupId(groupId) <= 1;
+        if (!lastMember && GroupMember.ROLE_ADMIN.equals(membership.getRole())
                 && groupMemberRepository.countActiveAdminsByGroupId(groupId) <= 1) {
             throw new LastAdminException();
         }
@@ -409,8 +499,13 @@ public class GroupService {
         groupMemberRepository.save(membership);
         activityEventService.record(groupId, GroupActivity.GroupActivityType.MEMBER_LEFT,
                 userId, Map.of());
+        if (lastMember) {
+            // Listing and detail require an active membership: the group no
+            // longer shows up for anyone. Its records stay in the database.
+            return new LeaveGroupResponse("Se eliminó el grupo.", true, true);
+        }
         return new LeaveGroupResponse("Se abandonó el grupo. Tus gastos previos se conservan.",
-                true);
+                true, false);
     }
 
     /**
@@ -435,8 +530,11 @@ public class GroupService {
     /** T029: groups where the caller is an active member, newest first. */
     @Transactional(readOnly = true)
     public List<GroupSummaryResponse> listUserGroups(Long userId) {
-        return groupRepository.findActiveGroupsOfUser(userId).stream()
-                .map(group -> toSummary(userId, group))
+        List<Group> groups = groupRepository.findActiveGroupsOfUser(userId);
+        Map<Long, OffsetDateTime> lastActivity = activityEventService.lastActivityByGroup(
+                groups.stream().map(Group::getId).toList());
+        return groups.stream()
+                .map(group -> toSummary(userId, group, lastActivity))
                 .toList();
     }
 
@@ -458,16 +556,23 @@ public class GroupService {
         return toDetail(userId, group, membershipOpt.get());
     }
 
-    private GroupSummaryResponse toSummary(Long userId, Group group) {
+    private GroupSummaryResponse toSummary(Long userId, Group group,
+            Map<Long, OffsetDateTime> lastActivity) {
         GroupSummaryResponse summary = new GroupSummaryResponse();
         summary.setId(group.getId());
         summary.setName(group.getName());
         summary.setDescription(group.getDescription());
         summary.setPhoto(group.getPhoto());
         summary.setCreatedAt(group.getCreatedAt());
+        summary.setLastActivityAt(lastActivity.getOrDefault(group.getId(), group.getCreatedAt()));
         summary.setMemberCount(activeMemberCount(group.getId()));
         groupMemberRepository.findByIdGroupIdAndIdUserId(group.getId(), userId)
-                .ifPresent(membership -> summary.setCurrentUserRole(membership.getRole()));
+                .ifPresent(membership -> {
+                    summary.setCurrentUserRole(membership.getRole());
+                    // 027 (FR-021): the "Gasto grupal" chooser greys out groups where it is not allowed.
+                    summary.setCanCreateExpenses(permissionChecker.canCreateExpenses(membership.getRole(),
+                            groupPermissionsRepository.findByGroupId(group.getId()).orElse(null)));
+                });
         return summary;
     }
 
@@ -482,9 +587,14 @@ public class GroupService {
         detail.setActiveForUser(membership.getLeftAt() == null);
         detail.setMemberCount(activeMemberCount(group.getId()));
         detail.setCurrentUserRole(membership.getRole());
+        detail.setLastMember(groupMemberRepository.countActiveByGroupId(group.getId()) <= 1);
+        detail.setLastAdmin(GroupMember.ROLE_ADMIN.equals(membership.getRole())
+                && groupMemberRepository.countActiveAdminsByGroupId(group.getId()) <= 1);
         detail.setPermissions(groupPermissionsRepository.findByGroupId(group.getId()).orElse(null));
         detail.setLastActivity(null); // history events come with later stories (T021 hook points)
-        detail.setExpensesCount(0);
+        detail.setExpensesCount(groupRepository.countGroupExpenses(group.getId())); // 017 FR-027
+        detail.setPrimaryCurrency(group.getPrimaryCurrency() == null ? null : group.getPrimaryCurrency().name());
+        detail.setDebtDueDays(group.getDebtDueDays());
         return detail;
     }
 

@@ -359,6 +359,36 @@ class RegisterExpenseIT {
                 .andExpect(status().isCreated());
     }
 
+    /** 027 T015 (FR-014): any currency of the BCRA catalog is accepted; others are not. */
+    @Test
+    void catalogCurrenciesBeyondArsUsdEurAreAccepted() throws Exception {
+        String email = "gasto.brl@example.com";
+        registerAccount(email, "S3gura!2026", "Ana");
+        Cookie session = verifiedSessionOf(email);
+        UUID key = UUID.randomUUID();
+        Map<String, String> payload = Map.of(
+                "amount", "10.10",
+                "currency", "BRL",
+                "date", LocalDate.now(ZoneOffset.UTC).toString(),
+                "category", "FOOD",
+                "type", "ONE_TIME",
+                "paymentMethod", "CASH",
+                "deviceTimeZone", "UTC");
+
+        createExpense(session, key, payload)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.currency").value("BRL"));
+        assertThat(rowsWithKey(email, key)).isOne();
+
+        UUID otherKey = UUID.randomUUID();
+        Map<String, String> vnd = new java.util.HashMap<>(payload);
+        vnd.put("currency", "VND");
+        createExpense(session, otherKey, vnd)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties." + FIELDS + ".currency").exists());
+        assertThat(rowsWithKey(email, otherKey)).isZero();
+    }
+
     @Test
     void manipulatedCatalogValuesAreRejectedWithoutPersisting() throws Exception {
         String email = "gasto.catalogo@example.com";
@@ -367,7 +397,7 @@ class RegisterExpenseIT {
         UUID key = UUID.randomUUID();
         Map<String, String> payload = Map.of(
                 "amount", "10.10",
-                "currency", "GBP",
+                "currency", "XAU",
                 "date", LocalDate.now(ZoneOffset.UTC).toString(),
                 "category", "PARTY",
                 "type", "WEEKLY",

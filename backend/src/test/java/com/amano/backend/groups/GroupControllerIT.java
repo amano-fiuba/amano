@@ -1,5 +1,7 @@
 package com.amano.backend.groups;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -41,7 +43,8 @@ import tools.jackson.databind.node.JsonNodeFactory;
 class GroupControllerIT {
 
     /** Real friendships replacing the old stub property (see {@link FriendshipFixtures}). */
-    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com", "listfriend@example.com");
+    private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com", "listfriend@example.com",
+            "canmember@example.com");
 
     @Container
     @ServiceConnection
@@ -118,6 +121,66 @@ class GroupControllerIT {
                 .andExpect(jsonPath("$.creator.email").value("creator@example.com"));
     }
 
+    /** 022 T068: POST /api/groups takes an optional primaryCurrency (ARS by default). */
+    @Test
+    void t068CreationWithoutPrimaryCurrencyDefaultsToArs() throws Exception {
+        Cookie session = verifiedSessionOf("curdefault@example.com");
+
+        String created = mockMvc.perform(post("/api/groups")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "name", "Sin moneda",
+                        "member", Map.of("memberType", "SIMULATED", "identifier", "curdefaultguest@example.com", "name", "Invitada")))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.primaryCurrency").value("ARS"))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(session))
+                .andExpect(jsonPath("$.primaryCurrency").value("ARS"));
+    }
+
+    @Test
+    void t068CreationWithAnAllowedPrimaryCurrencyPersistsAndReturnsIt() throws Exception {
+        Cookie session = verifiedSessionOf("curusd@example.com");
+
+        String created = mockMvc.perform(post("/api/groups")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "name", "En dólares",
+                        "primaryCurrency", "USD",
+                        "member", Map.of("memberType", "SIMULATED", "identifier", "curusdguest@example.com", "name", "Invitada")))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.primaryCurrency").value("USD"))
+                .andReturn().getResponse().getContentAsString();
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups/" + groupId).cookie(session))
+                .andExpect(jsonPath("$.primaryCurrency").value("USD"));
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT primary_currency FROM groups WHERE id = ?", String.class, groupId)).isEqualTo("USD");
+    }
+
+    @Test
+    void t068CreationWithAnInvalidPrimaryCurrencyAnswers400WithoutCreatingTheGroup() throws Exception {
+        Cookie session = verifiedSessionOf("curbad@example.com");
+        Integer before = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups", Integer.class);
+
+        mockMvc.perform(post("/api/groups")
+                .cookie(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "name", "Moneda rara",
+                        "primaryCurrency", "BRL",
+                        "member", Map.of("memberType", "SIMULATED", "identifier", "curbadguest@example.com", "name", "Invitada")))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.primaryCurrency").value("La moneda no es válida"));
+
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM groups", Integer.class)).isEqualTo(before);
+    }
+
     @Test
     void creationWithSimulatedProfileSucceeds() throws Exception {
         Cookie session = verifiedSessionOf("simcreator@example.com");
@@ -181,6 +244,30 @@ class GroupControllerIT {
                 .andExpect(status().isNotFound());
     }
 
+    /** 027 (FR-021): each list item says whether the caller may register expenses there. */
+    @Test
+    void groupsListTellsWhetherTheCallerCanCreateExpenses() throws Exception {
+        Cookie member = verifiedSessionOf("canmember@example.com");
+        Cookie admin = verifiedSessionOf("canadmin@example.com");
+        String created = postGroup(admin, "Permisos", Map.of(
+                "memberType", "REGISTERED",
+                "identifier", "canmember@example.com"));
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        mockMvc.perform(get("/api/groups").cookie(member))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].canCreateExpenses").value(true));
+
+        jdbcTemplate.update("UPDATE group_permissions SET members_cannot_make_expenses = TRUE WHERE group_id = ?",
+                groupId);
+
+        mockMvc.perform(get("/api/groups").cookie(member))
+                .andExpect(jsonPath("$[0].currentUserRole").value("MEMBER"))
+                .andExpect(jsonPath("$[0].canCreateExpenses").value(false));
+        mockMvc.perform(get("/api/groups").cookie(admin))
+                .andExpect(jsonPath("$[0].canCreateExpenses").value(true));
+    }
+
     @Test
     void groupsListAndDetailOfTheCaller() throws Exception {
         Cookie session = verifiedSessionOf("lister@example.com");
@@ -207,5 +294,30 @@ class GroupControllerIT {
 
         mockMvc.perform(get("/api/groups/999999").cookie(session))
                 .andExpect(status().isNotFound());
+    }
+    /** 015 FR-007: the latest history event, or the creation date without events. */
+    @Test
+    void groupsListInformsTheLastActivity() throws Exception {
+        Cookie session = verifiedSessionOf("activitylister@example.com");
+        String created = postGroup(session, "Actividad", Map.of(
+                "memberType", "SIMULATED",
+                "identifier", "actividad@example.com",
+                "name", "Invitado"));
+        long groupId = objectMapper.readTree(created).get("id").asLong();
+
+        jdbcTemplate.update("DELETE FROM group_activity WHERE group_id = ?", groupId);
+        String listed = mockMvc.perform(get("/api/groups").cookie(session))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        var summary = objectMapper.readTree(listed).get(0);
+        assertThat(summary.get("lastActivityAt").asString()).isEqualTo(summary.get("createdAt").asString());
+
+        String insertEvent = "INSERT INTO group_activity (group_id, event_type, created_at) "
+                + "VALUES (?, 'MEMBER_ADDED', ?::timestamptz)";
+        jdbcTemplate.update(insertEvent, groupId, "2029-06-15 12:00:00+00");
+        jdbcTemplate.update(insertEvent, groupId, "2030-06-15 12:00:00+00");
+        mockMvc.perform(get("/api/groups").cookie(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].lastActivityAt").value(startsWith("2030-06-15")));
     }
 }

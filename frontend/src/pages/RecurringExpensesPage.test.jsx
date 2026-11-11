@@ -118,7 +118,7 @@ describe('RecurringExpensesPage (009)', () => {
 
     resolve({ ok: true, expense: { ...ACTIVE, status: 'PAUSED' } })
 
-    expect(await screen.findByTestId('recurring-notice')).toHaveTextContent(PAUSED_MESSAGE)
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(PAUSED_MESSAGE)
     expect(item(81).getByText('Pausado')).toBeInTheDocument()
     expect(item(81).getByRole('button', { name: 'Reanudar' })).toBeEnabled()
   })
@@ -136,7 +136,7 @@ describe('RecurringExpensesPage (009)', () => {
     await user.click(item(64).getByRole('button', { name: 'Reanudar' }))
 
     expect(updateRecurringExpenseStatus).toHaveBeenCalledWith(64, 'ACTIVE')
-    expect(await screen.findByTestId('recurring-notice')).toHaveTextContent(RESUMED_MESSAGE)
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(RESUMED_MESSAGE)
     expect(item(64).getByText('Activo')).toBeInTheDocument()
     expect(item(64).getByText(/Próxima fecha: 07\/11\/2026/)).toBeInTheDocument()
   })
@@ -171,7 +171,7 @@ describe('RecurringExpensesPage (009)', () => {
     await user.click(screen.getByRole('button', { name: 'Sí, finalizar' }))
 
     expect(updateRecurringExpenseStatus).toHaveBeenCalledWith(81, 'FINISHED')
-    expect(await screen.findByTestId('recurring-notice')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FINISHED_MESSAGE,
     )
     expect(item(81).getByText('Finalizado')).toBeInTheDocument()
@@ -200,7 +200,7 @@ describe('RecurringExpensesPage (009)', () => {
     )
     await waitFor(() => expect(listRecurringExpenses).toHaveBeenCalledTimes(2))
     expect(await item(64).findByText('Finalizado')).toBeInTheDocument()
-    expect(screen.queryByTestId('recurring-notice')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('snackbar')).not.toBeInTheDocument()
   })
 
   it('ante fallo de red al cambiar conserva el estado y muestra el mensaje fijo', async () => {

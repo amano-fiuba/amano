@@ -1,11 +1,14 @@
 package com.amano.backend.groups.dto;
 
+import java.util.List;
+
 /**
- * Payload of {@code POST /api/groups} (contracts/api-contracts.md). The
- * additional member is required: a registered friend (identifier = email,
- * resolved through the friendship relation) or a simulated profile (email +
- * name). Nothing else lives in it — business validation is in
- * {@code GroupService}.
+ * Payload of {@code POST /api/groups} (contracts/api-contracts.md). At least one
+ * additional member is required: registered friends (identifier = email,
+ * resolved through the friendship relation) or simulated profiles (email +
+ * name). {@code members} (spec 023) carries several; {@code member} remains
+ * valid for one, and {@code members} wins if both arrive. Nothing else lives in
+ * it — business validation is in {@code GroupService}.
  */
 public class CreateGroupRequest {
 
@@ -15,6 +18,19 @@ public class CreateGroupRequest {
     private String description;
 
     private MemberInput member;
+
+    private List<MemberInput> members;
+
+    /** 022 T068: optional group currency (ARS default). */
+    private String primaryCurrency;
+
+    public String getPrimaryCurrency() {
+        return primaryCurrency;
+    }
+
+    public void setPrimaryCurrency(String primaryCurrency) {
+        this.primaryCurrency = primaryCurrency;
+    }
 
     public static class MemberInput {
 
@@ -74,5 +90,13 @@ public class CreateGroupRequest {
 
     public void setMember(MemberInput member) {
         this.member = member;
+    }
+
+    public List<MemberInput> getMembers() {
+        return members;
+    }
+
+    public void setMembers(List<MemberInput> members) {
+        this.members = members;
     }
 }

@@ -67,7 +67,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/health", "/api/auth/register", "/api/auth/verify-email",
                                 "/api/auth/login", "/api/auth/logout", "/api/auth/resend-verification",
                                 "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
-                        .requestMatchers("/api/users/**", "/api/expenses/**", "/api/groups/**")
+                        .requestMatchers("/api/users/**", "/api/expenses/**", "/api/groups/**", "/api/payments/**",
+                                "/api/currencies/**")
                                 .access(verifiedAccount(userRepository))
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

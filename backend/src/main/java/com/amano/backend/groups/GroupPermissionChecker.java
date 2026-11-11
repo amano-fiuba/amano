@@ -13,14 +13,6 @@ import org.springframework.stereotype.Component;
 public class GroupPermissionChecker {
 
     /**
-     * Settings editing (PUT /api/groups/{id}): allowed for ADMIN always and
-     * for MEMBER only when members_cannot_edit_settings = false.
-     */
-    public boolean canEditSettings(String callerRole, GroupPermissions permissions) {
-        return allowedUnless(callerRole, permissions != null && permissions.isMembersCannotEditSettings());
-    }
-
-    /**
      * Adding members (POST /api/groups/{id}/members): ADMIN always; MEMBER
      * only when members_cannot_invite = false.
      */
@@ -66,11 +58,29 @@ public class GroupPermissionChecker {
     }
 
     /**
-     * US8 group photo upload/replace: ADMIN-only with no casilla (spec
-     * "Solo ADMIN"; the check concentrates here).
+     * US8 group photo upload/replace/remove: ADMIN always; MEMBER only when
+     * members_can_edit_group_data = true.
      */
     public boolean canManagePhoto(String callerRole, GroupPermissions permissions) {
+        return canEditGroupData(callerRole, permissions);
+    }
+
+    /**
+     * Editing the group data (photo, name, description): ADMIN always; MEMBER
+     * only when members_can_edit_group_data = true (positive casilla).
+     */
+    public boolean canEditGroupData(String callerRole, GroupPermissions permissions) {
+        return positiveCasilla(callerRole, permissions != null && permissions.isMembersCanEditGroupData());
+    }
+
+    /** Changing the casillas: ADMIN-only, no casilla. */
+    public boolean canManagePermissions(String callerRole, GroupPermissions permissions) {
         return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    private boolean positiveCasilla(String callerRole, boolean granted) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole)
+                || (GroupMember.ROLE_MEMBER.equals(callerRole) && granted);
     }
 
     /**
@@ -81,6 +91,58 @@ public class GroupPermissionChecker {
     public boolean canViewGroup(String callerRole, GroupPermissions permissions) {
         return GroupMember.ROLE_ADMIN.equals(callerRole)
                 || GroupMember.ROLE_MEMBER.equals(callerRole);
+    }
+
+    /**
+     * 017 (research.md D8, FR-007): registering a group expense. ADMIN always;
+     * MEMBER only when members_cannot_make_expenses = false.
+     */
+    public boolean canCreateExpenses(String callerRole, GroupPermissions permissions) {
+        return allowedUnless(callerRole, permissions != null && permissions.isMembersCannotMakeExpenses());
+    }
+
+    /**
+     * 017 (research.md D8, FR-007): registering a group expense whose payer is
+     * someone else ("generar gastos en nombre de otras personas"). ADMIN always;
+     * MEMBER only when members_can_generate_expenses_for_others = true (positive
+     * casilla, false by default).
+     */
+    public boolean canExpenseForOthers(String callerRole, GroupPermissions permissions) {
+        if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
+            return true;
+        }
+        return GroupMember.ROLE_MEMBER.equals(callerRole)
+                && permissions != null
+                && permissions.isMembersCanGenerateExpensesForOthers();
+    }
+
+    /**
+     * 022 US5: confirming or rejecting a reported payment. ADMIN-only, with no
+     * casilla: validation is the administrator's responsibility.
+     */
+    public boolean canDecidePayments(String callerRole) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    /**
+     * 025 US2: reading or changing the reminder settings. ADMIN-only, with no
+     * casilla.
+     */
+    public boolean canManageReminderSettings(String callerRole) {
+        return GroupMember.ROLE_ADMIN.equals(callerRole);
+    }
+
+    /**
+     * 018 (plan.md D2, FR-004): registering a payment of a debt. ADMIN always;
+     * otherwise only the debtor (when registered) or the creditor of the debt.
+     */
+    public boolean canRegisterPayment(String callerRole, Long callerUserId, Long debtorUserId,
+            Long creditorUserId) {
+        if (GroupMember.ROLE_ADMIN.equals(callerRole)) {
+            return true;
+        }
+        return callerUserId != null
+                && (callerUserId.equals(debtorUserId) || callerUserId.equals(creditorUserId));
     }
 
     private boolean allowedUnless(String callerRole, boolean denied) {

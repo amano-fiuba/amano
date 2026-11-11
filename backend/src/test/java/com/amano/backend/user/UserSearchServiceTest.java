@@ -13,6 +13,8 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
+
+import com.amano.backend.friendship.FriendshipRequestRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -27,12 +29,16 @@ import com.amano.backend.common.FieldValidationException;
 class UserSearchServiceTest {
 
     private UserRepository userRepository;
+    private FriendshipRequestRepository friendshipRequestRepository;
+    private AvatarVisibility avatarVisibility;
     private UserSearchService service;
 
     @BeforeEach
     void setUp() {
         userRepository = Mockito.mock(UserRepository.class);
-        service = new UserSearchService(userRepository);
+        friendshipRequestRepository = Mockito.mock(FriendshipRequestRepository.class);
+        avatarVisibility = Mockito.mock(AvatarVisibility.class);
+        service = new UserSearchService(userRepository, friendshipRequestRepository, avatarVisibility);
     }
 
     private static User user(long id, String firstName, String lastName, String email) {
@@ -63,7 +69,23 @@ class UserSearchServiceTest {
 
         List<UserSearchResult> results = service.search(7L, "an");
 
-        assertThat(results).containsExactly(new UserSearchResult(3L, "Ana", "Pérez", "ana@example.com"));
+        assertThat(results).containsExactly(new UserSearchResult(3L, "Ana", "Pérez", "ana@example.com", "NONE", null));
+    }
+
+    /** 023 FR-032: both conditions are required for the URL to go out. */
+    @Test
+    void theAvatarUrlNeedsAPhotoTheCallerMaySee() {
+        when(userRepository.searchVerified(anyString(), anyLong(), any(Pageable.class))).thenReturn(List.of(
+                user(1L, "Visible", null, "a@example.com"),
+                user(2L, "Oculta", null, "b@example.com"),
+                user(3L, "Sinfoto", null, "c@example.com")));
+        when(userRepository.findIdsWithAvatar(List.of(1L, 2L, 3L))).thenReturn(java.util.Set.of(1L, 2L));
+        when(avatarVisibility.visibleAmong(7L, List.of(1L, 2L, 3L))).thenReturn(java.util.Set.of(1L, 3L));
+
+        List<UserSearchResult> results = service.search(7L, "an");
+
+        assertThat(results).extracting(UserSearchResult::avatarUrl)
+                .containsExactly("/api/users/1/avatar", null, null);
     }
 
     @Test
@@ -111,5 +133,36 @@ class UserSearchServiceTest {
                 .thenReturn(List.of());
 
         assertThat(service.search(7L, "a".repeat(100))).isEmpty();
+    }
+
+    @Test
+    void resultsCarryTheFriendshipStatusWithTheCaller() {
+        when(userRepository.searchVerified(anyString(), anyLong(), any(Pageable.class)))
+                .thenReturn(List.of(user(3L, "Ana", "Pérez", "ana@example.com"),
+                        user(4L, "Bruno", null, "bruno@example.com"),
+                        user(5L, "Carla", null, "carla@example.com")));
+        com.amano.backend.friendship.FriendshipRequest fromAna = request(3L, 1L,
+                com.amano.backend.friendship.FriendshipRequestStatus.PENDING);
+        com.amano.backend.friendship.FriendshipRequest toBruno = request(1L, 4L,
+                com.amano.backend.friendship.FriendshipRequestStatus.PENDING);
+        com.amano.backend.friendship.FriendshipRequest withCarla = request(5L, 1L,
+                com.amano.backend.friendship.FriendshipRequestStatus.ACCEPTED);
+        when(friendshipRequestRepository.findActiveBetween(eq(1L), any()))
+                .thenReturn(List.of(fromAna, toBruno, withCarla));
+
+        List<UserSearchResult> results = service.search(1L, "an");
+
+        assertThat(results).extracting(UserSearchResult::friendshipStatus)
+                .containsExactly("PENDING_RECEIVED", "PENDING_SENT", "FRIENDS");
+    }
+
+    private static com.amano.backend.friendship.FriendshipRequest request(Long sender, Long recipient,
+            com.amano.backend.friendship.FriendshipRequestStatus status) {
+        com.amano.backend.friendship.FriendshipRequest request = Mockito
+                .mock(com.amano.backend.friendship.FriendshipRequest.class);
+        when(request.getSenderId()).thenReturn(sender);
+        when(request.getRecipientId()).thenReturn(recipient);
+        when(request.getStatus()).thenReturn(status);
+        return request;
     }
 }

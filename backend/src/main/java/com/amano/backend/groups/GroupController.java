@@ -211,6 +211,17 @@ public class GroupController {
         return ResponseEntity.ok(response);
     }
 
+    /** Removes the group photo (back to the default). Idempotent. */
+    @DeleteMapping(path = "/api/groups/{id}/photo")
+    public ResponseEntity<?> deleteGroupPhoto(@PathVariable Long id) {
+        Long callerId = currentUserId();
+        if (callerId == null) {
+            return unauthorized();
+        }
+        groupService.deletePhoto(callerId, id);
+        return ResponseEntity.noContent().build();
+    }
+
     /** T084 (US8): serves the group photo bytes (members only, neutral 404). */
     @GetMapping(path = "/api/groups/{id}/photo")
     public ResponseEntity<?> getGroupPhoto(@PathVariable Long id) {

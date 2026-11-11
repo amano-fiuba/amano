@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../api/groupsClient', async (importOriginal) => ({
@@ -20,12 +21,28 @@ beforeEach(() => {
 })
 
 const MEMBERS = [
-  { userId: 7, name: 'Ana López', avatar: null, role: 'ADMIN' },
-  { userId: 15, name: 'Carla Gómez', avatar: null, role: 'MEMBER' },
-  { userId: null, simulatedProfileId: 33, name: 'Juan Simulado', avatar: null, role: 'MEMBER' },
+  { userId: 7, name: 'Ana López', avatar: null, role: 'ADMIN', cbuCvu: '0000003100010000000001' },
+  { userId: 15, name: 'Carla Gómez', avatar: null, role: 'MEMBER', cbuCvu: '0000003100010000000002' },
+  { userId: null, simulatedProfileId: 33, name: 'Juan Simulado', avatar: null, role: 'MEMBER', cbuCvu: null },
 ]
 
+async function openActions(key) {
+  fireEvent.click(await screen.findByTestId(`member-actions-${key}`))
+}
+
 describe('MemberListView (T079/T077, US6)', () => {
+  it('el menú de acciones se fija a la pantalla y se cierra al scrollear la lista', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await openActions('user-15')
+    const remove = screen.getByRole('button', { name: 'Eliminar miembro' })
+    expect(remove.closest('.member-menu__panel')).toHaveClass('member-menu__panel--fixed')
+
+    fireEvent.scroll(screen.getByRole('list'))
+    expect(screen.queryByRole('button', { name: 'Eliminar miembro' })).not.toBeInTheDocument()
+  })
+
   it('renderiza a todos los miembros activos con perfil simulado incluido', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 
@@ -36,13 +53,13 @@ describe('MemberListView (T079/T077, US6)', () => {
     expect(screen.getByText('Juan Simulado')).toBeInTheDocument()
   })
 
-  it('distingue al usuario actual con "Vos"', async () => {
+  it('distingue al usuario actual con "Yo"', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 
     render(<MemberListView groupId={3} currentUserId={7} />)
 
     await waitFor(() => expect(screen.getByTestId('member-current')).toHaveTextContent(/Ana López/))
-    expect(screen.getByText(/Vos/)).toBeInTheDocument()
+    expect(screen.getByText('Yo')).toBeInTheDocument()
     expect(screen.queryByTestId('member-current')).not.toHaveTextContent('Carla Gómez')
   })
 
@@ -53,6 +70,31 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     const avatars = await screen.findAllByAltText('')
     avatars.forEach((img) => expect(img).toHaveAttribute('src', '/avatar-default.png'))
+  })
+
+  it('sin saldos del backend no muestra nada de deudas', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} />, { wrapper: MemoryRouter })
+
+    await screen.findByText('Carla Gómez')
+    expect(screen.queryByText(/Te debe|Le debés/)).not.toBeInTheDocument()
+  })
+
+  it('muestra un saldo por moneda, también de perfiles simulados', async () => {
+    getMembers.mockResolvedValue({
+      ok: true,
+      members: [
+        { ...MEMBERS[1], balances: [{ amount: '500.00', currency: 'ARS' }], payUrl: '/pagar' },
+        { ...MEMBERS[2], balances: [{ amount: '-20.00', currency: 'USD' }, { amount: '0', currency: 'ARS' }] },
+      ],
+    })
+
+    render(<MemberListView groupId={3} currentUserId={7} />, { wrapper: MemoryRouter })
+
+    expect(await screen.findByText(/Te debe/)).toBeInTheDocument()
+    expect(screen.getByText(/Le debés/)).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: 'Pagar' })).toHaveLength(1)
   })
 
   it('renderiza el rol de cada miembro', async () => {
@@ -67,14 +109,104 @@ describe('MemberListView (T079/T077, US6)', () => {
     expect(screen.getByTestId('member-role-sim-33')).toHaveTextContent(/Miembro/)
   })
 
-  it('sin ser admin no muestra las acciones por fila', async () => {
+  it('sin ser admin ve el icono de copiar junto al nombre pero no acciones de rol', async () => {
     getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
 
     render(<MemberListView groupId={3} currentUserId={7} isAdmin={false} />)
 
-    await waitFor(() => expect(screen.getByText('Juan Simulado')).toBeInTheDocument())
-    expect(screen.queryByTestId('grant-admin-user-15')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('revoke-admin-user-7')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Carla Gómez')).toBeInTheDocument())
+    expect(screen.getByTestId('copy-cbu-user-15')).toBeInTheDocument()
+    expect(screen.queryByTestId('member-actions-user-15')).not.toBeInTheDocument()
+  })
+
+  it('copia el CBU/CVU del miembro desde el icono junto a su nombre', async () => {
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    fireEvent.click(await screen.findByTestId('copy-cbu-user-15'))
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('0000003100010000000002'))
+    expect(screen.getByText('¡Copiado!')).toBeInTheDocument()
+    delete navigator.clipboard
+  })
+
+  it('no ofrece copiar el CBU/CVU de un perfil simulado ni de quien no lo informó', async () => {
+    getMembers.mockResolvedValue({
+      ok: true,
+      members: [
+        MEMBERS[0],
+        { userId: 15, name: 'Carla Gómez', avatar: null, role: 'MEMBER', cbuCvu: null },
+        MEMBERS[2],
+      ],
+    })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await waitFor(() => expect(screen.getByText('Carla Gómez')).toBeInTheDocument())
+    expect(screen.queryByTestId('copy-cbu-user-15')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('copy-cbu-sim-33')).not.toBeInTheDocument()
+  })
+
+  it('no muestra el icono de copiar sobre el propio usuario', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} />)
+
+    await waitFor(() => expect(screen.getByTestId('member-current')).toBeInTheDocument())
+    expect(screen.queryByTestId('copy-cbu-user-7')).not.toBeInTheDocument()
+  })
+
+  it('muestra primero al usuario actual', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={15} />)
+
+    const rows = await screen.findAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('Carla Gómez')
+    expect(rows[1]).toHaveTextContent('Ana López')
+  })
+
+  it('no muestra el aviso de último administrador: solo aparece en el modal de abandonar', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: [MEMBERS[0]] })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    expect(await screen.findByText('Ana López')).toBeInTheDocument()
+    expect(screen.queryByText(/Sos el último administrador/i)).not.toBeInTheDocument()
+  })
+
+  it('el admin no tiene menú de acciones sobre sí mismo', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await screen.findByTestId('member-actions-user-15')
+    expect(screen.queryByTestId('member-actions-user-7')).not.toBeInTheDocument()
+  })
+
+  it('el menú abre y cierra con Escape devolviendo el foco', async () => {
+    getMembers.mockResolvedValue({ ok: true, members: MEMBERS })
+
+    render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
+
+    await openActions('user-15')
+    const trigger = screen.getByRole('button', { name: 'Acciones de Carla Gómez' })
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+
+    const item = screen.getByTestId('grant-admin-user-15')
+    item.focus()
+    fireEvent.keyDown(item, { key: 'Escape' })
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('grant-admin-user-15')).not.toBeInTheDocument(),
+    )
+    expect(trigger).toHaveFocus()
   })
 
   it('siendo admin muestra "Hacer admin" en miembros y elimina perfiles simulados', async () => {
@@ -82,9 +214,11 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
 
-    expect(await screen.findByTestId('grant-admin-user-15')).toHaveTextContent(/Hacer admin/)
+    await openActions('user-15')
+    expect(screen.getByTestId('grant-admin-user-15')).toHaveTextContent(/Hacer admin/)
+    await openActions('sim-33')
     expect(screen.queryByTestId('grant-admin-sim-33')).not.toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: /Eliminar/i }).length).toBeLessThan(10)
+    expect(screen.getByRole('button', { name: 'Eliminar perfil simulado' })).toBeInTheDocument()
   })
 
   it('muestra el error de conexión cuando getMembers falla', async () => {
@@ -105,6 +239,7 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
 
     const row = await screen.findByTestId('member-row-sim-33')
+    await openActions('sim-33')
     expect(row).toHaveTextContent('Juan Simulado')
     expect(row.querySelector('[data-testid^="grant-admin"]')).toBeNull()
     expect(row.querySelector('[data-testid^="revoke-admin"]')).toBeNull()
@@ -122,15 +257,16 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin onChanged={onChanged} />)
 
     const row = await screen.findByTestId('member-row-sim-33')
+    await openActions('sim-33')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar perfil simulado' }))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
 
     await waitFor(() => expect(screen.queryByText('Juan Simulado')).not.toBeInTheDocument())
     expect(removeSimulatedProfile).toHaveBeenCalledWith(3, 33)
     expect(removeMember).not.toHaveBeenCalled()
     expect(getMembers).toHaveBeenCalledTimes(2)
     expect(onChanged).toHaveBeenCalledTimes(1)
-    expect(screen.getByTestId('members-status')).toHaveTextContent('Juan Simulado ya no forma parte del grupo')
+    expect(screen.getByTestId('snackbar')).toHaveTextContent('Juan Simulado ya no forma parte del grupo')
   })
 
   it('al eliminar a un miembro registrado la lista se actualiza sola', async () => {
@@ -142,8 +278,9 @@ describe('MemberListView (T079/T077, US6)', () => {
     render(<MemberListView groupId={3} currentUserId={7} isAdmin />)
 
     const row = await screen.findByTestId('member-row-user-15')
+    await openActions('user-15')
     fireEvent.click(within(row).getByRole('button', { name: 'Eliminar miembro' }))
-    fireEvent.click(within(row).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirmar' }))
 
     await waitFor(() => expect(screen.queryByText('Carla Gómez')).not.toBeInTheDocument())
     expect(removeMember).toHaveBeenCalledWith(3, 15)
@@ -156,7 +293,8 @@ describe('MemberListView (T079/T077, US6)', () => {
 
     render(<MemberListView groupId={3} currentUserId={7} isAdmin onChanged={onChanged} />)
 
-    fireEvent.click(await screen.findByTestId('grant-admin-user-15'))
+    await openActions('user-15')
+    fireEvent.click(screen.getByTestId('grant-admin-user-15'))
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1))
     expect(grantAdminRole).toHaveBeenCalledWith(3, 15)

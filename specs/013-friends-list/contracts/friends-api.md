@@ -21,19 +21,25 @@ Arreglo ordenado por nombre y apellido (sin distinguir mayúsculas, apellido vac
     "firstName": "Ana",
     "lastName": "Pérez",
     "email": "ana@example.com",
-    "friendsSince": "2026-10-31T14:05:00Z"
+    "friendsSince": "2026-10-31T14:05:00Z",
+    "cbuCvu": "0000003100010000000001",
+    "avatarUrl": "/api/users/12/avatar"
   },
   {
     "id": 8,
     "firstName": "Bruno",
     "lastName": null,
     "email": "bruno@example.com",
-    "friendsSince": "2026-10-30T09:00:00Z"
+    "friendsSince": "2026-10-30T09:00:00Z",
+    "cbuCvu": null,
+    "avatarUrl": null
   }
 ]
 ```
 
-Nunca incluye `cbu`, `cbuCvu`, `currencies`, `passwordHash` ni otros datos de la cuenta (FR-004).
+`avatarUrl` es `null` si el amigo no tiene avatar propio: la pantalla usa el avatar por defecto. `cbuCvu` se expone a los amigos para que puedan copiarlo y transferir; es `null` si el amigo no lo informó.
+
+Nunca incluye `cbu`, `currencies`, `passwordHash` ni otros datos de la cuenta (FR-004).
 
 ### Respuesta 401 — sin sesión o cuenta no verificada
 

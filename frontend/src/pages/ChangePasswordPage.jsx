@@ -6,11 +6,12 @@
 // texto claro salvo el botón Mostrar/Ocultar del formulario (FR-008 de 001).
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   UPDATE_NETWORK_ERROR_MESSAGE,
   updatePassword,
 } from '../api/authClient'
+import { useSnackbar } from '../components/Snackbar'
 import TextField from '../components/TextField'
 import {
   validateConfirmPassword,
@@ -18,6 +19,7 @@ import {
 } from '../validation/registerValidation'
 
 export default function ChangePasswordPage() {
+  const navigate = useNavigate()
   const {
     handleSubmit,
     watch,
@@ -28,7 +30,7 @@ export default function ChangePasswordPage() {
   } = useForm({ mode: 'onBlur' })
 
   const [formError, setFormError] = useState('')
-  const [success, setSuccess] = useState('')
+  const showSnackbar = useSnackbar()
   const password = watch('newPassword') ?? ''
   const confirmation = watch('confirmPassword') ?? ''
 
@@ -41,7 +43,6 @@ export default function ChangePasswordPage() {
 
   const onSubmit = async (values) => {
     setFormError('')
-    setSuccess('')
     const result = await updatePassword({
       currentPassword: values.currentPassword,
       newPassword: values.newPassword,
@@ -50,7 +51,7 @@ export default function ChangePasswordPage() {
 
     if (result.ok) {
       // El cambio no rota la sesión: el usuario queda en la misma pantalla.
-      setSuccess('La contraseña se cambió correctamente')
+      showSnackbar('La contraseña se cambió correctamente')
       reset({ currentPassword: '', newPassword: '', confirmPassword: '' })
       return
     }
@@ -76,12 +77,12 @@ export default function ChangePasswordPage() {
 
   return (
     <main className="page">
+      <nav className="group-page__back">
+        <Link to="/profile">
+          <span aria-hidden="true">←</span> Mi perfil
+        </Link>
+      </nav>
       <h1>Cambiar contraseña</h1>
-      {success && (
-        <p role="status" data-testid="form-success">
-          {success}
-        </p>
-      )}
       {formError && (
         <p role="alert" data-testid="form-error">
           {formError}
@@ -119,15 +120,17 @@ export default function ChangePasswordPage() {
           })}
         />
 
-        {/* FR-011: deshabilitado durante el envío; rehabilitado ante errores. */}
-        <button type="submit" disabled={isSubmitting}>
-          Guardar nueva contraseña
-        </button>
+        {/* Cancelar a la izquierda y Guardar a la derecha. FR-011: Guardar
+            deshabilitado durante el envío; rehabilitado ante errores. */}
+        <div className="form-actions form-actions--split">
+          <button type="button" onClick={() => navigate('/profile')}>
+            Cancelar
+          </button>
+          <button type="submit" disabled={isSubmitting}>
+            Guardar
+          </button>
+        </div>
       </form>
-
-      <p>
-        <Link to="/profile">Volver a Mi perfil</Link>
-      </p>
     </main>
   )
 }

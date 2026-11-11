@@ -13,8 +13,11 @@ public class GroupSummaryResponse {
     private String description;
     private String photo;
     private OffsetDateTime createdAt;
+    private OffsetDateTime lastActivityAt;
     private long memberCount;
     private String currentUserRole;
+    /** 027 (FR-021): whether the caller may register expenses in the group now (additive). */
+    private boolean canCreateExpenses;
 
     public Long getId() {
         return id;
@@ -56,6 +59,15 @@ public class GroupSummaryResponse {
         this.createdAt = createdAt;
     }
 
+    /** 015 FR-007: latest history event, or {@code createdAt} without events. */
+    public OffsetDateTime getLastActivityAt() {
+        return lastActivityAt;
+    }
+
+    public void setLastActivityAt(OffsetDateTime lastActivityAt) {
+        this.lastActivityAt = lastActivityAt;
+    }
+
     public long getMemberCount() {
         return memberCount;
     }
@@ -70,5 +82,13 @@ public class GroupSummaryResponse {
 
     public void setCurrentUserRole(String currentUserRole) {
         this.currentUserRole = currentUserRole;
+    }
+
+    public boolean isCanCreateExpenses() {
+        return canCreateExpenses;
+    }
+
+    public void setCanCreateExpenses(boolean canCreateExpenses) {
+        this.canCreateExpenses = canCreateExpenses;
     }
 }

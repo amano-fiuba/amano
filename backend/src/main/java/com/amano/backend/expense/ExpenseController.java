@@ -85,6 +85,26 @@ public class ExpenseController {
         return ResponseEntity.ok(series);
     }
 
+    /** Latest expenses of the session user for the main screen (015 FR-008). */
+    @GetMapping(path = "/api/expenses/recent", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listRecent() {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return unauthorized();
+        }
+        return ResponseEntity.ok(expenseService.listRecent(userId));
+    }
+
+    /** Personal activity screen: the session user's expenses, newest first (last 200). */
+    @GetMapping(path = "/api/expenses", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listHistory() {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return unauthorized();
+        }
+        return ResponseEntity.ok(expenseService.listHistory(userId));
+    }
+
     @PatchMapping(path = "/api/expenses/{id}/status", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> changeStatus(@PathVariable Long id,

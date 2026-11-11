@@ -52,9 +52,9 @@
 
 ## D8 — Acciones en la bandeja, sin recargar la pantalla
 
-- **Decisión**: `FriendsPage` agrega "Aceptar" y "Rechazar" por fila; tras un resultado (éxito, 409 o 404) la fila se retira del estado local y se muestra una confirmación condensada; tras error de red la fila queda reactiva. No se repite el `GET` completo ni se agrega un estado "respondida" en la fila.
-- **Rationale**: la única lista pendiente, así que retirar la fila localmente refleja el estado real sin una petición extra; la confirmación (FR-013/FR-014) cumple "el sistema debe informar al usuario cuando la acción se haya realizado correctamente" y sigue visible si la lista queda vacía (FR-014), que el estado vacío de 011 es solo para cargas iniciales.
-- **Alternativas consideradas**: recargar la bandeja tras cada respuesta (la confirmación de éxito desaparecería si queda vacía: contradice FR-014); mantener la fila con etiqueta "Aceptada"/"Rechazada" (contradice el criterio de no seguir apareciendo como pendiente).
+- **Decisión**: `FriendsPage` agrega "Aceptar" y "Rechazar" por fila; tras un resultado (éxito, 409 o 404) la fila se retira del estado local y se muestra una confirmación (en el snackbar global si fue un éxito); tras error de red la fila queda reactiva. No se repite el `GET` completo ni se agrega un estado "respondida" en la fila.
+- **Rationale**: la única lista pendiente, así que retirar la fila localmente refleja el estado real sin una petición extra; la confirmación (FR-013/FR-014) cumple "el sistema debe informar al usuario cuando la acción se haya realizado correctamente" y sigue visible si la lista queda vacía (FR-014), junto al estado vacío de 011.
+- **Alternativas consideradas**: recargar la bandeja tras cada respuesta (petición extra sin beneficio: el estado local ya refleja la lista); mantener la fila con etiqueta "Aceptada"/"Rechazada" (contradice el criterio de no seguir apareciendo como pendiente).
 
 ## D9 — Sin cambios en el buscador ni en el contrato de 008/011
 
@@ -73,7 +73,7 @@
 - **Decisión**:
   - Backend unitario con Mockito (ampliación de `FriendshipRequestServiceTest`): transiciones válidas, acciones inválidas, 404 por inexistencia o ajeneidad, 409 por ya respondida, que la relectura distinga 404 de 409 y que el `UPDATE` condicional sea la única escritura.
   - Backend de integración con Testcontainers (ampliación de `FriendshipRequestIT`): flujo HTTP completo, aislamiento entre cuentas, 400/401/404/409, doble respuesta concurrente con una única transición, corridas de aceptar y rechazar sobre la misma fila, estado y `responded_at` en la base, invarianza de los endpoints de 011.
-  - Frontend Vitest (ampliación de `FriendsPage.test.jsx` y `friendsClient.test.js`): botones por fila, carga por acción, retiro de fila, confirmaciones exactas, permanencia de la confirmación con lista vacía, 409/404, error de red con fila reactiva y 401.
+  - Frontend Vitest (ampliación de `FriendsPage.test.jsx` y `friendsClient.test.js`): botones por fila, carga por acción, retiro de fila, confirmaciones exactas, confirmación en el snackbar con lista vacía, 409/404, error de red con fila reactiva y 401.
 - **Rationale**: principio V (cobertura ≥ 85 %). Las reglas de negocio se prueban en backend porque el frontend no es frontera de seguridad; la concurrencia se prueba con Testcontainers porque es donde realmente se materializa el `UPDATE` condicional.
 
 ## Riesgos y mitigaciones

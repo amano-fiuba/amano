@@ -1,5 +1,7 @@
 package com.amano.backend.user;
 
+import java.util.Collection;
+import java.util.Set;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -58,4 +60,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     List<User> searchVerified(@Param("term") String term,
             @Param("currentUserId") Long currentUserId, Pageable pageable);
+
+    /** Accounts with a custom avatar among {@code ids}, without loading the binaries. */
+    @Query("select a.id from UserAvatar a where a.id in :ids")
+    Set<Long> findIdsWithAvatar(@Param("ids") Collection<Long> ids);
 }

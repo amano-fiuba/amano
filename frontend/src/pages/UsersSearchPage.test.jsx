@@ -43,10 +43,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function renderPage() {
+function renderPage(entry = '/users/search') {
   return render(
     <AuthProvider>
-      <MemoryRouter initialEntries={['/users/search']}>
+      <MemoryRouter initialEntries={[entry]}>
         <Routes>
           <Route
             path="/users/search"
@@ -64,23 +64,74 @@ function renderPage() {
 }
 
 async function search(user, text) {
-  const input = await screen.findByLabelText('Nombre, apellido o email')
+  const input = await screen.findByLabelText('Buscar usuarios')
   await user.clear(input)
   if (text) {
     await user.type(input, text)
   }
-  await user.click(screen.getByRole('button', { name: 'Buscar' }))
+  await user.keyboard('{Enter}')
 }
 
 describe('UsersSearchPage (feature 008)', () => {
-  it('muestra el título, el campo y el botón Buscar dentro de la tarjeta de página', async () => {
+  it('ejecuta la búsqueda indicada por ?q= (015, FR-006)', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    renderPage('/users/search?q=ana%20p')
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(usersClient.searchUsers).toHaveBeenCalledTimes(1)
+    expect(usersClient.searchUsers).toHaveBeenCalledWith('ana p')
+    expect(screen.getByLabelText('Buscar usuarios')).toHaveValue('ana p')
+  })
+
+  it('muestra el título y el campo, con el texto adentro y sin botón Buscar', async () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { name: 'Buscar usuarios' })).toBeInTheDocument()
     expect(screen.getByRole('main')).toHaveClass('page', 'users-search-page')
-    expect(screen.getByLabelText('Nombre, apellido o email')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Buscar' })).toBeEnabled()
+    const input = screen.getByRole('searchbox', { name: 'Buscar usuarios' })
+    expect(input).toHaveAttribute('placeholder', 'Buscá por nombre, apellido o correo')
+    expect(screen.queryByText('Nombre, apellido o email')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Buscar' })).not.toBeInTheDocument()
+    expect(screen.getByText('Mínimo 2 caracteres.')).toBeInTheDocument()
     expect(screen.getByTestId('search-initial')).toBeInTheDocument()
+  })
+
+  it('busca mientras se escribe, sin apretar nada', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText('Buscar usuarios'), 'ana')
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    expect(usersClient.searchUsers).toHaveBeenCalledTimes(1)
+    expect(usersClient.searchUsers).toHaveBeenCalledWith('ana')
+  })
+
+  it('mientras se escribe, con menos de 2 caracteres no busca ni muestra el aviso', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText('Buscar usuarios'), 'a')
+    await new Promise((resolve) => setTimeout(resolve, 400))
+
+    expect(usersClient.searchUsers).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('search-notice')).not.toBeInTheDocument()
+    expect(screen.getByTestId('search-initial')).toBeInTheDocument()
+  })
+
+  it('al borrar el término vuelve al estado inicial', async () => {
+    usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
+    const user = userEvent.setup()
+    renderPage()
+
+    const input = await screen.findByLabelText('Buscar usuarios')
+    await user.type(input, 'ana')
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+
+    await user.clear(input)
+    expect(await screen.findByTestId('search-initial')).toBeInTheDocument()
+    expect(screen.queryByText('Ana Pérez')).not.toBeInTheDocument()
   })
 
   it.each([
@@ -88,7 +139,7 @@ describe('UsersSearchPage (feature 008)', () => {
     ['un carácter', 'a'],
     ['solo espacios', '   '],
     ['un carácter con espacios', '  a  '],
-  ])('término %s: muestra el aviso y no busca', async (_label, text) => {
+  ])('término %s con Enter: muestra el aviso y no busca', async (_label, text) => {
     const user = userEvent.setup()
     renderPage()
 
@@ -119,6 +170,22 @@ describe('UsersSearchPage (feature 008)', () => {
     avatars.forEach((img) => expect(img).toHaveAttribute('src', '/avatar-default.png'))
   })
 
+  it('muestra la foto si la API la envía', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: true,
+      users: [{ ...ANA, avatarUrl: '/api/users/3/avatar' }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    expect((await screen.findByTestId('user-card-3')).querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/users/3/avatar',
+    )
+  })
+
   it('presenta cada resultado como tarjeta con su acción de agregar', async () => {
     usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA, JUAN] })
     const user = userEvent.setup()
@@ -133,7 +200,46 @@ describe('UsersSearchPage (feature 008)', () => {
     expect(screen.getByRole('button', { name: 'Agregar a Juan' })).toBeEnabled()
   })
 
-  it('deshabilita Buscar y muestra el estado de carga mientras consulta', async () => {
+  it('muestra Amigos, Pendiente o Agregar según la relación, sin acción en los dos primeros', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: true,
+      users: [
+        { ...ANA, friendshipStatus: 'FRIENDS' },
+        { ...JUAN, friendshipStatus: 'PENDING_RECEIVED' },
+        { id: 5, firstName: 'Lola', lastName: null, email: 'lola@example.com', friendshipStatus: 'NONE' },
+      ],
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    const friends = await screen.findByRole('button', { name: 'Ana Pérez ya es tu amigo' })
+    expect(friends).toHaveTextContent('Amigos')
+    expect(friends).toBeDisabled()
+    const pending = screen.getByRole('button', { name: 'Solicitud pendiente de Juan' })
+    expect(pending).toHaveTextContent('Pendiente')
+    expect(pending).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Agregar a Lola' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Agregar a Ana Pérez' })).not.toBeInTheDocument()
+  })
+
+  it('muestra Solicitud enviada si yo ya le envié una solicitud', async () => {
+    usersClient.searchUsers.mockResolvedValue({
+      ok: true,
+      users: [{ ...ANA, friendshipStatus: 'PENDING_SENT' }],
+    })
+    const user = userEvent.setup()
+    renderPage()
+
+    await search(user, 'an')
+
+    const sent = await screen.findByRole('button', { name: 'Solicitud enviada a Ana Pérez' })
+    expect(sent).toHaveTextContent('Solicitud enviada')
+    expect(sent).toBeDisabled()
+  })
+
+  it('muestra el estado de carga mientras consulta', async () => {
     let resolveSearch
     usersClient.searchUsers.mockReturnValue(
       new Promise((resolve) => {
@@ -143,14 +249,11 @@ describe('UsersSearchPage (feature 008)', () => {
     const user = userEvent.setup()
     renderPage()
 
-    const input = await screen.findByLabelText('Nombre, apellido o email')
-    await user.type(input, 'ana')
-    await user.click(screen.getByRole('button', { name: 'Buscar' }))
+    const input = await screen.findByLabelText('Buscar usuarios')
+    await user.type(input, 'ana{Enter}')
 
     expect(await screen.findByTestId('search-loading')).toBeInTheDocument()
-    const pendingButton = screen.getByRole('button', { name: 'Buscando…' })
-    expect(pendingButton).toBeDisabled()
-    expect(pendingButton).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('search')).toHaveAttribute('aria-busy', 'true')
 
     await act(async () => {
       resolveSearch({ ok: true, users: [ANA] })
@@ -160,15 +263,17 @@ describe('UsersSearchPage (feature 008)', () => {
     expect(screen.queryByTestId('search-loading')).not.toBeInTheDocument()
   })
 
-  it('también busca al apretar Enter', async () => {
+  it('Enter busca enseguida, sin repetir la búsqueda automática', async () => {
     usersClient.searchUsers.mockResolvedValue({ ok: true, users: [ANA] })
     const user = userEvent.setup()
     renderPage()
 
-    await user.type(await screen.findByLabelText('Nombre, apellido o email'), 'ana{Enter}')
+    await user.type(await screen.findByLabelText('Buscar usuarios'), 'ana{Enter}')
 
     expect(usersClient.searchUsers).toHaveBeenCalledWith('ana')
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 400))
+    expect(usersClient.searchUsers).toHaveBeenCalledTimes(1)
   })
 
   it('sin coincidencias muestra "No se encontraron usuarios"', async () => {
@@ -261,7 +366,7 @@ describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
       resolveSend({ ok: true, request: { id: 9 } })
     })
 
-    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FRIENDSHIP_REQUEST_SENT_MESSAGE,
     )
     expect(
@@ -348,7 +453,7 @@ describe('UsersSearchPage envío de solicitudes (feature 011)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Agregar a Ana Pérez' }))
 
-    expect(await screen.findByTestId('friendship-feedback')).toHaveTextContent(
+    expect(await screen.findByTestId('snackbar')).toHaveTextContent(
       FRIENDSHIP_REQUEST_SENT_MESSAGE,
     )
     expect(friendsClient.sendFriendshipRequest).toHaveBeenCalledTimes(2)

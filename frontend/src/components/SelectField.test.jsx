@@ -20,6 +20,14 @@ describe('SelectField (T025)', () => {
     expect(select).not.toHaveAttribute('aria-invalid')
   })
 
+  it('con placeholder={null} no ofrece la opción vacía', () => {
+    render(<SelectField label="Moneda" options={OPTIONS} placeholder={null} defaultValue="ARS" />)
+
+    expect(screen.queryByRole('option', { name: 'Seleccioná una opción' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+    expect(screen.getByLabelText('Moneda')).toHaveValue('ARS')
+  })
+
   it('expone el error con aria-invalid, aria-describedby y role=alert', () => {
     render(<SelectField label="Categoría" options={OPTIONS} error="La categoría es obligatoria" />)
 

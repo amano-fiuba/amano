@@ -1,11 +1,13 @@
 package com.amano.backend.expense;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,11 +16,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
+import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
+import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.user.Currency;
+import com.amano.backend.user.User;
+import com.amano.backend.user.UserRepository;
 
 /**
  * Registration of a personal expense (US1, contracts/expenses-api.md). The owner
@@ -41,16 +49,10 @@ public class ExpenseService {
     private static final String CURRENCY_REQUIRED = "La moneda es obligatoria";
     private static final String CURRENCY_INVALID = "La moneda no es válida";
     private static final String DATE_FORMAT = "La fecha debe tener el formato aaaa-mm-dd";
-    private static final String CATEGORY_REQUIRED = "La categoría es obligatoria";
-    private static final String CATEGORY_INVALID = "La categoría no es válida";
-    private static final String TYPE_REQUIRED = "El tipo de gasto es obligatorio";
-    private static final String TYPE_INVALID = "El tipo de gasto no es válido";
     private static final String FREQUENCY_REQUIRED =
             "La frecuencia es obligatoria para un gasto recurrente";
     private static final String FREQUENCY_INVALID = "La frecuencia no es válida";
     private static final String FREQUENCY_NOT_ALLOWED = "Un gasto único no puede tener frecuencia";
-    private static final String PAYMENT_REQUIRED = "El medio de pago es obligatorio";
-    private static final String PAYMENT_INVALID = "El medio de pago no es válido";
     private static final String RESERVED_PROPERTY = "No se permite informar este campo";
 
     /** Fields of future shared-expense models that must never select the owner (FR-005/FR-006). */
@@ -59,9 +61,20 @@ public class ExpenseService {
             "splits", "divisions", "shares", "debts", "friends", "groups");
 
     private final ExpenseRepository expenseRepository;
+    private final UserRepository userRepository;
+    private final ExchangeRateProvider exchangeRateProvider;
 
+    /** Kept for the unit tests that only exercise registration. */
     public ExpenseService(ExpenseRepository expenseRepository) {
+        this(expenseRepository, null, null);
+    }
+
+    @Autowired
+    public ExpenseService(ExpenseRepository expenseRepository, UserRepository userRepository,
+            ExchangeRateProvider exchangeRateProvider) {
         this.expenseRepository = expenseRepository;
+        this.userRepository = userRepository;
+        this.exchangeRateProvider = exchangeRateProvider;
     }
 
     /** Result of a registration: the representation plus whether a row was inserted. */
@@ -71,6 +84,73 @@ public class ExpenseService {
     private record NormalizedExpense(BigDecimal amount, Currency currency, LocalDate date,
             ExpenseCategory category, ExpenseType type, PaymentMethod paymentMethod,
             String description, RecurrenceFrequency frequency, LocalDate today) {
+    }
+
+    /** Latest expenses of the user, newest registration first (015 FR-008). */
+    @Transactional(readOnly = true)
+    public List<ExpenseResponse> listRecent(Long userId) {
+        return expenseRepository.findTop5ByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
+                .map(ExpenseResponse::from)
+                .toList();
+    }
+
+    /**
+     * Personal activity screen: the user's last 200 expenses, newest first. Each
+     * expense also carries its equivalent in the user's preferred currencies
+     * (ARS when none is configured), skipping its own currency. A missing quote
+     * only omits that conversion, it never fails the page.
+     */
+    @Transactional(readOnly = true)
+    public List<ExpenseResponse> listHistory(Long userId) {
+        Set<Currency> preferred = preferredCurrencies(userId);
+        return expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
+                .map(expense -> ExpenseResponse.from(expense, conversionsOf(expense, preferred)))
+                .toList();
+    }
+
+    /** Preferred currencies of the account, defaulting to ARS at read time (002 FR-011). */
+    private Set<Currency> preferredCurrencies(Long userId) {
+        if (userRepository == null) {
+            return Set.of(Currency.ARS);
+        }
+        return userRepository.findById(userId)
+                .map(User::getCurrencies)
+                .filter(currencies -> !currencies.isEmpty())
+                .orElse(Set.of(Currency.ARS));
+    }
+
+    /**
+     * Converts the expense to every preferred currency except its own. Currencies
+     * are visited in enum order so the list is stable; an unavailable quote for one
+     * target is skipped without affecting the others.
+     */
+    private List<ExpenseResponse.Conversion> conversionsOf(Expense expense,
+            Set<Currency> preferred) {
+        List<ExpenseResponse.Conversion> conversions = new ArrayList<>();
+        if (exchangeRateProvider == null) {
+            return conversions;
+        }
+        for (Currency target : Currency.values()) {
+            if (!preferred.contains(target) || target == expense.getCurrency()) {
+                continue;
+            }
+            try {
+                ExchangeRateQuote quote = exchangeRateProvider.getQuote(
+                        expense.getCurrency(), target, expense.getExpenseDate());
+                if (quote == null || quote.rate() == null) {
+                    continue;
+                }
+                BigDecimal converted = expense.getAmount()
+                        .multiply(quote.rate())
+                        .setScale(2, RoundingMode.HALF_UP);
+                conversions.add(new ExpenseResponse.Conversion(target.name(),
+                        converted.toPlainString()));
+            }
+            catch (ExchangeRateUnavailableException unavailable) {
+                // No quote for this pair/date: silently omit this conversion.
+            }
+        }
+        return conversions;
     }
 
     /**
@@ -148,16 +228,16 @@ public class ExpenseService {
         if (amountError != null) {
             fieldErrors.put("amount", amountError);
         }
-        Currency currency = parseCatalog(request.getCurrency(), Currency.class, "currency",
+        Currency currency = ExpenseClassification.parseCatalog(request.getCurrency(), Currency.class, "currency",
                 CURRENCY_REQUIRED, CURRENCY_INVALID, fieldErrors);
         LocalDate date = parseDate(request.getDate(), request.getDeviceTimeZone(), fieldErrors);
-        ExpenseCategory category = parseCatalog(request.getCategory(), ExpenseCategory.class,
-                "category", CATEGORY_REQUIRED, CATEGORY_INVALID, fieldErrors);
-        ExpenseType type = parseCatalog(request.getType(), ExpenseType.class, "type",
-                TYPE_REQUIRED, TYPE_INVALID, fieldErrors);
+        ExpenseCategory category = ExpenseClassification.parseCatalog(request.getCategory(), ExpenseCategory.class,
+                "category", ExpenseClassification.CATEGORY_REQUIRED, ExpenseClassification.CATEGORY_INVALID, fieldErrors);
+        ExpenseType type = ExpenseClassification.parseCatalog(request.getType(), ExpenseType.class, "type",
+                ExpenseClassification.TYPE_REQUIRED, ExpenseClassification.TYPE_INVALID, fieldErrors);
         RecurrenceFrequency frequency = parseFrequency(request.getFrequency(), type, fieldErrors);
-        PaymentMethod paymentMethod = parseCatalog(request.getPaymentMethod(), PaymentMethod.class,
-                "paymentMethod", PAYMENT_REQUIRED, PAYMENT_INVALID, fieldErrors);
+        PaymentMethod paymentMethod = ExpenseClassification.parseCatalog(request.getPaymentMethod(), PaymentMethod.class,
+                "paymentMethod", ExpenseClassification.PAYMENT_REQUIRED, ExpenseClassification.PAYMENT_INVALID, fieldErrors);
         String descriptionError = ExpenseDescriptionNormalizer.validationError(
                 request.getDescription());
         if (descriptionError != null) {
@@ -215,21 +295,6 @@ public class ExpenseService {
         }
         catch (DateTimeException | NullPointerException exception) {
             return LocalDate.now(ZoneOffset.UTC);
-        }
-    }
-
-    private static <E extends Enum<E>> E parseCatalog(String raw, Class<E> type, String field,
-            String requiredMessage, String invalidMessage, Map<String, String> fieldErrors) {
-        if (raw == null || raw.isBlank()) {
-            fieldErrors.put(field, requiredMessage);
-            return null;
-        }
-        try {
-            return Enum.valueOf(type, raw);
-        }
-        catch (IllegalArgumentException exception) {
-            fieldErrors.put(field, invalidMessage);
-            return null;
         }
     }
 

@@ -31,6 +31,25 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
     boolean existsBetween(@Param("a") Long a, @Param("b") Long b,
             @Param("status") FriendshipRequestStatus status);
 
+    /**
+     * PENDING and ACCEPTED requests between {@code userId} and any of {@code otherIds}
+     * (either direction): used to tell the user search which relationship each
+     * result already has with the caller.
+     */
+    @Query("""
+            select r from FriendshipRequest r
+            where r.status in (com.amano.backend.friendship.FriendshipRequestStatus.PENDING,
+                               com.amano.backend.friendship.FriendshipRequestStatus.ACCEPTED)
+              and ((r.senderId = :userId and r.recipientId in :otherIds)
+                or (r.recipientId = :userId and r.senderId in :otherIds))
+            """)
+    List<FriendshipRequest> findActiveBetween(@Param("userId") Long userId,
+            @Param("otherIds") java.util.Collection<Long> otherIds);
+
+    /** Directional check: {@code senderId} has a request with this status to {@code recipientId}. */
+    boolean existsBySenderIdAndRecipientIdAndStatus(Long senderId, Long recipientId,
+            FriendshipRequestStatus status);
+
     /** Inbox of the session user: pending requests received, newest first (FR-012). */
     List<FriendshipRequest> findByRecipientIdAndStatusOrderByCreatedAtDescIdDesc(
             Long recipientId, FriendshipRequestStatus status);
@@ -43,15 +62,32 @@ public interface FriendshipRequestRepository extends JpaRepository<FriendshipReq
      */
     @Query("""
             select new com.amano.backend.friendship.FriendResponse(
-                u.id, u.firstName, u.lastName, u.email, r.respondedAt)
+                u.id, u.firstName, u.lastName, u.email, r.respondedAt, u.cbu,
+                case when a.id is not null then true else false end)
             from FriendshipRequest r
             join User u on u.id = case when r.senderId = :userId
                                        then r.recipientId else r.senderId end
+            left join UserAvatar a on a.id = u.id
             where r.status = ACCEPTED
               and (r.senderId = :userId or r.recipientId = :userId)
             order by lower(u.firstName), lower(u.lastName) nulls last, u.id
             """)
     List<FriendResponse> findFriendsOf(@Param("userId") Long userId);
+
+    /**
+     * Deletes the ACCEPTED row between the two accounts in either direction
+     * (feature 016, FR-007/FR-009). Returns the affected row count so the service
+     * can distinguish a real deletion (1) from a missing or concurrent one (0).
+     * Pending and rejected rows are never touched.
+     */
+    @Modifying
+    @Query("""
+            delete from FriendshipRequest r
+            where r.status = ACCEPTED
+              and ((r.senderId = :a and r.recipientId = :b)
+                or (r.senderId = :b and r.recipientId = :a))
+            """)
+    int deleteAcceptedBetween(@Param("a") Long a, @Param("b") Long b);
 
     /**
      * Atomic transition of a pending request owned by {@code recipientId} to a

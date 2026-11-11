@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,12 @@ class ActivityEventServiceTest {
         repository = Mockito.mock(GroupActivityRepository.class);
         when(repository.save(any(GroupActivity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         service = new ActivityEventService(repository, objectMapper);
+    }
+
+    @Test
+    void lastActivityOfNoGroupsDoesNotQueryTheDatabase() {
+        assertThat(service.lastActivityByGroup(List.of())).isEmpty();
+        verify(repository, never()).findLastActivityByGroupIds(any());
     }
 
     private GroupActivity saved() {
@@ -110,7 +117,7 @@ class ActivityEventServiceTest {
     @Test
     void expenseHookRecordsTheDataModelFormat() {
         service.recordExpenseCreated(GROUP_ID, ACTOR_ID,
-                new ExpenseActivityDetails(10L, new BigDecimal("1500.00"), " ars ", "  Súper  "));
+                new ExpenseActivityDetails(10L, new BigDecimal("1500.00"), " ars ", "  Súper  ", 15L, " Juan Pérez "));
 
         GroupActivity event = saved();
         assertThat(event.getEventType()).isEqualTo("EXPENSE_CREATED");
@@ -119,14 +126,65 @@ class ActivityEventServiceTest {
         assertThat(json.get("amount").asString()).isEqualTo("1500.00");
         assertThat(json.get("currency").asString()).isEqualTo("ARS");
         assertThat(json.get("description").asString()).isEqualTo("Súper");
+        assertThat(json.get("payerUserId").asLong()).isEqualTo(15L);
+        assertThat(json.get("payerName").asString()).isEqualTo("Juan Pérez");
     }
 
     @Test
-    void expenseHookOmitsABlankDescription() {
+    void expenseHookOmitsABlankDescriptionAndNullPayer() {
         service.recordExpenseCreated(GROUP_ID, ACTOR_ID,
                 new ExpenseActivityDetails(null, new BigDecimal("1E+3"), "USD", "   "));
 
         assertThat(saved().getDetailsJson()).isEqualTo("{\"amount\":\"1000\",\"currency\":\"USD\"}");
+    }
+
+    @Test
+    void paymentAndDebtHooksRecordTransitionsAndLiquidation() {
+        service.recordPaymentRegistered(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(54L, new BigDecimal("1000.00"), "ARS", "Juan Pérez", "Ana López",
+                        12L, 31L, "PENDING", "PAYMENT_REPORTED"));
+        GroupActivity registered = saved();
+        assertThat(registered.getEventType()).isEqualTo("PAYMENT_REGISTERED");
+        JsonNode regJson = objectMapper.readTree(registered.getDetailsJson());
+        assertThat(regJson.get("debtStatusBefore").asString()).isEqualTo("PENDING");
+        assertThat(regJson.get("debtStatusAfter").asString()).isEqualTo("PAYMENT_REPORTED");
+
+        Mockito.reset(repository);
+        service.recordPaymentConfirmed(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(54L, new BigDecimal("1000.00"), "ARS", "Juan Pérez", "Ana López",
+                        12L, 31L, "PAYMENT_REPORTED", "VERIFIED"));
+        assertThat(saved().getEventType()).isEqualTo("PAYMENT_CONFIRMED");
+
+        Mockito.reset(repository);
+        service.recordPaymentRejected(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(54L, new BigDecimal("1000.00"), "ARS", "Juan Pérez", "Ana López",
+                        12L, 31L, "PAYMENT_REPORTED", "PENDING"));
+        assertThat(saved().getEventType()).isEqualTo("PAYMENT_REJECTED");
+
+        Mockito.reset(repository);
+        service.recordDebtOverdue(GROUP_ID, 31L, 12L, new BigDecimal("1000.00"), "ARS", "Juan Pérez", "Ana López");
+        GroupActivity overdue = saved();
+        assertThat(overdue.getEventType()).isEqualTo("DEBT_OVERDUE");
+        assertThat(overdue.getActorUserId()).isNull();
+        JsonNode overdueJson = objectMapper.readTree(overdue.getDetailsJson());
+        assertThat(overdueJson.get("debtStatusBefore").asString()).isEqualTo("PENDING");
+        assertThat(overdueJson.get("debtStatusAfter").asString()).isEqualTo("OVERDUE");
+
+        Mockito.reset(repository);
+        service.recordLiquidationProposed(GROUP_ID, ACTOR_ID, 2, "ARS");
+        GroupActivity liquidation = saved();
+        assertThat(liquidation.getEventType()).isEqualTo("LIQUIDATION_PROPOSED");
+        JsonNode liqJson = objectMapper.readTree(liquidation.getDetailsJson());
+        assertThat(liqJson.get("transferCount").asInt()).isEqualTo(2);
+        assertThat(liqJson.get("currency").asString()).isEqualTo("ARS");
+
+        Mockito.reset(repository);
+        OffsetDateTime dayStart = OffsetDateTime.parse("2026-11-05T00:00:00-03:00");
+        OffsetDateTime dayEnd = OffsetDateTime.parse("2026-11-06T00:00:00-03:00");
+        when(repository.existsByGroupIdAndEventTypeAndCreatedAtBetween(
+                GROUP_ID, "LIQUIDATION_PROPOSED", dayStart, dayEnd)).thenReturn(true);
+        assertThat(service.recordLiquidationProposed(GROUP_ID, ACTOR_ID, 2, "ARS", dayStart, dayEnd)).isNull();
+        verify(repository, never()).save(any(GroupActivity.class));
     }
 
     @Test
@@ -141,6 +199,27 @@ class ActivityEventServiceTest {
         assertThat(json.get("amount").asString()).isEqualTo("500");
         assertThat(json.get("fromName").asString()).isEqualTo("Juan Pérez");
         assertThat(json.has("toName")).isFalse();
+    }
+
+    // 018 T017 (plan.md D6): additive expense and debt links.
+    @Test
+    void paymentHookAddsTheExpenseAndDebtWhenPresent() {
+        service.recordPaymentMade(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(54L, new BigDecimal("1000.00"), "ARS", "Juan Pérez", "Ana López", 12L, 31L));
+
+        JsonNode json = objectMapper.readTree(saved().getDetailsJson());
+        assertThat(json.get("expenseId").asLong()).isEqualTo(12L);
+        assertThat(json.get("debtId").asLong()).isEqualTo(31L);
+        assertThat(json.get("toName").asString()).isEqualTo("Ana López");
+    }
+
+    @Test
+    void paymentHookWithoutLinksKeepsThe014Format() {
+        service.recordPaymentMade(GROUP_ID, ACTOR_ID,
+                new PaymentActivityDetails(3L, new BigDecimal("500"), "ARS", "Juan", "Ana"));
+
+        assertThat(saved().getDetailsJson()).isEqualTo(
+                "{\"paymentId\":3,\"amount\":\"500\",\"currency\":\"ARS\",\"fromName\":\"Juan\",\"toName\":\"Ana\"}");
     }
 
     @Test

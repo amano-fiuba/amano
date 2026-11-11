@@ -100,6 +100,25 @@ describe('ProfilePage (US1: visualizar mi perfil)', () => {
     )
   })
 
+  it('copia el CBU/CVU propio desde la línea del perfil', async () => {
+    const user = userEvent.setup()
+    // Después de setup(): userEvent instala su propio navigator.clipboard.
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderProfile()
+
+    await user.click(await screen.findByRole('button', { name: 'Copiar CBU/CVU' }))
+
+    expect(writeText).toHaveBeenCalledWith(PERFIL_COMPLETO.cbuCvu)
+    expect(await screen.findByText('¡Copiado!')).toBeInTheDocument()
+    delete navigator.clipboard
+  })
+
   it('muestra "No informado", ARS y avatar default en opcionales ausentes (FR-004, FR-005, FR-006)', async () => {
     stubSesion(PERFIL_MINIMO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_MINIMO })
@@ -108,6 +127,7 @@ describe('ProfilePage (US1: visualizar mi perfil)', () => {
     expect(await screen.findByTestId('profile-name')).toHaveTextContent('Beto')
     expect(screen.getByTestId('profile-lastname')).toHaveTextContent('No informado')
     expect(screen.getByTestId('profile-cbu')).toHaveTextContent('No informado')
+    expect(screen.queryByRole('button', { name: 'Copiar CBU/CVU' })).not.toBeInTheDocument()
     expect(screen.getByTestId('profile-currencies')).toHaveTextContent('ARS')
     expect(screen.getByRole('img', { name: /avatar de beto/i })).toHaveAttribute(
       'src',
@@ -191,47 +211,5 @@ describe('ProfilePage (005: entrada a la edición)', () => {
     await user.click(screen.getByRole('link', { name: /modificar perfil/i }))
 
     expect(await screen.findByText('Pantalla de edición')).toBeInTheDocument()
-  })
-})
-
-// Aviso one-shot de 005 (FR-009 enmendado, T025): la edición marca
-// 'amano.profile.saved' en sessionStorage y esta pantalla lo consume y
-// remueve al montar; el mensaje no puede reaparecer tras un refresco.
-describe('ProfilePage (005: aviso one-shot tras guardar)', () => {
-  it('sin la clave no muestra ningún aviso de éxito (navegación/refresco normal)', async () => {
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
-    renderProfile()
-
-    expect(await screen.findByTestId('profile-name')).toBeInTheDocument()
-    expect(screen.queryByTestId('profile-saved')).not.toBeInTheDocument()
-  })
-
-  it('con la clave marca muestra el mensaje una única vez y la remueve', async () => {
-    sessionStorage.setItem('amano.profile.saved', 'true')
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
-    renderProfile()
-
-    expect(await screen.findByTestId('profile-saved')).toHaveTextContent(
-      /los cambios se guardaron correctamente/i,
-    )
-    expect(sessionStorage.getItem('amano.profile.saved')).toBe(null)
-  })
-
-  it('un refresco posterior (remontaje sin clave) ya no repite el aviso', async () => {
-    sessionStorage.setItem('amano.profile.saved', 'true')
-    stubSesion(PERFIL_COMPLETO)
-    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
-    const { unmount } = renderProfile()
-
-    expect(await screen.findByTestId('profile-saved')).toBeInTheDocument()
-    // La clave se consumió al primer montaje: la segunda render (refresco)
-    // encuentra sessionStorage sin la clave y no avisa nada.
-    unmount()
-    renderProfile()
-
-    expect(await screen.findByTestId('profile-name')).toBeInTheDocument()
-    expect(screen.queryByTestId('profile-saved')).not.toBeInTheDocument()
   })
 })
