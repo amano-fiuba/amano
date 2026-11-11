@@ -1091,7 +1091,10 @@ fieldset {
 // leaves the card visible while the deletion is in progress. Sits at the right
 // of the card, where "Amigos desde" used to be.
 .friend-card__actions {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 0.35rem;
   margin-left: auto;
 }
 

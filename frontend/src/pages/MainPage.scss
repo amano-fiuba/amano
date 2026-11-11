@@ -164,9 +164,19 @@
 }
 
 .main-expense__amount {
+  display: grid;
   flex: 0 0 auto;
+  justify-items: end;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+// Equivalent in one of the user's preferred currencies, below the original
+// amount (personal activity screen).
+.main-expense__conversion {
+  color: var(--color-texto-suave);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .main-request {

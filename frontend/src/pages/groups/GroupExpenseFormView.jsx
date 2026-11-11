@@ -320,18 +320,21 @@ export default function GroupExpenseFormView({ mode = 'group' }) {
 
   // Participants keep the on-screen order: it is the order sent to the API and
   // the one the preview uses for the remaining cents.
-  // With CUSTOM and PERCENTAGE the payer always takes part in the split.
   const nonEqual = method !== 'EQUAL'
   // A personal expense has the payer as its only participant (no debts).
+  // In every shared expense the payer always takes part in the split and
+  // cannot be unchecked (022 FR-003), whatever the split method.
   const orderedSelection = personal
     ? (payerKey ? [payerKey] : [])
     : members
       .map(participantKey)
-      .filter((key) => selected.includes(key) || (nonEqual && key === payerKey))
+      .filter((key) => selected.includes(key) || key === payerKey)
   const parsedAmount = parseArgentineAmount(amountValue)
   const hasOtherParticipant = personal || orderedSelection.some((key) => key !== payerKey)
 
   function toggleParticipant(key) {
+    // El pagador no puede quitarse del reparto (022 FR-003).
+    if (key === payerKey) return
     setParticipantsError('')
     setSelected((previous) =>
       previous.includes(key) ? previous.filter((item) => item !== key) : [...previous, key],
@@ -927,7 +930,7 @@ export default function GroupExpenseFormView({ mode = 'group' }) {
                       {members.map((member) => {
                         const key = participantKey(member)
                         const included = orderedSelection.includes(key)
-                        const lockedPayer = nonEqual && key === payerKey
+                        const lockedPayer = key === payerKey
                         const shortName = shortNames[key] ?? member.name
                         // What the short name leaves out stays for screen readers.
                         const hiddenName = [

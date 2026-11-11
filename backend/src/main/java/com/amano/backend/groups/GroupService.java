@@ -342,7 +342,8 @@ public class GroupService {
      * T078 (US6): active members of the group (group_members with left_at
      * NULL + the simulated profiles, which are members by group_id alone)
      * with display name, avatar URL (existing user-avatar mechanism; NULL →
-     * the UI renders the gray default) and the per-group role. Viewed by both
+     * the UI renders the gray default), the per-group role and the CBU/CVU
+     * (so members can copy it to transfer; NULL when not informed). Viewed by both
      * roles — the decision goes through {@link GroupPermissionChecker#canViewMembers}.
      */
     @Transactional(readOnly = true)
@@ -370,11 +371,11 @@ public class GroupService {
                     .<String>map(stored -> "/api/users/" + user.getId() + "/avatar")
                     .orElse(null); // no custom avatar → NULL → gray default in the UI
             members.add(new GroupMemberView(user.getId(), null, fullName, avatarUrl,
-                    row.getRole()));
+                    row.getRole(), user.getCbu()));
         }
         for (SimulatedProfile simulated : simulatedProfileRepository.findByGroupId(groupId)) {
             members.add(new GroupMemberView(null, simulated.getId(), simulated.getName(),
-                    null, GroupMember.ROLE_MEMBER));
+                    null, GroupMember.ROLE_MEMBER, null));
         }
         return members;
     }

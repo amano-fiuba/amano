@@ -796,6 +796,14 @@
   min-width: 0;
 }
 
+// Copiar CBU/CVU y menú "⋯" comparten la misma altura y el borde derecho.
+.member-row__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.15rem;
+}
+
 .member-name {
   min-width: 0;
   overflow-wrap: anywhere;

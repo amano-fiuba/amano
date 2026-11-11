@@ -4,7 +4,7 @@ import { useDismiss } from '../../hooks/useDismiss'
 /**
  * Acciones de administración de un miembro detrás de un botón "⋯". Es un
  * disclosure, no un role="menu": sus opciones son botones comunes que se
- * recorren con Tab, y uno de ellos abre su confirmación dentro del panel.
+ * recorren con Tab, y una de ellas abre su confirmación dentro del panel.
  * `children` recibe `close` para que cada opción decida si cierra el panel.
  */
 export default function MemberActionsMenu({ memberName, testId, children }) {

@@ -100,6 +100,25 @@ describe('ProfilePage (US1: visualizar mi perfil)', () => {
     )
   })
 
+  it('copia el CBU/CVU propio desde la línea del perfil', async () => {
+    const user = userEvent.setup()
+    // Después de setup(): userEvent instala su propio navigator.clipboard.
+    const writeText = vi.fn().mockResolvedValue()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    })
+    stubSesion(PERFIL_COMPLETO)
+    me.mockResolvedValue({ ok: true, profile: PERFIL_COMPLETO })
+    renderProfile()
+
+    await user.click(await screen.findByRole('button', { name: 'Copiar CBU/CVU' }))
+
+    expect(writeText).toHaveBeenCalledWith(PERFIL_COMPLETO.cbuCvu)
+    expect(await screen.findByText('¡Copiado!')).toBeInTheDocument()
+    delete navigator.clipboard
+  })
+
   it('muestra "No informado", ARS y avatar default en opcionales ausentes (FR-004, FR-005, FR-006)', async () => {
     stubSesion(PERFIL_MINIMO)
     me.mockResolvedValue({ ok: true, profile: PERFIL_MINIMO })
@@ -108,6 +127,7 @@ describe('ProfilePage (US1: visualizar mi perfil)', () => {
     expect(await screen.findByTestId('profile-name')).toHaveTextContent('Beto')
     expect(screen.getByTestId('profile-lastname')).toHaveTextContent('No informado')
     expect(screen.getByTestId('profile-cbu')).toHaveTextContent('No informado')
+    expect(screen.queryByRole('button', { name: 'Copiar CBU/CVU' })).not.toBeInTheDocument()
     expect(screen.getByTestId('profile-currencies')).toHaveTextContent('ARS')
     expect(screen.getByRole('img', { name: /avatar de beto/i })).toHaveAttribute(
       'src',

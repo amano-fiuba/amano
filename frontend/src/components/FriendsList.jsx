@@ -8,6 +8,7 @@ import {
   listFriends,
 } from '../api/friendsClient'
 import { useAuth } from '../auth/AuthContext'
+import CopyCbuButton from './CopyCbuButton'
 import DeleteFriendDialog from './DeleteFriendDialog'
 import ListSearch, { ListSearchNoMatches } from './ListSearch'
 import { filterPeople, fullName } from '../utils/personSearch'
@@ -295,6 +296,12 @@ export default function FriendsList({ reloadKey = 0 }) {
                   {since && <span className="friend-card__since">Amigos desde {since}</span>}
                 </div>
                 <div className="friend-card__actions">
+                  <CopyCbuButton
+                    value={friend.cbuCvu}
+                    iconOnly
+                    ariaLabel={`Copiar CBU/CVU de ${fullName(friend)}`}
+                    testId={`copy-cbu-friend-${friend.id}`}
+                  />
                   <button
                     type="button"
                     className="friend-card__delete"
