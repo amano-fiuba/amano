@@ -15,6 +15,8 @@
 - **009 (pausar gasto recurrente personal)**: precedentes adoptados para las series de grupo — finalizar es definitivo, pausar no genera retroactivamente, pedir el estado que la serie ya tiene es éxito sin cambios y solo es error modificar una finalizada.
 - **022 (deudas y vencimientos)**: las ocurrencias generadas antes de pausar o finalizar conservan sus deudas y su flujo de pago, saldo y recordatorio.
 
+**Difiere de 028**: la reanudación de una serie Pausada NO conserva su próxima fecha ni reutiliza el anclaje original de la serie (028, FR-022): la serie se reancla a la fecha de reanudación, como si el gasto recurrente se registrara de nuevo en ese momento (ver Clarificaciones).
+
 Donde esta spec y una anterior difieran, vale esta.
 
 ## Fuera de alcance
@@ -23,6 +25,13 @@ Donde esta spec y una anterior difieran, vale esta.
 - Editar el monto u otros datos de una serie, eliminar series y programar una fecha de fin (la frecuencia ya puede cambiarse según 028).
 - Pausar o finalizar desde otras pantallas distintas de la de gastos recurrentes del grupo.
 - Notificaciones al pausar, reanudar o finalizar una serie.
+
+## Clarificaciones
+
+### Session 2026-11-13
+
+- Q: ¿Cómo se muestra la próxima fecha de una serie Pausada cuando esa fecha ya pasó, y qué pasa con el anclaje de la serie al reanudarla? → A: Ocultar la próxima fecha mientras esté Pausada (la fila no muestra próxima fecha ni vencimiento; la fecha guardada deja de regir) y, al reanudar, reanclar la serie a la fecha de reanudación como si el mismo gasto recurrente se registrara de nuevo en ese momento ("flujo de 0"): se genera de inmediato una ocurrencia con fecha de hoy que vence según el plazo vigente del grupo (hoy + `debt_due_days`), la próxima ocurrencia se genera un período después de la reanudación y así sucesivamente; los períodos transcurridos durante la pausa no se generan. El aviso de reanudación MUST aclarar este reinicio (ej.: frecuencia mensual y 7 días de plazo → un gasto para pagar en 7 días y la siguiente ocurrencia un mes después).
+- Q: ¿Deben quedar en el historial de actividad del grupo los cambios de estado de una serie (pausar, reanudar, finalizar) y el gasto que se genera al reanudarla? → A: Sí: los cambios de estado se registran con el miembro que los ejecutó y la ocurrencia de reanudación se registra como `EXPENSE_CREATED` a nombre del miembro que reanudó; las ocurrencias del job siguen apareciendo como "Sistema", como en 028.
 
 ## Supuestos
 
@@ -48,16 +57,16 @@ transcurrieron durante la pausa. Todo lo ya generado queda intacto.
 la generación sin perder la serie ni lo ya registrado.
 
 **Independent Test**: pausar una serie activa con confirmación, verificar que la
-generación no crea nada mientras esté pausada, reanudarla y verificar que la
-próxima fecha queda en el futuro según la frecuencia y que los gastos anteriores
-siguen registrados.
+generación no crea nada mientras esté pausada, reanudarla y verificar que aparece
+de inmediato un gasto con la fecha de hoy, que la próxima fecha queda un período
+después de la reanudación y que los gastos anteriores siguen registrados.
 
 **Acceptance Scenarios**:
 
 1. **Given** una serie Activa en la pantalla de gastos recurrentes, **When** el creador, el pagador o un administrador pulsa "Pausar", **Then** el sistema pide confirmación; **When** cancela, **Then** no cambia nada; **When** confirma, **Then** la serie queda Pausada, se indica claramente su nuevo estado y se muestra "El gasto recurrente se pausó".
 2. **Given** una serie Pausada cuya próxima fecha ya venció, **When** corre la generación diaria, **Then** no se crea ninguna ocurrencia para esa serie mientras permanezca pausada.
-3. **Given** una serie Pausada, **When** se la reanuda, **Then** queda Activa, su próxima fecha se recalcula con la frecuencia configurada como la primera fecha igual o posterior a hoy y no se generan ocurrencias de los períodos transcurridos durante la pausa.
-4. **Given** la serie reanudada, **When** llega su próxima fecha dentro de la ventana de generación, **Then** se generan las próximas ocurrencias según la periodicidad configurada, con sus deudas y vencimientos como en 028.
+3. **Given** una serie Pausada, **When** se la reanuda (previa confirmación que aclara el reinicio), **Then** queda Activa, se genera de inmediato una ocurrencia con la fecha de hoy cuyas deudas vencen dentro del plazo vigente del grupo, la próxima fecha pasa al primer período posterior a la fecha de reanudación, no se generan los períodos transcurridos durante la pausa y la ocurrencia queda registrada en el historial a nombre del miembro que reanudó.
+4. **Given** la serie reanudada, **When** transcurre un período desde la reanudación y llega la próxima fecha dentro de la ventana de generación, **Then** se genera la siguiente ocurrencia con fecha anclada a la reanudación, con sus deudas y venciendo en su propia fecha (reglas de 028).
 5. **Given** una serie con ocurrencias ya generadas, **When** se la pausa y se la reanuda, **Then** el gasto original y todas las ocurrencias generadas antes de pausar se conservan con sus deudas.
 6. **Given** un miembro que no creó la serie, no es el pagador ni administrador, **When** intenta pausarla o reanudarla, **Then** recibe el mismo rechazo por permisos que en 028 y nada cambia.
 
@@ -81,7 +90,7 @@ verificar el rechazo; verificar que las ocurrencias anteriores se conservan.
 **Acceptance Scenarios**:
 
 1. **Given** una serie Activa o Pausada, **When** se pulsa "Finalizar", **Then** el sistema pide confirmación advirtiendo que es definitivo y que no se generarán más gastos de esa serie; **When** se cancela, **Then** no cambia nada.
-2. **Given** la confirmación, **When** se confirma, **Then** la serie queda Finalizada, pierde su próxima fecha, ya no ofrece acciones y se muestra "El gasto recurrente se finalizó".
+2. **Given** la confirmación, **When** se confirma, **Then** la serie queda Finalizada, pierde su próxima fecha, ya no ofrece acciones, se muestra "El gasto recurrente se finalizó" y el cambio queda registrado en el historial del grupo a nombre del miembro que finalizó.
 3. **Given** una serie Finalizada, **When** corre la generación diaria, **Then** no se registra ninguna ocurrencia para esa serie.
 4. **Given** una serie Finalizada, **When** alguien intenta pausarla, reanudarla o cambiarle la frecuencia, **Then** se rechaza con "El gasto recurrente ya está finalizado y no puede modificarse" y la serie no cambia.
 5. **Given** una serie Finalizada con ocurrencias y deudas previas, **When** se consulta el grupo, **Then** el gasto original y las ocurrencias generadas se conservan con sus deudas y siguen disponibles para pagos, saldos y recordatorios.
@@ -118,11 +127,12 @@ detalle de una ocurrencia generada y verificar que muestra su origen y su serie.
 
 ### Edge Cases
 
-- **Mismo estado** (pausar una serie ya pausada, reanudar una activa, finalizar una finalizada por doble clic): pedir el estado que la serie ya tiene responde éxito sin cambios, salvo modificar una Finalizada, que siempre se rechaza.
+- **Mismo estado** (pausar una serie ya pausada, reanudar una activa, finalizar una finalizada por doble clic): pedir el estado que la serie ya tiene responde éxito sin cambios — reanudar una serie ya Activa no genera la ocurrencia inmediata ni reancla la serie — salvo modificar una Finalizada, que siempre se rechaza.
 - **Finalizar mientras hay una ocurrencia en la ventana de anticipación ya generada**: la ocurrencia ya creada se conserva; la serie no genera más.
 - **Detalle de una ocurrencia cuya serie fue finalizada o pausada**: el detalle sigue mostrando el origen y la serie; finalizar o pausar no rompe el vínculo.
 - **Acumulado y moneda**: una serie en una moneda distinta a la del grupo muestra su acumulado en la moneda de la serie, con los datos de conversión que conserva de 028.
-- **Serie pausada con próxima fecha conservada**: mientras está pausada, la fila muestra su próxima fecha guardada pero no genera; al reanudar se recalcula.
+- **Serie pausada con próxima fecha que venció**: mientras está pausada, la fila no muestra próxima fecha ni vencimiento; la fecha guardada deja de regir y al reanudar la serie se reancla a la fecha de reanudación (FR-003), sin importar qué fecha tenía guardada.
+- **Reanudación con la ocurrencia inmediata**: el gasto generado al reanudar usa el plazo de pago vigente del grupo en ese momento (como primera ocurrencia); las siguientes ocurrencias vencen en su propia fecha.
 - **Serie finalizada en la lista**: sigue visible con su estado Finalizado y su acumulado histórico, sin acciones.
 - **Permisos**: solo creador, pagador o administrador pueden pausar, reanudar o finalizar; el resto de los miembros puede ver la lista y los detalles, y sus intentos de modificación se rechazan sin cambios.
 - **Sesión expirada, error de red o del servidor**: al cambiar de estado, se informa el error y la serie conserva su estado anterior en pantalla; al cargar la lista, se ofrece reintentar, sin éxitos falsos.
@@ -135,22 +145,24 @@ detalle de una ocurrencia generada y verificar que muestra su origen y su serie.
 **Ciclo de vida de la serie (US1, US2)**
 
 - **FR-001**: Una serie de grupo MUST tener uno de tres estados: Activo, Pausado o Finalizado. Solo las series Activas generan ocurrencias. Este requisito agrega Finalizado al modelo de 028.
-- **FR-002**: Pausar una serie Activa MUST pedir confirmación previa y, al confirmarse, cambiar el estado a Pausado conservando su próxima fecha. Mientras esté Pausada, la generación MUST NOT crear ocurrencias para esa serie.
-- **FR-003**: Reanudar una serie Pausada MUST cambiar su estado a Activo y MUST recalcular su próxima fecha como la primera fecha de la frecuencia configurada igual o posterior a hoy; las fechas transcurridas durante la pausa MUST NOT generarse retroactivamente.
+- **FR-002**: Pausar una serie Activa MUST pedir confirmación previa y, al confirmarse, cambiar el estado a Pausado. Mientras esté Pausada, la generación MUST NOT crear ocurrencias para esa serie y su próxima fecha deja de regir.
+- **FR-003**: Reanudar una serie Pausada MUST cambiar su estado a Activo y MUST reanclar la serie a la fecha de reanudación, como si el mismo gasto recurrente se registrara de nuevo en ese momento: se genera de inmediato una ocurrencia con la fecha de hoy, con deudas que vencen según el plazo vigente del grupo al reanudarse (regla de primera ocurrencia de 028, FR-016); la próxima fecha se fija en el primer período posterior a la fecha de reanudación. Las fechas transcurridas durante la pausa MUST NOT generarse retroactivamente.
 - **FR-004**: Finalizar MUST estar disponible para series Activas y Pausadas y MUST pedir confirmación previa advirtiendo explícitamente que es definitivo.
 - **FR-005**: Al finalizar, la serie MUST cambiar a Finalizado, MUST dejar de tener próxima fecha y MUST NOT generar ocurrencias. Una serie Finalizada MUST NOT poder pausarse, reanudarse ni cambiar su frecuencia: los intentos MUST rechazarse con "El gasto recurrente ya está finalizado y no puede modificarse".
 - **FR-006**: Pausar, reanudar o finalizar una serie MUST NOT alterar el gasto original ni las ocurrencias y deudas ya generadas: MUST conservarse con sus datos, vencimientos y flujo de pagos y recordatorios.
 - **FR-007**: Las transiciones válidas MUST ser Activo → Pausado, Pausado → Activo, Activo → Finalizado y Pausado → Finalizado. Pedir el estado que la serie ya tiene MUST responder éxito sin cambios.
 - **FR-008**: Solo el creador de la serie, el pagador o un administrador del grupo MUST poder pausarla, reanudarla o finalizarla; cualquier otro miembro MUST recibir el mismo rechazo por permisos que define 028 (FR-021).
+- **FR-017**: El aviso de reanudación MUST explicar claramente que a partir de la reanudación empieza un nuevo ciclo desde hoy: se generará un gasto con la fecha de hoy que vence dentro del plazo vigente del grupo y la próxima ocurrencia se generará un período después (ej.: con frecuencia mensual y 7 días de plazo, "un gasto para pagar en 7 días y el siguiente en un mes").
+- **FR-018**: Los cambios de estado de una serie (pausar, reanudar, finalizar) MUST registrarse en el historial de actividad del grupo a nombre del miembro que los ejecutó. La ocurrencia generada al reanudar MUST registrarse como `EXPENSE_CREATED` a nombre del miembro que reanudó; las ocurrencias del job siguen apareciendo como "Sistema", como define 028 (FR-023).
 
 **Vista de gastos recurrentes (US3)**
 
 - **FR-009**: La pantalla de gastos recurrentes del grupo MUST listar las series con concepto, importe por ocurrencia, moneda, categoría, grupo asociado, frecuencia, estado y acumulado gastado de la serie.
-- **FR-010**: Para una serie Activa, la vista MUST mostrar su próxima fecha y el próximo vencimiento de su próxima ocurrencia, calculado según las reglas de vencimiento de 028 (FR-016); una serie Pausada muestra su próxima fecha guardada sin vencimiento vigente y una Finalizada no muestra ninguna.
+- **FR-010**: Para una serie Activa, la vista MUST mostrar su próxima fecha y el próximo vencimiento de su próxima ocurrencia, calculado según las reglas de vencimiento de 028 (FR-016); una serie Pausada o Finalizada no muestra próxima fecha ni vencimiento.
 - **FR-011**: El acumulado gastado de una serie MUST ser la suma del gasto original y de sus ocurrencias generadas, en la moneda de la serie; una serie sin ocurrencias generadas MUST mostrar un acumulado de $0.
 - **FR-012**: Cuando el job registre una nueva ocurrencia, los saldos, totales del grupo y el acumulado de la serie MUST reflejarla sin acción manual de ningún miembro.
 - **FR-013**: El usuario MUST poder acceder al detalle de cualquier gasto de una serie (original u ocurrencia generada) para conocer su origen: la serie a la que pertenece y si fue creado por el sistema o por una persona, junto con sus datos (monto, moneda, categoría, pagador, reparto y deudas).
-- **FR-014**: La interfaz MUST indicar claramente el estado de cada serie (Activo, Pausado, Finalizado) y, tras pausar, reanudar o finalizar, MUST mostrar la confirmación correspondiente ("El gasto recurrente se pausó", "…se reanudó", "…se finalizó") sin recargar la página.
+- **FR-014**: La interfaz MUST indicar claramente el estado de cada serie (Activo, Pausado, Finalizado) y, tras pausar, reanudar o finalizar, MUST mostrar la confirmación correspondiente ("El gasto recurrente se pausó", "…se reanudó" con el aviso de reinicio de FR-017, "…se finalizó") sin recargar la página.
 
 **Compatibilidad, seguridad y errores**
 
@@ -159,11 +171,12 @@ detalle de una ocurrencia generada y verificar que muestra su origen y su serie.
 
 ### Key Entities *(include if feature involves data)*
 
-- **GroupExpense (serie)**: gasto compartido con `expense_type = RECURRING`, frecuencia y estado de ciclo de vida (Activo, Pausado, Finalizado); tiene próxima fecha mientras no esté finalizada. Esta spec agrega el estado Finalizado a lo definido en 028.
-- **GroupExpense (ocurrencia)**: gasto compartido generado por el job con `recurrence_source_id` apuntando a la serie; el gasto original es la primera ocurrencia. Es la base del detalle de origen (FR-013).
+- **GroupExpense (serie)**: gasto compartido con `expense_type = RECURRING`, frecuencia y estado de ciclo de vida (Activo, Pausado, Finalizado); tiene próxima fecha solo mientras esté Activa, anclada al momento en que la serie empezó o se reanudó. Esta spec agrega el estado Finalizado a lo definido en 028.
+- **GroupExpense (ocurrencia)**: gasto compartido generado por el job o al reanudar la serie, con `recurrence_source_id` apuntando a la serie; el gasto original es la primera ocurrencia. Es la base del detalle de origen (FR-013).
 - **GroupExpenseShare**: partes de cada ocurrencia, copiadas de la serie.
 - **Debt**: deudas `PENDING` de cada ocurrencia, conservadas aunque la serie se pause o finalice (FR-006).
 - **Acumulado de la serie**: valor calculado como la suma de las ocurrencias de la serie en la moneda de la serie (FR-011).
+- **GroupActivity**: eventos del historial del grupo: `EXPENSE_CREATED` de cada ocurrencia (a nombre del miembro que la creó, incluida la reanudación, o "Sistema" si la generó el job) y los eventos de cambio de estado de la serie con su actor (FR-018).
 
 ## Success Criteria *(mandatory)*
 
