@@ -181,7 +181,7 @@ describe('agrupación por día (014 FR-015)', () => {
 
   it('expone los filtros del contrato', () => {
     expect(ACTIVITY_FILTERS.map((option) => option.label)).toEqual([
-      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Recordatorios', 'Cambios del grupo',
+      'Toda la actividad', 'Altas', 'Bajas', 'Gastos', 'Pagos', 'Recordatorios', 'Recurrencia', 'Cambios del grupo',
     ])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMOVED').eventTypes)
       .toEqual(['MEMBER_REMOVED', 'MEMBER_LEFT'])
@@ -194,6 +194,8 @@ describe('agrupación por día (014 FR-015)', () => {
     ])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMINDERS').eventTypes)
       .toEqual(['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
+    expect(ACTIVITY_FILTERS.find((option) => option.value === 'RECURRENCE').eventTypes)
+      .toEqual(['RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED'])
   })
 })
 
@@ -233,9 +235,18 @@ describe('expenseLinkId / deletedExpenseIds (022 T076)', () => {
   it('enlaza los eventos con gasto asociado que traen expenseId', () => {
     for (const type of ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'PAYMENT_MADE', 'PAYMENT_REGISTERED',
       'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED', 'DEBT_OVERDUE', 'DEBT_REMINDER_SENT',
-      'PAYER_DUE_NOTICE_SENT']) {
+      'PAYER_DUE_NOTICE_SENT', 'RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED']) {
       expect(expenseLinkId(entry(type, { expenseId: 12 }))).toBe(12)
     }
+  })
+
+  it('describe eventos de recurrencia con descripción opcional', () => {
+    expect(phrase('RECURRENCE_PAUSED', { expenseId: 7, description: 'Alquiler' }))
+      .toBe('Ana López pausó el gasto recurrente «Alquiler»')
+    expect(phrase('RECURRENCE_RESUMED', { expenseId: 7 }))
+      .toBe('Ana López reanudó un gasto recurrente')
+    expect(phrase('RECURRENCE_FINISHED', { expenseId: 7, description: 'Internet' }))
+      .toBe('Ana López finalizó el gasto recurrente «Internet»')
   })
 
   it('no enlaza EXPENSE_DELETED, tipos sin gasto ni eventos viejos sin expenseId', () => {

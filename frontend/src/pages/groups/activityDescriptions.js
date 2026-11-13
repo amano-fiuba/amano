@@ -49,6 +49,7 @@ export const ACTIVITY_FILTERS = [
     ],
   },
   { value: 'REMINDERS', label: 'Recordatorios', eventTypes: ['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'] },
+  { value: 'RECURRENCE', label: 'Recurrencia', eventTypes: ['RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED'] },
   { value: 'SETTINGS', label: 'Cambios del grupo', eventTypes: ['PERMISSION_CHANGED', 'PHOTO_CHANGED'] },
 ]
 
@@ -184,6 +185,23 @@ function payerDueNoticeSent(details) {
   return sentence
 }
 
+function recurrenceDescription(verb, details) {
+  const description = text(details.description)
+  return description ? `${verb} el gasto recurrente «${description}»` : `${verb} un gasto recurrente`
+}
+
+function recurrencePaused(details) {
+  return recurrenceDescription('pausó', details)
+}
+
+function recurrenceResumed(details) {
+  return recurrenceDescription('reanudó', details)
+}
+
+function recurrenceFinished(details) {
+  return recurrenceDescription('finalizó', details)
+}
+
 const SYSTEM_EVENTS = new Set([
   'DEBT_OVERDUE',
   'DEBT_REMINDER_SENT',
@@ -209,6 +227,9 @@ const DESCRIBERS = {
   LIQUIDATION_PROPOSED: liquidationProposed,
   DEBT_REMINDER_SENT: debtReminderSent,
   PAYER_DUE_NOTICE_SENT: payerDueNoticeSent,
+  RECURRENCE_PAUSED: recurrencePaused,
+  RECURRENCE_RESUMED: recurrenceResumed,
+  RECURRENCE_FINISHED: recurrenceFinished,
 }
 
 // Eventos que abren el detalle del gasto: el gasto mismo (017, 022 edición) y sus
@@ -223,6 +244,9 @@ const LINKS_TO_EXPENSE = [
   'DEBT_OVERDUE',
   'DEBT_REMINDER_SENT',
   'PAYER_DUE_NOTICE_SENT',
+  'RECURRENCE_PAUSED',
+  'RECURRENCE_RESUMED',
+  'RECURRENCE_FINISHED',
 ]
 
 /** Ids (texto) de los gastos que tienen un EXPENSE_DELETED entre las entradas. */
