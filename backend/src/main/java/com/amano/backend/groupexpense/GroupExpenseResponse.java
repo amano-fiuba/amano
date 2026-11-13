@@ -15,6 +15,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * {@code splitMethod} are additive (022 D8 and D2/T066). 027 (FR-020) adds
  * {@code category}, {@code type} and {@code paymentMethod}, null for older expenses;
  * US4 adds {@code friend}, the other person of an expense with a friend ({@code groupId} null).
+ * 029 adds {@code recurrence} for recurring series and their generated occurrences.
  */
 public record GroupExpenseResponse(
         Long id,
@@ -37,6 +38,7 @@ public record GroupExpenseResponse(
         String category,
         String type,
         String paymentMethod,
+        @JsonInclude(JsonInclude.Include.NON_NULL) RecurrenceInfo recurrence,
         Person friend) {
 
     /** 027 US3 constructor without {@code friend} (null: a group expense). */
@@ -63,7 +65,7 @@ public record GroupExpenseResponse(
             String paymentMethod) {
         this(id, groupId, amount, currency, convertedAmount, convertedCurrency, exchangeRate, rateDate,
                 rateSource, date, description, payer, createdBy, createdAt, shares, debts, splitMethod,
-                category, type, paymentMethod, null);
+                category, type, paymentMethod, null, null);
     }
 
     /** 024 constructor without the 027 classification (null: expense created before 027). */
@@ -87,7 +89,7 @@ public record GroupExpenseResponse(
             String splitMethod) {
         this(id, groupId, amount, currency, convertedAmount, convertedCurrency, exchangeRate, rateDate,
                 rateSource, date, description, payer, createdBy, createdAt, shares, debts, splitMethod,
-                null, null, null);
+                null, null, null, null, null);
     }
 
     /** 022 constructor without the split method, kept for backward compatibility. */
@@ -109,7 +111,8 @@ public record GroupExpenseResponse(
             List<Share> shares,
             List<DebtView> debts) {
         this(id, groupId, amount, currency, convertedAmount, convertedCurrency, exchangeRate, rateDate,
-                rateSource, date, description, payer, createdBy, createdAt, shares, debts, "EQUAL");
+                rateSource, date, description, payer, createdBy, createdAt, shares, debts, "EQUAL",
+                null, null, null, null, null);
     }
 
     /** 017 constructor without conversion fields, kept for backward compatibility. */
@@ -126,11 +129,15 @@ public record GroupExpenseResponse(
             List<Share> shares,
             List<DebtView> debts) {
         this(id, groupId, amount, currency, null, null, null, null, null, date, description, payer,
-                createdBy, createdAt, shares, debts, "EQUAL");
+                createdBy, createdAt, shares, debts, "EQUAL", null, null, null, null, null);
     }
 
     /** A registered user. */
     public record Person(Long userId, String name) {
+    }
+
+    /** Recurrence origin data for a series or one of its generated occurrences (029). */
+    public record RecurrenceInfo(Long sourceId, String status, String createdVia) {
     }
 
     /** One share, in request order. */

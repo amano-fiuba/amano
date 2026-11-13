@@ -4,9 +4,11 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -17,9 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.RecurrenceFrequency;
 import com.amano.backend.expense.RecurrenceStatus;
+import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.ExpenseActivityDetails;
 import com.amano.backend.groups.Group;
+import com.amano.backend.groups.GroupActivity;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupNotFoundException;
@@ -53,7 +57,7 @@ public class GroupRecurringExpenseService {
     private static final int ANTICIPATION_DAYS = 7;
 
     public static final String RECURRENCE_EDIT_EMPTY = "Enviá al menos un campo para editar";
-    public static final String RECURRENCE_STATUS_INVALID = "El estado debe ser ACTIVE o PAUSED";
+    public static final String RECURRENCE_STATUS_INVALID = "El estado no es válido";
     public static final String RECURRENCE_FREQUENCY_INVALID = "La frecuencia no es válida";
     public static final String NOT_ALLOWED_TO_EDIT_RECURRENCE = "No podés modificar este gasto recurrente";
 
@@ -85,21 +89,30 @@ public class GroupRecurringExpenseService {
         return LocalDate.now(clock);
     }
 
-    /** 028: recurring series of the group, newest first, visible to any member. */
+    /** 028/029: recurring series of the group, newest first, visible to any member. */
     @Transactional(readOnly = true)
     public List<RecurringGroupExpenseResponse> listSeries(Long callerId, Long groupId) {
         requireMember(callerId, groupId);
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupNotFoundException(GroupExpenseService.NOT_MEMBER));
+        int debtDueDays = group.getDebtDueDays() == null ? 0 : group.getDebtDueDays();
+        List<Object[]> countRows = expenseRepository.countOccurrencesByGroupIdGroupByRecurrenceSourceId(groupId);
+        Map<Long, Long> occurrenceCounts = new HashMap<>();
+        for (Object[] row : countRows) {
+            occurrenceCounts.put((Long) row[0], (Long) row[1]);
+        }
         return expenseRepository
                 .findByGroupIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(groupId)
                 .stream()
-                .map(RecurringGroupExpenseResponse::from)
+                .map(expense -> RecurringGroupExpenseResponse.from(expense, debtDueDays,
+                        occurrenceCounts.getOrDefault(expense.getId(), 0L)))
                 .toList();
     }
 
     /**
-     * 028: pause/resume or change the frequency of a group series. The creator,
-     * the payer or an admin may do it. Reactivating or changing the frequency of
-     * an active series recomputes the next date from the new cadence and today.
+     * 029: pause/resume/finish or change the frequency of a group series. The
+     * creator, the payer or an admin may do it. Reactivating re-anchors the
+     * series to today and generates the immediate occurrence. Finishing is final.
      */
     @Transactional
     public RecurringGroupExpenseResponse updateSeries(Long callerId, Long groupId, Long expenseId,
@@ -117,12 +130,15 @@ public class GroupRecurringExpenseService {
         if (fields == null || fields.isEmpty()) {
             throw new FieldValidationException(Map.of("body", RECURRENCE_EDIT_EMPTY));
         }
+        if (series.getRecurrenceStatus() == RecurrenceStatus.FINISHED) {
+            throw new RecurringExpenseFinishedException();
+        }
 
         Map<String, String> errors = new LinkedHashMap<>();
         RecurrenceStatus targetStatus = series.getRecurrenceStatus();
         if (fields.containsKey("status")) {
             String raw = fields.get("status");
-            if ("ACTIVE".equals(raw) || "PAUSED".equals(raw)) {
+            if ("ACTIVE".equals(raw) || "PAUSED".equals(raw) || "FINISHED".equals(raw)) {
                 targetStatus = RecurrenceStatus.valueOf(raw);
             }
             else {
@@ -146,14 +162,37 @@ public class GroupRecurringExpenseService {
         boolean statusChanged = targetStatus != series.getRecurrenceStatus();
         boolean frequencyChanged = targetFrequency != series.getRecurrenceFrequency();
         series.setRecurrenceFrequency(targetFrequency);
-        if (targetStatus == RecurrenceStatus.ACTIVE && (statusChanged || frequencyChanged)) {
-            series.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+
+        if (statusChanged) {
+            if (targetStatus == RecurrenceStatus.ACTIVE) {
+                LocalDate today = today();
+                series.setRecurrenceAnchorDate(today);
+                series.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+                series.setRecurrenceNextDate(series.getRecurrenceFrequency().firstAfter(today, today));
+                createImmediateOccurrenceIfMissing(series, callerId, today);
+                recordRecurrenceChange(series, GroupActivity.GroupActivityType.RECURRENCE_RESUMED, callerId);
+            }
+            else if (targetStatus == RecurrenceStatus.PAUSED) {
+                series.setRecurrenceStatus(RecurrenceStatus.PAUSED);
+                recordRecurrenceChange(series, GroupActivity.GroupActivityType.RECURRENCE_PAUSED, callerId);
+            }
+            else if (targetStatus == RecurrenceStatus.FINISHED) {
+                series.setRecurrenceStatus(RecurrenceStatus.FINISHED);
+                series.setRecurrenceNextDate(null);
+                recordRecurrenceChange(series, GroupActivity.GroupActivityType.RECURRENCE_FINISHED, callerId);
+            }
+        }
+        else if (frequencyChanged && series.getRecurrenceStatus() == RecurrenceStatus.ACTIVE) {
             series.setRecurrenceNextDate(targetFrequency.firstOnOrAfter(series.getRecurrenceAnchorDate(), today()));
         }
-        else if (statusChanged) {
-            series.setRecurrenceStatus(targetStatus);
-        }
-        return RecurringGroupExpenseResponse.from(expenseRepository.save(series));
+
+        GroupExpense saved = expenseRepository.save(series);
+        int debtDueDays = groupRepository.findById(groupId)
+                .map(Group::getDebtDueDays)
+                .filter(Objects::nonNull)
+                .orElse(0);
+        long occurrenceCount = expenseRepository.countByRecurrenceSourceId(saved.getId());
+        return RecurringGroupExpenseResponse.from(saved, debtDueDays, occurrenceCount);
     }
 
     private GroupMember requireMember(Long callerId, Long groupId) {
@@ -181,7 +220,7 @@ public class GroupRecurringExpenseService {
             while (date != null && !date.isAfter(windowEnd) && generated < MAX_OCCURRENCES_PER_RUN) {
                 advanced = true;
                 if (expenseRepository.findByRecurrenceSourceIdAndExpenseDate(series.getId(), date).isEmpty()) {
-                    createOccurrence(series, date);
+                    createOccurrence(series, date, date, null, "JOB");
                     generated++;
                 }
                 date = series.getRecurrenceFrequency().firstAfter(series.getRecurrenceAnchorDate(), date);
@@ -198,7 +237,8 @@ public class GroupRecurringExpenseService {
         return created;
     }
 
-    private void createOccurrence(GroupExpense series, LocalDate date) {
+    private void createOccurrence(GroupExpense series, LocalDate date, LocalDate dueDate,
+            Long actorUserId, String createdVia) {
         GroupExpense occurrence = new GroupExpense();
         occurrence.setGroupId(series.getGroupId());
         occurrence.setFriendUserId(series.getFriendUserId());
@@ -215,11 +255,11 @@ public class GroupRecurringExpenseService {
         occurrence.setExpenseType(series.getExpenseType());
         occurrence.setPaymentMethod(series.getPaymentMethod());
         occurrence.setExpenseDate(date);
-        occurrence.setDueDate(date);
+        occurrence.setDueDate(dueDate);
         occurrence.setDescription(series.getDescription());
         occurrence.setIdempotencyKey(occurrenceKey(series.getId(), date));
         occurrence.setRecurrenceSourceId(series.getId());
-        occurrence.setRecurrenceCreatedVia("JOB");
+        occurrence.setRecurrenceCreatedVia(createdVia);
         GroupExpense saved = expenseRepository.save(occurrence);
 
         List<GroupExpenseShare> seriesShares =
@@ -249,12 +289,37 @@ public class GroupRecurringExpenseService {
                     .map(GroupExpenseShare::getParticipantName)
                     .findFirst()
                     .orElse(null);
-            // 028: la ocurrencia la crea el sistema, no la persona que creó la serie.
-            activityEventService.recordExpenseCreated(saved.getGroupId(), null,
+            activityEventService.recordExpenseCreated(saved.getGroupId(), actorUserId,
                     new ExpenseActivityDetails(saved.getId(), saved.getAmount(),
                             saved.getCurrency().name(), saved.getDescription(), saved.getPayerUserId(),
                             payerName));
         }
+    }
+
+    /** 029 FR-003: creates the resumed occurrence for today unless it already exists. */
+    private void createImmediateOccurrenceIfMissing(GroupExpense series, Long callerId, LocalDate today) {
+        if (expenseRepository.findByRecurrenceSourceIdAndExpenseDate(series.getId(), today).isEmpty()) {
+            createOccurrence(series, today, dueDateFor(series.getGroupId(), today), callerId, "RESUME");
+        }
+    }
+
+    /** 029 FR-018: records a recurrence state change in the group activity feed. */
+    private void recordRecurrenceChange(GroupExpense series, GroupActivity.GroupActivityType type, Long actorUserId) {
+        activityEventService.recordRecurrenceChange(series.getGroupId(), actorUserId, type,
+                new RecurringActivityDetails(series.getId(), series.getDescription(),
+                        series.getRecurrenceStatus().name()));
+    }
+
+    /** 029: deadline of an occurrence generated on {@code date} using the current group deadline. */
+    private LocalDate dueDateFor(Long groupId, LocalDate date) {
+        if (groupId == null) {
+            return null;
+        }
+        return groupRepository.findById(groupId)
+                .map(Group::getDebtDueDays)
+                .filter(Objects::nonNull)
+                .map(date::plusDays)
+                .orElse(null);
     }
 
     /** Debt currency of the series: its existing debts or the group primary currency. */

@@ -1129,9 +1129,23 @@ public class GroupExpenseService {
                 expense.getCategory() == null ? null : expense.getCategory().name(),
                 expense.getExpenseType() == null ? null : expense.getExpenseType().name(),
                 expense.getPaymentMethod() == null ? null : expense.getPaymentMethod().name(),
+                recurrenceInfoOf(expense),
                 expense.getFriendUserId() == null ? null
                         : new GroupExpenseResponse.Person(expense.getFriendUserId(),
                                 names.get(expense.getFriendUserId())));
+    }
+
+    /** 029 FR-013: recurrence origin for a series or one of its occurrences. */
+    private GroupExpenseResponse.RecurrenceInfo recurrenceInfoOf(GroupExpense expense) {
+        if (!expense.isRecurringSeries() && expense.getRecurrenceSourceId() == null) {
+            return null;
+        }
+        if (expense.getRecurrenceSourceId() != null) {
+            return new GroupExpenseResponse.RecurrenceInfo(expense.getRecurrenceSourceId(), null,
+                    expense.getRecurrenceCreatedVia());
+        }
+        return new GroupExpenseResponse.RecurrenceInfo(null,
+                expense.getRecurrenceStatus() == null ? null : expense.getRecurrenceStatus().name(), null);
     }
 
     /**
