@@ -15,6 +15,7 @@ Campos de recurrencia vigentes (V32) más el nuevo anclaje (V35):
 | `recurrence_next_date` | DATE NULL | NOT NULL si `ACTIVE`/`PAUSED`; `NULL` si `FINISHED` o sin frecuencia | 028 |
 | `recurrence_source_id` | BIGINT NULL | FK a `group_expenses.id`; `NOT NULL` solo en ocurrencias; único por `(source_id, expense_date)` | 028 |
 | **`recurrence_anchor_date`** | **DATE NULL (nuevo, V35)** | **Inicio del ciclo actual de la serie; NOT NULL si hay frecuencia. Backfill: `= expense_date` para las series existentes. Al reanudar: `= fecha de reanudación`.** | 029 FR-003 |
+| **`recurrence_created_via`** | **VARCHAR(8) NULL (nuevo, V35)** | **Solo en ocurrencias: `'JOB'` (generada por el job) o `'RESUME'` (creada al reanudar). Backfill: `'JOB'` para las ocurrencias existentes. CHECK: `NULL` si y solo si `recurrence_source_id IS NULL`.** | 029 FR-013 |
 | `due_date` | DATE NULL | Gasto normal y primera ocurrencia: `expense_date + groups.debt_due_days` vigente al crearse; ocurrencias generadas: su propia fecha; nunca se recalcula | 028 (V33) |
 
 ### Reglas del ciclo de vida (FR-001 a FR-008)
@@ -72,14 +73,14 @@ Campo nuevo en `GroupExpenseResponse` (detalle de gasto), `NULL` si el gasto no 
 ```
 
 - `SERIE`: el gasto es el que dio origen a la serie (fila con frecuencia).
-- `SISTEMA`: ocurrencia generada por el job.
-- `MIEMBRO`: ocurrencia creada por la reanudación.
+- `SISTEMA`: ocurrencia con `recurrence_created_via = 'JOB'` (generada por el job).
+- `MIEMBRO`: ocurrencia con `recurrence_created_via = 'RESUME'` (creada al reanudar).
 
-La distinción SISTEMA/MIEMBRO se resuelve en la capa de servicio (el job y la reanudación conocen al actor al momento de crear); la respuesta no infiere del histórico de actividad.
+La lectura se resuelve con datos persistidos en la fila (`recurrence_created_via`, V35), no infiriendo del histórico de actividad; el job y la reanudación fijan el valor al crear la ocurrencia.
 
 ## Migraciones nuevas
 
-1. **`V35__group_expense_recurrence_anchor.sql`**: `ALTER TABLE group_expenses ADD COLUMN recurrence_anchor_date DATE` + backfill `UPDATE ... SET recurrence_anchor_date = expense_date WHERE recurrence_frequency IS NOT NULL` + CHECK `ck_group_expenses_recurrence_anchor ((recurrence_frequency IS NULL) = (recurrence_anchor_date IS NULL))`.
+1. **`V35__group_expense_recurrence_anchor.sql`**: `ALTER TABLE group_expenses ADD COLUMN recurrence_anchor_date DATE` + backfill `UPDATE ... SET recurrence_anchor_date = expense_date WHERE recurrence_frequency IS NOT NULL` + CHECK `ck_group_expenses_recurrence_anchor ((recurrence_frequency IS NULL) = (recurrence_anchor_date IS NULL))`; y `ALTER TABLE group_expenses ADD COLUMN recurrence_created_via VARCHAR(8)` + backfill `UPDATE ... SET recurrence_created_via = 'JOB' WHERE recurrence_source_id IS NOT NULL` + CHECK `ck_group_expenses_recurrence_created_via ((recurrence_source_id IS NULL) = (recurrence_created_via IS NULL))`.
 2. **`V36__group_activity_recurrence_events.sql`**: `ALTER TABLE group_activity DROP CONSTRAINT group_activity_event_type_check; ADD CONSTRAINT ... CHECK (event_type IN (<lista vigente de V28> + 'RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED'))`.
 
 Ambas siguen la regla del proyecto: migraciones nuevas, sin editar las ya integradas.

@@ -72,6 +72,14 @@ Investigación sobre el código existente (backend Spring Boot + frontend React)
 
 **Alternatives considered**: (a) modal `ConfirmModal` — existe pero la convención en pantallas de recurrencia es la confirmación inline; (b) acciones sin confirmación — viola FR-002/FR-004.
 
+## D10 — Persistencia del origen de la ocurrencia (FR-013)
+
+**Decision**: columna nueva `recurrence_created_via VARCHAR(8) NULL` en `group_expenses` (incluida en V35): `'JOB'` para las ocurrencias del job, `'RESUME'` para la ocurrencia creada al reanudar, `NULL` para series y gastos normales (CHECK `(recurrence_source_id IS NULL) = (recurrence_created_via IS NULL)`; backfill `'JOB'` para las ocurrencias existentes). El detalle de gasto (FR-013) resuelve el origen leyendo esta columna, sin inferir del histórico de actividad.
+
+**Rationale**: tanto el job como la reanudación copian `createdByUserId` de la serie, de modo que la fila no distingue quién creó la ocurrencia; el actor real solo vive en el evento de actividad, y consultar `group_activity` por gasto en la lectura sería costoso y frágil. Un dato persistido en la fila es determinístico, barato y consistente con laCHECK-style del modelo.
+
+**Alternatives considered**: (a) resolver en lectura consultando el evento `EXPENSE_CREATED` del gasto en `group_activity` (actor null → Sistema) — requiere parseo de `details_json` por lectura y acopla el detalle al feed; (b) no distinguir SISTEMA/MIEMBRO — contradice FR-013. Hallazgo U1 del `/speckit.analyze` del 2026-11-13.
+
 ## D9 — Observaciones fuera de alcance
 
 - `OverdueDebtJob` compara contra `expense_date` y no contra la nueva `due_date` (V33): limitación preexistente de 028, no se corrige acá (fuera de alcance de la spec 029).

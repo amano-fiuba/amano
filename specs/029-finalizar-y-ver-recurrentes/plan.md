@@ -85,7 +85,7 @@ backend/
 │       ├── GroupActivity.java           # tipos de evento nuevos (enum interno)
 │       └── ActivityEventService.java    # + recordRecurrenceChange
 ├── src/main/resources/db/migration/
-│   ├── V35__group_expense_recurrence_anchor.sql   # columna de anclaje + backfill + CHECK
+│   ├── V35__group_expense_recurrence_anchor.sql   # anclaje del ciclo + origen de ocurrencia (created_via) + CHECKs
 │   └── V36__group_activity_recurrence_events.sql  # amplía el CHECK de event_type
 └── src/test/java/com/amano/backend/groupexpense/
     ├── GroupRecurringExpenseIT.java     # estados, confirmaciones semánticas, 409, acumulado
@@ -110,5 +110,5 @@ frontend/
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| Columna nueva `recurrence_anchor_date` en `group_expenses` (V35) | La aritmética de fechas (`RecurrenceFrequency.firstAfter/firstOnOrAfter`) es anclada al inicio de la serie (`series.expenseDate`), que es la fecha del gasto histórico original. FR-003 exige reanclar el ciclo a la fecha de reanudación sin mutar ese gasto histórico (FR-006), por lo que el anclaje debe vivir en un campo propio que V35 retrocompata con `expense_date`. | (a) Mutar `expense_date` de la serie al reanudar: corrompería el gasto original (viola FR-006). (b) Avanzar fechas con `date.plus(1, unit)` sin anclaje: rompe el clamp de meses cortos (31/01 → 28/02 → 31/03) que FR-013 de la spec conserva de 009. |
+| Columna nueva `recurrence_anchor_date` y `recurrence_created_via` en `group_expenses` (V35) | La aritmética de fechas (`RecurrenceFrequency.firstAfter/firstOnOrAfter`) es anclada al inicio de la serie (`series.expenseDate`), que es la fecha del gasto histórico original. FR-003 exige reanclar el ciclo a la fecha de reanudación sin mutar ese gasto histórico (FR-006), por lo que el anclaje debe vivir en un campo propio que V35 retrocompata con `expense_date`. Además, FR-013 exige distinguir en lectura ocurrencias creadas por el job (`JOB`) de las creadas por la reanudación (`RESUME`), y la fila no conserva ese dato (el actor solo vive en el evento de actividad), por lo que también se persiste `recurrence_created_via`. | (a) Mutar `expense_date` de la serie al reanudar: corrompería el gasto original (viola FR-006). (b) Avanzar fechas con `date.plus(1, unit)` sin anclaje: rompe el clamp de meses cortos (31/01 → 28/02 → 31/03) que FR-013 de la spec conserva de 009. (c) Resolver el origen consultando `group_activity` en cada lectura: costoso y frágil (acopla el detalle al feed). |
 | Ampliación del CHECK de `group_activity.event_type` (V36) | FR-018 exige eventos de cambio de estado con actor; la BD limita `event_type` a un catálogo cerrado (patrón existente de V20/V22/V28). | No aplica: es la única vía permitida (no se editan migraciones integradas). |

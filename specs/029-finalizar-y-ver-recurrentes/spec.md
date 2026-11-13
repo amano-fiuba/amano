@@ -157,7 +157,7 @@ detalle de una ocurrencia generada y verificar que muestra su origen y su serie.
 
 **Vista de gastos recurrentes (US3)**
 
-- **FR-009**: La pantalla de gastos recurrentes del grupo MUST listar las series con concepto, importe por ocurrencia, moneda, categoría, grupo asociado, frecuencia, estado y acumulado gastado de la serie.
+- **FR-009**: La pantalla de gastos recurrentes del grupo MUST listar las series con concepto, importe por ocurrencia, moneda, categoría, grupo asociado (el grupo es el contexto de la pantalla, por lo que no requiere un campo adicional por fila), frecuencia, estado y acumulado gastado de la serie.
 - **FR-010**: Para una serie Activa, la vista MUST mostrar su próxima fecha y el próximo vencimiento de su próxima ocurrencia, calculado según las reglas de vencimiento de 028 (FR-016); una serie Pausada o Finalizada no muestra próxima fecha ni vencimiento.
 - **FR-011**: El acumulado gastado de una serie MUST ser la suma del gasto original y de sus ocurrencias generadas, en la moneda de la serie; una serie sin ocurrencias generadas MUST mostrar un acumulado de $0.
 - **FR-012**: Cuando el job registre una nueva ocurrencia, los saldos, totales del grupo y el acumulado de la serie MUST reflejarla sin acción manual de ningún miembro.
