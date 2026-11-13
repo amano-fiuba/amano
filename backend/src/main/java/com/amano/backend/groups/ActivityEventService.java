@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.amano.backend.groupexpense.RecurringActivityDetails;
 import com.amano.backend.user.User;
 
 import tools.jackson.databind.ObjectMapper;
@@ -175,6 +176,23 @@ public class ActivityEventService {
         map.put("daysRemaining", daysRemaining);
         map.put("pendingTotals", pendingTotals == null ? List.of() : pendingTotals);
         return record(groupId, GroupActivity.GroupActivityType.PAYER_DUE_NOTICE_SENT, null, map);
+    }
+
+    /**
+     * 029 FR-018: records a recurrence state change (pause, resume or finish)
+     * with the member that performed it.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordRecurrenceChange(Long groupId, Long actorUserId,
+            GroupActivity.GroupActivityType type, RecurringActivityDetails details) {
+        if (details == null) {
+            throw new IllegalArgumentException("Faltan los datos del gasto recurrente");
+        }
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("expenseId", details.expenseId());
+        map.put("description", blankToNull(details.description()));
+        map.put("status", blankToNull(details.status()));
+        return record(groupId, type, actorUserId, map);
     }
 
     /**

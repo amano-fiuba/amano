@@ -125,6 +125,14 @@ public class GroupExpense {
     @Column(name = "recurrence_source_id")
     private Long recurrenceSourceId;
 
+    /** V35 / 029 FR-003: start date of the current recurrence cycle. */
+    @Column(name = "recurrence_anchor_date")
+    private LocalDate recurrenceAnchorDate;
+
+    /** V35 / 029 FR-013: origin of an occurrence ('JOB' or 'RESUME'); null for series. */
+    @Column(name = "recurrence_created_via", length = 8)
+    private String recurrenceCreatedVia;
+
     /**
      * V33 / 028 FR-016: persisted deadline. Normal expenses and the first
      * occurrence use {@code expense_date + groups.debt_due_days} at creation;
@@ -312,6 +320,22 @@ public class GroupExpense {
 
     public void setRecurrenceSourceId(Long recurrenceSourceId) {
         this.recurrenceSourceId = recurrenceSourceId;
+    }
+
+    public LocalDate getRecurrenceAnchorDate() {
+        return recurrenceAnchorDate;
+    }
+
+    public void setRecurrenceAnchorDate(LocalDate recurrenceAnchorDate) {
+        this.recurrenceAnchorDate = recurrenceAnchorDate;
+    }
+
+    public String getRecurrenceCreatedVia() {
+        return recurrenceCreatedVia;
+    }
+
+    public void setRecurrenceCreatedVia(String recurrenceCreatedVia) {
+        this.recurrenceCreatedVia = recurrenceCreatedVia;
     }
 
     public LocalDate getDueDate() {

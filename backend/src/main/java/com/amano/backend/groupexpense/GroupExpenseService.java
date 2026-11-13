@@ -350,6 +350,7 @@ public class GroupExpenseService {
         if (normalized.frequency() != null) {
             expense.setRecurrenceFrequency(normalized.frequency());
             expense.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+            expense.setRecurrenceAnchorDate(normalized.date());
             expense.setRecurrenceNextDate(
                     normalized.frequency().firstAfter(normalized.date(), LocalDate.now(clock)));
         }
@@ -569,6 +570,8 @@ public class GroupExpenseService {
             expense.setRecurrenceFrequency(null);
             expense.setRecurrenceStatus(null);
             expense.setRecurrenceNextDate(null);
+            expense.setRecurrenceAnchorDate(null);
+            expense.setRecurrenceCreatedVia(null);
         }
         expense.setConvertedAmount(convertedAmount);
         expense.setExchangeRate(exchangeRate);

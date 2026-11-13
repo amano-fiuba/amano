@@ -38,7 +38,10 @@ public class GroupActivity {
         DEBT_OVERDUE,
         LIQUIDATION_PROPOSED,
         DEBT_REMINDER_SENT,
-        PAYER_DUE_NOTICE_SENT
+        PAYER_DUE_NOTICE_SENT,
+        RECURRENCE_PAUSED,
+        RECURRENCE_RESUMED,
+        RECURRENCE_FINISHED
     }
 
     @Id

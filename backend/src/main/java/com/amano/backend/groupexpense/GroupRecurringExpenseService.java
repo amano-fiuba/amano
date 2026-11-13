@@ -148,7 +148,7 @@ public class GroupRecurringExpenseService {
         series.setRecurrenceFrequency(targetFrequency);
         if (targetStatus == RecurrenceStatus.ACTIVE && (statusChanged || frequencyChanged)) {
             series.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
-            series.setRecurrenceNextDate(targetFrequency.firstOnOrAfter(series.getExpenseDate(), today()));
+            series.setRecurrenceNextDate(targetFrequency.firstOnOrAfter(series.getRecurrenceAnchorDate(), today()));
         }
         else if (statusChanged) {
             series.setRecurrenceStatus(targetStatus);
@@ -184,7 +184,7 @@ public class GroupRecurringExpenseService {
                     createOccurrence(series, date);
                     generated++;
                 }
-                date = series.getRecurrenceFrequency().firstAfter(series.getExpenseDate(), date);
+                date = series.getRecurrenceFrequency().firstAfter(series.getRecurrenceAnchorDate(), date);
             }
             if (advanced) {
                 series.setRecurrenceNextDate(date);
@@ -219,6 +219,7 @@ public class GroupRecurringExpenseService {
         occurrence.setDescription(series.getDescription());
         occurrence.setIdempotencyKey(occurrenceKey(series.getId(), date));
         occurrence.setRecurrenceSourceId(series.getId());
+        occurrence.setRecurrenceCreatedVia("JOB");
         GroupExpense saved = expenseRepository.save(occurrence);
 
         List<GroupExpenseShare> seriesShares =
