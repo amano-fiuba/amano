@@ -15,10 +15,14 @@ import {
 import { SnackbarProvider } from '../../components/Snackbar'
 import GroupRecurringExpensesPage, {
   EMPTY_MESSAGE,
+  FINISHED_MESSAGE,
+  FINISH_CONFIRMATION_MESSAGE,
+  FREQUENCY_MESSAGE,
   LOAD_ERROR_MESSAGE,
   PAUSED_MESSAGE,
+  PAUSE_CONFIRMATION_MESSAGE,
   RESUMED_MESSAGE,
-  FREQUENCY_MESSAGE,
+  RESUME_CONFIRMATION_MESSAGE,
 } from './GroupRecurringExpensesPage'
 
 const SERIES = {
@@ -33,6 +37,8 @@ const SERIES = {
   frequency: 'WEEKLY',
   status: 'ACTIVE',
   nextOccurrenceDate: '2026-11-16',
+  nextDueDate: '2026-11-23',
+  accumulatedAmount: '100000.00',
 }
 
 function renderPage() {
@@ -47,6 +53,10 @@ function renderPage() {
   )
 }
 
+function confirmButton() {
+  return screen.getByRole('button', { name: 'Sí, confirmar' })
+}
+
 beforeEach(() => {
   listGroupRecurringExpenses.mockReset()
   updateGroupRecurringExpense.mockReset()
@@ -57,22 +67,27 @@ beforeEach(() => {
   }))
 })
 
-describe('GroupRecurringExpensesPage (028)', () => {
-  it('lista las series del grupo con su estado, frecuencia y fechas', async () => {
+describe('GroupRecurringExpensesPage (028/029)', () => {
+  it('lista las series del grupo con su estado, frecuencia, acumulado y vencimiento', async () => {
     renderPage()
 
     expect(await screen.findByText('Alquiler')).toBeInTheDocument()
     expect(screen.getByText('Activo')).toBeInTheDocument()
-    expect(screen.getByText(/50\.000,00 ARS/)).toBeInTheDocument()
-    expect(screen.getByText(/Vivienda/)).toBeInTheDocument()
-    expect(screen.getByText(/Desde 02\/11\/2026 · Próxima fecha: 16\/11\/2026/)).toBeInTheDocument()
+    expect(screen.getByText(/50\.000,00 ARS · Vivienda · Semanal/)).toBeInTheDocument()
+    expect(screen.getByText(/Desde 02\/11\/2026 · Próxima fecha: 16\/11\/2026 · Vence: 23\/11\/2026/)).toBeInTheDocument()
+    expect(screen.getByText(/Acumulado: 100\.000,00 ARS/)).toBeInTheDocument()
     expect(screen.getByLabelText('Frecuencia de Alquiler')).toHaveValue('WEEKLY')
+    expect(screen.getByRole('link', { name: 'Alquiler' })).toHaveAttribute('href', '/groups/3/expenses/7')
   })
 
-  it('pausa una serie activa', async () => {
+  it('pausa una serie activa previa confirmación', async () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Pausar' }))
+
+    const confirm = screen.getByRole('group', { name: 'Confirmar pausar' })
+    expect(confirm).toHaveTextContent(PAUSE_CONFIRMATION_MESSAGE)
+    fireEvent.click(confirmButton())
 
     await waitFor(() => expect(updateGroupRecurringExpense).toHaveBeenCalledWith(
       '3', 7, { status: 'PAUSED' },
@@ -81,14 +96,29 @@ describe('GroupRecurringExpensesPage (028)', () => {
     expect(screen.getByText('Pausado')).toBeInTheDocument()
   })
 
-  it('reactiva una serie pausada', async () => {
+  it('cancelar la confirmación de pausa no envía nada', async () => {
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Pausar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    await waitFor(() => expect(screen.queryByRole('group')).not.toBeInTheDocument())
+    expect(updateGroupRecurringExpense).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument()
+  })
+
+  it('reactiva una serie pausada previa confirmación de reinicio', async () => {
     listGroupRecurringExpenses.mockResolvedValue({
       ok: true,
-      series: [{ ...SERIES, status: 'PAUSED' }],
+      series: [{ ...SERIES, status: 'PAUSED', nextOccurrenceDate: null, nextDueDate: null }],
     })
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Reactivar' }))
+
+    const confirm = screen.getByRole('group', { name: 'Confirmar reactivar' })
+    expect(confirm).toHaveTextContent(RESUME_CONFIRMATION_MESSAGE)
+    fireEvent.click(confirmButton())
 
     await waitFor(() => expect(updateGroupRecurringExpense).toHaveBeenCalledWith(
       '3', 7, { status: 'ACTIVE' },
@@ -96,10 +126,32 @@ describe('GroupRecurringExpensesPage (028)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(RESUMED_MESSAGE)
   })
 
-  it('cambia la frecuencia de la serie', async () => {
+  it('finaliza una serie activa previa confirmación definitiva', async () => {
     updateGroupRecurringExpense.mockResolvedValue({
       ok: true,
-      series: { ...SERIES, frequency: 'MONTHLY', nextOccurrenceDate: '2026-12-02' },
+      series: { ...SERIES, status: 'FINISHED', nextOccurrenceDate: null, nextDueDate: null },
+    })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Finalizar' }))
+
+    const confirm = screen.getByRole('group', { name: 'Confirmar finalizar' })
+    expect(confirm).toHaveTextContent(FINISH_CONFIRMATION_MESSAGE)
+    fireEvent.click(confirmButton())
+
+    await waitFor(() => expect(updateGroupRecurringExpense).toHaveBeenCalledWith(
+      '3', 7, { status: 'FINISHED' },
+    ))
+    expect(await screen.findByRole('status')).toHaveTextContent(FINISHED_MESSAGE)
+    expect(screen.getByText('Finalizado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pausar' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Frecuencia de Alquiler')).not.toBeInTheDocument()
+  })
+
+  it('cambia la frecuencia de la serie sin pedir confirmación', async () => {
+    updateGroupRecurringExpense.mockResolvedValue({
+      ok: true,
+      series: { ...SERIES, frequency: 'MONTHLY', nextOccurrenceDate: '2026-12-02', nextDueDate: '2026-12-02' },
     })
     renderPage()
 
