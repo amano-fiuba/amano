@@ -599,15 +599,16 @@ fieldset {
 
 .recurring-item__actions {
   justify-content: space-between;
+  font-size: 0.9rem;
 }
 
 .recurring-item__frequency-block {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 1rem;
 
   label {
-    font-weight: 700;
+    font-weight: 650;
   }
 }
 
