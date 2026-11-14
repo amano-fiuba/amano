@@ -183,35 +183,35 @@ export default function GroupRecurringExpensesPage() {
                   Acumulado: {formatAmount(series.accumulatedAmount)} {series.currency}
                 </p>
 
-                {confirmingThis ? (
-                  <div
-                    className="recurring-item__confirm"
-                    role="group"
-                    aria-label={`Confirmar ${ACTION_LABELS[confirming.target].toLowerCase()}`}
-                    data-testid={`confirm-${series.id}`}
-                  >
-                    <p>{CONFIRMATION_MESSAGES[confirming.target]}</p>
-                    <button
-                      type="button"
-                      className="buttonLink recurring-item__action"
-                      disabled={busy}
-                      onClick={() => confirmAction(series)}
-                    >
-                      {busy ? PENDING_LABELS[confirming.target] : 'Sí, confirmar'}
-                    </button>
-                    <button
-                      type="button"
-                      className="text-button"
-                      disabled={busy}
-                      onClick={() => setConfirming(null)}
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  !isFinished(series) && (
-                    <>
-                      <hr className="recurring-item__divider" />
+                {!isFinished(series) && (
+                  <>
+                    <hr className="recurring-item__divider" />
+                    {confirmingThis ? (
+                      <div
+                        className="recurring-item__confirm"
+                        role="group"
+                        aria-label={`Confirmar ${ACTION_LABELS[confirming.target].toLowerCase()}`}
+                        data-testid={`confirm-${series.id}`}
+                      >
+                        <p>{CONFIRMATION_MESSAGES[confirming.target]}</p>
+                        <button
+                          type="button"
+                          className="buttonLink recurring-item__action"
+                          disabled={busy}
+                          onClick={() => confirmAction(series)}
+                        >
+                          {busy ? PENDING_LABELS[confirming.target] : 'Sí, confirmar'}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-button"
+                          disabled={busy}
+                          onClick={() => setConfirming(null)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    ) : (
                       <div className="recurring-item__actions">
                         <div className="recurring-item__frequency-block">
                           <label htmlFor={`frequency-${series.id}`}>Frecuencia</label>
@@ -248,8 +248,8 @@ export default function GroupRecurringExpensesPage() {
                           ))}
                         </div>
                       </div>
-                    </>
-                  )
+                    )}
+                  </>
                 )}
               </li>
             )

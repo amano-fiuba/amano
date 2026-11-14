@@ -624,13 +624,14 @@ fieldset {
 .recurring-item__action-buttons {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   margin-left: auto;
+  margin-top: -3px;
 }
 
 .recurring-item__action {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.9rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 .recurring-item__confirm p {
