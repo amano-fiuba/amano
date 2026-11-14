@@ -78,9 +78,14 @@ public record RecurringGroupExpenseResponse(
                 || expense.getRecurrenceNextDate() == null) {
             return null;
         }
-        LocalDate nextDue = expense.getRecurrenceNextDate();
+        LocalDate nextDue;
         if (occurrenceCount == 0 && debtDueDays > 0) {
-            nextDue = nextDue.plusDays(debtDueDays);
+            // 029 FR-010: antes de generar ninguna ocurrencia, el vencimiento que se
+            // muestra es el de la primera ocurrencia (el gasto original): fecha de
+            // creación + plazo vigente del grupo.
+            nextDue = expense.getExpenseDate().plusDays(debtDueDays);
+        } else {
+            nextDue = expense.getRecurrenceNextDate();
         }
         if (minFutureDueDate != null && minFutureDueDate.isBefore(nextDue)) {
             nextDue = minFutureDueDate;
