@@ -204,7 +204,7 @@ export default function GroupRecurringExpensesPage() {
                         </button>
                         <button
                           type="button"
-                          className="text-button"
+                          className="buttonLink recurring-item__action"
                           disabled={busy}
                           onClick={() => setConfirming(null)}
                         >
