@@ -582,9 +582,10 @@ fieldset {
 
 .recurring-item__divider {
   width: 100%;
-  margin: 0.75rem 0 0.25rem;
+  margin: 0.85rem 0 0.35rem;
   border: 0;
-  border-top: 1px dashed var(--color-borde);
+  border-top: 2px dashed var(--color-texto-suave);
+  opacity: 0.6;
 }
 
 .recurring-item__actions,
