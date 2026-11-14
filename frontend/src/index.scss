@@ -580,17 +580,34 @@ fieldset {
   font-size: 0.9rem;
 }
 
+.recurring-item__divider {
+  width: 100%;
+  margin: 0.75rem 0 0.25rem;
+  border: 0;
+  border-top: 1px dashed var(--color-borde);
+}
+
 .recurring-item__actions,
 .recurring-item__confirm {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
-.recurring-item__actions label {
-  font-weight: 700;
+.recurring-item__actions {
+  justify-content: space-between;
+}
+
+.recurring-item__frequency-block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  label {
+    font-weight: 700;
+  }
 }
 
 .recurring-item__frequency {
@@ -600,6 +617,13 @@ fieldset {
   border-radius: var(--radio-control);
   background: var(--color-fondo);
   color: var(--color-texto);
+}
+
+.recurring-item__action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .recurring-item__action {

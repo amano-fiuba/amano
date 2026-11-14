@@ -193,7 +193,7 @@ export default function GroupRecurringExpensesPage() {
                     <p>{CONFIRMATION_MESSAGES[confirming.target]}</p>
                     <button
                       type="button"
-                      className="buttonLink"
+                      className="buttonLink recurring-item__action"
                       disabled={busy}
                       onClick={() => confirmAction(series)}
                     >
@@ -210,38 +210,45 @@ export default function GroupRecurringExpensesPage() {
                   </div>
                 ) : (
                   !isFinished(series) && (
-                    <div className="recurring-item__actions">
-                      <label htmlFor={`frequency-${series.id}`}>Frecuencia</label>
-                      <select
-                        id={`frequency-${series.id}`}
-                        className="recurring-item__frequency"
-                        aria-label={`Frecuencia de ${title}`}
-                        value={series.frequency}
-                        disabled={busy}
-                        onChange={(event) =>
-                          change(series, { frequency: event.target.value }, FREQUENCY_MESSAGE)}
-                      >
-                        {FREQUENCY_OPTIONS.map((option) => (
-                          <option key={option.code} value={option.code}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                    <>
+                      <hr className="recurring-item__divider" />
+                      <div className="recurring-item__actions">
+                        <div className="recurring-item__frequency-block">
+                          <label htmlFor={`frequency-${series.id}`}>Frecuencia</label>
+                          <select
+                            id={`frequency-${series.id}`}
+                            className="recurring-item__frequency"
+                            aria-label={`Frecuencia de ${title}`}
+                            value={series.frequency}
+                            disabled={busy}
+                            onChange={(event) =>
+                              change(series, { frequency: event.target.value }, FREQUENCY_MESSAGE)}
+                          >
+                            {FREQUENCY_OPTIONS.map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                      {ACTIONS_BY_STATUS[series.status]?.map((target) => (
-                        <button
-                          key={target}
-                          type="button"
-                          className="buttonLink recurring-item__action"
-                          disabled={busy}
-                          onClick={() => startAction(series, target)}
-                        >
-                          {busy && pendingId === series.id
-                            ? PENDING_LABELS[target]
-                            : ACTION_LABELS[target]}
-                        </button>
-                      ))}
-                    </div>
+                        <div className="recurring-item__action-buttons">
+                          {ACTIONS_BY_STATUS[series.status]?.map((target) => (
+                            <button
+                              key={target}
+                              type="button"
+                              className="buttonLink recurring-item__action"
+                              disabled={busy}
+                              onClick={() => startAction(series, target)}
+                            >
+                              {busy && pendingId === series.id
+                                ? PENDING_LABELS[target]
+                                : ACTION_LABELS[target]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
                   )
                 )}
               </li>
