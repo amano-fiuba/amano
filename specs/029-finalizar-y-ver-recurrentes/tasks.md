@@ -115,8 +115,8 @@ description: "Task list for Finalizar y ver gastos recurrentes de grupo"
 **Purpose**: Verificación integrada, documentación y calidad
 
 - [x] T021 Validar el recorrido de specs/029-finalizar-y-ver-recurrentes/quickstart.md con las IT equivalentes (GroupRecurringExpenseIT para pausa/reanudación/finalización/409/permisos, GroupExpenseControllerIT para la generación posterior a la reanudación) y cubrir los criterios SC-001 a SC-006
-- [ ] T022 [P] Actualizar specs/029-finalizar-y-ver-recurrentes/plan.md, research.md, data-model.md y contracts/ con cualquier ajuste que surja de la implementación (sin cambiar el alcance de la spec)
-- [ ] T023 Cobertura y calidad: `mvn -B verify` en `backend/` y `npm ci && npm run lint && npm run test:coverage && npm run build` en `frontend/`, con cobertura ≥ 85 % (JaCoCo + Vitest coverage), sin bajar umbrales
+- [x] T022 [P] Actualizar specs/029-finalizar-y-ver-recurrentes/plan.md, research.md, data-model.md y contracts/ con cualquier ajuste que surja de la implementación (sin cambiar el alcance de la spec)
+- [x] T023 Cobertura y calidad: `mvn -B verify` en `backend/` y `npm ci && npm run lint && npm run test:coverage && npm run build` en `frontend/`, con cobertura ≥ 85 % (JaCoCo + Vitest coverage), sin bajar umbrales
 
 ---
 
