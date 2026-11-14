@@ -214,6 +214,7 @@ export default function GroupRecurringExpensesPage() {
                       <label htmlFor={`frequency-${series.id}`}>Frecuencia</label>
                       <select
                         id={`frequency-${series.id}`}
+                        className="recurring-item__frequency"
                         aria-label={`Frecuencia de ${title}`}
                         value={series.frequency}
                         disabled={busy}
@@ -231,7 +232,7 @@ export default function GroupRecurringExpensesPage() {
                         <button
                           key={target}
                           type="button"
-                          className="buttonLink"
+                          className="buttonLink recurring-item__action"
                           disabled={busy}
                           onClick={() => startAction(series, target)}
                         >
