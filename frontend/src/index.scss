@@ -574,7 +574,8 @@ fieldset {
   gap: 0.5rem;
 }
 
-.recurring-item__dates {
+.recurring-item__dates,
+.recurring-item__accumulated {
   color: var(--color-texto-suave);
   font-size: 0.9rem;
 }

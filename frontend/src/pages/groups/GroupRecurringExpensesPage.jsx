@@ -19,7 +19,7 @@ export const LOADING_MESSAGE = 'Cargando gastos recurrentes…'
 export const LOAD_ERROR_MESSAGE = 'No se pudieron cargar los gastos recurrentes. Intentá nuevamente'
 export const UPDATE_ERROR_MESSAGE = 'No se pudo actualizar el gasto recurrente. Intentá nuevamente'
 export const PAUSED_MESSAGE = 'El gasto recurrente se pausó'
-export const RESUMED_MESSAGE = 'El gasto recurrente se reactivó'
+export const RESUMED_MESSAGE = 'El gasto recurrente se reanudó'
 export const FINISHED_MESSAGE = 'El gasto recurrente se finalizó'
 export const FREQUENCY_MESSAGE = 'Se actualizó la frecuencia del gasto recurrente'
 
@@ -30,8 +30,8 @@ export const RESUME_CONFIRMATION_MESSAGE =
 export const FINISH_CONFIRMATION_MESSAGE =
   'Finalizar es definitivo: no se generarán más gastos de esta serie.'
 
-const ACTION_LABELS = { PAUSED: 'Pausar', ACTIVE: 'Reactivar', FINISHED: 'Finalizar' }
-const PENDING_LABELS = { PAUSED: 'Pausando…', ACTIVE: 'Reactivando…', FINISHED: 'Finalizando…' }
+const ACTION_LABELS = { PAUSED: 'Pausar', ACTIVE: 'Reanudar', FINISHED: 'Finalizar' }
+const PENDING_LABELS = { PAUSED: 'Pausando…', ACTIVE: 'Reanudando…', FINISHED: 'Finalizando…' }
 const SUCCESS_MESSAGES = { PAUSED: PAUSED_MESSAGE, ACTIVE: RESUMED_MESSAGE, FINISHED: FINISHED_MESSAGE }
 
 const CONFIRMATION_MESSAGES = {
@@ -231,7 +231,7 @@ export default function GroupRecurringExpensesPage() {
                         <button
                           key={target}
                           type="button"
-                          className={target === 'FINISHED' ? 'text-button' : 'buttonLink'}
+                          className="buttonLink"
                           disabled={busy}
                           onClick={() => startAction(series, target)}
                         >

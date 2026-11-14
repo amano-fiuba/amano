@@ -107,16 +107,16 @@ describe('GroupRecurringExpensesPage (028/029)', () => {
     expect(screen.getByRole('button', { name: 'Pausar' })).toBeInTheDocument()
   })
 
-  it('reactiva una serie pausada previa confirmación de reinicio', async () => {
+  it('reanuda una serie pausada previa confirmación de reinicio', async () => {
     listGroupRecurringExpenses.mockResolvedValue({
       ok: true,
       series: [{ ...SERIES, status: 'PAUSED', nextOccurrenceDate: null, nextDueDate: null }],
     })
     renderPage()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Reactivar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Reanudar' }))
 
-    const confirm = screen.getByRole('group', { name: 'Confirmar reactivar' })
+    const confirm = screen.getByRole('group', { name: 'Confirmar reanudar' })
     expect(confirm).toHaveTextContent(RESUME_CONFIRMATION_MESSAGE)
     fireEvent.click(confirmButton())
 
