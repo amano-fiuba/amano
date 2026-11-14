@@ -37,6 +37,17 @@ public interface GroupExpenseRepository extends JpaRepository<GroupExpense, Long
             """)
     List<Object[]> countOccurrencesByGroupIdGroupByRecurrenceSourceId(@Param("groupId") Long groupId);
 
+    /** 029: earliest future due date of already-generated occurrences per series. */
+    @Query("""
+            SELECT e.recurrenceSourceId, MIN(e.dueDate)
+            FROM GroupExpense e
+            WHERE e.groupId = :groupId AND e.recurrenceSourceId IS NOT NULL
+              AND e.dueDate >= :today
+            GROUP BY e.recurrenceSourceId
+            """)
+    List<Object[]> findMinFutureDueDateByGroupIdAndTodayGroupByRecurrenceSourceId(
+            @Param("groupId") Long groupId, @Param("today") LocalDate today);
+
     long countByRecurrenceSourceId(Long recurrenceSourceId);
 
     /** 027 US4: an expense with a friend whose two participants are {@code a} and {@code b}. */

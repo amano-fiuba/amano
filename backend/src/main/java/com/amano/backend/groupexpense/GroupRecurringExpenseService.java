@@ -96,16 +96,24 @@ public class GroupRecurringExpenseService {
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupNotFoundException(GroupExpenseService.NOT_MEMBER));
         int debtDueDays = group.getDebtDueDays() == null ? 0 : group.getDebtDueDays();
+        LocalDate today = today();
         List<Object[]> countRows = expenseRepository.countOccurrencesByGroupIdGroupByRecurrenceSourceId(groupId);
         Map<Long, Long> occurrenceCounts = new HashMap<>();
         for (Object[] row : countRows) {
             occurrenceCounts.put((Long) row[0], (Long) row[1]);
         }
+        List<Object[]> dueRows = expenseRepository.findMinFutureDueDateByGroupIdAndTodayGroupByRecurrenceSourceId(
+                groupId, today);
+        Map<Long, LocalDate> minFutureDueDates = new HashMap<>();
+        for (Object[] row : dueRows) {
+            minFutureDueDates.put((Long) row[0], (LocalDate) row[1]);
+        }
         return expenseRepository
                 .findByGroupIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(groupId)
                 .stream()
                 .map(expense -> RecurringGroupExpenseResponse.from(expense, debtDueDays,
-                        occurrenceCounts.getOrDefault(expense.getId(), 0L)))
+                        occurrenceCounts.getOrDefault(expense.getId(), 0L),
+                        minFutureDueDates.get(expense.getId())))
                 .toList();
     }
 
@@ -192,7 +200,15 @@ public class GroupRecurringExpenseService {
                 .filter(Objects::nonNull)
                 .orElse(0);
         long occurrenceCount = expenseRepository.countByRecurrenceSourceId(saved.getId());
-        return RecurringGroupExpenseResponse.from(saved, debtDueDays, occurrenceCount);
+        LocalDate today = today();
+        LocalDate minFutureDueDate = expenseRepository
+                .findMinFutureDueDateByGroupIdAndTodayGroupByRecurrenceSourceId(groupId, today)
+                .stream()
+                .filter(row -> saved.getId().equals(row[0]))
+                .map(row -> (LocalDate) row[1])
+                .findFirst()
+                .orElse(null);
+        return RecurringGroupExpenseResponse.from(saved, debtDueDays, occurrenceCount, minFutureDueDate);
     }
 
     private GroupMember requireMember(Long callerId, Long groupId) {

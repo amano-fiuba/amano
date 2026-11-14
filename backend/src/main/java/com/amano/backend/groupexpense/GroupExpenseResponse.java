@@ -137,7 +137,7 @@ public record GroupExpenseResponse(
     }
 
     /** Recurrence origin data for a series or one of its generated occurrences (029). */
-    public record RecurrenceInfo(Long sourceId, String status, String createdVia) {
+    public record RecurrenceInfo(Long seriesId, String origin) {
     }
 
     /** One share, in request order. */

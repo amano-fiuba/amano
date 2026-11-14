@@ -321,19 +321,18 @@ describe('GroupExpenseDetailView: origen recurrente (029)', () => {
   it('muestra que el gasto dio origen a una serie recurrente', async () => {
     getGroupExpense.mockResolvedValue({
       ok: true,
-      expense: { ...EXPENSE, recurrence: { status: 'ACTIVE' } },
+      expense: { ...EXPENSE, recurrence: { seriesId: 12, origin: 'SERIE' } },
     })
     renderView()
 
     const origin = await screen.findByTestId('recurrence-origin')
     expect(origin).toHaveTextContent('Este gasto dio origen a una serie recurrente')
-    expect(origin).toHaveTextContent('Activo')
   })
 
   it('muestra que un gasto fue generado automáticamente desde una serie', async () => {
     getGroupExpense.mockResolvedValue({
       ok: true,
-      expense: { ...EXPENSE, recurrence: { sourceId: 99, createdVia: 'JOB' } },
+      expense: { ...EXPENSE, recurrence: { seriesId: 99, origin: 'SISTEMA' } },
     })
     renderView()
 
@@ -349,11 +348,15 @@ describe('GroupExpenseDetailView: origen recurrente (029)', () => {
   it('muestra que un gasto fue generado al reanudar una serie', async () => {
     getGroupExpense.mockResolvedValue({
       ok: true,
-      expense: { ...EXPENSE, recurrence: { sourceId: 99, createdVia: 'RESUME' } },
+      expense: {
+        ...EXPENSE,
+        recurrence: { seriesId: 99, origin: 'MIEMBRO' },
+        createdBy: { userId: 7, name: 'Ana López' },
+      },
     })
     renderView()
 
     const origin = await screen.findByTestId('recurrence-origin')
-    expect(origin).toHaveTextContent('Creado al reanudar la serie')
+    expect(origin).toHaveTextContent('Creado al reanudar la serie por Ana López')
   })
 })

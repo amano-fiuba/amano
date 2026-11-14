@@ -29,10 +29,11 @@ public record RecurringGroupExpenseResponse(
         String nextDueDate) {
 
     public static RecurringGroupExpenseResponse from(GroupExpense expense) {
-        return from(expense, 0, 0L);
+        return from(expense, 0, 0L, null);
     }
 
-    public static RecurringGroupExpenseResponse from(GroupExpense expense, int debtDueDays, long occurrenceCount) {
+    public static RecurringGroupExpenseResponse from(GroupExpense expense, int debtDueDays, long occurrenceCount,
+            LocalDate minFutureDueDate) {
         String nextDate = nextOccurrenceDateOf(expense);
         return new RecurringGroupExpenseResponse(
                 expense.getId(),
@@ -47,7 +48,7 @@ public record RecurringGroupExpenseResponse(
                 nameOf(expense.getRecurrenceStatus()),
                 nextDate,
                 accumulatedAmountOf(expense, occurrenceCount),
-                nextDueDateOf(expense, debtDueDays, occurrenceCount));
+                nextDueDateOf(expense, debtDueDays, occurrenceCount, minFutureDueDate));
     }
 
     private static String nameOf(Enum<?> value) {
@@ -65,18 +66,25 @@ public record RecurringGroupExpenseResponse(
     }
 
     private static String accumulatedAmountOf(GroupExpense expense, long occurrenceCount) {
-        return expense.getAmount().multiply(BigDecimal.valueOf(occurrenceCount)).toPlainString();
+        if (occurrenceCount == 0) {
+            return BigDecimal.ZERO.setScale(2).toPlainString();
+        }
+        return expense.getAmount().multiply(BigDecimal.valueOf(occurrenceCount + 1)).toPlainString();
     }
 
-    private static String nextDueDateOf(GroupExpense expense, int debtDueDays, long occurrenceCount) {
+    private static String nextDueDateOf(GroupExpense expense, int debtDueDays, long occurrenceCount,
+            LocalDate minFutureDueDate) {
         if (expense.getRecurrenceStatus() != RecurrenceStatus.ACTIVE
                 || expense.getRecurrenceNextDate() == null) {
             return null;
         }
-        LocalDate due = expense.getRecurrenceNextDate();
+        LocalDate nextDue = expense.getRecurrenceNextDate();
         if (occurrenceCount == 0 && debtDueDays > 0) {
-            due = due.plusDays(debtDueDays);
+            nextDue = nextDue.plusDays(debtDueDays);
         }
-        return due.toString();
+        if (minFutureDueDate != null && minFutureDueDate.isBefore(nextDue)) {
+            nextDue = minFutureDueDate;
+        }
+        return nextDue.toString();
     }
 }

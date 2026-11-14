@@ -306,15 +306,15 @@ class GroupRecurringExpenseIT {
     void listIncludesAccumulatedAmountAndNextDueDate() throws Exception {
         jdbc.update("""
                 INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
-                    expense_date, description, idempotency_key, expense_type, category, payment_method,
+                    expense_date, due_date, description, idempotency_key, expense_type, category, payment_method,
                     recurrence_source_id, recurrence_created_via)
-                VALUES (?, ?, ?, 100.00, 'ARS', DATE '2026-11-09', 'Ocurrencia', gen_random_uuid(),
+                VALUES (?, ?, ?, 100.00, 'ARS', DATE '2026-11-09', DATE '2026-11-09', 'Ocurrencia', gen_random_uuid(),
                     'RECURRING', 'FOOD', 'CASH', ?, 'JOB')
                 """, groupId, creatorId, creatorId, seriesId);
 
         mockMvc.perform(get("/api/groups/{id}/recurring-expenses", groupId).cookie(session(otherId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[1].accumulatedAmount").value("100.00"))
+                .andExpect(jsonPath("$[1].accumulatedAmount").value("200.00"))
                 .andExpect(jsonPath("$[1].nextDueDate").value("2026-11-02"));
     }
 
@@ -332,8 +332,8 @@ class GroupRecurringExpenseIT {
         mockMvc.perform(get("/api/groups/{id}/expenses/{expenseId}", groupId, occurrenceId)
                         .cookie(session(otherId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.recurrence.sourceId").value(seriesId))
-                .andExpect(jsonPath("$.recurrence.createdVia").value("JOB"));
+                .andExpect(jsonPath("$.recurrence.seriesId").value(seriesId))
+                .andExpect(jsonPath("$.recurrence.origin").value("SISTEMA"));
     }
 
     private String activityEvent(long expenseId) {

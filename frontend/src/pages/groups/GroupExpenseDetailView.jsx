@@ -11,7 +11,6 @@ import {
 import { useSnackbar } from '../../components/Snackbar'
 import ExpenseDebtList from '../../components/groups/ExpenseDebtList'
 import { formatAmount, formatIsoDate } from '../../validation/expenseFormat'
-import { STATUS_OPTIONS, labelOf } from '../../validation/expenseCatalog'
 
 export const EXPENSE_NOT_FOUND_MESSAGE = 'No existe el gasto solicitado o no sos miembro del grupo'
 export const DELETE_SUCCESS_MESSAGE = 'Gasto eliminado'
@@ -194,20 +193,17 @@ export default function GroupExpenseDetailView() {
           {expense.recurrence && (
             <section className="group-card" aria-label="Origen del gasto" data-testid="recurrence-origin">
               <h3>Origen</h3>
-              {expense.recurrence.sourceId ? (
-                <p>
-                  Gasto generado de la{' '}
-                  <Link to={`/groups/${id}/expenses/${expense.recurrence.sourceId}`}>
-                    serie recurrente
-                  </Link>
-                  {expense.recurrence.createdVia === 'JOB' && ' · Creado automáticamente por el sistema'}
-                  {expense.recurrence.createdVia === 'RESUME' && ' · Creado al reanudar la serie'}
-                </p>
+              {expense.recurrence.origin === 'SERIE' ? (
+                <p>Este gasto dio origen a una serie recurrente</p>
               ) : (
                 <p>
-                  Este gasto dio origen a una serie recurrente
-                  {expense.recurrence.status &&
-                    ` (${labelOf(STATUS_OPTIONS, expense.recurrence.status)})`}
+                  Gasto generado de la{' '}
+                  <Link to={`/groups/${id}/expenses/${expense.recurrence.seriesId}`}>
+                    serie recurrente
+                  </Link>
+                  {expense.recurrence.origin === 'SISTEMA' && ' · Creado automáticamente por el sistema'}
+                  {expense.recurrence.origin === 'MIEMBRO' &&
+                    ` · Creado al reanudar la serie por ${expense.createdBy?.name ?? 'un miembro'}`}
                 </p>
               )}
             </section>

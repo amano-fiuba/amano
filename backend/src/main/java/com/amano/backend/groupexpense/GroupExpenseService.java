@@ -1141,11 +1141,10 @@ public class GroupExpenseService {
             return null;
         }
         if (expense.getRecurrenceSourceId() != null) {
-            return new GroupExpenseResponse.RecurrenceInfo(expense.getRecurrenceSourceId(), null,
-                    expense.getRecurrenceCreatedVia());
+            String origin = "RESUME".equals(expense.getRecurrenceCreatedVia()) ? "MIEMBRO" : "SISTEMA";
+            return new GroupExpenseResponse.RecurrenceInfo(expense.getRecurrenceSourceId(), origin);
         }
-        return new GroupExpenseResponse.RecurrenceInfo(null,
-                expense.getRecurrenceStatus() == null ? null : expense.getRecurrenceStatus().name(), null);
+        return new GroupExpenseResponse.RecurrenceInfo(expense.getId(), "SERIE");
     }
 
     /**
