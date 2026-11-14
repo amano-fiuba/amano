@@ -190,6 +190,25 @@ export default function GroupExpenseDetailView() {
             </section>
           )}
 
+          {expense.recurrence && (
+            <section className="group-card" aria-label="Origen del gasto" data-testid="recurrence-origin">
+              <h3>Origen</h3>
+              {expense.recurrence.origin === 'SERIE' ? (
+                <p>Este gasto dio origen a una serie recurrente</p>
+              ) : (
+                <p>
+                  Gasto generado de la{' '}
+                  <Link to={`/groups/${id}/expenses/${expense.recurrence.seriesId}`}>
+                    serie recurrente
+                  </Link>
+                  {expense.recurrence.origin === 'SISTEMA' && ' · Creado automáticamente por el sistema'}
+                  {expense.recurrence.origin === 'MIEMBRO' &&
+                    ` · Creado al reanudar la serie por ${expense.createdBy?.name ?? 'un miembro'}`}
+                </p>
+              )}
+            </section>
+          )}
+
           <section className="group-card" aria-label="Partes del gasto">
             <h3>División</h3>
             <ul className="group-expense__shares">

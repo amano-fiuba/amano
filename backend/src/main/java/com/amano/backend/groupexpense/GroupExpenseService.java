@@ -350,6 +350,7 @@ public class GroupExpenseService {
         if (normalized.frequency() != null) {
             expense.setRecurrenceFrequency(normalized.frequency());
             expense.setRecurrenceStatus(RecurrenceStatus.ACTIVE);
+            expense.setRecurrenceAnchorDate(normalized.date());
             expense.setRecurrenceNextDate(
                     normalized.frequency().firstAfter(normalized.date(), LocalDate.now(clock)));
         }
@@ -569,6 +570,8 @@ public class GroupExpenseService {
             expense.setRecurrenceFrequency(null);
             expense.setRecurrenceStatus(null);
             expense.setRecurrenceNextDate(null);
+            expense.setRecurrenceAnchorDate(null);
+            expense.setRecurrenceCreatedVia(null);
         }
         expense.setConvertedAmount(convertedAmount);
         expense.setExchangeRate(exchangeRate);
@@ -1126,9 +1129,22 @@ public class GroupExpenseService {
                 expense.getCategory() == null ? null : expense.getCategory().name(),
                 expense.getExpenseType() == null ? null : expense.getExpenseType().name(),
                 expense.getPaymentMethod() == null ? null : expense.getPaymentMethod().name(),
+                recurrenceInfoOf(expense),
                 expense.getFriendUserId() == null ? null
                         : new GroupExpenseResponse.Person(expense.getFriendUserId(),
                                 names.get(expense.getFriendUserId())));
+    }
+
+    /** 029 FR-013: recurrence origin for a series or one of its occurrences. */
+    private GroupExpenseResponse.RecurrenceInfo recurrenceInfoOf(GroupExpense expense) {
+        if (!expense.isRecurringSeries() && expense.getRecurrenceSourceId() == null) {
+            return null;
+        }
+        if (expense.getRecurrenceSourceId() != null) {
+            String origin = "RESUME".equals(expense.getRecurrenceCreatedVia()) ? "MIEMBRO" : "SISTEMA";
+            return new GroupExpenseResponse.RecurrenceInfo(expense.getRecurrenceSourceId(), origin);
+        }
+        return new GroupExpenseResponse.RecurrenceInfo(expense.getId(), "SERIE");
     }
 
     /**
