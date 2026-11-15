@@ -6,7 +6,7 @@
 
 ## Summary
 
-El acreedor de una deuda abierta de un grupo puede mandarle al deudor un correo inmediato ("silbido"), con confirmación previa. El límite es 1 silbido por par acreedor–deudor por grupo cada 24 h, y cada silbido enviado queda en el historial del grupo.
+El acreedor de una deuda abierta de un grupo puede mandarle al deudor un correo inmediato ("aviso"), con confirmación previa. El límite es 1 aviso por par acreedor–deudor por grupo cada 24 h, y cada aviso enviado queda en el historial del grupo.
 
 Técnicamente:
 
@@ -42,7 +42,7 @@ Técnicamente:
 
 **Scale/Scope**:
 
-- 3 historias: US1 silbar (P1), US2 límite (P1), US3 historial (P2).
+- 3 historias: US1 avisar (P1), US2 límite (P1), US3 historial (P2).
 - 1 migración, 1 endpoint nuevo, 1 tipo de evento nuevo, 1 componente de UI nuevo y 2 componentes extendidos.
 
 ## Constitution Check
@@ -56,7 +56,7 @@ Técnicamente:
 | III. Entrega incremental | Tareas por historia (US1 → US2 → US3). US1 es entregable sola. | PASS |
 | IV. Alcance controlado | Solo lo pedido por el cronograma y la propuesta. Las decisiones Q1 a Q11 están marcadas **a confirmar** y no se tratan como confirmadas. | **PASS condicionado**: no se implementa hasta aprobar Q1–Q11 |
 | V. Calidad y cobertura | Pruebas unitarias, de integración con GreenMail y de Vitest por cada criterio. Umbral del 85 %. | PASS |
-| VI. Reglas de negocio | No se inventan transiciones de deuda: silbar solo lee (FR-006). Los permisos y estados admitidos son decisiones explícitas (Q1, Q2). | PASS |
+| VI. Reglas de negocio | No se inventan transiciones de deuda: avisar solo lee (FR-006). Los permisos y estados admitidos son decisiones explícitas (Q1, Q2). | PASS |
 | VII. Contratos REST | Solo cambios aditivos: endpoint y evento nuevos (FR-017), documentados en `contracts/`. | PASS |
 | VIII. Validación y errores | Revalidación en el servidor; códigos 401/403/404/409/422/429/503 con mensajes en español, sin exponer correos (FR-016). | PASS |
 | IX. Seguridad | Permiso verificado en el servicio, no solo en la UI. Sesión requerida. Límite aplicado en el servidor con bloqueo (D3). | PASS |
@@ -143,7 +143,7 @@ Fecha: 2026-11-15. Ninguno cambia el alcance de la spec.
 | El repositorio expone `findBlocking(...)`, que devuelve los intentos que bloquean ordenados del más nuevo al más viejo, en lugar de `findLatestBlocking` | El servicio toma el `createdAt` máximo; con una lista se testea más fácil el caso de varios intentos |
 | Se creó `WhistleNotCreditorException` en lugar de reutilizar `GroupPermissionDeniedException` | El handler existente no agrega `properties.code`, y el contrato pide `WHISTLE_NOT_CREDITOR` (research D5 dejaba la decisión abierta) |
 | Archivo extra `frontend/src/components/groups/whistleText.js` con `formatWait` y `whistleSuccessMessage` | La regla de lint `react-refresh/only-export-components` no permite exportar funciones desde el archivo del componente |
-| La frase del historial usa `formatMoney`, por ejemplo "Ana López le silbó a Juan Pérez por $ 8.000,00 (Cena)", en lugar de "{monto} {moneda}" | Mismo formato de moneda que el resto de los eventos de deuda del historial |
+| La frase del historial usa `formatMoney`, por ejemplo "Ana López le avisó a Juan Pérez por $ 8.000,00 (Cena)", en lugar de "{monto} {moneda}" | Mismo formato de moneda que el resto de los eventos de deuda del historial |
 | `DEBT_WHISTLED` se agregó al filtro "Recordatorios" del historial y a los eventos que enlazan al gasto | Sin eso, el evento no se podía filtrar ni abrir, a diferencia de `DEBT_REMINDER_SENT` |
 | En "Mis deudas pendientes", el modal no muestra el concepto | `PendingDebtResponse` no trae la descripción del gasto. Agregarla sería un cambio de contrato fuera de alcance. El detalle del gasto sí la muestra |
 | El log de falla de envío registra solo el tipo de excepción | El mensaje de una `MailSendException` puede incluir la dirección del destinatario (NFR-002) |

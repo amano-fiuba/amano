@@ -4,7 +4,7 @@ package com.amano.backend.groupexpense.whistle;
 public class SimulatedDebtorWhistleException extends RuntimeException {
 
     public static final String CODE = "SIMULATED_DEBTOR";
-    public static final String MESSAGE = "Los perfiles simulados no reciben silbidos";
+    public static final String MESSAGE = "Los perfiles simulados no reciben avisos";
 
     public SimulatedDebtorWhistleException() {
         super(MESSAGE);

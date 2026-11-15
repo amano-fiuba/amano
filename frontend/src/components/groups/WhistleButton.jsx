@@ -5,16 +5,16 @@ import ConfirmModal from '../ConfirmModal'
 import { useSnackbar } from '../Snackbar'
 import { formatWait, whistleSuccessMessage } from './whistleText'
 
-export const WHISTLE_LIMIT_NOTE = 'Podés silbarle una vez cada 24 horas en este grupo.'
-export const SIMULATED_NOTE = 'Los perfiles simulados no reciben silbidos'
+export const WHISTLE_LIMIT_NOTE = 'Podés avisarle una vez cada 24 horas en este grupo.'
+export const SIMULATED_NOTE = 'Los perfiles simulados no reciben avisos'
 export const WHISTLE_DELIVERY_ERROR = 'No pudimos enviar el aviso. Probá de nuevo en unos minutos'
 export const WHISTLE_NETWORK_ERROR = 'No se pudo enviar el aviso. Revisá tu conexión e intentá de nuevo'
 
 function rateLimitedMessage(name, seconds) {
-  return `Ya le silbaste a ${name} hace poco. Vas a poder volver a hacerlo en ${formatWait(seconds)}`
+  return `Ya le avisaste a ${name} hace poco. Vas a poder volver a hacerlo en ${formatWait(seconds)}`
 }
 
-// 030 (contracts/debt-whistle.md): "Silbar" for one debt in which the session user is
+// 030 (contracts/debt-whistle.md): "Avisar" for one debt in which the session user is
 // the creditor. It confirms with the base modal, calls the API once per confirmation
 // and reports the outcome. A 409 means the debt changed under the screen: the message
 // goes to the snackbar (the row may disappear) and the list reloads. A simulated debtor
@@ -78,12 +78,12 @@ export default function WhistleButton({ groupId, debtId, debtorName, amountText,
         type="button"
         ref={trigger}
         className="group-action"
-        aria-label={`Silbar a ${name}`}
+        aria-label={`Avisar a ${name}`}
         aria-describedby={simulated ? noteId : undefined}
         disabled={Boolean(simulated)}
         onClick={() => setOpen(true)}
       >
-        Silbar
+        Avisar
       </button>
       {simulated && (
         <small id={noteId} className="group-whistle__note" data-testid="whistle-simulated-note">
@@ -92,9 +92,9 @@ export default function WhistleButton({ groupId, debtId, debtorName, amountText,
       )}
       {open && (
         <ConfirmModal
-          title={`Silbar a ${name}`}
-          confirmLabel="Silbar"
-          busyConfirmLabel="Silbando…"
+          title={`Avisar a ${name}`}
+          confirmLabel="Avisar"
+          busyConfirmLabel="Avisando…"
           busy={busy}
           error={error}
           errorTestId="whistle-error"

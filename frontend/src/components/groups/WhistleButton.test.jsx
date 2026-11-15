@@ -22,7 +22,7 @@ import WhistleButton, {
 } from './WhistleButton'
 import { formatWait, whistleSuccessMessage } from './whistleText'
 
-// 030 T010/T023: "Silbar" with its confirmation and feedback.
+// 030 T010/T023: "Avisar" with its confirmation and feedback.
 
 const onStale = vi.fn()
 
@@ -34,9 +34,9 @@ function renderButton(props = {}) {
 }
 
 async function openAndConfirm(user) {
-  await user.click(screen.getByRole('button', { name: 'Silbar a Juan Pérez' }))
+  await user.click(screen.getByRole('button', { name: 'Avisar a Juan Pérez' }))
   const dialog = screen.getByRole('dialog')
-  await user.click(within(dialog).getByRole('button', { name: 'Silbar' }))
+  await user.click(within(dialog).getByRole('button', { name: 'Avisar' }))
   return dialog
 }
 
@@ -49,9 +49,9 @@ describe('WhistleButton: confirmación y envío (030 US1)', () => {
     const user = userEvent.setup()
     renderButton()
 
-    await user.click(screen.getByRole('button', { name: 'Silbar a Juan Pérez' }))
+    await user.click(screen.getByRole('button', { name: 'Avisar a Juan Pérez' }))
 
-    const dialog = screen.getByRole('dialog', { name: 'Silbar a Juan Pérez' })
+    const dialog = screen.getByRole('dialog', { name: 'Avisar a Juan Pérez' })
     expect(dialog).toHaveTextContent('Juan Pérez')
     expect(dialog).toHaveTextContent('$ 8.000,00 ARS')
     expect(dialog).toHaveTextContent(WHISTLE_LIMIT_NOTE)
@@ -61,7 +61,7 @@ describe('WhistleButton: confirmación y envío (030 US1)', () => {
   it('incluye el concepto cuando lo conoce', async () => {
     const user = userEvent.setup()
     renderButton({ concept: 'Cena' })
-    await user.click(screen.getByRole('button', { name: 'Silbar a Juan Pérez' }))
+    await user.click(screen.getByRole('button', { name: 'Avisar a Juan Pérez' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('por «Cena»')
   })
 
@@ -69,17 +69,17 @@ describe('WhistleButton: confirmación y envío (030 US1)', () => {
     const user = userEvent.setup()
     renderButton()
 
-    await user.click(screen.getByRole('button', { name: 'Silbar a Juan Pérez' }))
+    await user.click(screen.getByRole('button', { name: 'Avisar a Juan Pérez' }))
     await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cerrar' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Silbar a Juan Pérez' }))
+    await user.click(screen.getByRole('button', { name: 'Avisar a Juan Pérez' }))
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(whistleDebt).not.toHaveBeenCalled()
   })
 
-  it('confirmar silba, cierra y avisa con el snackbar', async () => {
+  it('confirmar avisa, cierra y avisa con el snackbar', async () => {
     whistleDebt.mockResolvedValue({ ok: true, data: { whistleId: 1 } })
     const user = userEvent.setup()
     renderButton()
@@ -99,7 +99,7 @@ describe('WhistleButton: confirmación y envío (030 US1)', () => {
     renderButton()
 
     const dialog = await openAndConfirm(user)
-    expect(within(dialog).getByRole('button', { name: 'Silbando…' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Avisando…' })).toBeDisabled()
     await user.keyboard('{Escape}')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(whistleDebt).toHaveBeenCalledTimes(1)
@@ -113,7 +113,7 @@ describe('WhistleButton: perfiles simulados (030 Q3)', () => {
     const user = userEvent.setup()
     renderButton({ simulated: true })
 
-    const button = screen.getByRole('button', { name: 'Silbar a Juan Pérez' })
+    const button = screen.getByRole('button', { name: 'Avisar a Juan Pérez' })
     expect(button).toBeDisabled()
     expect(screen.getByText(SIMULATED_NOTE)).toBeVisible()
     expect(button).toHaveAccessibleDescription(SIMULATED_NOTE)
@@ -145,7 +145,7 @@ describe('WhistleButton: errores (030 FR-015)', () => {
     const dialog = await openAndConfirm(user)
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(WHISTLE_DELIVERY_ERROR)
 
-    await user.click(within(dialog).getByRole('button', { name: 'Silbar' }))
+    await user.click(within(dialog).getByRole('button', { name: 'Avisar' }))
     await waitFor(() => expect(showSnackbar).toHaveBeenCalledWith('Le avisamos a Juan Pérez'))
   })
 
@@ -161,8 +161,8 @@ describe('WhistleButton: errores (030 FR-015)', () => {
   })
 
   it.each([
-    [403, 'Solo quien recibe el pago puede silbar esta deuda'],
-    [422, 'Los perfiles simulados no reciben silbidos'],
+    [403, 'Solo quien recibe el pago puede avisar esta deuda'],
+    [422, 'Los perfiles simulados no reciben avisos'],
   ])('%s muestra el mensaje del servidor en el modal', async (status, detail) => {
     whistleDebt.mockResolvedValue({ ok: false, status, detail })
     const user = userEvent.setup()
@@ -197,7 +197,7 @@ describe('WhistleButton: límite de 24 horas (030 T023)', () => {
     const dialog = await openAndConfirm(user)
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Ya le silbaste a Juan Pérez hace poco. Vas a poder volver a hacerlo en 17 h 40 min',
+      'Ya le avisaste a Juan Pérez hace poco. Vas a poder volver a hacerlo en 17 h 40 min',
     )
   })
 

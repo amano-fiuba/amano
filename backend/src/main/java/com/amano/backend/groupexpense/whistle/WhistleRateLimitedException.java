@@ -11,7 +11,7 @@ public class WhistleRateLimitedException extends RuntimeException {
     private final long retryAfterSeconds;
 
     public WhistleRateLimitedException(String debtorName, long retryAfterSeconds) {
-        super("Ya le silbaste a " + debtorName + " en las últimas 24 horas");
+        super("Ya le avisaste a " + debtorName + " en las últimas 24 horas");
         this.retryAfterSeconds = retryAfterSeconds;
     }
 

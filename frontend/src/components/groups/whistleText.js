@@ -1,4 +1,4 @@
-// 030: pure texts of "Silbar" (kept apart from the component for Fast Refresh).
+// 030: pure texts of "Avisar" (kept apart from the component for Fast Refresh).
 
 export function whistleSuccessMessage(name) {
   return `Le avisamos a ${name}`

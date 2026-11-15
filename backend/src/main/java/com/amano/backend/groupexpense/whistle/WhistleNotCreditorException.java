@@ -4,7 +4,7 @@ package com.amano.backend.groupexpense.whistle;
 public class WhistleNotCreditorException extends RuntimeException {
 
     public static final String CODE = "WHISTLE_NOT_CREDITOR";
-    public static final String MESSAGE = "Solo quien recibe el pago puede silbar esta deuda";
+    public static final String MESSAGE = "Solo quien recibe el pago puede avisar esta deuda";
 
     public WhistleNotCreditorException() {
         super(MESSAGE);

@@ -12,7 +12,7 @@ export const NO_DEBTS_MESSAGE = 'Este gasto no generó deudas'
 // share order (contract §GET). With `groupId` and `expenseId`, each debt the
 // session user may pay (`canRegisterPayment`, 018 FR-016/FR-017) links to the
 // "Registrar pago" screen; without them the list stays read-only. 030: the session
-// user also gets "Silbar" on the payable debts in which they are the creditor.
+// user also gets "Avisar" on the payable debts in which they are the creditor.
 export default function ExpenseDebtList({ debts, groupId, expenseId, concept, onStale }) {
   const auth = useAuth()
   const currentUserId = auth?.user?.id ?? null

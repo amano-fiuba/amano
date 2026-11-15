@@ -297,10 +297,10 @@ describe('whistleDebt (030 T009)', () => {
   })
 
   it.each([
-    [403, 'WHISTLE_NOT_CREDITOR', 'Solo quien recibe el pago puede silbar esta deuda'],
+    [403, 'WHISTLE_NOT_CREDITOR', 'Solo quien recibe el pago puede avisar esta deuda'],
     [404, null, 'No existe el grupo solicitado o no sos miembro'],
     [409, 'DEBT_NOT_WHISTLEABLE', 'La deuda ya no tiene saldo pendiente'],
-    [422, 'SIMULATED_DEBTOR', 'Los perfiles simulados no reciben silbidos'],
+    [422, 'SIMULATED_DEBTOR', 'Los perfiles simulados no reciben avisos'],
     [503, 'WHISTLE_DELIVERY_FAILED', 'No pudimos enviar el aviso. Probá de nuevo en unos minutos'],
   ])('%s devuelve el estado, el detalle y el código', async (status, code, detail) => {
     vi.stubGlobal('fetch', respond(status, { detail, properties: code ? { code } : {} }))
@@ -309,7 +309,7 @@ describe('whistleDebt (030 T009)', () => {
 
   it('429 lee los segundos de espera del cuerpo o, si faltan, de la cabecera Retry-After', async () => {
     vi.stubGlobal('fetch', respond(429, {
-      detail: 'Ya le silbaste a Juan Pérez en las últimas 24 horas',
+      detail: 'Ya le avisaste a Juan Pérez en las últimas 24 horas',
       properties: { code: 'WHISTLE_RATE_LIMITED', retryAfterSeconds: 63600 },
     }))
     expect(await whistleDebt(3, 42)).toMatchObject({ ok: false, status: 429, retryAfterSeconds: 63600 })

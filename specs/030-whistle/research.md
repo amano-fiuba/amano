@@ -39,7 +39,7 @@ Investigación sobre el código existente para resolver las decisiones técnicas
 
 **Rationale**:
 
-- El bloqueo sobre la membresía del acreedor serializa sus silbidos dentro del grupo. Dos confirmaciones simultáneas no pueden ver las dos "0 intentos" (FR-010, SC-003).
+- El bloqueo sobre la membresía del acreedor serializa sus avisos dentro del grupo. Dos confirmaciones simultáneas no pueden ver las dos "0 intentos" (FR-010, SC-003).
 - No se puede bloquear la fila del deudor, porque un perfil simulado no tiene fila en `group_members`, y bloquear una sola deuda no alcanza: el límite es por par.
 - No se envía correo dentro de una transacción (mismo criterio que `ReminderDispatcher`).
 - `FAILED` no cuenta para el límite (FR-008).
@@ -55,9 +55,9 @@ Investigación sobre el código existente para resolver las decisiones técnicas
 1. Sesión → **401** (en el controller).
 2. El grupo existe y el caller es miembro activo → si no, **404** neutral (`GroupNotFoundException`, mensaje de `PendingDebtService.NOT_MEMBER`).
 3. La deuda existe y `debt.groupId == groupId` → si no, **404** neutral.
-4. `debt.creditorUserId == callerId` → si no, **403** "Solo quien recibe el pago puede silbar esta deuda".
+4. `debt.creditorUserId == callerId` → si no, **403** "Solo quien recibe el pago puede avisar esta deuda".
 5. `debt.status.isPayable()` (`PENDING`, `PARTIALLY_PAID`, `OVERDUE`) → si no, **409** `DEBT_NOT_WHISTLEABLE` "La deuda ya no tiene saldo pendiente" o, para `PAYMENT_REPORTED`, "La deuda tiene un pago esperando validación".
-6. `debt.debtorType == SIMULATED` → **422** `SIMULATED_DEBTOR` "Los perfiles simulados no reciben silbidos" (**sujeto a Q3**).
+6. `debt.debtorType == SIMULATED` → **422** `SIMULATED_DEBTOR` "Los perfiles simulados no reciben avisos" (**sujeto a Q3**).
 7. El deudor registrado es miembro activo del grupo → si no, **409** `DEBTOR_NOT_MEMBER`.
 8. Límite (D3) → **429** `WHISTLE_RATE_LIMITED`.
 9. Envío → **503** `WHISTLE_DELIVERY_FAILED` si el SMTP falla o no hay correo.
@@ -80,8 +80,8 @@ Investigación sobre el código existente para resolver las decisiones técnicas
 
 **Decision**: un componente `WhistleButton({ groupId, debt, debtorName, amountText, currency, concept, simulated, onStale })` encapsula el botón, el `ConfirmModal`, la llamada a `whistleDebt` y los mensajes. Se monta en:
 
-- `MyDebtsPanel`, cuando `debt.creditorUserId === currentUserId` y el estado es silbable (`isPayableDebtStatus`, que ya existe en `debtStatusLabels.js`). Simulado = `debt.debtorUserId == null`.
-- `ExpenseDebtList`, cuando `debt.creditor.userId === currentUserId` (el `Person` de `DebtView` trae `userId`) y el estado es silbable. Simulado = `debt.debtor.type === 'SIMULATED'`.
+- `MyDebtsPanel`, cuando `debt.creditorUserId === currentUserId` y el estado es avisable (`isPayableDebtStatus`, que ya existe en `debtStatusLabels.js`). Simulado = `debt.debtorUserId == null`.
+- `ExpenseDebtList`, cuando `debt.creditor.userId === currentUserId` (el `Person` de `DebtView` trae `userId`) y el estado es avisable. Simulado = `debt.debtor.type === 'SIMULATED'`.
 
 `whistleDebt(groupId, debtId)` se agrega a `groupExpensesClient.js` siguiendo `problemOf` y `failure`, y devuelve `{ ok, status, detail, code, retryAfterSeconds, network }`.
 

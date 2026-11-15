@@ -263,7 +263,7 @@ describe('GroupDebtsView: mis deudas pendientes (022 T074)', () => {
   })
 })
 
-describe('GroupDebtsView: "Silbar" en mis deudas pendientes (030 T011)', () => {
+describe('GroupDebtsView: "Avisar" en mis deudas pendientes (030 T011)', () => {
   const OWED_REPORTED = debt({
     debtId: 35, debtorName: 'Juan Pérez', creditorName: 'Ana López', status: 'PAYMENT_REPORTED',
     debtorUserId: 15, creditorUserId: 7,
@@ -277,19 +277,19 @@ describe('GroupDebtsView: "Silbar" en mis deudas pendientes (030 T011)', () => {
     paidAmount: 1000, outstanding: 2333.33, debtorUserId: 22, creditorUserId: 7,
   })
 
-  it('aparece solo cuando la persona es la acreedora y la deuda tiene saldo silbable', async () => {
+  it('aparece solo cuando la persona es la acreedora y la deuda tiene saldo avisable', async () => {
     getPendingDebts.mockResolvedValue(ok([OWE, OWED_USD, REPORTED, OWED_REPORTED, OWED_BY_SIMULATED, OWED_PARTIAL]))
     renderView()
 
     const rows = await screen.findAllByTestId('my-debt-row')
-    const whistle = (row) => within(row).queryByRole('button', { name: /^Silbar a / })
+    const whistle = (row) => within(row).queryByRole('button', { name: /^Avisar a / })
     expect(whistle(rows[0])).not.toBeInTheDocument()
-    expect(whistle(rows[1])).toHaveAccessibleName('Silbar a Juan Pérez')
+    expect(whistle(rows[1])).toHaveAccessibleName('Avisar a Juan Pérez')
     expect(whistle(rows[1])).toBeEnabled()
     expect(whistle(rows[2])).not.toBeInTheDocument()
     expect(whistle(rows[3])).not.toBeInTheDocument()
     expect(whistle(rows[4])).toBeDisabled()
-    expect(rows[4]).toHaveTextContent('Los perfiles simulados no reciben silbidos')
+    expect(rows[4]).toHaveTextContent('Los perfiles simulados no reciben avisos')
     expect(whistle(rows[5])).toBeEnabled()
   })
 })

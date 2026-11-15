@@ -12,7 +12,7 @@ description: "Task list for Whistle — aviso manual a un deudor"
 
 **Organization**: tareas agrupadas por historia de usuario.
 
-- US1: silbar (P1, MVP).
+- US1: avisar (P1, MVP).
 - US2: límite de 24 h (P1).
 - US3: historial (P2).
 
@@ -78,11 +78,11 @@ US1 se puede entregar sola. US2 y US3 dependen de US1.
 
 ---
 
-## Phase 3: User Story 1 - Silbar a un deudor (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Avisar a un deudor (Priority: P1) 🎯 MVP
 
 **Goal**: el acreedor confirma y el deudor registrado recibe un correo en ese momento. Las reglas de permiso, estado, simulado y miembro se aplican en el servidor y la UI muestra el botón solo donde corresponde (FR-001 a FR-006, FR-009, FR-013 a FR-016).
 
-**Independent Test**: con una deuda `PENDING` de un usuario registrado, silbar como acreedor y verificar un único correo en GreenMail y la deuda sin cambios.
+**Independent Test**: con una deuda `PENDING` de un usuario registrado, avisar como acreedor y verificar un único correo en GreenMail y la deuda sin cambios.
 
 ### Tests for User Story 1 ⚠️ (escribir primero, deben fallar)
 
@@ -105,15 +105,15 @@ US1 se puede entregar sola. US2 y US3 dependen de US1.
   - Debe fallar antes de T016.
 - [x] T009 [P] [US1] Extender `frontend/src/api/groupExpensesClient.test.js` con `whistleDebt`: 201 → `{ ok, data }`; 409, 422 y 503 → `{ ok: false, status, detail, code }`; error de red → `{ network: true }`.
 - [x] T010 [P] [US1] Crear `frontend/src/components/groups/WhistleButton.test.jsx`:
-  - el botón tiene `aria-label` "Silbar a {deudor}";
+  - el botón tiene `aria-label` "Avisar a {deudor}";
   - abre un `ConfirmModal` con título, monto, concepto y la aclaración de 24 h;
   - la × y Escape no llaman al API;
   - confirmar muestra el snackbar "Le avisamos a {deudor}";
   - mientras `busy`, no se puede confirmar dos veces;
-  - simulado: botón deshabilitado con el texto visible "Los perfiles simulados no reciben silbidos" (Q3);
+  - simulado: botón deshabilitado con el texto visible "Los perfiles simulados no reciben avisos" (Q3);
   - 409 muestra el mensaje y llama a `onStale`; 503 muestra su mensaje; error de red permite reintentar; 401 llama a `setUser(null)`.
-- [x] T011 [P] [US1] Extender `frontend/src/pages/groups/GroupDebtsView.test.jsx` (pestaña "Mis deudas pendientes", `MyDebtsPanel`): "Silbar" aparece en "X te debe" con estado silbable y no aparece en "Le debés a…", en `PAYMENT_REPORTED` ni en deudas ajenas.
-- [x] T012 [P] [US1] Extender `frontend/src/components/groups/ExpenseDebtList.test.jsx`: "Silbar" aparece solo cuando `debt.creditor.userId` es el usuario de la sesión y el estado es silbable.
+- [x] T011 [P] [US1] Extender `frontend/src/pages/groups/GroupDebtsView.test.jsx` (pestaña "Mis deudas pendientes", `MyDebtsPanel`): "Avisar" aparece en "X te debe" con estado avisable y no aparece en "Le debés a…", en `PAYMENT_REPORTED` ni en deudas ajenas.
+- [x] T012 [P] [US1] Extender `frontend/src/components/groups/ExpenseDebtList.test.jsx`: "Avisar" aparece solo cuando `debt.creditor.userId` es el usuario de la sesión y el estado es avisable.
 
 ### Implementation for User Story 1
 
@@ -129,17 +129,17 @@ US1 se puede entregar sola. US2 y US3 dependen de US1.
 - [x] T017 [US1] Agregar `whistleDebt(groupId, debtId)` a `frontend/src/api/groupExpensesClient.js`, reutilizando `problemOf` y `failure`, y leyendo `properties.code` y `properties.retryAfterSeconds` o la cabecera `Retry-After`. Pasa T009.
 - [x] T018 [US1] Crear `frontend/src/components/groups/WhistleButton.jsx` (`ConfirmModal`, `useSnackbar`, textos exportados como constantes para los tests, estado deshabilitado para simulados). Pasa T010.
 - [x] T019 [US1] Montar `WhistleButton` en `frontend/src/components/groups/MyDebtsPanel.jsx` cuando `debt.creditorUserId === currentUserId` y `isPayableDebtStatus(debt.status)`. Simulado = `debt.debtorUserId == null`. `onStale` llama a `onChanged`. Pasa T011.
-- [x] T020 [US1] Montar `WhistleButton` en `frontend/src/components/groups/ExpenseDebtList.jsx` (con el usuario de `useAuth`) cuando `debt.creditor.userId` es el usuario de la sesión y el estado es silbable. Simulado = `debt.debtor.type === 'SIMULATED'`. Pasa T012.
+- [x] T020 [US1] Montar `WhistleButton` en `frontend/src/components/groups/ExpenseDebtList.jsx` (con el usuario de `useAuth`) cuando `debt.creditor.userId` es el usuario de la sesión y el estado es avisable. Simulado = `debt.debtor.type === 'SIMULATED'`. Pasa T012.
 
 **Checkpoint**: US1 funciona y se puede probar sola: escenarios 1 a 4 y 9 de quickstart.md.
 
 ---
 
-## Phase 4: User Story 2 - Límite de un silbido por día (Priority: P1)
+## Phase 4: User Story 2 - Límite de un aviso por día (Priority: P1)
 
-**Goal**: como máximo 1 silbido enviado o en curso por par (grupo, acreedor, deudor) cada 24 h. Responde 429 con el tiempo restante, ignora los intentos fallidos y resiste la concurrencia (FR-007, FR-008, FR-010).
+**Goal**: como máximo 1 aviso enviado o en curso por par (grupo, acreedor, deudor) cada 24 h. Responde 429 con el tiempo restante, ignora los intentos fallidos y resiste la concurrencia (FR-007, FR-008, FR-010).
 
-**Independent Test**: dos silbidos seguidos al mismo deudor en el mismo grupo producen un correo y un 429. Con el reloj adelantado 24 h, el silbido vuelve a salir.
+**Independent Test**: dos avisos seguidos al mismo deudor en el mismo grupo producen un correo y un 429. Con el reloj adelantado 24 h, el aviso vuelve a salir.
 
 ### Tests for User Story 2 ⚠️
 
@@ -150,8 +150,8 @@ US1 se puede entregar sola. US2 y US3 dependen de US1.
   - el límite es por par: otro deudor u otro grupo no quedan bloqueados, y la misma pareja desde otra deuda sí;
   - `retryAfterSeconds` se redondea hacia arriba.
 - [x] T022 [P] [US2] Extender `DebtWhistleIT.java`:
-  - el segundo silbido responde 429 con `Retry-After` y `properties.retryAfterSeconds`, y GreenMail sigue con un solo mensaje;
-  - con `@MockitoBean Clock` adelantado 24 h, el silbido vuelve a salir (201);
+  - el segundo aviso responde 429 con `Retry-After` y `properties.retryAfterSeconds`, y GreenMail sigue con un solo mensaje;
+  - con `@MockitoBean Clock` adelantado 24 h, el aviso vuelve a salir (201);
   - un 503 seguido de un reintento con el SMTP sano responde 201;
   - **concurrencia**: dos solicitudes simultáneas en hilos distintos producen exactamente un 201, un 429 y un solo correo.
 - [x] T023 [P] [US2] Extender `WhistleButton.test.jsx`: 429 con `retryAfterSeconds = 63600` muestra "Vas a poder volver a hacerlo en 17 h 40 min"; con menos de una hora, solo minutos; siempre redondeando hacia arriba.
@@ -165,11 +165,11 @@ US1 se puede entregar sola. US2 y US3 dependen de US1.
 
 ---
 
-## Phase 5: User Story 3 - Silbidos en el historial del grupo (Priority: P2)
+## Phase 5: User Story 3 - Avisos en el historial del grupo (Priority: P2)
 
-**Goal**: cada silbido enviado queda como `DEBT_WHISTLED` a nombre del acreedor. Los intentos fallidos o rechazados no dejan nada (FR-011, FR-012).
+**Goal**: cada aviso enviado queda como `DEBT_WHISTLED` a nombre del acreedor. Los intentos fallidos o rechazados no dejan nada (FR-011, FR-012).
 
-**Independent Test**: silbar y ver el evento en `GET /api/groups/{id}/activity` y en la pantalla de historial. Un 503 o un 429 no agrega eventos.
+**Independent Test**: avisar y ver el evento en `GET /api/groups/{id}/activity` y en la pantalla de historial. Un 503 o un 429 no agrega eventos.
 
 ### Tests for User Story 3 ⚠️
 
@@ -238,7 +238,7 @@ US1 se puede entregar sola. US2 y US3 dependen de US1.
 ### Incremental Delivery
 
 1. Migración, entidad, evento y errores.
-2. US1: silbido funcional.
+2. US1: aviso funcional.
 3. US2: límite anti-spam. **Recomendado antes de mergear**: sin él, el botón permite spam.
 4. US3: historial.
 

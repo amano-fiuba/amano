@@ -206,12 +206,12 @@ function recurrenceFinished(details) {
   return recurrenceDescription('finalizó', details)
 }
 
-// 030: aviso manual del acreedor (el actor es quien silbó).
+// 030: aviso manual del acreedor (el actor es quien avisó).
 function debtWhistled(details) {
   const debtor = text(details.fromName) ?? 'alguien'
   const money = formatMoney(details.amount, details.currency)
   const concept = text(details.description)
-  let sentence = `le silbó a ${debtor} por ${money ?? 'una deuda'}`
+  let sentence = `le avisó a ${debtor} por ${money ?? 'una deuda'}`
   if (concept) sentence += ` (${concept})`
   return sentence
 }

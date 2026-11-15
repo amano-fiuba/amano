@@ -231,7 +231,7 @@ class DebtWhistleIT {
 
         JsonNode body = problem(anaSession, groupId, debt, 422);
 
-        assertThat(body.get("detail").asString()).isEqualTo("Los perfiles simulados no reciben silbidos");
+        assertThat(body.get("detail").asString()).isEqualTo("Los perfiles simulados no reciben avisos");
         assertThat(body.at("/properties/code").asString()).isEqualTo("SIMULATED_DEBTOR");
         assertThat(greenMail.getReceivedMessages()).isEmpty();
     }
@@ -278,7 +278,7 @@ class DebtWhistleIT {
                 .andExpect(header().string("Retry-After", String.valueOf(17 * 3600 + 40 * 60)))
                 .andExpect(jsonPath("$.properties.code").value("WHISTLE_RATE_LIMITED"))
                 .andExpect(jsonPath("$.properties.retryAfterSeconds").value(17 * 3600 + 40 * 60))
-                .andExpect(jsonPath("$.detail").value("Ya le silbaste a Juan Pérez en las últimas 24 horas"));
+                .andExpect(jsonPath("$.detail").value("Ya le avisaste a Juan Pérez en las últimas 24 horas"));
         assertThat(greenMail.waitForIncomingEmail(2_000, 2)).isFalse();
 
         at(NOW.plusHours(24));

@@ -36,27 +36,27 @@ Pruebas clave (ver `tasks.md`):
 - Ana registra "Nafta" por $6.000, repartida entre Ana y Pepe.
 - Juan registra "Taxi", pagado por él y repartido con Ana, así que Ana le debe a Juan.
 
-1. **Silbar (US1)**: Ana abre "Viaje" → Deudas → "Mis deudas pendientes".
-   - En la fila "Juan te debe", pulsa "Silbar". Se abre el modal "Silbar a Juan" con el monto, el concepto y la aclaración de 24 horas.
+1. **Avisar (US1)**: Ana abre "Viaje" → Deudas → "Mis deudas pendientes".
+   - En la fila "Juan te debe", pulsa "Avisar". Se abre el modal "Avisar a Juan" con el monto, el concepto y la aclaración de 24 horas.
    - Si lo cierra con la ×, no pasa nada.
    - Si confirma, aparece el aviso "Le avisamos a Juan" y en el SMTP de prueba hay un correo para Juan con el asunto "Ana te recuerda una deuda - Viaje".
    - La deuda sigue `PENDING` y por $8.000.
-2. **Desde el detalle del gasto (US1)**: Ana abre el gasto "Cena". En la lista de deudas, la de Juan tiene el botón "Silbar", con el mismo comportamiento.
-3. **No es acreedor (US1)**: en la deuda de "Taxi" (Ana le debe a Juan), Ana no ve "Silbar". Un `curl` al endpoint con la sesión de Ana sobre esa deuda responde 403.
-4. **Perfil simulado (US1, sujeto a Q3)**: en la deuda de Pepe por "Nafta", el botón aparece deshabilitado con el texto "Los perfiles simulados no reciben silbidos". Por API responde 422 y no llega ningún correo.
-5. **Límite (US2)**: enseguida, Ana vuelve a silbar a Juan, por la misma deuda o por otra del grupo.
-   - Aparece "Ya le silbaste a Juan hace poco. Vas a poder volver a hacerlo en 23 h 59 min" y no llega un correo nuevo.
-   - Silbar a Juan desde otro grupo sí funciona.
+2. **Desde el detalle del gasto (US1)**: Ana abre el gasto "Cena". En la lista de deudas, la de Juan tiene el botón "Avisar", con el mismo comportamiento.
+3. **No es acreedor (US1)**: en la deuda de "Taxi" (Ana le debe a Juan), Ana no ve "Avisar". Un `curl` al endpoint con la sesión de Ana sobre esa deuda responde 403.
+4. **Perfil simulado (US1, sujeto a Q3)**: en la deuda de Pepe por "Nafta", el botón aparece deshabilitado con el texto "Los perfiles simulados no reciben avisos". Por API responde 422 y no llega ningún correo.
+5. **Límite (US2)**: enseguida, Ana vuelve a avisar a Juan, por la misma deuda o por otra del grupo.
+   - Aparece "Ya le avisaste a Juan hace poco. Vas a poder volver a hacerlo en 23 h 59 min" y no llega un correo nuevo.
+   - Avisar a Juan desde otro grupo sí funciona.
 6. **Doble clic (US2)**: con DevTools en "Slow 3G", Ana confirma y vuelve a confirmar rápido (o usa dos pestañas). Llega un solo correo.
-7. **Falla de correo (US2 y edge cases)**: con el SMTP de prueba detenido, silbar muestra "No pudimos enviar el aviso…". Si se levanta el SMTP y se reintenta, el silbido sale (la falla no consumió el límite).
-8. **Historial (US3)**: Deudas → Historial muestra "Ana le silbó a Juan por 8000.00 ARS (Cena)" una sola vez, y nada por los intentos fallidos o rechazados.
-9. **Deuda saldada (edge case)**: Juan registra el pago total y Ana, con la pantalla vieja, pulsa "Silbar". Aparece "La deuda ya no tiene saldo pendiente" y la lista se recarga sin el botón.
-10. **Accesibilidad**: navegando solo con teclado se llega a "Silbar", Enter abre el modal con el foco en la ×, Escape lo cierra y el lector anuncia "Silbar a Juan".
+7. **Falla de correo (US2 y edge cases)**: con el SMTP de prueba detenido, avisar muestra "No pudimos enviar el aviso…". Si se levanta el SMTP y se reintenta, el aviso sale (la falla no consumió el límite).
+8. **Historial (US3)**: Deudas → Historial muestra "Ana le avisó a Juan por 8000.00 ARS (Cena)" una sola vez, y nada por los intentos fallidos o rechazados.
+9. **Deuda saldada (edge case)**: Juan registra el pago total y Ana, con la pantalla vieja, pulsa "Avisar". Aparece "La deuda ya no tiene saldo pendiente" y la lista se recarga sin el botón.
+10. **Accesibilidad**: navegando solo con teclado se llega a "Avisar", Enter abre el modal con el foco en la ×, Escape lo cierra y el lector anuncia "Avisar a Juan".
 
 ## Resultado esperado
 
-- Un correo por silbido confirmado (SC-002) y ninguno por encima del límite (SC-003).
-- Ningún correo para quien no es acreedor, deudas no silbables ni perfiles simulados (SC-004).
+- Un correo por aviso confirmado (SC-002) y ninguno por encima del límite (SC-003).
+- Ningún correo para quien no es acreedor, deudas no avisables ni perfiles simulados (SC-004).
 - Historial con el 100 % de los envíos y ninguno fallido (SC-005).
 - Deudas sin cambios (SC-006).
 

@@ -218,7 +218,7 @@ class DebtWhistleServiceTest {
         debt(DebtStatus.PENDING, ParticipantType.SIMULATED, GROUP);
         assertThatThrownBy(() -> service.whistle(ANA, GROUP, DEBT))
                 .isInstanceOf(SimulatedDebtorWhistleException.class)
-                .hasMessage("Los perfiles simulados no reciben silbidos");
+                .hasMessage("Los perfiles simulados no reciben avisos");
         verifyNothingSent();
     }
 
@@ -285,7 +285,7 @@ class DebtWhistleServiceTest {
 
         assertThatThrownBy(() -> service.whistle(ANA, GROUP, DEBT))
                 .isInstanceOf(WhistleRateLimitedException.class)
-                .hasMessage("Ya le silbaste a Juan Pérez en las últimas 24 horas")
+                .hasMessage("Ya le avisaste a Juan Pérez en las últimas 24 horas")
                 .extracting("retryAfterSeconds").isEqualTo(1L);
         verify(whistleRepository, never()).save(any());
         verify(mailService, never()).send(anyString(), any());

@@ -1,4 +1,4 @@
-# Contract: Correo del silbido y evento de historial (030)
+# Contract: Correo del aviso y evento de historial (030)
 
 **Feature**: specs/030-whistle | **Date**: 2026-11-15
 
@@ -27,7 +27,7 @@ Este aviso lo envió {acreedor} desde A mano.
 - La fecha límite se incluye solo si el gasto tiene `due_date`.
 - Las líneas de categoría, tipo y medio de pago salen de `appendExpenseDetails`, con las mismas reglas de 025 y 028.
 - **No** se usa `groups.reminder_message` (spec Q5).
-- **Sujeto a Q3**: si se habilita silbar a perfiles simulados, el mismo correo va a `SimulatedProfile.email`.
+- **Sujeto a Q3**: si se habilita avisar a perfiles simulados, el mismo correo va a `SimulatedProfile.email`.
 
 ## 2. Evento `DEBT_WHISTLED`
 
@@ -52,7 +52,7 @@ Este aviso lo envió {acreedor} desde A mano.
 
 `frontend/src/pages/groups/activityDescriptions.js` lo describe como:
 
-> {actor} le silbó a {fromName} por {amount} {currency} ({description})
+> {actor} le avisó a {fromName} por {amount} {currency} ({description})
 
 Si falta `description`, se omite el paréntesis.
 

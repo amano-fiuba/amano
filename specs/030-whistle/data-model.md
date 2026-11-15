@@ -10,8 +10,8 @@ Una tabla nueva y un valor nuevo en el catálogo de eventos. No se modifica ning
 |-------|------|-------|
 | `id` | `BIGSERIAL PRIMARY KEY` | |
 | `group_id` | `BIGINT NOT NULL REFERENCES groups (id)` | Grupo de la deuda; forma parte de la clave del límite |
-| `debt_id` | `BIGINT NOT NULL REFERENCES debts (id)` | Deuda desde la que se silbó. Las deudas no se borran físicamente: `deletePersonal` rechaza gastos con deudas, y el patrón es el mismo de `reminders.debt_id` en V27 |
-| `creditor_user_id` | `BIGINT NOT NULL REFERENCES users (id)` | Quien silba; copia de `debts.creditor_user_id` |
+| `debt_id` | `BIGINT NOT NULL REFERENCES debts (id)` | Deuda desde la que se avisó. Las deudas no se borran físicamente: `deletePersonal` rechaza gastos con deudas, y el patrón es el mismo de `reminders.debt_id` en V27 |
+| `creditor_user_id` | `BIGINT NOT NULL REFERENCES users (id)` | Quien avisa; copia de `debts.creditor_user_id` |
 | `debtor_user_id` | `BIGINT NOT NULL REFERENCES users (id)` | Deudor registrado (por Q3 nunca es un simulado). Si Q3 cambia, pasa a nullable y se agrega `debtor_simulated_profile_id` |
 | `status` | `VARCHAR(10) NOT NULL DEFAULT 'SENDING'` | `CHECK (status IN ('SENDING', 'SENT', 'FAILED'))` |
 | `created_at` | `TIMESTAMPTZ NOT NULL DEFAULT now()` | Inicio del intento; base de la ventana de 24 h. El servicio lo asigna con el `Clock` de la aplicación, para que las IT con `@MockitoBean Clock` controlen la ventana. El `DEFAULT` es solo una red de seguridad |
@@ -47,7 +47,7 @@ ALTER TABLE group_activity ADD CONSTRAINT group_activity_event_type_check
 
 | Evento | Actor | `details` (JSON) | Cuándo |
 |--------|-------|------------------|--------|
-| `DEBT_WHISTLED` | acreedor | `{ whistleId, debtId, expenseId, amount, currency, fromName, toName, description }`: `amount` es el saldo pendiente al silbar, `fromName` el deudor, `toName` el acreedor y `description` el concepto | Transacción 2 de research D3, solo si el correo salió |
+| `DEBT_WHISTLED` | acreedor | `{ whistleId, debtId, expenseId, amount, currency, fromName, toName, description }`: `amount` es el saldo pendiente al avisar, `fromName` el deudor, `toName` el acreedor y `description` el concepto | Transacción 2 de research D3, solo si el correo salió |
 
 ## Debt — tabla `debts` (existente, solo lectura)
 
@@ -55,4 +55,4 @@ Campos usados: `group_id`, `creditor_user_id`, `debtor_type`, `debtor_user_id`, 
 
 ## GroupMember — tabla `group_members` (existente, sin cambios de esquema)
 
-Se agrega un método de repositorio con `@Lock(PESSIMISTIC_WRITE)` sobre la fila (grupo, acreedor) para serializar los silbidos (research D3). También se usa para comprobar que el deudor sigue siendo miembro activo (`left_at IS NULL`, FR-009).
+Se agrega un método de repositorio con `@Lock(PESSIMISTIC_WRITE)` sobre la fila (grupo, acreedor) para serializar los avisos (research D3). También se usa para comprobar que el deudor sigue siendo miembro activo (`left_at IS NULL`, FR-009).

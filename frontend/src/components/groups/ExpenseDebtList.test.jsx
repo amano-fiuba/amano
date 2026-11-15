@@ -113,7 +113,7 @@ describe('ExpenseDebtList con "Registrar pago" (018)', () => {
   })
 })
 
-describe('ExpenseDebtList con "Silbar" (030 T012)', () => {
+describe('ExpenseDebtList con "Avisar" (030 T012)', () => {
   function renderList(props) {
     return render(
       <MemoryRouter>
@@ -121,9 +121,9 @@ describe('ExpenseDebtList con "Silbar" (030 T012)', () => {
       </MemoryRouter>,
     )
   }
-  const whistle = (row) => within(row).queryByRole('button', { name: /^Silbar a / })
+  const whistle = (row) => within(row).queryByRole('button', { name: /^Avisar a / })
 
-  it('aparece en las deudas silbables cuyo acreedor es la persona de la sesión', () => {
+  it('aparece en las deudas avisables cuyo acreedor es la persona de la sesión', () => {
     renderList({
       debts: [
         debt(31, 'Juan Pérez', 'PENDING'),
@@ -135,7 +135,7 @@ describe('ExpenseDebtList con "Silbar" (030 T012)', () => {
       ],
     })
     const rows = screen.getAllByTestId('debt-row')
-    expect(whistle(rows[0])).toHaveAccessibleName('Silbar a Juan Pérez')
+    expect(whistle(rows[0])).toHaveAccessibleName('Avisar a Juan Pérez')
     expect(whistle(rows[1])).toBeEnabled()
     expect(whistle(rows[2])).not.toBeInTheDocument()
     expect(whistle(rows[3])).not.toBeInTheDocument()
@@ -143,9 +143,9 @@ describe('ExpenseDebtList con "Silbar" (030 T012)', () => {
     expect(whistle(rows[5])).toBeDisabled()
   })
 
-  it('sin groupId ni expenseId no ofrece silbar', () => {
+  it('sin groupId ni expenseId no ofrece avisar', () => {
     render(<MemoryRouter><ExpenseDebtList debts={[debt(31, 'Juan Pérez', 'PENDING')]} /></MemoryRouter>)
-    expect(screen.queryByRole('button', { name: /^Silbar a / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Avisar a / })).not.toBeInTheDocument()
   })
 })
 

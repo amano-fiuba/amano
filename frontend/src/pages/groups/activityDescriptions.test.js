@@ -192,7 +192,7 @@ describe('agrupación por día (014 FR-015)', () => {
       'PAYMENT_MADE', 'PAYMENT_REGISTERED', 'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED',
       'DEBT_OVERDUE', 'LIQUIDATION_PROPOSED',
     ])
-    // 030: los silbidos se filtran junto con los recordatorios
+    // 030: los avisos se filtran junto con los recordatorios
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMINDERS').eventTypes)
       .toEqual(['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT', 'DEBT_WHISTLED'])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'RECURRENCE').eventTypes)
@@ -274,18 +274,18 @@ describe('expenseLinkId / deletedExpenseIds (022 T076)', () => {
   })
 })
 
-describe('describeActivity: silbidos (030 T027)', () => {
-  it('describe el silbido a nombre del acreedor, con el deudor, el monto y el concepto', () => {
+describe('describeActivity: avisos (030 T027)', () => {
+  it('describe el aviso a nombre del acreedor, con el deudor, el monto y el concepto', () => {
     expect(phrase('DEBT_WHISTLED', {
       whistleId: 1, debtId: 42, expenseId: 9, amount: '8000.00', currency: 'ARS',
       fromName: 'Juan Pérez', toName: 'Ana López', description: 'Cena',
-    })).toBe(`Ana López le silbó a Juan Pérez por ${formatMoney('8000.00', 'ARS')} (Cena)`)
+    })).toBe(`Ana López le avisó a Juan Pérez por ${formatMoney('8000.00', 'ARS')} (Cena)`)
   })
 
   it('sin concepto omite el paréntesis y sin datos sigue siendo legible', () => {
     expect(phrase('DEBT_WHISTLED', { amount: '500', currency: 'USD', fromName: 'Juan Pérez' }))
-      .toBe(`Ana López le silbó a Juan Pérez por ${formatMoney('500', 'USD')}`)
-    expect(phrase('DEBT_WHISTLED', {})).toBe('Ana López le silbó a alguien por una deuda')
+      .toBe(`Ana López le avisó a Juan Pérez por ${formatMoney('500', 'USD')}`)
+    expect(phrase('DEBT_WHISTLED', {})).toBe('Ana López le avisó a alguien por una deuda')
   })
 
   it('el actor es el acreedor, nunca "Sistema", y un tipo desconocido conserva la frase por defecto', () => {

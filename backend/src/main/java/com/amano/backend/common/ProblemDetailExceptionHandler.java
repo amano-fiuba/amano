@@ -449,7 +449,7 @@ public class ProblemDetailExceptionHandler {
     @ExceptionHandler(DebtNotWhistleableException.class)
     public ProblemDetail handleDebtNotWhistleable(DebtNotWhistleableException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
-        problem.setTitle("No se puede silbar esta deuda");
+        problem.setTitle("No se puede avisar esta deuda");
         problem.setProperty("properties", Map.of("code", exception.getCode()));
         return problem;
     }
@@ -459,7 +459,7 @@ public class ProblemDetailExceptionHandler {
     public ProblemDetail handleSimulatedDebtorWhistle(SimulatedDebtorWhistleException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
-        problem.setTitle("No se puede silbar esta deuda");
+        problem.setTitle("No se puede avisar esta deuda");
         problem.setProperty("properties", Map.of("code", SimulatedDebtorWhistleException.CODE));
         return problem;
     }
@@ -471,7 +471,7 @@ public class ProblemDetailExceptionHandler {
     @ExceptionHandler(WhistleRateLimitedException.class)
     public ResponseEntity<ProblemDetail> handleWhistleRateLimited(WhistleRateLimitedException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
-        problem.setTitle("Límite de silbidos alcanzado");
+        problem.setTitle("Límite de avisos alcanzado");
         problem.setProperty("properties", Map.of("code", WhistleRateLimitedException.CODE,
                 "retryAfterSeconds", exception.getRetryAfterSeconds()));
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
