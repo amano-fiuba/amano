@@ -117,6 +117,30 @@ public class ReminderMessageBuilder {
         return new Mail(subject, body.toString());
     }
 
+    /**
+     * 030 (contracts/debt-whistle-activity.md §1): manual notice that the
+     * creditor sends right away. Its own subject and wording, so it is never
+     * confused with the automatic reminder, and never the group's custom
+     * reminder message (Q5). {@code outstanding} is the balance still owed.
+     */
+    public Mail debtWhistle(String groupName, String creditorName, String debtorName, String concept,
+            BigDecimal outstanding, Currency currency, LocalDate dueDate, GroupExpense expense) {
+        String subject = creditorName + " te recuerda una deuda - " + groupName;
+        StringBuilder body = new StringBuilder();
+        body.append("Hola ").append(debtorName).append(":\n\n")
+                .append(creditorName).append(" te recuerda que en el grupo «").append(groupName)
+                .append("» tenés una deuda pendiente\n")
+                .append("de ").append(money(outstanding, currency)).append(" por «").append(concept(concept))
+                .append('»');
+        if (dueDate != null) {
+            body.append(", con fecha límite ").append(dueDate.format(DATE_FORMAT));
+        }
+        body.append(".\n");
+        appendExpenseDetails(body, expense);
+        body.append('\n').append("Este aviso lo envió ").append(creditorName).append(" desde A mano.\n");
+        return new Mail(subject, body.toString());
+    }
+
     public Mail failureNotice(String groupName, String type, String recipientName,
             String recipientEmail, LocalDate dueDate, BigDecimal amount, Currency currency) {
         String subject = "No se pudo enviar un recordatorio - " + groupName;

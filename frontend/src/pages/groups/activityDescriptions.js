@@ -48,7 +48,11 @@ export const ACTIVITY_FILTERS = [
       'LIQUIDATION_PROPOSED',
     ],
   },
-  { value: 'REMINDERS', label: 'Recordatorios', eventTypes: ['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'] },
+  {
+    value: 'REMINDERS',
+    label: 'Recordatorios',
+    eventTypes: ['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT', 'DEBT_WHISTLED'],
+  },
   { value: 'RECURRENCE', label: 'Recurrencia', eventTypes: ['RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED'] },
   { value: 'SETTINGS', label: 'Cambios del grupo', eventTypes: ['PERMISSION_CHANGED', 'PHOTO_CHANGED'] },
 ]
@@ -202,6 +206,16 @@ function recurrenceFinished(details) {
   return recurrenceDescription('finalizó', details)
 }
 
+// 030: aviso manual del acreedor (el actor es quien silbó).
+function debtWhistled(details) {
+  const debtor = text(details.fromName) ?? 'alguien'
+  const money = formatMoney(details.amount, details.currency)
+  const concept = text(details.description)
+  let sentence = `le silbó a ${debtor} por ${money ?? 'una deuda'}`
+  if (concept) sentence += ` (${concept})`
+  return sentence
+}
+
 const SYSTEM_EVENTS = new Set([
   'DEBT_OVERDUE',
   'DEBT_REMINDER_SENT',
@@ -230,6 +244,7 @@ const DESCRIBERS = {
   RECURRENCE_PAUSED: recurrencePaused,
   RECURRENCE_RESUMED: recurrenceResumed,
   RECURRENCE_FINISHED: recurrenceFinished,
+  DEBT_WHISTLED: debtWhistled,
 }
 
 // Eventos que abren el detalle del gasto: el gasto mismo (017, 022 edición) y sus
@@ -247,6 +262,7 @@ const LINKS_TO_EXPENSE = [
   'RECURRENCE_PAUSED',
   'RECURRENCE_RESUMED',
   'RECURRENCE_FINISHED',
+  'DEBT_WHISTLED',
 ]
 
 /** Ids (texto) de los gastos que tienen un EXPENSE_DELETED entre las entradas. */
