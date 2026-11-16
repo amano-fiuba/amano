@@ -6,6 +6,7 @@ import MainPage from './pages/MainPage'
 import SettingsPage from './pages/SettingsPage'
 import FaqPage from './pages/FaqPage'
 import ActivityPage from './pages/ActivityPage'
+import ExpenseDetailPage from './pages/ExpenseDetailPage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import CheckEmailPage from './pages/CheckEmailPage'
@@ -213,6 +214,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ActivityPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expenses/:id"
+        element={
+          <ProtectedRoute>
+            <ExpenseDetailPage />
           </ProtectedRoute>
         }
       />

@@ -4,7 +4,10 @@ import {
   RECURRING_LOAD_ERROR_MESSAGE,
   RECURRING_UPDATE_ERROR_MESSAGE,
   createExpense,
+  getExpense,
+  listExpenseYears,
   listRecentExpenses,
+  searchExpenses,
   listRecurringExpenses,
   updateRecurringExpenseStatus,
 } from './expenseClient'
@@ -283,5 +286,106 @@ describe('listRecentExpenses (015, FR-008)', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
 
     await expect(listRecentExpenses()).resolves.toEqual({ ok: false, network: true })
+  })
+})
+
+describe('searchExpenses (031)', () => {
+  it('envía q y year con cookie y devuelve los gastos y el indicador de truncado', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({ ok: true, body: { expenses: [{ id: 1 }], truncated: true } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchExpenses('café', '2026')
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/search?q=caf%C3%A9&year=2026', {
+      credentials: 'include',
+    })
+    expect(result).toEqual({ ok: true, expenses: [{ id: 1 }], truncated: true })
+  })
+
+  it('omite q vacío y year nulo', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: {} }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchExpenses('', null)
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/search?')
+    expect(result).toEqual({ ok: true, expenses: [], truncated: false })
+  })
+
+  it('devuelve los campos inválidos de un 400', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      response({ status: 400, body: { properties: { fields: { q: 'corto', otro: 3 } } } }),
+    ))
+
+    expect(await searchExpenses('a', null)).toEqual({ ok: false, status: 400, fields: { q: 'corto' } })
+  })
+
+  it('un 400 sin cuerpo JSON devuelve campos vacíos', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 401, json: () => Promise.reject(new Error('sin cuerpo')),
+    }))
+
+    expect(await searchExpenses('ab', null)).toEqual({ ok: false, status: 401, fields: {} })
+  })
+
+  it('trata 5xx y fallas de red como error de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 503 })))
+    expect(await searchExpenses('ab', null)).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await searchExpenses('ab', null)).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('listExpenseYears (031)', () => {
+  it('devuelve solo años enteros', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({ ok: true, body: { years: [2026, '2025', 2024] } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await listExpenseYears()).toEqual({ ok: true, years: [2026, 2024] })
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/years', { credentials: 'include' })
+  })
+
+  it('un cuerpo sin años devuelve una lista vacía', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ok: true, body: null })))
+    expect(await listExpenseYears()).toEqual({ ok: true, years: [] })
+  })
+
+  it('distingue 4xx de 5xx y de fallas de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 401 })))
+    expect(await listExpenseYears()).toEqual({ ok: false, status: 401 })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 500 })))
+    expect(await listExpenseYears()).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await listExpenseYears()).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('getExpense (031)', () => {
+  it('pide el gasto por id con cookie', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: { id: 7 } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await getExpense('7')).toEqual({ ok: true, expense: { id: 7 } })
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/7', { credentials: 'include' })
+  })
+
+  it('codifica el id y distingue 404, 5xx y fallas de red', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ status: 404 }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await getExpense('a/b')).toEqual({ ok: false, status: 404 })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/a%2Fb')
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 502 })))
+    expect(await getExpense('1')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await getExpense('1')).toEqual({ ok: false, network: true })
   })
 })

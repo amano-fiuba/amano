@@ -220,3 +220,205 @@ button.main-request__reject {
     width: calc(100% - 1.5rem);
   }
 }
+
+// Actividad personal (031): el mismo ancho que "Mis grupos", así el buscador
+// entra completo junto al selector de año.
+// Más ancha que "Mis grupos" para que el campo, el mes y el año entren en una
+// fila (031, sesión 4).
+.activity-page {
+  max-width: 880px;
+}
+
+// Buscador de la actividad personal (031): campo con lupa (mismo aspecto que el
+// buscador de la barra superior), mes y año en una fila; en pantallas angostas
+// el campo ocupa todo el ancho y los selectores quedan debajo, lado a lado.
+.activity-search {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.activity-search__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.activity-search__field {
+  display: flex;
+  flex: 1 1 16rem;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0 0.9rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+  color: var(--color-texto-suave);
+
+  svg {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  input {
+    width: 100%;
+    min-width: 0;
+    height: 2.4rem;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-texto);
+    font: inherit;
+
+    &::placeholder {
+      color: var(--color-texto-suave);
+    }
+  }
+
+  &:focus-within {
+    outline: 2px solid var(--color-acento);
+    outline-offset: 1px;
+  }
+}
+
+.activity-search__selects {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+
+  select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 600px) {
+  .activity-search__field {
+    flex-basis: 100%;
+  }
+
+  .activity-search__selects {
+    flex: 1 1 100%;
+
+    select {
+      flex: 1 1 0;
+    }
+  }
+}
+
+// Mientras carga otra página, la anterior queda atenuada (no salta la paginación).
+.activity-results[aria-busy='true'] .expense-rows {
+  opacity: 0.55;
+  transition: opacity 160ms ease;
+}
+
+// Paginación de la actividad (031, FR-021): Anterior, números y Siguiente.
+.activity-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 1rem 0 0;
+
+  ol {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  button {
+    min-width: 2.4rem;
+    justify-content: center;
+    padding: 0.45rem 0.7rem;
+    border-color: var(--color-borde);
+    background: var(--color-fondo);
+    color: var(--color-texto);
+    font-weight: 600;
+
+    &:hover:not(:disabled) {
+      background: var(--color-superficie-fuerte);
+      color: var(--color-texto);
+    }
+
+    &[aria-current='page'] {
+      border-color: var(--color-texto);
+      background: var(--color-texto);
+      color: var(--color-superficie);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.45;
+    }
+  }
+}
+
+.activity-pagination__gap {
+  align-self: center;
+  padding: 0 0.2rem;
+  color: var(--color-texto-suave);
+}
+
+.activity-search__notice,
+.activity-search__count {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.activity-search__empty {
+  font-weight: 600;
+}
+
+.activity-search__error {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+}
+
+// Monto a la derecha del título dentro de la tarjeta de cada gasto.
+.expense-row .group-row__title {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+
+// Detalle de un gasto personal (031, US3).
+.expense-detail__amount {
+  margin: 0;
+  color: var(--color-texto);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.expense-detail__conversions {
+  margin: 0.15rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-texto-suave);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.expense-detail__data {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.45rem 1rem;
+  margin: 1rem 0 0;
+
+  dt {
+    color: var(--color-texto-suave);
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}

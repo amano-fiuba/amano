@@ -6,6 +6,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Persistence for {@code expenses}. The unique index
@@ -13,7 +16,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
  * the service resolves conflicts by re-reading the winner and comparing payloads
  * (research.md D1).
  */
-public interface ExpenseRepository extends JpaRepository<Expense, Long> {
+public interface ExpenseRepository extends JpaRepository<Expense, Long>,
+        JpaSpecificationExecutor<Expense> {
 
     Optional<Expense> findByUserIdAndIdempotencyKey(Long userId, UUID idempotencyKey);
 
@@ -22,7 +26,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     /** Latest expenses registered by a user (015 FR-008). */
     List<Expense> findTop5ByUserIdOrderByCreatedAtDescIdDesc(Long userId);
 
-    List<Expense> findTop200ByUserIdOrderByCreatedAtDescIdDesc(Long userId);
+    /** Years (by expense date) with at least one expense of the user, newest first (031, FR-006). */
+    @Query("select distinct year(e.expenseDate) as y from Expense e "
+            + "where e.userId = :userId order by y desc")
+    List<Integer> findExpenseYears(@Param("userId") Long userId);
 
     /** Series of a user for the "Gastos recurrentes" screen, newest first (009, FR-012). */
     List<Expense> findByUserIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(Long userId);

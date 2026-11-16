@@ -21,7 +21,7 @@ import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
 /**
- * Feature: personal activity screen shows the equivalent of each expense in the
+ * Feature: personal activity screen (031 search and detail) shows the equivalent of each expense in the
  * user's preferred currencies (ARS when none is configured), skipping the
  * expense's own currency and omitting a target when its quote is unavailable.
  */
@@ -72,10 +72,9 @@ class ExpenseHistoryConversionsTest {
         preferred(Currency.ARS, Currency.USD);
         Expense usd = expense(1L, "10.00", Currency.USD, LocalDate.parse("2026-11-02"));
         quote(Currency.USD, Currency.ARS, "1000.00");
-        when(expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(USER_ID))
-                .thenReturn(List.of(usd));
+        List<Expense> expenses = List.of(usd);
 
-        List<ExpenseResponse> history = service.listHistory(USER_ID);
+        List<ExpenseResponse> history = service.withConversions(USER_ID, expenses);
 
         assertThat(history).hasSize(1);
         assertThat(history.get(0).conversions())
@@ -88,10 +87,9 @@ class ExpenseHistoryConversionsTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         Expense usd = expense(1L, "10.00", Currency.USD, LocalDate.parse("2026-11-02"));
         quote(Currency.USD, Currency.ARS, "1000.00");
-        when(expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(USER_ID))
-                .thenReturn(List.of(usd));
+        List<Expense> expenses = List.of(usd);
 
-        assertThat(service.listHistory(USER_ID).get(0).conversions())
+        assertThat(service.withConversions(USER_ID, expenses).get(0).conversions())
                 .containsExactly(new ExpenseResponse.Conversion("ARS", "10000.00"));
     }
 
@@ -103,10 +101,9 @@ class ExpenseHistoryConversionsTest {
         when(exchangeRateProvider.getQuote(Currency.USD, Currency.EUR, LocalDate.parse("2026-11-02")))
                 .thenThrow(new ExchangeRateUnavailableException());
         quote(Currency.ARS, Currency.EUR, "0.0009");
-        when(expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(USER_ID))
-                .thenReturn(List.of(usd, ars));
+        List<Expense> expenses = List.of(usd, ars);
 
-        List<ExpenseResponse> history = service.listHistory(USER_ID);
+        List<ExpenseResponse> history = service.withConversions(USER_ID, expenses);
 
         assertThat(history.get(0).conversions()).isEmpty();
         // ARS to ARS is skipped; only the EUR equivalent is attached.

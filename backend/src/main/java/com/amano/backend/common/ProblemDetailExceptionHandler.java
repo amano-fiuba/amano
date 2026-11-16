@@ -16,9 +16,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.expense.ExpenseNotFoundException;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.friendship.AlreadyFriendsException;
 import com.amano.backend.friendship.FriendNotFoundException;
@@ -192,6 +194,15 @@ public class ProblemDetailExceptionHandler {
                 HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
         problem.setTitle("Operación ya registrada");
         problem.setProperty("properties", Map.of("code", "IDEMPOTENCY_KEY_REUSED"));
+        return problem;
+    }
+
+    /** Missing or foreign personal expense (feature 031, FR-016): one neutral 404. */
+    @ExceptionHandler(ExpenseNotFoundException.class)
+    public ProblemDetail handleExpenseNotFound(ExpenseNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Gasto no encontrado");
         return problem;
     }
 
@@ -462,6 +473,18 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, "No existe el recurso solicitado");
         problem.setTitle("Recurso no encontrado");
+        return problem;
+    }
+
+    /**
+     * A path that exists only for other methods (e.g. {@code GET /api/expenses},
+     * removed in 031, while {@code POST} stays) answers 405, not the generic 500.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ProblemDetail handleMethodNotSupported(HttpRequestMethodNotSupportedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.METHOD_NOT_ALLOWED, "La operación no está disponible para este recurso");
+        problem.setTitle("Método no permitido");
         return problem;
     }
 
