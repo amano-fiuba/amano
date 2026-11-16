@@ -170,6 +170,50 @@ class ReminderMessageBuilderTest {
                 .contains("No se reintentará el envío.");
     }
 
+    // 030 T006: manual whistle mail (contracts/debt-whistle-activity.md §1).
+
+    @Test
+    void whistleSubjectNamesTheCreditorAndTheGroup() {
+        ReminderMessageBuilder.Mail mail = whistleMail("Cena", DUE_DATE);
+        assertThat(mail.subject()).isEqualTo("Ana López te recuerda una deuda - Grupo Amigos");
+        assertThat(mail.subject()).isNotEqualTo(debtMail("Cena", DebtStatus.PENDING, null).subject());
+    }
+
+    @Test
+    void whistleBodyIncludesDebtorCreditorGroupBalanceConceptAndDeadline() {
+        ReminderMessageBuilder.Mail mail = whistleMail("Cena", DUE_DATE);
+        assertThat(mail.body())
+                .startsWith("Hola Juan Pérez:")
+                .contains("Ana López te recuerda que en el grupo «Grupo Amigos» tenés una deuda pendiente")
+                .contains("8000.00 ARS")
+                .contains("«Cena»")
+                .contains("con fecha límite 20/11/2026")
+                .contains("Categoría: Alimentos")
+                .contains("Tipo de gasto: Recurrente")
+                .contains("Medio de pago: Efectivo")
+                .endsWith("Este aviso lo envió Ana López desde A mano.\n");
+    }
+
+    @Test
+    void whistleWithoutDeadlineOrConceptUsesTheDefaults() {
+        ReminderMessageBuilder.Mail mail = whistleMail("  ", null);
+        assertThat(mail.body())
+                .contains("«" + ReminderMessageBuilder.DEFAULT_CONCEPT + "».")
+                .doesNotContain("fecha límite");
+    }
+
+    @Test
+    void whistleNeverUsesTheReminderWording() {
+        ReminderMessageBuilder.Mail mail = whistleMail("Cena", DUE_DATE);
+        assertThat(mail.body()).doesNotContain("Te recordamos");
+        assertThat(mail.subject()).doesNotStartWith("Recordatorio de deuda");
+    }
+
+    private ReminderMessageBuilder.Mail whistleMail(String concept, LocalDate dueDate) {
+        return builder.debtWhistle("Grupo Amigos", "Ana López", "Juan Pérez", concept,
+                new BigDecimal("8000"), Currency.ARS, dueDate, expense(null));
+    }
+
     private ReminderMessageBuilder.Mail debtMail(String concept, DebtStatus status, String customMessage) {
         return builder.debtReminder("Grupo Amigos", "Juan Pérez", concept,
                 new BigDecimal("3333.33"), Currency.ARS, DUE_DATE, status, customMessage, expense(null));
