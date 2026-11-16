@@ -192,8 +192,9 @@ describe('agrupación por día (014 FR-015)', () => {
       'PAYMENT_MADE', 'PAYMENT_REGISTERED', 'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED',
       'DEBT_OVERDUE', 'LIQUIDATION_PROPOSED',
     ])
+    // 030: los avisos se filtran junto con los recordatorios
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'REMINDERS').eventTypes)
-      .toEqual(['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT'])
+      .toEqual(['DEBT_REMINDER_SENT', 'PAYER_DUE_NOTICE_SENT', 'DEBT_WHISTLED'])
     expect(ACTIVITY_FILTERS.find((option) => option.value === 'RECURRENCE').eventTypes)
       .toEqual(['RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED'])
   })
@@ -235,7 +236,8 @@ describe('expenseLinkId / deletedExpenseIds (022 T076)', () => {
   it('enlaza los eventos con gasto asociado que traen expenseId', () => {
     for (const type of ['EXPENSE_CREATED', 'EXPENSE_EDITED', 'PAYMENT_MADE', 'PAYMENT_REGISTERED',
       'PAYMENT_CONFIRMED', 'PAYMENT_REJECTED', 'DEBT_OVERDUE', 'DEBT_REMINDER_SENT',
-      'PAYER_DUE_NOTICE_SENT', 'RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED']) {
+      'PAYER_DUE_NOTICE_SENT', 'RECURRENCE_PAUSED', 'RECURRENCE_RESUMED', 'RECURRENCE_FINISHED',
+      'DEBT_WHISTLED']) {
       expect(expenseLinkId(entry(type, { expenseId: 12 }))).toBe(12)
     }
   })
@@ -269,5 +271,25 @@ describe('expenseLinkId / deletedExpenseIds (022 T076)', () => {
     expect([...deleted]).toEqual(['12'])
     expect(entries.map((item) => expenseLinkId(item, deleted))).toEqual([null, null, null, 13])
     expect(deletedExpenseIds(undefined).size).toBe(0)
+  })
+})
+
+describe('describeActivity: avisos (030 T027)', () => {
+  it('describe el aviso a nombre del acreedor, con el deudor, el monto y el concepto', () => {
+    expect(phrase('DEBT_WHISTLED', {
+      whistleId: 1, debtId: 42, expenseId: 9, amount: '8000.00', currency: 'ARS',
+      fromName: 'Juan Pérez', toName: 'Ana López', description: 'Cena',
+    })).toBe(`Ana López le avisó a Juan Pérez por ${formatMoney('8000.00', 'ARS')} (Cena)`)
+  })
+
+  it('sin concepto omite el paréntesis y sin datos sigue siendo legible', () => {
+    expect(phrase('DEBT_WHISTLED', { amount: '500', currency: 'USD', fromName: 'Juan Pérez' }))
+      .toBe(`Ana López le avisó a Juan Pérez por ${formatMoney('500', 'USD')}`)
+    expect(phrase('DEBT_WHISTLED', {})).toBe('Ana López le avisó a alguien por una deuda')
+  })
+
+  it('el actor es el acreedor, nunca "Sistema", y un tipo desconocido conserva la frase por defecto', () => {
+    expect(describeActivity({ eventType: 'DEBT_WHISTLED', details: {}, actor: null }).actor).toBe('Alguien')
+    expect(phrase('ALGO_NUEVO', {})).toBe('Ana López realizó una acción en el grupo')
   })
 })
