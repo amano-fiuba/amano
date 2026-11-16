@@ -105,23 +105,6 @@ export const RECENT_EXPENSES_ERROR_MESSAGE =
  * 200, { ok: false, status } on 4xx and { ok: false, network: true } on 5xx or
  * network failures.
  */
-/** GET /api/expenses: últimos 200 gastos propios, para la pantalla de actividad. */
-export async function listExpenseHistory() {
-  try {
-    const response = await fetch('/api/expenses', { credentials: 'include' })
-    if (response.ok) {
-      const body = await response.json()
-      return { ok: true, expenses: Array.isArray(body) ? body : [] }
-    }
-    if (response.status >= 500) {
-      return { ok: false, network: true }
-    }
-    return { ok: false, status: response.status }
-  } catch {
-    return { ok: false, network: true }
-  }
-}
-
 export async function listRecentExpenses() {
   try {
     const response = await fetch('/api/expenses/recent', { credentials: 'include' })
@@ -165,6 +148,97 @@ export async function updateRecurringExpenseStatus(id, status) {
       detail: problem.detail ?? '',
       code: problem.properties?.code ?? null,
     }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+// Feature 031 (specs/031-buscar-en-actividad-personal/contracts/personal-expenses-search-api.md).
+export const SEARCH_EXPENSES_ERROR_MESSAGE =
+  'No pudimos cargar tu actividad. Intentá nuevamente'
+export const EXPENSE_DETAIL_ERROR_MESSAGE =
+  'No se pudo cargar el gasto. Intentá nuevamente'
+
+function positiveInteger(value, fallback) {
+  return Number.isInteger(value) && value >= 0 ? value : fallback
+}
+
+/**
+ * GET /api/expenses/search?q=&year=&month=&page=&size= (q omitted = no text
+ * filter, year omitted = all years, month omitted = the whole year):
+ * { ok: true, expenses, page, totalElements, totalPages } on 200,
+ * { ok: false, status, fields } on 4xx (400 invalid criteria, 401 no session) and
+ * { ok: false, network: true } on 5xx or network failures.
+ */
+export async function searchExpenses({ term, year, month, page, size } = {}) {
+  const params = new URLSearchParams()
+  const optional = { q: term, year, month, page, size }
+  for (const [name, value] of Object.entries(optional)) {
+    if (value !== null && value !== undefined && value !== '') {
+      params.set(name, String(value))
+    }
+  }
+  try {
+    const response = await fetch(`/api/expenses/search?${params}`, { credentials: 'include' })
+    if (response.ok) {
+      const body = await response.json()
+      return {
+        ok: true,
+        expenses: Array.isArray(body?.expenses) ? body.expenses : [],
+        page: positiveInteger(body?.page, 1) || 1,
+        totalElements: positiveInteger(body?.totalElements, 0),
+        totalPages: positiveInteger(body?.totalPages, 0),
+      }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    const problem = await problemOf(response)
+    return { ok: false, status: response.status, fields: safeFields(problem.properties?.fields) }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * GET /api/expenses/years: { ok: true, years } (years with expenses, newest
+ * first) on 200, { ok: false, status } on 4xx and { ok: false, network: true }
+ * on 5xx or network failures.
+ */
+export async function listExpenseYears() {
+  try {
+    const response = await fetch('/api/expenses/years', { credentials: 'include' })
+    if (response.ok) {
+      const body = await response.json()
+      const years = Array.isArray(body?.years) ? body.years.filter(Number.isInteger) : []
+      return { ok: true, years }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return { ok: false, status: response.status }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
+/**
+ * GET /api/expenses/{id}: { ok: true, expense } on 200, { ok: false, status } on
+ * 4xx (401 no session, 404 missing or foreign) and { ok: false, network: true }
+ * on 5xx or network failures.
+ */
+export async function getExpense(id) {
+  try {
+    const response = await fetch(`/api/expenses/${encodeURIComponent(id)}`, {
+      credentials: 'include',
+    })
+    if (response.ok) {
+      return { ok: true, expense: await response.json() }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return { ok: false, status: response.status }
   } catch {
     return { ok: false, network: true }
   }

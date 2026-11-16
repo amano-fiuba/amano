@@ -4,7 +4,10 @@ import {
   RECURRING_LOAD_ERROR_MESSAGE,
   RECURRING_UPDATE_ERROR_MESSAGE,
   createExpense,
+  getExpense,
+  listExpenseYears,
   listRecentExpenses,
+  searchExpenses,
   listRecurringExpenses,
   updateRecurringExpenseStatus,
 } from './expenseClient'
@@ -283,5 +286,131 @@ describe('listRecentExpenses (015, FR-008)', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')))
 
     await expect(listRecentExpenses()).resolves.toEqual({ ok: false, network: true })
+  })
+})
+
+describe('searchExpenses (031)', () => {
+  it('envía q, year, month, page y size con cookie y devuelve la página', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({
+      ok: true,
+      body: { expenses: [{ id: 1 }], page: 2, size: 9, totalElements: 12, totalPages: 2 },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchExpenses({ term: 'café', year: 2026, month: 3, page: 2, size: 9 })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/expenses/search?q=caf%C3%A9&year=2026&month=3&page=2&size=9',
+      { credentials: 'include' },
+    )
+    expect(result).toEqual({
+      ok: true, expenses: [{ id: 1 }], page: 2, totalElements: 12, totalPages: 2,
+    })
+  })
+
+  it('omite los parámetros vacíos, nulos o ausentes', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: {} }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchExpenses({ term: '', year: null, month: undefined, page: 1 })
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/search?page=1')
+    expect(result).toEqual({ ok: true, expenses: [], page: 1, totalElements: 0, totalPages: 0 })
+  })
+
+  it('sin argumentos pide la búsqueda sin parámetros', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: null }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchExpenses()
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/search?')
+    expect(result).toEqual({ ok: true, expenses: [], page: 1, totalElements: 0, totalPages: 0 })
+  })
+
+  it('ignora totales y páginas que no son enteros válidos', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({
+      ok: true,
+      body: { expenses: 'x', page: 0, totalElements: -3, totalPages: '4' },
+    })))
+
+    expect(await searchExpenses({ term: 'ab' })).toEqual({
+      ok: true, expenses: [], page: 1, totalElements: 0, totalPages: 0,
+    })
+  })
+
+  it('devuelve los campos inválidos de un 400', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      response({ status: 400, body: { properties: { fields: { q: 'corto', otro: 3 } } } }),
+    ))
+
+    expect(await searchExpenses({ term: 'a' })).toEqual({ ok: false, status: 400, fields: { q: 'corto' } })
+  })
+
+  it('un 400 sin cuerpo JSON devuelve campos vacíos', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 401, json: () => Promise.reject(new Error('sin cuerpo')),
+    }))
+
+    expect(await searchExpenses({ term: 'ab' })).toEqual({ ok: false, status: 401, fields: {} })
+  })
+
+  it('trata 5xx y fallas de red como error de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 503 })))
+    expect(await searchExpenses({ term: 'ab' })).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await searchExpenses({ term: 'ab' })).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('listExpenseYears (031)', () => {
+  it('devuelve solo años enteros', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      response({ ok: true, body: { years: [2026, '2025', 2024] } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await listExpenseYears()).toEqual({ ok: true, years: [2026, 2024] })
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/years', { credentials: 'include' })
+  })
+
+  it('un cuerpo sin años devuelve una lista vacía', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ok: true, body: null })))
+    expect(await listExpenseYears()).toEqual({ ok: true, years: [] })
+  })
+
+  it('distingue 4xx de 5xx y de fallas de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 401 })))
+    expect(await listExpenseYears()).toEqual({ ok: false, status: 401 })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 500 })))
+    expect(await listExpenseYears()).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await listExpenseYears()).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('getExpense (031)', () => {
+  it('pide el gasto por id con cookie', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: { id: 7 } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await getExpense('7')).toEqual({ ok: true, expense: { id: 7 } })
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/7', { credentials: 'include' })
+  })
+
+  it('codifica el id y distingue 404, 5xx y fallas de red', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ status: 404 }))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await getExpense('a/b')).toEqual({ ok: false, status: 404 })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/a%2Fb')
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 502 })))
+    expect(await getExpense('1')).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await getExpense('1')).toEqual({ ok: false, network: true })
   })
 })

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.amano.backend.common.FieldValidationException;
@@ -41,11 +42,18 @@ public class ExpenseController {
 
     private final ExpenseService expenseService;
     private final RecurringExpenseService recurringExpenseService;
+    private final ExpenseSearchService expenseSearchService;
 
     public ExpenseController(ExpenseService expenseService,
-            RecurringExpenseService recurringExpenseService) {
+            RecurringExpenseService recurringExpenseService,
+            ExpenseSearchService expenseSearchService) {
         this.expenseService = expenseService;
         this.recurringExpenseService = recurringExpenseService;
+        this.expenseSearchService = expenseSearchService;
+    }
+
+    /** Years of the user's expenses for the activity search selector (031, FR-006). */
+    public record ExpenseYearsResponse(List<Integer> years) {
     }
 
     /** Body of the state change (009): {@code ACTIVE}, {@code PAUSED} or {@code FINISHED}. */
@@ -95,14 +103,45 @@ public class ExpenseController {
         return ResponseEntity.ok(expenseService.listRecent(userId));
     }
 
-    /** Personal activity screen: the session user's expenses, newest first (last 200). */
-    @GetMapping(path = "/api/expenses", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> listHistory() {
+    /** Search inside the personal activity (031, contracts/personal-expenses-search-api.md). */
+    @GetMapping(path = "/api/expenses/search", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> search(@RequestParam(name = "q", required = false) String term,
+            @RequestParam(name = "year", required = false) String year,
+            @RequestParam(name = "month", required = false) String month,
+            @RequestParam(name = "page", required = false) String page,
+            @RequestParam(name = "size", required = false) String size) {
         Long userId = currentUserId();
         if (userId == null) {
             return unauthorized();
         }
-        return ResponseEntity.ok(expenseService.listHistory(userId));
+        return ResponseEntity.ok(expenseSearchService.search(userId,
+                new ExpenseSearchService.Query(term, year, month, page, size)));
+    }
+
+    @GetMapping(path = "/api/expenses/years", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> listYears() {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return unauthorized();
+        }
+        return ResponseEntity.ok(new ExpenseYearsResponse(expenseSearchService.years(userId)));
+    }
+
+    /** Detail of one own expense (031, FR-014); a non-numeric id is the same neutral 404. */
+    @GetMapping(path = "/api/expenses/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> detail(@PathVariable String id) {
+        Long userId = currentUserId();
+        if (userId == null) {
+            return unauthorized();
+        }
+        Long expenseId;
+        try {
+            expenseId = Long.valueOf(id);
+        }
+        catch (NumberFormatException invalid) {
+            throw new ExpenseNotFoundException();
+        }
+        return ResponseEntity.ok(expenseService.getExpense(userId, expenseId));
     }
 
     @PatchMapping(path = "/api/expenses/{id}/status", consumes = MediaType.APPLICATION_JSON_VALUE,

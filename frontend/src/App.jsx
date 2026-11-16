@@ -11,6 +11,7 @@ const MainPage = lazy(() => import('./pages/MainPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const FaqPage = lazy(() => import('./pages/FaqPage'))
 const ActivityPage = lazy(() => import('./pages/ActivityPage'))
+const ExpenseDetailPage = lazy(() => import('./pages/ExpenseDetailPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const CheckEmailPage = lazy(() => import('./pages/CheckEmailPage'))
@@ -215,6 +216,14 @@ export function AppRoutes() {
           element={
             <ProtectedRoute>
               <ActivityPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expenses/:id"
+          element={
+            <ProtectedRoute>
+              <ExpenseDetailPage />
             </ProtectedRoute>
           }
         />
