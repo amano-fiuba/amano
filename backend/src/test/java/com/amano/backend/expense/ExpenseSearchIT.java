@@ -113,7 +113,10 @@ class ExpenseSearchIT {
         mockMvc.perform(get("/api/expenses/search").param("q", "farma").cookie(session(user)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.expenses[*].id").value(contains((int) pharmacy)))
-                .andExpect(jsonPath("$.truncated").value(false));
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(ExpenseSearchService.DEFAULT_PAGE_SIZE))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1));
         mockMvc.perform(get("/api/expenses/search").param("q", "alim").cookie(session(user)))
                 .andExpect(jsonPath("$.expenses[*].id").value(contains((int) noDescription, (int) market)));
         mockMvc.perform(get("/api/expenses/search").param("q", "efectivo").cookie(session(user)))
@@ -124,7 +127,10 @@ class ExpenseSearchIT {
         }
         mockMvc.perform(get("/api/expenses/search").param("q", "xyz").cookie(session(user)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.expenses", empty()));
+                .andExpect(jsonPath("$.expenses", empty()))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
     }
 
     @Test
@@ -174,20 +180,73 @@ class ExpenseSearchIT {
     }
 
     @Test
-    void searchCapsAt200NewestAndReportsTruncation() throws Exception {
+    void monthFiltersWithinTheChosenYear() throws Exception {
+        long user = verifiedUser("ana@search031.test");
+        long marchStart = insert(user, "Luz", "HOUSING", "TRANSFER", "2026-03-01");
+        long marchEnd = insert(user, "Gas", "HOUSING", "TRANSFER", "2026-03-31");
+        insert(user, "Agua", "HOUSING", "TRANSFER", "2026-04-01");
+        insert(user, "Luz vieja", "HOUSING", "TRANSFER", "2025-03-15");
+
+        mockMvc.perform(get("/api/expenses/search").param("year", "2026").param("month", "3")
+                        .cookie(session(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expenses[*].id").value(contains((int) marchEnd, (int) marchStart)))
+                .andExpect(jsonPath("$.totalElements").value(2));
+        mockMvc.perform(get("/api/expenses/search").param("q", "luz").param("year", "2026")
+                        .param("month", "3").cookie(session(user)))
+                .andExpect(jsonPath("$.expenses[*].id").value(contains((int) marchStart)));
+        mockMvc.perform(get("/api/expenses/search").param("year", "2026").param("month", "5")
+                        .cookie(session(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expenses", empty()))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    void searchPaginatesNewestFirstAndClampsToTheLastPage() throws Exception {
         long user = verifiedUser("ana@search031.test");
         jdbcTemplate.update("""
                 INSERT INTO expenses (user_id, amount, currency, expense_date, category, expense_type,
                                       payment_method, description, idempotency_key, created_at)
                 SELECT ?, 10.00, 'ARS', DATE '2026-05-01', 'FOOD', 'ONE_TIME', 'CASH',
                        'Kiosco ' || n, gen_random_uuid(), TIMESTAMPTZ '2026-01-01 00:00Z' + n * INTERVAL '1 minute'
-                FROM generate_series(1, 201) AS n
+                FROM generate_series(1, 23) AS n
                 """, user);
 
-        mockMvc.perform(get("/api/expenses/search").param("q", "kiosco").cookie(session(user)))
-                .andExpect(jsonPath("$.expenses", hasSize(200)))
-                .andExpect(jsonPath("$.expenses[0].description").value("Kiosco 201"))
-                .andExpect(jsonPath("$.truncated").value(true));
+        mockMvc.perform(get("/api/expenses/search").param("q", "kiosco").param("size", "10")
+                        .cookie(session(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expenses", hasSize(10)))
+                .andExpect(jsonPath("$.expenses[0].description").value("Kiosco 23"))
+                .andExpect(jsonPath("$.expenses[9].description").value("Kiosco 14"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(10))
+                .andExpect(jsonPath("$.totalElements").value(23))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        mockMvc.perform(get("/api/expenses/search").param("q", "kiosco").param("size", "10")
+                        .param("page", "2").cookie(session(user)))
+                .andExpect(jsonPath("$.expenses[0].description").value("Kiosco 13"))
+                .andExpect(jsonPath("$.page").value(2));
+        mockMvc.perform(get("/api/expenses/search").param("q", "kiosco").param("size", "10")
+                        .param("page", "3").cookie(session(user)))
+                .andExpect(jsonPath("$.expenses", hasSize(3)))
+                .andExpect(jsonPath("$.expenses[2].description").value("Kiosco 1"))
+                .andExpect(jsonPath("$.page").value(3));
+        // A page past the last one returns the last page.
+        mockMvc.perform(get("/api/expenses/search").param("q", "kiosco").param("size", "10")
+                        .param("page", "9").cookie(session(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expenses", hasSize(3)))
+                .andExpect(jsonPath("$.page").value(3))
+                .andExpect(jsonPath("$.totalPages").value(3));
+        // Without size the default page size applies.
+        mockMvc.perform(get("/api/expenses/search").cookie(session(user)))
+                .andExpect(jsonPath("$.expenses", hasSize(ExpenseSearchService.DEFAULT_PAGE_SIZE)))
+                .andExpect(jsonPath("$.size").value(ExpenseSearchService.DEFAULT_PAGE_SIZE))
+                .andExpect(jsonPath("$.totalPages").value(2));
+        mockMvc.perform(get("/api/expenses/search").param("size", "50").cookie(session(user)))
+                .andExpect(jsonPath("$.expenses", hasSize(23)))
+                .andExpect(jsonPath("$.totalPages").value(1));
     }
 
     @Test
@@ -203,6 +262,60 @@ class ExpenseSearchIT {
         mockMvc.perform(get("/api/expenses/search").param("year", "abc").cookie(session(user)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.year").value(ExpenseSearchService.YEAR_INVALID));
+        mockMvc.perform(get("/api/expenses/search").param("year", "0").cookie(session(user)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.year").value(ExpenseSearchService.YEAR_INVALID));
+    }
+
+    @Test
+    void searchValidatesMonth() throws Exception {
+        long user = verifiedUser("ana@search031.test");
+
+        for (String month : new String[] {"0", "13", "abc"}) {
+            mockMvc.perform(get("/api/expenses/search").param("year", "2026").param("month", month)
+                            .cookie(session(user)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.properties.fields.month")
+                            .value(ExpenseSearchService.MONTH_INVALID));
+        }
+        mockMvc.perform(get("/api/expenses/search").param("month", "3").cookie(session(user)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.month")
+                        .value(ExpenseSearchService.MONTH_WITHOUT_YEAR));
+        // An invalid year is reported on its own field, not as a month without year.
+        mockMvc.perform(get("/api/expenses/search").param("year", "abc").param("month", "3")
+                        .cookie(session(user)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.properties.fields.year").value(ExpenseSearchService.YEAR_INVALID))
+                .andExpect(jsonPath("$.properties.fields.month").doesNotExist());
+    }
+
+    @Test
+    void searchValidatesPageAndSize() throws Exception {
+        long user = verifiedUser("ana@search031.test");
+
+        for (String page : new String[] {"0", "-1", "abc"}) {
+            mockMvc.perform(get("/api/expenses/search").param("page", page).cookie(session(user)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.properties.fields.page")
+                            .value(ExpenseSearchService.PAGE_INVALID));
+        }
+        for (String size : new String[] {"0", "51", "abc"}) {
+            mockMvc.perform(get("/api/expenses/search").param("size", size).cookie(session(user)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.properties.fields.size")
+                            .value(ExpenseSearchService.SIZE_INVALID));
+        }
+    }
+
+    // ----- Removed listing ------------------------------------------------------
+
+    @Test
+    void theOldExpenseListingNoLongerExists() throws Exception {
+        long user = verifiedUser("ana@search031.test");
+
+        mockMvc.perform(get("/api/expenses").cookie(session(user)))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     // ----- Years --------------------------------------------------------------

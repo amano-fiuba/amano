@@ -290,28 +290,53 @@ describe('listRecentExpenses (015, FR-008)', () => {
 })
 
 describe('searchExpenses (031)', () => {
-  it('envía q y year con cookie y devuelve los gastos y el indicador de truncado', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      response({ ok: true, body: { expenses: [{ id: 1 }], truncated: true } }),
-    )
+  it('envía q, year, month, page y size con cookie y devuelve la página', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({
+      ok: true,
+      body: { expenses: [{ id: 1 }], page: 2, size: 9, totalElements: 12, totalPages: 2 },
+    }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await searchExpenses('café', '2026')
+    const result = await searchExpenses({ term: 'café', year: 2026, month: 3, page: 2, size: 9 })
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/search?q=caf%C3%A9&year=2026', {
-      credentials: 'include',
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/expenses/search?q=caf%C3%A9&year=2026&month=3&page=2&size=9',
+      { credentials: 'include' },
+    )
+    expect(result).toEqual({
+      ok: true, expenses: [{ id: 1 }], page: 2, totalElements: 12, totalPages: 2,
     })
-    expect(result).toEqual({ ok: true, expenses: [{ id: 1 }], truncated: true })
   })
 
-  it('omite q vacío y year nulo', async () => {
+  it('omite los parámetros vacíos, nulos o ausentes', async () => {
     const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: {} }))
     vi.stubGlobal('fetch', fetchMock)
 
-    const result = await searchExpenses('', null)
+    const result = await searchExpenses({ term: '', year: null, month: undefined, page: 1 })
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/search?page=1')
+    expect(result).toEqual({ ok: true, expenses: [], page: 1, totalElements: 0, totalPages: 0 })
+  })
+
+  it('sin argumentos pide la búsqueda sin parámetros', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: null }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await searchExpenses()
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/expenses/search?')
-    expect(result).toEqual({ ok: true, expenses: [], truncated: false })
+    expect(result).toEqual({ ok: true, expenses: [], page: 1, totalElements: 0, totalPages: 0 })
+  })
+
+  it('ignora totales y páginas que no son enteros válidos', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({
+      ok: true,
+      body: { expenses: 'x', page: 0, totalElements: -3, totalPages: '4' },
+    })))
+
+    expect(await searchExpenses({ term: 'ab' })).toEqual({
+      ok: true, expenses: [], page: 1, totalElements: 0, totalPages: 0,
+    })
   })
 
   it('devuelve los campos inválidos de un 400', async () => {
@@ -319,7 +344,7 @@ describe('searchExpenses (031)', () => {
       response({ status: 400, body: { properties: { fields: { q: 'corto', otro: 3 } } } }),
     ))
 
-    expect(await searchExpenses('a', null)).toEqual({ ok: false, status: 400, fields: { q: 'corto' } })
+    expect(await searchExpenses({ term: 'a' })).toEqual({ ok: false, status: 400, fields: { q: 'corto' } })
   })
 
   it('un 400 sin cuerpo JSON devuelve campos vacíos', async () => {
@@ -327,15 +352,15 @@ describe('searchExpenses (031)', () => {
       ok: false, status: 401, json: () => Promise.reject(new Error('sin cuerpo')),
     }))
 
-    expect(await searchExpenses('ab', null)).toEqual({ ok: false, status: 401, fields: {} })
+    expect(await searchExpenses({ term: 'ab' })).toEqual({ ok: false, status: 401, fields: {} })
   })
 
   it('trata 5xx y fallas de red como error de red', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 503 })))
-    expect(await searchExpenses('ab', null)).toEqual({ ok: false, network: true })
+    expect(await searchExpenses({ term: 'ab' })).toEqual({ ok: false, network: true })
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
-    expect(await searchExpenses('ab', null)).toEqual({ ok: false, network: true })
+    expect(await searchExpenses({ term: 'ab' })).toEqual({ ok: false, network: true })
   })
 })
 

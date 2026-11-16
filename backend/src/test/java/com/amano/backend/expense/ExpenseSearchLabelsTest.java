@@ -121,4 +121,50 @@ class ExpenseSearchLabelsTest {
                             .containsEntry("year", ExpenseSearchService.YEAR_INVALID));
         }
     }
+
+    private static ExpenseSearchService.Criteria validate(String year, String month, String page,
+            String size) {
+        return ExpenseSearchService.validate(new ExpenseSearchService.Query(null, year, month, page, size));
+    }
+
+    @Test
+    void validateAcceptsMonthPageAndSize() {
+        assertThat(validate("2026", " 3 ", "2", "10"))
+                .isEqualTo(new ExpenseSearchService.Criteria(null, 2026, 3, 2, 10));
+        assertThat(validate("2026", "12", "", "50"))
+                .isEqualTo(new ExpenseSearchService.Criteria(null, 2026, 12, 1, 50));
+    }
+
+    @Test
+    void validateRejectsInvalidMonthsAndMonthWithoutYear() {
+        for (String month : new String[] {"0", "13", "abc"}) {
+            assertThatThrownBy(() -> validate("2026", month, null, null))
+                    .as(month)
+                    .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
+                            .containsEntry("month", ExpenseSearchService.MONTH_INVALID));
+        }
+        assertThatThrownBy(() -> validate(null, "3", null, null))
+                .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
+                        .containsEntry("month", ExpenseSearchService.MONTH_WITHOUT_YEAR));
+        assertThatThrownBy(() -> validate("abc", "3", null, null))
+                .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
+                        .containsEntry("year", ExpenseSearchService.YEAR_INVALID)
+                        .doesNotContainKey("month"));
+    }
+
+    @Test
+    void validateRejectsInvalidPagesAndSizes() {
+        for (String page : new String[] {"0", "-1", "abc"}) {
+            assertThatThrownBy(() -> validate(null, null, page, null))
+                    .as(page)
+                    .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
+                            .containsEntry("page", ExpenseSearchService.PAGE_INVALID));
+        }
+        for (String size : new String[] {"0", "51", "abc"}) {
+            assertThatThrownBy(() -> validate(null, null, null, size))
+                    .as(size)
+                    .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
+                            .containsEntry("size", ExpenseSearchService.SIZE_INVALID));
+        }
+    }
 }

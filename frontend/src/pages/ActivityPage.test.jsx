@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
@@ -19,11 +19,29 @@ import {
 import ActivityPage, {
   NO_RESULTS_MESSAGE,
   SEARCH_PLACEHOLDER,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
   TOO_SHORT_MESSAGE,
-  TRUNCATED_MESSAGE,
 } from './ActivityPage'
 
 const YEAR = String(new Date().getFullYear())
+// jsdom's default window height (768 px) fits 7 cards with the estimated card height.
+const DEFAULT_HEIGHT = 768
+const SIZE = 7
+
+/** Arguments of searchExpenses for some criteria; the rest are the defaults. */
+function query(overrides = {}) {
+  return { term: '', year: YEAR, month: null, page: 1, size: SIZE, ...overrides }
+}
+
+/** A page of the search answer; by default the asked page exists. */
+function pageOf(expenses, { page = 1, totalElements = expenses.length, totalPages = page } = {}) {
+  return { ok: true, expenses, page, totalElements, totalPages }
+}
+
+function setWindowHeight(height) {
+  Object.defineProperty(window, 'innerHeight', { configurable: true, writable: true, value: height })
+}
 
 const PIZZA = {
   id: 1,
@@ -66,12 +84,15 @@ function renderPage(entry = '/activity') {
 
 const searchbox = () => screen.getByRole('searchbox', { name: SEARCH_PLACEHOLDER })
 const yearSelect = () => screen.getByRole('combobox', { name: 'Año' })
+const monthSelect = () => screen.getByRole('combobox', { name: 'Mes' })
+const location = () => screen.getByTestId('location')
 
 beforeEach(() => {
   searchExpenses.mockReset()
   listExpenseYears.mockReset()
   setUser.mockReset()
-  searchExpenses.mockResolvedValue({ ok: true, expenses: [PIZZA], truncated: false })
+  setWindowHeight(DEFAULT_HEIGHT)
+  searchExpenses.mockImplementation(async ({ page }) => pageOf([PIZZA], { page }))
   listExpenseYears.mockResolvedValue({ ok: true, years: [] })
 })
 
@@ -80,7 +101,7 @@ describe('ActivityPage (031)', () => {
     renderPage()
 
     expect(await screen.findByText('Pizza')).toBeInTheDocument()
-    expect(searchExpenses).toHaveBeenCalledWith('', YEAR)
+    expect(searchExpenses).toHaveBeenCalledWith(query())
     expect(yearSelect()).toHaveValue(YEAR)
     expect(searchbox()).toHaveAttribute('placeholder', SEARCH_PLACEHOLDER)
     expect(screen.getByText('ARS 1.500,00')).toBeInTheDocument()
@@ -94,7 +115,9 @@ describe('ActivityPage (031)', () => {
   it('muestra las conversiones y la categoría cuando no hay descripción', async () => {
     searchExpenses.mockResolvedValue({
       ok: true,
-      truncated: false,
+      page: 1,
+      totalElements: 1,
+      totalPages: 1,
       expenses: [
         {
           ...PIZZA,
@@ -120,9 +143,9 @@ describe('ActivityPage (031)', () => {
     await user.type(searchbox(), 'farma')
 
     expect(screen.getByText('Buscando…')).toBeInTheDocument()
-    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith('farma', YEAR))
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ term: 'farma' })))
     expect(await screen.findByText('1 resultado')).toBeInTheDocument()
-    expect(searchExpenses).not.toHaveBeenCalledWith('f', YEAR)
+    expect(searchExpenses).not.toHaveBeenCalledWith(query({ term: 'f' }))
     expect(screen.getByTestId('location')).toHaveTextContent('/activity?q=farma')
   })
 
@@ -133,7 +156,7 @@ describe('ActivityPage (031)', () => {
 
     await user.type(searchbox(), 'pizza{Enter}')
 
-    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith('pizza', YEAR), {
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ term: 'pizza' })), {
       timeout: 200,
     })
   })
@@ -153,7 +176,7 @@ describe('ActivityPage (031)', () => {
     const user = userEvent.setup()
     renderPage()
     await screen.findByText('Pizza')
-    searchExpenses.mockResolvedValue({ ok: true, expenses: [], truncated: false })
+    searchExpenses.mockResolvedValue(pageOf([], { totalPages: 0 }))
 
     await user.type(searchbox(), 'xyz{Enter}')
 
@@ -169,7 +192,7 @@ describe('ActivityPage (031)', () => {
 
     await user.clear(searchbox())
 
-    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith('', '2025'), {
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ year: '2025' })), {
       timeout: 200,
     })
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/activity\?year=2025$/)
@@ -185,21 +208,21 @@ describe('ActivityPage (031)', () => {
     expect(options).toEqual([YEAR, '2024', 'Todos los años'])
 
     await user.selectOptions(yearSelect(), '2024')
-    expect(searchExpenses).toHaveBeenLastCalledWith('', '2024')
+    expect(searchExpenses).toHaveBeenLastCalledWith(query({ year: '2024' }))
 
     await user.selectOptions(yearSelect(), 'all')
-    expect(searchExpenses).toHaveBeenLastCalledWith('', null)
+    expect(searchExpenses).toHaveBeenLastCalledWith(query({ year: null }))
 
     await user.type(searchbox(), 'pizza{Enter}')
     await user.selectOptions(yearSelect(), YEAR)
-    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith('pizza', YEAR))
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ term: 'pizza' })))
     expect(screen.getByTestId('location')).toHaveTextContent(/^\/activity\?q=pizza$/)
   })
 
   it('un año inválido en la dirección se toma como el actual y uno sin gastos se ofrece igual', async () => {
     renderPage('/activity?q=pizza&year=20x5')
     await screen.findByText('Pizza')
-    expect(searchExpenses).toHaveBeenCalledWith('pizza', YEAR)
+    expect(searchExpenses).toHaveBeenCalledWith(query({ term: 'pizza' }))
   })
 
   it('ofrece el año de la dirección aunque no tenga gastos', async () => {
@@ -208,16 +231,8 @@ describe('ActivityPage (031)', () => {
     expect(yearSelect()).toHaveValue('2019')
   })
 
-  it('avisa cuando hay más de 200 resultados', async () => {
-    searchExpenses.mockResolvedValue({ ok: true, expenses: [PIZZA], truncated: true })
-
-    renderPage('/activity?q=pizza')
-
-    expect(await screen.findByText(TRUNCATED_MESSAGE)).toBeInTheDocument()
-  })
-
   it('sin gastos en el año ofrece registrar uno', async () => {
-    searchExpenses.mockResolvedValue({ ok: true, expenses: [], truncated: false })
+    searchExpenses.mockResolvedValue(pageOf([], { totalPages: 0 }))
 
     renderPage()
 
@@ -229,7 +244,7 @@ describe('ActivityPage (031)', () => {
   })
 
   it('sin gastos en ningún año lo dice así', async () => {
-    searchExpenses.mockResolvedValue({ ok: true, expenses: [], truncated: false })
+    searchExpenses.mockResolvedValue(pageOf([], { totalPages: 0 }))
 
     renderPage('/activity?year=all')
 
@@ -273,5 +288,239 @@ describe('ActivityPage (031)', () => {
     await user.click(await screen.findByRole('link', { name: /Pizza/ }))
 
     expect(screen.getByText('Detalle desde /activity?q=pizza&year=2025')).toBeInTheDocument()
+  })
+})
+
+describe('ActivityPage: mes (031, FR-020)', () => {
+  it('ofrece todos los meses y filtra por el elegido dentro del año', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Pizza')
+    const options = within(monthSelect()).getAllByRole('option').map((option) => option.textContent)
+    expect(options).toHaveLength(13)
+    expect(options[0]).toBe('Todos los meses')
+    expect(options[3]).toBe('Marzo')
+    expect(monthSelect()).toHaveValue('')
+
+    await user.selectOptions(monthSelect(), '3')
+
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ month: '3' })))
+    expect(location()).toHaveTextContent(/^\/activity\?month=3$/)
+  })
+
+  it('el mes de la dirección se aplica junto con el texto y el año', async () => {
+    renderPage('/activity?q=pizza&year=2025&month=12')
+    await screen.findByText('Pizza')
+
+    expect(searchExpenses).toHaveBeenCalledWith(query({ term: 'pizza', year: '2025', month: '12' }))
+    expect(monthSelect()).toHaveValue('12')
+  })
+
+  it('con "Todos los años" el mes queda deshabilitado y vuelve a todos', async () => {
+    const user = userEvent.setup()
+    renderPage('/activity?month=5')
+    await screen.findByText('Pizza')
+    expect(monthSelect()).toBeEnabled()
+
+    await user.selectOptions(yearSelect(), 'all')
+
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ year: null })))
+    expect(monthSelect()).toBeDisabled()
+    expect(monthSelect()).toHaveValue('')
+    expect(location()).toHaveTextContent(/^\/activity\?year=all$/)
+  })
+
+  it('ignora un mes inválido o un mes con "Todos los años" en la dirección', async () => {
+    renderPage('/activity?month=13')
+    await screen.findByText('Pizza')
+    expect(searchExpenses).toHaveBeenLastCalledWith(query())
+    expect(monthSelect()).toHaveValue('')
+  })
+
+  it('ignora el mes de la dirección cuando el año es "Todos los años"', async () => {
+    renderPage('/activity?year=all&month=3')
+    await screen.findByText('Pizza')
+    expect(searchExpenses).toHaveBeenLastCalledWith(query({ year: null }))
+    expect(monthSelect()).toBeDisabled()
+  })
+
+  it('sin gastos en el mes lo dice con el nombre del mes', async () => {
+    searchExpenses.mockResolvedValue(pageOf([], { totalPages: 0 }))
+
+    renderPage('/activity?year=2025&month=3')
+
+    expect(await screen.findByText('No registraste gastos en marzo de 2025.')).toBeInTheDocument()
+  })
+})
+
+describe('ActivityPage: paginación (031, FR-021..FR-023)', () => {
+  const pagination = () => screen.getByRole('navigation', { name: 'Paginación' })
+  const pageNumbers = () => pagination().querySelector('ol').textContent
+
+  it('con una sola página no muestra la paginación', async () => {
+    renderPage()
+    await screen.findByText('Pizza')
+    expect(screen.queryByRole('navigation', { name: 'Paginación' })).not.toBeInTheDocument()
+  })
+
+  it('con pocas páginas las muestra todas, sin "…"', async () => {
+    searchExpenses.mockImplementation(async ({ page }) =>
+      pageOf([PIZZA], { page, totalElements: 45, totalPages: 7 }))
+
+    renderPage()
+    await screen.findByText('Pizza')
+
+    expect(pageNumbers()).toBe('1234567')
+    expect(screen.getByRole('button', { name: 'Página 1' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: '‹ Anterior' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Siguiente ›' })).toBeEnabled()
+  })
+
+  it('con muchas páginas resume los saltos con "…"', async () => {
+    searchExpenses.mockImplementation(async ({ page }) =>
+      pageOf([PIZZA], { page, totalElements: 70, totalPages: 10 }))
+
+    renderPage('/activity?page=5')
+    await screen.findByText('Pizza')
+
+    expect(searchExpenses).toHaveBeenCalledWith(query({ page: 5 }))
+    expect(pageNumbers()).toBe('1…456…10')
+    expect(screen.getByRole('button', { name: 'Página 5' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('en la primera y la última página muestra un solo "…"', async () => {
+    searchExpenses.mockImplementation(async ({ page }) =>
+      pageOf([PIZZA], { page, totalElements: 70, totalPages: 10 }))
+
+    const { unmount } = renderPage()
+    await screen.findByText('Pizza')
+    expect(pageNumbers()).toBe('12…10')
+    unmount()
+
+    renderPage('/activity?page=10')
+    await screen.findByText('Pizza')
+    expect(pageNumbers()).toBe('1…910')
+    expect(screen.getByRole('button', { name: 'Siguiente ›' })).toBeDisabled()
+  })
+
+  it('los botones cambian de página y la guardan en la dirección', async () => {
+    searchExpenses.mockImplementation(async ({ page }) =>
+      pageOf([{ ...PIZZA, id: page, description: `Gasto ${page}` }],
+        { page, totalElements: 70, totalPages: 10 }))
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Gasto 1')
+
+    await user.click(screen.getByRole('button', { name: 'Siguiente ›' }))
+    expect(await screen.findByText('Gasto 2')).toBeInTheDocument()
+    expect(searchExpenses).toHaveBeenLastCalledWith(query({ page: 2 }))
+    expect(location()).toHaveTextContent(/^\/activity\?page=2$/)
+
+    await user.click(screen.getByRole('button', { name: 'Página 10' }))
+    expect(await screen.findByText('Gasto 10')).toBeInTheDocument()
+    expect(location()).toHaveTextContent(/^\/activity\?page=10$/)
+
+    await user.click(screen.getByRole('button', { name: '‹ Anterior' }))
+    expect(await screen.findByText('Gasto 9')).toBeInTheDocument()
+  })
+
+  it('una página que ya no existe se reemplaza por la última', async () => {
+    searchExpenses.mockResolvedValue(pageOf([PIZZA], { page: 3, totalElements: 15, totalPages: 3 }))
+
+    renderPage('/activity?page=9')
+    await screen.findByText('Pizza')
+
+    expect(searchExpenses).toHaveBeenCalledWith(query({ page: 9 }))
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/activity\?page=3$/))
+    expect(screen.getByRole('button', { name: 'Página 3' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('una página inválida en la dirección se toma como la primera', async () => {
+    renderPage('/activity?page=abc')
+    await screen.findByText('Pizza')
+    expect(searchExpenses).toHaveBeenCalledWith(query())
+  })
+
+  it('el contador muestra el total de resultados, no solo los de la página', async () => {
+    searchExpenses.mockImplementation(async ({ page }) =>
+      pageOf([PIZZA], { page, totalElements: 23, totalPages: 4 }))
+
+    renderPage('/activity?q=pizza')
+
+    expect(await screen.findByText('23 resultados')).toBeInTheDocument()
+  })
+
+  it('cambiar el texto, el mes o el año vuelve a la página 1', async () => {
+    searchExpenses.mockImplementation(async ({ page }) =>
+      pageOf([PIZZA], { page, totalElements: 70, totalPages: 10 }))
+    listExpenseYears.mockResolvedValue({ ok: true, years: [2024] })
+    const user = userEvent.setup()
+
+    renderPage('/activity?page=3')
+    await screen.findByText('Pizza')
+    await user.selectOptions(monthSelect(), '2')
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(query({ month: '2' })))
+    expect(location()).toHaveTextContent(/^\/activity\?month=2$/)
+
+    await user.click(screen.getByRole('button', { name: 'Página 2' }))
+    await waitFor(() => expect(location()).toHaveTextContent(/page=2/))
+    await user.selectOptions(yearSelect(), '2024')
+    await waitFor(() =>
+      expect(searchExpenses).toHaveBeenLastCalledWith(query({ year: '2024', month: '2' })))
+    expect(location()).toHaveTextContent(/^\/activity\?year=2024&month=2$/)
+
+    await user.click(screen.getByRole('button', { name: 'Página 2' }))
+    await waitFor(() => expect(location()).toHaveTextContent(/page=2/))
+    await user.type(searchbox(), 'pizza{Enter}')
+    await waitFor(() => expect(searchExpenses).toHaveBeenLastCalledWith(
+      query({ term: 'pizza', year: '2024', month: '2' })))
+    expect(location()).toHaveTextContent(/^\/activity\?q=pizza&year=2024&month=2$/)
+  })
+})
+
+describe('ActivityPage: tamaño de página según el alto (031, FR-022)', () => {
+  it.each([
+    [400, MIN_PAGE_SIZE],
+    [1000, 10],
+    [3000, MAX_PAGE_SIZE],
+  ])('con %i px de alto pide páginas de %i gastos', async (height, size) => {
+    setWindowHeight(height)
+
+    renderPage()
+    await screen.findByText('Pizza')
+
+    expect(searchExpenses).toHaveBeenCalledTimes(1)
+    expect(searchExpenses).toHaveBeenCalledWith(query({ size }))
+  })
+
+  it('al cambiar el tamaño de la ventana recalcula y conserva el primer gasto a la vista', async () => {
+    searchExpenses.mockImplementation(async ({ page, size }) =>
+      pageOf([PIZZA], { page, totalElements: 70, totalPages: Math.ceil(70 / size) }))
+    renderPage('/activity?page=3')
+    await screen.findByText('Pizza')
+    expect(searchExpenses).toHaveBeenLastCalledWith(query({ page: 3 }))
+
+    // Page 3 of 7 starts at the 15th expense; with pages of 10 it is on page 2.
+    act(() => {
+      setWindowHeight(1000)
+      window.dispatchEvent(new Event('resize'))
+    })
+
+    await waitFor(() =>
+      expect(searchExpenses).toHaveBeenLastCalledWith(query({ page: 2, size: 10 })))
+    expect(location()).toHaveTextContent(/^\/activity\?page=2$/)
+  })
+
+  it('un cambio de alto que no cambia el tamaño no vuelve a consultar', async () => {
+    renderPage()
+    await screen.findByText('Pizza')
+
+    act(() => {
+      setWindowHeight(DEFAULT_HEIGHT + 10)
+      window.dispatchEvent(new Event('resize'))
+    })
+    await new Promise((resolve) => setTimeout(resolve, 250))
+
+    expect(searchExpenses).toHaveBeenCalledTimes(1)
   })
 })

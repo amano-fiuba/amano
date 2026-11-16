@@ -79,9 +79,9 @@ description: "Task list for Buscar en actividad personal"
 - [x] T019 [P] Tests de los clientes nuevos en frontend/src/api/expenseClient.test.js
 - [x] T020 [P] Tests de búsqueda al dejar de escribir y con Enter, borrar el texto, cambio de año con y sin texto, mínimo de caracteres, sin resultados, error, años, URL y enlaces en frontend/src/pages/ActivityPage.test.jsx
 - [x] T021 [P] Tests del detalle (único, recurrente, 404, error, Volver) en frontend/src/pages/ExpenseDetailPage.test.jsx
-- [ ] T038 [P] Tests backend: mes (filtro, sin año, inválido), paginación (tamaño, totales, fuera de rango, `page`/`size` inválidos) y `GET /api/expenses` → 405 en ExpenseSearchIT.java y ExpenseSearchLabelsTest.java; tests de conversiones sobre `withConversions` y quitar los de historial de RecurringExpenseIT.java
-- [ ] T039 [P] Tests frontend: selector de mes, paginación, tamaño por alto y `resize`, vuelta a la página 1, contador total y clientes en ActivityPage.test.jsx y expenseClient.test.js
-- [ ] T040 Repetir T022 tras la sesión 4
+- [x] T038 [P] Tests backend: mes (filtro, sin año, inválido), paginación (tamaño, totales, fuera de rango, `page`/`size` inválidos) y `GET /api/expenses` → 405 en ExpenseSearchIT.java y ExpenseSearchLabelsTest.java; tests de conversiones sobre `withConversions` y quitar los de historial de RecurringExpenseIT.java
+- [x] T039 [P] Tests frontend: selector de mes, paginación, tamaño por alto y `resize`, vuelta a la página 1, contador total y clientes en ActivityPage.test.jsx y expenseClient.test.js
+- [x] T040 Repetir T022 tras la sesión 4
 - [x] T022 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; informar cobertura (≥ 85 %)
 
 ## Dependencies
