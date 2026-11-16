@@ -1,0 +1,45 @@
+// Torta de las estadísticas (032): porciones separadas por un trazo del color de
+// la superficie y la porción activa resaltada sin cambiar su color.
+.pie-chart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+
+  svg {
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    overflow: visible;
+  }
+}
+
+.pie-chart__slice {
+  stroke: var(--color-superficie);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible,
+  &.is-active {
+    stroke: var(--color-texto);
+    stroke-width: 2.5;
+  }
+}
+
+.pie-chart svg:has(.is-active) .pie-chart__slice:not(.is-active) {
+  opacity: 0.55;
+}
+
+.pie-chart__detail {
+  min-height: 1.4em;
+  color: var(--color-texto-suave);
+  font-size: 0.9rem;
+  text-align: center;
+}

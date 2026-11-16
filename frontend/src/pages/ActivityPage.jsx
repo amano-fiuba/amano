@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthContext'
 import { SearchIcon } from '../components/NavIcons'
 import { CATEGORY_OPTIONS, PAYMENT_METHOD_OPTIONS, labelOf } from '../validation/expenseCatalog'
 import { formatAmount, formatIsoDate } from '../validation/expenseFormat'
+import { MONTH_NAMES } from '../validation/months'
 import './MainPage.scss'
 import './groups/groups.scss'
 import HomeLink from '../components/HomeLink'
@@ -24,20 +25,7 @@ const MAX_LENGTH = 100
 export const DEBOUNCE_MS = 400
 export const ALL_YEARS = 'all'
 export const ALL_MONTHS = ''
-const MONTHS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-]
+const MONTHS = MONTH_NAMES
 
 // Page size from the screen height (FR-022, plan D13): the cards that fit below
 // the filters without scrolling, between 5 and 20.

@@ -25,14 +25,14 @@ description: "Task list for Ver estadísticas de mis gastos"
 
 ## Phase 2: US1 – Ver en qué categorías gasté este mes (P1) 🎯 MVP
 
-- [ ] T004 [US1] Crear `ExpenseStatisticsService`: validación de `year` (1–9999) y `month` (1–12) obligatorios, rango del mes con `YearMonth`, moneda del cálculo (primera preferida por orden de `Currency`, ARS por defecto), suma por categoría de cada tipo, totales, porcentajes sobre el total del tipo, redondeo `HALF_UP` al final, orden por importe descendente y luego por `ordinal()`, y años, en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsService.java (FR-005..FR-008, FR-011..FR-013, plan D5, D7, D8, D10). En esta fase, sin conversión: solo subtotales en la moneda del cálculo (la conversión llega en T013)
-- [ ] T005 [US1] Crear `ExpenseStatisticsController` con `GET /api/expenses/statistics` (persona desde la sesión, 401 sin sesión como `ExpenseController`) en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsController.java (FR-005, FR-019, plan D1)
-- [ ] T006 [P] [US1] Agregar `getExpenseStatistics({ year, month })` y el mensaje "No pudimos cargar tus estadísticas. Intentá nuevamente" en frontend/src/api/expenseClient.js (FR-020)
-- [ ] T007 [P] [US1] Agregar el color fijo de cada una de las 10 categorías en frontend/src/validation/expenseCatalog.js, distinguibles y con contraste en los temas claro y oscuro (FR-016, plan D14)
-- [ ] T008 [P] [US1] Crear frontend/src/components/charts/PieChart.jsx: torta SVG con un arco por categoría (círculo completo si hay una sola), porciones enfocables, detalle "Categoría · importe · porcentaje" al pasar el mouse, enfocar o tocar, `role="img"` con `aria-label` de resumen (FR-013..FR-016, plan D13)
-- [ ] T009 [US1] Crear frontend/src/pages/StatisticsPage.jsx: total combinado y moneda del cálculo ("Importes en Peso argentino (ARS)"), torta "Personales" y torta "Grupales" con su total y su lista (color, nombre, importe, porcentaje), mensajes de vacío general y por tipo con enlace para registrar un gasto, "Buscando…" y error con "Reintentar" (FR-014, FR-015, FR-017, FR-020)
-- [ ] T010 [P] [US1] Crear frontend/src/pages/StatisticsPage.scss: torta y lista lado a lado en escritorio, una debajo de la otra en celular
-- [ ] T011 [US1] Registrar la ruta protegida `/statistics` en frontend/src/App.jsx, agregar `StatisticsIcon` en frontend/src/components/NavIcons.jsx y la entrada "Estadísticas" junto a "Actividad personal" en frontend/src/components/AppHeader.jsx (FR-001, plan D15)
+- [x] T004 [US1] Crear `ExpenseStatisticsService`: validación de `year` (1–9999) y `month` (1–12) obligatorios, rango del mes con `YearMonth`, moneda del cálculo (primera preferida por orden de `Currency`, ARS por defecto), suma por categoría de cada tipo, totales, porcentajes sobre el total del tipo, redondeo `HALF_UP` al final, orden por importe descendente y luego por `ordinal()`, y años, en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsService.java (FR-005..FR-008, FR-011..FR-013, plan D5, D7, D8, D10). La conversión (T013) se implementó junto con esta tarea para no escribir un cálculo provisorio
+- [x] T005 [US1] Crear `ExpenseStatisticsController` con `GET /api/expenses/statistics` (persona desde la sesión, 401 sin sesión como `ExpenseController`) en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsController.java (FR-005, FR-019, plan D1)
+- [x] T006 [P] [US1] Agregar `getExpenseStatistics({ year, month })` y el mensaje "No pudimos cargar tus estadísticas. Intentá nuevamente" en frontend/src/api/expenseClient.js (FR-020)
+- [x] T007 [P] [US1] Agregar el color fijo de cada una de las 10 categorías como variables CSS por tema en frontend/src/pages/StatisticsPage.scss y `categoryColor(code)` en frontend/src/validation/expenseCatalog.js, distinguibles y con contraste en los temas claro y oscuro (FR-016, plan D14)
+- [x] T008 [P] [US1] Crear frontend/src/components/charts/PieChart.jsx: torta SVG con un arco por categoría (círculo completo si hay una sola), porciones enfocables, detalle "Categoría · importe · porcentaje" al pasar el mouse, enfocar o tocar, `role="img"` con `aria-label` de resumen (FR-013..FR-016, plan D13)
+- [x] T009 [US1] Crear frontend/src/pages/StatisticsPage.jsx: total combinado y moneda del cálculo ("Importes en Peso argentino (ARS)"), torta "Personales" y torta "Grupales" con su total y su lista (color, nombre, importe, porcentaje), mensajes de vacío general y por tipo con enlace para registrar un gasto, "Buscando…" y error con "Reintentar" (FR-014, FR-015, FR-017, FR-020)
+- [x] T010 [P] [US1] Crear frontend/src/pages/StatisticsPage.scss: torta y lista lado a lado en escritorio, una debajo de la otra en celular
+- [x] T011 [US1] Registrar la ruta protegida `/statistics` en frontend/src/App.jsx, agregar `StatisticsIcon` en frontend/src/components/NavIcons.jsx y la entrada "Estadísticas" junto a "Actividad personal" en frontend/src/components/AppHeader.jsx (FR-001, plan D15)
 
 ## Phase 3: US2 – Cambiar de mes (P1)
 
@@ -40,8 +40,8 @@ description: "Task list for Ver estadísticas de mis gastos"
 
 ## Phase 4: US3 – Sumar gastos en distintas monedas (P2)
 
-- [ ] T013 [US3] Convertir en `ExpenseStatisticsService` cada subtotal en otra moneda con `ExchangeRateProvider.getQuote(moneda, monedaCálculo, fecha)`, una vez por par (moneda, fecha); ante `ExchangeRateUnavailableException`, descartar el subtotal y sumar su cantidad a `excludedCount`, en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsService.java (FR-008..FR-010, plan D6)
-- [ ] T014 [US3] Mostrar en frontend/src/pages/StatisticsPage.jsx el aviso "1 gasto no se pudo convertir a <moneda> y no está incluido." / "N gastos no se pudieron convertir…" cuando `excludedCount > 0` (FR-018)
+- [x] T013 [US3] Convertir en `ExpenseStatisticsService` cada subtotal en otra moneda con `ExchangeRateProvider.getQuote(moneda, monedaCálculo, fecha)`, una vez por par (moneda, fecha); ante `ExchangeRateUnavailableException`, descartar el subtotal y sumar su cantidad a `excludedCount`, en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsService.java (FR-008..FR-010, plan D6)
+- [x] T014 [US3] Mostrar en frontend/src/pages/StatisticsPage.jsx el aviso "1 gasto no se pudo convertir a <moneda> y no está incluido." / "N gastos no se pudieron convertir…" cuando `excludedCount > 0` (FR-018)
 
 ## Phase 5: Validación manual
 

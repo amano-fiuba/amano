@@ -7,6 +7,7 @@ import SettingsPage from './pages/SettingsPage'
 import FaqPage from './pages/FaqPage'
 import ActivityPage from './pages/ActivityPage'
 import ExpenseDetailPage from './pages/ExpenseDetailPage'
+import StatisticsPage from './pages/StatisticsPage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import CheckEmailPage from './pages/CheckEmailPage'
@@ -214,6 +215,14 @@ export function AppRoutes() {
         element={
           <ProtectedRoute>
             <ActivityPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/statistics"
+        element={
+          <ProtectedRoute>
+            <StatisticsPage />
           </ProtectedRoute>
         }
       />
