@@ -36,7 +36,7 @@ description: "Task list for Ver estadísticas de mis gastos"
 
 ## Phase 3: US2 – Cambiar de mes (P1)
 
-- [ ] T012 [US2] Agregar a frontend/src/pages/StatisticsPage.jsx los selectores de mes (enero a diciembre) y año (actual + `years`, descendente), con el mes y el año actuales por defecto, período en la dirección (`?year=&month=`, omitidos si son los actuales, `replace`), valores inválidos tratados como el actual, el mes conservado al cambiar de año y descarte de respuestas viejas con `key` por período (FR-002..FR-004, plan D11, D12)
+- [x] T012 [US2] Agregar a frontend/src/pages/StatisticsPage.jsx los selectores de mes (enero a diciembre) y año (actual + `years`, descendente), con el mes y el año actuales por defecto, período en la dirección (`?year=&month=`, omitidos si son los actuales, `replace`), valores inválidos tratados como el actual, el mes conservado al cambiar de año y descarte de respuestas viejas con `key` por período (FR-002..FR-004, plan D11, D12)
 
 ## Phase 4: US3 – Sumar gastos en distintas monedas (P2)
 
@@ -45,15 +45,15 @@ description: "Task list for Ver estadísticas de mis gastos"
 
 ## Phase 5: Validación manual
 
-- [ ] T015 Validar con el usuario los escenarios de la spec en la app levantada con Docker Compose (US1, US2, US3 y casos límite), con datos de demo que incluyan gastos personales, de grupo y con amigos en varias monedas y meses
+- [x] T015 Validar con el usuario los escenarios de la spec en la app levantada con Docker Compose (US1, US2, US3 y casos límite), con datos de demo que incluyan gastos personales, de grupo y con amigos en varias monedas y meses
 
 ## Phase 6: Pruebas automatizadas (después de la validación manual)
 
-- [ ] T016 [P] Unit test de `ExpenseStatisticsService` con repositorios y `ExchangeRateProvider` simulados: validación, moneda del cálculo (sin preferencias, varias preferencias), sumas, porcentajes, redondeo, orden y desempate, conversión, cotización faltante y `excludedCount`, en backend/src/test/java/com/amano/backend/expense/ExpenseStatisticsServiceTest.java
-- [ ] T017 [P] Integration test (Testcontainers + MockMvc) de `GET /api/expenses/statistics`: personales del mes, partes grupales pagadas o no por la persona, gasto con amigo, gasto grupal sin categoría → `OTHER`, gasto de grupo sin parte propia, gastos de otras personas, series recurrentes sin doble conteo, años, 400 y 401, en backend/src/test/java/com/amano/backend/expense/ExpenseStatisticsIT.java
-- [ ] T018 [P] Tests de `getExpenseStatistics` en frontend/src/api/expenseClient.test.js
-- [ ] T019 [P] Tests de frontend/src/components/charts/PieChart.test.jsx: una porción por categoría, círculo completo con una sola, detalle al pasar el mouse, enfocar y tocar, `aria-label`
-- [ ] T020 [P] Tests de frontend/src/pages/StatisticsPage.test.jsx: período por defecto, cambio de mes y año, dirección, valores inválidos, dos tortas y listas, vacío general y por tipo, aviso de excluidos, error y reintento, sesión vencida, entrada en la barra
+- [x] T016 [P] Unit test de `ExpenseStatisticsService` con repositorios y `ExchangeRateProvider` simulados: validación, moneda del cálculo (sin preferencias, varias preferencias), sumas, porcentajes, redondeo, orden y desempate, conversión, cotización faltante y `excludedCount`, en backend/src/test/java/com/amano/backend/expense/ExpenseStatisticsServiceTest.java
+- [x] T017 [P] Integration test (Testcontainers + MockMvc) de `GET /api/expenses/statistics`: personales del mes, partes grupales pagadas o no por la persona, gasto con amigo, gasto grupal sin categoría → `OTHER`, gasto de grupo sin parte propia, gastos de otras personas, series recurrentes sin doble conteo, años, 400 y 401, en backend/src/test/java/com/amano/backend/expense/ExpenseStatisticsIT.java
+- [x] T018 [P] Tests de `getExpenseStatistics` en frontend/src/api/expenseClient.test.js
+- [x] T019 [P] Tests de frontend/src/components/charts/PieChart.test.jsx: una porción por categoría, círculo completo con una sola, detalle al pasar el mouse, enfocar y tocar, `aria-label`
+- [x] T020 [P] Tests de frontend/src/pages/StatisticsPage.test.jsx: período por defecto, cambio de mes y año, dirección, valores inválidos, dos tortas y listas, vacío general y por tipo, aviso de excluidos, error y reintento, sesión vencida, entrada en la barra
 - [ ] T021 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; informar cobertura (≥ 85 %)
 
 ## Dependencies

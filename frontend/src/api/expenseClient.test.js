@@ -5,6 +5,8 @@ import {
   RECURRING_UPDATE_ERROR_MESSAGE,
   createExpense,
   getExpense,
+  getExpenseStatistics,
+  STATISTICS_ERROR_MESSAGE,
   listExpenseYears,
   listRecentExpenses,
   searchExpenses,
@@ -412,5 +414,71 @@ describe('getExpense (031)', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
     expect(await getExpense('1')).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('getExpenseStatistics (032)', () => {
+  const BODY = {
+    year: 2026,
+    month: 11,
+    currency: 'ARS',
+    total: '160000.00',
+    excludedCount: 1,
+    personal: { total: '100000.00', categories: [{ category: 'FOOD', amount: '100000.00', percentage: '100.0' }] },
+    group: { total: '60000.00', categories: [{ category: 'LEISURE', amount: '60000.00', percentage: '100.0' }] },
+    years: [2026, '2025', 2024],
+  }
+
+  it('pide el período con cookie y devuelve las estadísticas', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: BODY }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getExpenseStatistics({ year: '2026', month: 11 })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/expenses/statistics?year=2026&month=11', {
+      credentials: 'include',
+    })
+    expect(result).toEqual({
+      ok: true,
+      statistics: {
+        currency: 'ARS',
+        total: '160000.00',
+        excludedCount: 1,
+        personal: BODY.personal,
+        group: BODY.group,
+        years: [2026, 2024],
+      },
+    })
+  })
+
+  it('completa con valores vacíos un cuerpo incompleto', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ok: true, body: null })))
+
+    expect(await getExpenseStatistics({ year: 2026, month: 1 })).toEqual({
+      ok: true,
+      statistics: {
+        currency: 'ARS',
+        total: '0.00',
+        excludedCount: 0,
+        personal: { total: '0.00', categories: [] },
+        group: { total: '0.00', categories: [] },
+        years: [],
+      },
+    })
+  })
+
+  it('distingue 4xx de 5xx y de fallas de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 400 })))
+    expect(await getExpenseStatistics({ year: 2026, month: 13 })).toEqual({ ok: false, status: 400 })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ status: 500 })))
+    expect(await getExpenseStatistics({ year: 2026, month: 1 })).toEqual({ ok: false, network: true })
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+    expect(await getExpenseStatistics({ year: 2026, month: 1 })).toEqual({ ok: false, network: true })
+  })
+
+  it('expone el mensaje fijo de error', () => {
+    expect(STATISTICS_ERROR_MESSAGE).toBe('No pudimos cargar tus estadísticas. Intentá nuevamente')
   })
 })
