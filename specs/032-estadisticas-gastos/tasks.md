@@ -19,9 +19,9 @@ description: "Task list for Ver estadísticas de mis gastos"
 
 ## Phase 1: Foundational (backend compartido)
 
-- [ ] T001 Agregar a `ExpenseRepository` la consulta de subtotales personales por categoría, moneda y fecha del gasto (`SUM(amount)`, `COUNT(id)`) entre dos fechas, filtrada por `userId`, en backend/src/main/java/com/amano/backend/expense/ExpenseRepository.java (FR-006, plan D2)
-- [ ] T002 [P] Crear `SharedExpenseStatisticsRepository` con dos consultas nativas: subtotales de las partes de la persona (`participant_type = 'REGISTERED'`, `user_id`) por `COALESCE(e.category, 'OTHER')`, `COALESCE(g.primary_currency, e.currency)` y `e.expense_date` entre dos fechas; y los años con gastos personales o partes grupales (`UNION`, descendente), en backend/src/main/java/com/amano/backend/expense/SharedExpenseStatisticsRepository.java (FR-002, FR-007, FR-012, plan D2, D3, D9)
-- [ ] T003 [P] Crear `ExpenseStatisticsResponse` (`year`, `month`, `currency`, `total`, `excludedCount`, `personal`, `group`, `years`; cada tipo con `total` y `categories[{category, amount, percentage}]`, importes y porcentajes como cadenas) en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsResponse.java (FR-005)
+- [x] T001 Agregar a `ExpenseRepository` la consulta de subtotales personales por categoría, moneda y fecha del gasto (`SUM(amount)`, `COUNT(id)`) entre dos fechas, filtrada por `userId`, en backend/src/main/java/com/amano/backend/expense/ExpenseRepository.java (FR-006, plan D2)
+- [x] T002 [P] Crear `SharedExpenseStatisticsRepository` con dos consultas nativas: subtotales de las partes de la persona (`participant_type = 'REGISTERED'`, `user_id`) por `COALESCE(e.category, 'OTHER')`, la moneda de la parte (plan D3) y `e.expense_date` entre dos fechas; y los años con gastos personales o partes grupales (`UNION`, descendente), en backend/src/main/java/com/amano/backend/expense/SharedExpenseStatisticsRepository.java (FR-002, FR-007, FR-012, plan D2, D3, D9)
+- [x] T003 [P] Crear `ExpenseStatisticsResponse` (`year`, `month`, `currency`, `total`, `excludedCount`, `personal`, `group`, `years`; cada tipo con `total` y `categories[{category, amount, percentage}]`, importes y porcentajes como cadenas) en backend/src/main/java/com/amano/backend/expense/ExpenseStatisticsResponse.java (FR-005)
 
 ## Phase 2: US1 – Ver en qué categorías gasté este mes (P1) 🎯 MVP
 
