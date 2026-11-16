@@ -54,7 +54,7 @@ description: "Task list for Ver estadísticas de mis gastos"
 - [x] T018 [P] Tests de `getExpenseStatistics` en frontend/src/api/expenseClient.test.js
 - [x] T019 [P] Tests de frontend/src/components/charts/PieChart.test.jsx: una porción por categoría, círculo completo con una sola, detalle al pasar el mouse, enfocar y tocar, `aria-label`
 - [x] T020 [P] Tests de frontend/src/pages/StatisticsPage.test.jsx: período por defecto, cambio de mes y año, dirección, valores inválidos, dos tortas y listas, vacío general y por tipo, aviso de excluidos, error y reintento, sesión vencida, entrada en la barra
-- [ ] T021 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; informar cobertura (≥ 85 %)
+- [x] T021 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; informar cobertura (≥ 85 %)
 
 ## Dependencies
 
