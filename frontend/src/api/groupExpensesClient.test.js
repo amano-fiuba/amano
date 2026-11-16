@@ -10,6 +10,7 @@ import {
   getPendingDebts,
   getSettlementProposal,
   updateGroupExpense,
+  whistleDebt,
 } from './groupExpensesClient'
 
 // 017 T033: client of contracts/group-expenses-api.md.
@@ -280,5 +281,54 @@ describe('createFriendExpense (027 US4)', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
     expect(await createFriendExpense(15, {}, 'k')).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('whistleDebt (030 T009)', () => {
+  const SENT = { whistleId: 15, debtId: 42, debtorName: 'Juan Pérez', sentAt: 'a', nextAvailableAt: 'b' }
+
+  it('201 manda POST con la cookie a la ruta de la deuda y devuelve { ok, data }', async () => {
+    const fetchMock = respond(201, SENT)
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await whistleDebt(3, 42)).toEqual({ ok: true, data: SENT })
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/groups/3/debts/42/whistle')
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST', credentials: 'include' })
+  })
+
+  it.each([
+    [403, 'WHISTLE_NOT_CREDITOR', 'Solo quien recibe el pago puede avisar esta deuda'],
+    [404, null, 'No existe el grupo solicitado o no sos miembro'],
+    [409, 'DEBT_NOT_WHISTLEABLE', 'La deuda ya no tiene saldo pendiente'],
+    [422, 'SIMULATED_DEBTOR', 'Los perfiles simulados no reciben avisos'],
+    [503, 'WHISTLE_DELIVERY_FAILED', 'No pudimos enviar el aviso. Probá de nuevo en unos minutos'],
+  ])('%s devuelve el estado, el detalle y el código', async (status, code, detail) => {
+    vi.stubGlobal('fetch', respond(status, { detail, properties: code ? { code } : {} }))
+    expect(await whistleDebt(3, 42)).toMatchObject({ ok: false, status, detail, code, retryAfterSeconds: null })
+  })
+
+  it('429 lee los segundos de espera del cuerpo o, si faltan, de la cabecera Retry-After', async () => {
+    vi.stubGlobal('fetch', respond(429, {
+      detail: 'Ya le avisaste a Juan Pérez en las últimas 24 horas',
+      properties: { code: 'WHISTLE_RATE_LIMITED', retryAfterSeconds: 63600 },
+    }))
+    expect(await whistleDebt(3, 42)).toMatchObject({ ok: false, status: 429, retryAfterSeconds: 63600 })
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      headers: { get: (name) => (name === 'Retry-After' ? '120' : null) },
+      json: () => Promise.resolve({}),
+    }))
+    expect(await whistleDebt(3, 42)).toMatchObject({ status: 429, retryAfterSeconds: 120 })
+  })
+
+  it('otros 5xx y la red se tratan como red; un cuerpo ilegible no rompe', async () => {
+    vi.stubGlobal('fetch', respond(500, {}))
+    expect(await whistleDebt(3, 42)).toEqual({ ok: false, network: true })
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
+    expect(await whistleDebt(3, 42)).toEqual({ ok: false, network: true })
+    vi.stubGlobal('fetch', respond(409, new Error('not json')))
+    expect(await whistleDebt(3, 42)).toMatchObject({ ok: false, status: 409, detail: '', code: null })
   })
 })

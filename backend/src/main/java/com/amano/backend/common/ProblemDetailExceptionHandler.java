@@ -5,8 +5,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -31,6 +33,11 @@ import com.amano.backend.friendship.PendingDirectDebtException;
 import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
+import com.amano.backend.groupexpense.whistle.DebtNotWhistleableException;
+import com.amano.backend.groupexpense.whistle.SimulatedDebtorWhistleException;
+import com.amano.backend.groupexpense.whistle.WhistleDeliveryException;
+import com.amano.backend.groupexpense.whistle.WhistleNotCreditorException;
+import com.amano.backend.groupexpense.whistle.WhistleRateLimitedException;
 
 /**
  * Global REST error handling following RFC 7807 ProblemDetail, as defined in
@@ -440,6 +447,59 @@ public class ProblemDetailExceptionHandler {
     }
 
     /** Service-level authorization rejection (US2/US3): 403 with the reason. */
+    /** 030 FR-003: someone other than the creditor tried to whistle — 403. */
+    @ExceptionHandler(WhistleNotCreditorException.class)
+    public ProblemDetail handleWhistleNotCreditor(WhistleNotCreditorException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, exception.getMessage());
+        problem.setTitle("Operación no permitida");
+        problem.setProperty("properties", Map.of("code", WhistleNotCreditorException.CODE));
+        return problem;
+    }
+
+    /** 030 FR-002/FR-009: settled debt, payment waiting for validation or debtor out of the group — 409. */
+    @ExceptionHandler(DebtNotWhistleableException.class)
+    public ProblemDetail handleDebtNotWhistleable(DebtNotWhistleableException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setTitle("No se puede avisar esta deuda");
+        problem.setProperty("properties", Map.of("code", exception.getCode()));
+        return problem;
+    }
+
+    /** 030 FR-004 (Q3): simulated debtors never receive whistles — 422. */
+    @ExceptionHandler(SimulatedDebtorWhistleException.class)
+    public ProblemDetail handleSimulatedDebtorWhistle(SimulatedDebtorWhistleException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
+        problem.setTitle("No se puede avisar esta deuda");
+        problem.setProperty("properties", Map.of("code", SimulatedDebtorWhistleException.CODE));
+        return problem;
+    }
+
+    /**
+     * 030 FR-007: the 24 h limit of the pair was reached — 429 with the
+     * {@code Retry-After} header and the same seconds in the body.
+     */
+    @ExceptionHandler(WhistleRateLimitedException.class)
+    public ResponseEntity<ProblemDetail> handleWhistleRateLimited(WhistleRateLimitedException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage());
+        problem.setTitle("Límite de avisos alcanzado");
+        problem.setProperty("properties", Map.of("code", WhistleRateLimitedException.CODE,
+                "retryAfterSeconds", exception.getRetryAfterSeconds()));
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(exception.getRetryAfterSeconds()))
+                .body(problem);
+    }
+
+    /** 030 Q10: the mail could not be delivered — 503, without internals. */
+    @ExceptionHandler(WhistleDeliveryException.class)
+    public ProblemDetail handleWhistleDelivery(WhistleDeliveryException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
+        problem.setTitle("Aviso no enviado");
+        problem.setProperty("properties", Map.of("code", WhistleDeliveryException.CODE));
+        return problem;
+    }
+
     @ExceptionHandler(com.amano.backend.groups.GroupPermissionDeniedException.class)
     public ProblemDetail handleGroupPermissionDenied(
             com.amano.backend.groups.GroupPermissionDeniedException exception) {

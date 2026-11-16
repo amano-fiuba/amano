@@ -7,9 +7,11 @@ import ConvertedAmount from '../debts/ConvertedAmount'
 import { useSnackbar } from '../Snackbar'
 import { isPayableDebtStatus } from '../../pages/groups/debtStatusLabels'
 import { moneyText } from '../../pages/groups/debtMoney'
+import { formatAmount } from '../../validation/expenseFormat'
 import useGroupResource from '../../pages/groups/useGroupResource'
 import DebtStatusBadge from './DebtStatusBadge'
 import PaymentConfirmDialog from './PaymentConfirmDialog'
+import WhistleButton from './WhistleButton'
 import ResourceState from './ResourceState'
 
 export const NO_OPEN_DEBTS_MESSAGE = 'No tenés deudas pendientes en este grupo'
@@ -140,6 +142,18 @@ export default function MyDebtsPanel({ groupId, requiresValidation, refreshKey, 
                   >
                     Registrar pago
                   </button>
+                )}
+                {/* 030: only the creditor whistles, and only a debt with a balance to pay. */}
+                {currentUserId != null && debt.creditorUserId === currentUserId
+                  && isPayableDebtStatus(debt.status) && (
+                  <WhistleButton
+                    groupId={groupId}
+                    debtId={debt.debtId}
+                    debtorName={debt.debtorName}
+                    amountText={`$ ${formatAmount(moneyText(debt.outstanding))} ${debt.currency}`}
+                    simulated={debt.debtorUserId == null}
+                    onStale={onChanged}
+                  />
                 )}
                 <Link className="group-action" to={`/groups/${groupId}/expenses/${debt.expenseId}`}>
                   Ver gasto

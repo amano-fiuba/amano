@@ -5,8 +5,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 /**
  * Persistence for {@code group_members}. Active membership = left_at IS NULL
@@ -20,6 +23,16 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, GroupM
     List<GroupMember> findByIdGroupIdAndLeftAtIsNull(Long groupId);
 
     Optional<GroupMember> findByIdGroupIdAndIdUserId(Long groupId, Long userId);
+
+    /**
+     * 030 (research.md D3): the membership row with a pessimistic write lock
+     * ({@code SELECT … FOR UPDATE}). Locking the creditor's row serializes their
+     * whistles in the group, so two concurrent requests never both pass the
+     * 24 h limit check.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM GroupMember m WHERE m.id.groupId = :groupId AND m.id.userId = :userId")
+    Optional<GroupMember> findForUpdate(@Param("groupId") Long groupId, @Param("userId") Long userId);
 
     boolean existsByIdGroupIdAndIdUserId(Long groupId, Long userId);
 
