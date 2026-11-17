@@ -50,6 +50,8 @@
 - El año y el mes de un ingreso son los de su **fecha del ingreso** (la que elige la persona), no la de registro.
 - Un ingreso conserva su moneda original; el balance usa la conversión a la moneda principal. Los ingresos proyectados no se convierten para el neto (no entran en él); su total informativo usa la cotización de su fecha o, si no existe, la de hoy. Si la cotización no está disponible, el balance no se muestra (no se inventan valores).
 - "Gastos" del balance son los gastos personales ya registrados (sin ocurrencias futuras de series recurrentes; no incluye gastos de grupo ni deudas con amigos), consistentes con lo que muestra "Actividad personal".
+- La condición **proyectado** (fecha del ingreso posterior a hoy) se evalúa en **UTC**, con corte a la medianoche UTC; cerca de esa hora puede diferir unas horas del "hoy" local de la persona.
+- El orden por defecto del listado de ingresos es por **fecha del ingreso descendente** (el más reciente primero), con desempate por último registrado; no es configurable.
 - Las monedas aceptadas para un ingreso son las del catálogo `/api/currencies`; no se limita a las preferidas de la persona.
 - El monto tiene como máximo 2 decimales y un tope igual al de gastos personales; la descripción admite hasta el mismo largo que en gastos.
 - No hay límite de antigüedad para la fecha; la fecha futura se admite hasta 1 año adelante.
@@ -85,7 +87,7 @@ Lucía quiere ver cuánto cobró por freelance este año. En la vista "Ingresos"
 
 **Acceptance Scenarios**:
 
-1. **Given** la vista "Ingresos", **When** se abre, **Then** muestra los ingresos del año actual, más reciente primero, en tarjetas con flecha, con el mismo buscador y selectores de mes y año de gastos.
+1. **Given** la vista "Ingresos", **When** se abre, **Then** muestra los ingresos del año actual, por fecha del ingreso descendente (el más reciente primero), en tarjetas con flecha, con el mismo buscador y selectores de mes y año de gastos.
 2. **Given** ingresos con descripciones "Proyecto web" y "Venta bici", **When** busca "proyec", **Then** ve solo el primero (coincidencia parcial, sin tildes ni mayúsculas; también contra el nombre de categoría en español).
 3. **Given** una consulta a la API con `from` y `to`, **When** se ejecuta, **Then** devuelve solo ingresos con fecha dentro del rango (ambos extremos incluidos); la pantalla no ofrece este filtro.
 4. **Given** un texto sin coincidencias, **When** busca, **Then** ve "No se encontraron resultados".

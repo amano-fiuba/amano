@@ -98,8 +98,9 @@ Balance neto personal del período. Parámetros opcionales: `year`, `month` (req
 ```
 
 - `currency`: moneda principal de la cuenta (ARS si no hay).
-- `income`: ingresos con fecha ≤ hoy; `projectedIncome`: con fecha > hoy (no entra en `net`); `expenses`: gastos personales ya registrados en el período; `net = income − expenses` (puede ser negativo).
-- **400** parámetros inválidos. **503** cotización no disponible (sin balance parcial).
+- Los ingresos proyectados se convierten con la cotización de su fecha o, si no existe, con la de hoy; si tampoco hay cotización de hoy, `projectedIncome` se omite de la respuesta (el `200` no se ve afectado).
+- `income`: ingresos con fecha ≤ hoy (UTC); `projectedIncome`: con fecha > hoy (no entra en `net`); `expenses`: gastos personales ya registrados en el período; `net = income − expenses` (puede ser negativo).
+- **400** parámetros inválidos. **503** cotización no disponible para un gasto o un ingreso efectivizado (sin balance parcial); un ingreso proyectado nunca provoca `503`.
 
 ## Sin cambios
 

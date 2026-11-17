@@ -20,6 +20,7 @@ Todas las decisiones salen de inspeccionar el código existente; no hubo incógn
 ## R4. Cálculo del balance
 - **Hallazgo**: `ExpenseService.conversionsOf` ya usa `ExchangeRateProvider.getQuote(from, to, date)` y omite conversiones sin cotización.
 - **Decisión**: para el balance, agrupar en SQL por `(currency, date)` y convertir cada grupo; una cotización faltante falla el balance (`503`) en lugar de omitirse, porque un balance parcial sería engañoso (FR-012). Redondeo `HALF_UP` a 2 decimales al convertir cada grupo; la suma es exacta.
+- **Ingresos proyectados**: su fecha es futura y el proveedor casi nunca tiene cotización para ella; se usa la cotización de hoy como fallback y, si tampoco existe, `projectedIncome` se omite sin fallar el balance.
 - **Alternativas**: convertir movimiento por movimiento (N cotizaciones, más lento); usar la cotización de hoy (rechazada en clarificación).
 
 ## R5. "Hoy" y fechas futuras

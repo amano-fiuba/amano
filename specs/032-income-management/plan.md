@@ -55,10 +55,21 @@ Todos los puntos de contexto se resolvieron con el código existente (ver [resea
 1. **Tabla propia `incomes`** (no discriminador en `expenses`): evita tocar búsqueda 031, recurrentes y grupos. (research R1)
 2. **Idempotencia embebida** en `incomes(user_id, idempotency_key)` con `UNIQUE`, igual que `expenses`; reintento con el mismo cuerpo = `200` con el mismo ingreso, otro cuerpo = `422 IDEMPOTENCY_KEY_REUSED`, carrera resuelta por el índice único (`resolveConcurrentRegistration`). **Corrige** `data-model.md` anterior, que preveía una tabla aparte. (R2)
 3. **Inmutabilidad**: `IncomeController` solo mapea `POST /api/incomes`, `GET /api/incomes/search`, `GET /api/incomes/years`, `GET /api/incomes/{id}` y `GET /api/balance`. Cualquier otro método sobre esas rutas ya produce `405` por `handleMethodNotSupported` (mismo mecanismo que `GET /api/expenses` tras 031). La entidad no expone setters públicos de edición. (R3)
-4. **Proyectado derivado** de `income_date > hoy`; sin columna de estado. "Hoy" se calcula en UTC en lecturas y balance; en el alta se valida con la zona del dispositivo (`deviceTimeZone`), igual que gastos. (R5)
-5. **Balance**: consulta agregada por `(moneda, fecha)` para ingresos efectivizados, ingresos proyectados y gastos; cada grupo se convierte con `ExchangeRateProvider.getQuote(moneda, principal, fecha)`. Si falta una cotización: `503`, sin balance parcial. (R4)
+4. **Proyectado derivado** de `income_date > hoy`; sin columna de estado. "Hoy" se evalúa en **UTC**, con corte a la medianoche UTC, en lecturas y balance; en el alta se valida el tope de 1 año con la zona del dispositivo (`deviceTimeZone`), igual que gastos. (R5)
+5. **Balance**: consulta agregada por `(moneda, fecha)` para ingresos efectivizados, ingresos proyectados y gastos; cada grupo se convierte con `ExchangeRateProvider.getQuote(moneda, principal, fecha)`. Ingresos efectivizados y gastos: si falta una cotización, `503` sin balance parcial. Ingresos **proyectados** (fecha futura): se convierten con la cotización de su fecha y, como casi nunca existe para una fecha futura, con la cotización de **hoy** como fallback; si tampoco hay cotización de hoy, `projectedIncome` se omite y el balance responde `200` (el `503` nunca lo causa un ingreso proyectado). (R4)
 6. **Moneda principal**: primera de `UserAccountResponse.currencies` por prioridad ARS→USD→EUR→otra, ARS por defecto; es la misma regla que `preferredCurrency()` del frontend. (R6)
-7. **Frontend**: el "modal de creación" es en realidad la página `/expenses/new` (`NewExpensePage` + `ExpenseForm`) con `ExpenseSummaryDialog` como confirmación. Se reutilizan parametrizados por `kind`; el detalle es una página de solo lectura. (R7)
+7. **Frontend**: el "modal de creación" es en realidad la página `/expenses/new` (`NewExpensePage` + `ExpenseForm`) con `ExpenseSummaryDialog` como confirmación. Se reutilizan parametrizados por `kind`; el detalle es una página de solo lectura. Tras guardar un ingreso, `NewIncomePage` redirige a `/activity` con `state.refreshBalance` y `BalanceCard` (sin caché) vuelve a pedir el balance, de modo que el neto se recalcula de inmediato. (R7)
+8. **Orden por defecto**: los ingresos se listan por **fecha del ingreso descendente** (desempate `id` descendente); a diferencia de gastos, que ordena por registro. Orden fijo, no configurable.
+9. **Extracción acotada en `ActivityPage`**: ver "Justificación de la extracción en ActivityPage".
+
+## Justificación de la extracción en ActivityPage
+
+La constitución (principios I y IV) prohíbe refactors ajenos al alcance sin justificación. Esta extracción se justifica porque la vista de ingresos debe tener **exactamente** el mismo buscador, selectores de mes y año y paginación que gastos (FR-015), y `ActivityPage.jsx` tiene 532 líneas con esas piezas definidas como funciones internas (`pagesOf`, `pageSizeFor`, `rowHeightOf`, `Pagination`, filtros). Alternativas rechazadas: copiar el archivo (dos implementaciones divergentes del mismo comportamiento, contra el principio X) o reescribir la pantalla. Límites: se extrae **solo** lo que ambas vistas usan; la lógica de gastos (`ExpenseItem`, `ActivityResults`) no se toca; el paso es un refactor puro (T055) que debe dejar `ActivityPage.test.jsx` en verde **sin modificarlo**, y recién después se agrega el control Gastos | Ingresos (T056).
+
+## Supuestos de diseño
+
+- **`projected` en UTC**: la condición `projected` (`income_date > hoy`) se evalúa en UTC, con corte a la medianoche UTC, tanto en las respuestas como en el balance. Cerca de esa hora una persona en otra zona puede ver un ingreso del día como proyectado o efectivizado unas horas antes o después; es una limitación aceptada (`research.md` R5).
+- **Orden por defecto**: el listado de ingresos se ordena por fecha del ingreso descendente, con desempate por `id` descendente. No hay otro orden configurable.
 
 ## Esquema de base de datos y migración
 
@@ -130,7 +141,9 @@ public record IncomeSearchResponse(List<IncomeResponse> incomes, int page, int s
 
 public record IncomeYearsResponse(List<Integer> years) {}
 
-public record BalanceResponse(String currency, String income, String projectedIncome,
+@JsonInclude(NON_NULL)
+public record BalanceResponse(String currency, String income,
+        String projectedIncome /* null si no hay cotización de su fecha ni de hoy */,
         String expenses, String net) {}
 ```
 
@@ -186,12 +199,13 @@ sequenceDiagram
             C-->>F: 201 IncomeResponse
         end
     end
-    F->>F: Éxito: reinicia el formulario y renueva la clave; snackbar
-    F->>C: GET /api/balance (período activo)
-    C-->>F: 200 BalanceResponse → tarjeta actualizada
+    F->>F: Éxito: snackbar global y renueva la clave
+    F->>F: onSaved → navigate('/activity', state.refreshBalance)
+    F->>C: GET /api/balance (BalanceCard se monta o cambia refreshKey; sin caché)
+    C-->>F: 200 BalanceResponse → tarjeta recalculada
 ```
 
-**Flujo del balance** (`GET /api/balance`): `BalanceService` toma la moneda principal de la cuenta, agrupa ingresos efectivizados, ingresos proyectados y gastos por `(moneda, fecha)` con filtros de período, convierte cada grupo con `ExchangeRateProvider.getQuote(moneda, principal, fecha)` (sin cotización si la moneda ya es la principal), suma con `BigDecimal` a 2 decimales (`HALF_UP`) y devuelve `net = income − expenses`; una cotización faltante lanza `ExchangeRateUnavailableException` → `503`.
+**Flujo del balance** (`GET /api/balance`): `BalanceService` toma la moneda principal de la cuenta, agrupa ingresos efectivizados, ingresos proyectados y gastos por `(moneda, fecha)` con filtros de período, convierte cada grupo con `ExchangeRateProvider.getQuote(moneda, principal, fecha)` (sin cotización si la moneda ya es la principal), suma con `BigDecimal` a 2 decimales (`HALF_UP`) y devuelve `net = income − expenses`. Una cotización faltante de un **gasto o de un ingreso efectivizado** lanza `ExchangeRateUnavailableException` → `503`. Para los grupos de **ingresos proyectados** (fecha > hoy UTC) se usa la cotización de hoy cuando no existe la de su fecha; si tampoco existe, `projectedIncome` queda `null` (se omite del JSON) y no afecta ni a `net` ni al código de respuesta.
 
 ## Módulos y componentes afectados
 
@@ -215,11 +229,11 @@ sequenceDiagram
 | Extraer | `api/problemDetail.js` con `problemOf` y `safeFields` (hoy privados en `expenseClient.js`); `expenseClient.js` los importa |
 | Catálogos | `validation/expenseCatalog.js`: `INCOME_CATEGORY_OPTIONS` (Sueldo, Freelance, Venta, Reembolso, Otros) e `INCOME_PAYMENT_METHOD_OPTIONS` (Efectivo, Transferencia, Billetera virtual, Otro) |
 | Validación | `validation/expenseValidation.js`: `INCOME_DATE_TOO_FAR` y validación de fecha de ingreso (hasta hoy + 1 año) |
-| Formulario compartido | `components/ExpenseForm.jsx`: prop `kind` (`'EXPENSE'` por defecto). Para `INCOME`: categorías y "Medio de cobro" de ingresos; se ocultan Tipo y Frecuencia; sin `max` en `DatePickerField`; aviso `role="status"` "Se contará en el balance a partir de esa fecha" con fecha futura; sin estimado en pesos para fecha futura; usa `createIncome`; textos "Nuevo ingreso", "El ingreso se guardó correctamente", "¿Descartar el ingreso?..."; `FIELD_NAMES` según `kind`. Conserva `Idempotency-Key` (se genera al confirmar, se mantiene ante fallos, se renueva tras éxito) y el mapeo `properties.fields` → `setError` |
+| Formulario compartido | `components/ExpenseForm.jsx`: prop `kind` (`'EXPENSE'` por defecto). Para `INCOME`: categorías y "Medio de cobro" de ingresos; se ocultan Tipo y Frecuencia; sin `max` en `DatePickerField`; aviso `role="status"` "Se contará en el balance a partir de esa fecha" con fecha futura; sin estimado en pesos para fecha futura; usa `createIncome`; textos "Nuevo ingreso", "El ingreso se guardó correctamente", "¿Descartar el ingreso?..."; `FIELD_NAMES` según `kind`. Conserva `Idempotency-Key` (se genera al confirmar, se mantiene ante fallos, se renueva tras éxito) y el mapeo `properties.fields` → `setError`; prop opcional `onSaved(result)` que, si se pasa, se invoca tras el snackbar de éxito (sin ella el comportamiento actual de gastos no cambia). Se implementa en cinco pasos pequeños (T029–T033) |
 | Diálogo | `components/ExpenseSummaryDialog.jsx`: prop `title` en lugar de `SUMMARY_TITLE` fijo ("Confirmá el ingreso") |
-| Páginas | nueva `pages/NewIncomePage.jsx` (`/incomes/new`); nueva `pages/IncomeDetailPage.jsx` (`/incomes/:id`, solo lectura, sin acciones, con "Volver" a `/activity`); `hooks/usePersonalFormDefaults.js` extrae de `NewExpensePage` la carga de moneda preferida y fecha |
-| Actividad | `pages/ActivityPage.jsx`: control segmentado **Gastos \| Ingresos** (`?view=incomes` en la URL junto con `q`, `year`, `month`, `page`), botón "Nuevo gasto"/"Nuevo ingreso", lista de ingresos con insignia "Proyectado", vacíos propios; extraer filas/paginación para compartirlas |
-| Tarjeta | nuevo `components/BalanceCard.jsx`: Ingresos, Gastos, **Balance neto** (signo y color/ícono), línea "Proyectado", carga y error con reintento; visible en ambas vistas |
+| Páginas | nueva `pages/NewIncomePage.jsx` (`/incomes/new`, pasa `onSaved` que redirige a `/activity` con `state: { refreshBalance: Date.now() }`); nueva `pages/IncomeDetailPage.jsx` (`/incomes/:id`, solo lectura, sin acciones, con "Volver" a `/activity`); `hooks/usePersonalFormDefaults.js` extrae de `NewExpensePage` la carga de moneda preferida y fecha |
+| Actividad | `pages/ActivityPage.jsx`: control segmentado **Gastos \| Ingresos** (`?view=incomes` en la URL junto con `q`, `year`, `month`, `page`), botón "Nuevo gasto"/"Nuevo ingreso", lista de ingresos con insignia "Proyectado", vacíos propios; extraer a `components/activity/` solo el buscador/filtros y la paginación (cuatro pasos, T055–T058; ver justificación abajo) |
+| Tarjeta | nuevo `components/BalanceCard.jsx`: Ingresos, Gastos, **Balance neto** (signo y color/ícono), línea "Proyectado", carga y error con reintento; visible en ambas vistas; sin caché: cada montaje y cada cambio de `year`, `month` o `refreshKey` (`location.state.refreshBalance`) vuelve a pedir `GET /api/balance` |
 | Rutas | `App.jsx`: rutas protegidas `/incomes/new` y `/incomes/:id` |
 | Pruebas | `incomeClient.test.js`, `ExpenseForm.test.jsx` (modo `INCOME`), `NewIncomePage.test.jsx`, `IncomeDetailPage.test.jsx`, `BalanceCard.test.jsx`, `ActivityPage.test.jsx` (vista Ingresos), ajustes en `ExpenseSummaryDialog` |
 
