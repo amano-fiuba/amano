@@ -16,17 +16,12 @@ import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 
@@ -36,16 +31,7 @@ import jakarta.servlet.http.Cookie;
  * inserted directly so their dates and registration order are fixed. All of them
  * are in ARS, the default preferred currency, so no exchange rate is requested.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class ExpenseSearchIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class ExpenseSearchIT extends AbstractIntegrationIT {
 
     private static final OffsetDateTime BASE = OffsetDateTime.of(2026, 1, 1, 12, 0, 0, 0, ZoneOffset.UTC);
 
@@ -74,14 +60,11 @@ class ExpenseSearchIT {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
 
-    private long verifiedUser(String email) throws Exception {
-        mockMvc.perform(multipart("/api/auth/register").part(
-                        part("firstName", "Ana"), part("email", email),
-                        part("password", "S3gura!2026"), part("confirmPassword", "S3gura!2026"),
-                        part("acceptTerms", "true")))
-                .andExpect(status().isCreated());
-        jdbcTemplate.update("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", email);
-        return jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+    private long verifiedUser(String email) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES ('Ana', ?, 'x', now(), CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, email);
     }
 
     private Cookie session(long userId) {

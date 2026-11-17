@@ -13,21 +13,11 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import com.icegreen.greenmail.junit5.GreenMailExtension;
+import com.amano.backend.support.AbstractClockIntegrationIT;
 import com.icegreen.greenmail.util.GreenMailUtil;
-import com.icegreen.greenmail.util.ServerSetup;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -37,39 +27,15 @@ import jakarta.mail.internet.MimeMessage;
  * GreenMail. One notice per expense, sent on the same date as the debt
  * reminders, with the payer's pending totals and no custom message.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class PayerNoticeIT {
+class PayerNoticeIT extends AbstractClockIntegrationIT {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(
-            new ServerSetup(0, "localhost", ServerSetup.PROTOCOL_SMTP))
-            .withPerMethodLifecycle(false);
 
     @Autowired
     private ReminderJob job;
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @MockitoBean
-    private Clock clock;
-
-    @DynamicPropertySource
-    static void mailProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
-    }
 
     @BeforeEach
     void setUp() throws Exception {

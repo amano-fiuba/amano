@@ -17,26 +17,16 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import com.icegreen.greenmail.junit5.GreenMailExtension;
 import com.icegreen.greenmail.util.GreenMailUtil;
-import com.icegreen.greenmail.util.ServerSetup;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.mail.Address;
 import jakarta.mail.internet.MimeMessage;
@@ -51,24 +41,9 @@ import jakarta.servlet.http.Cookie;
  * tampered token 400 and expired token 410 with the exact Spanish messages,
  * plus SC-003 (no reuse, no use after 24 h).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class EmailVerificationIT {
+class EmailVerificationIT extends AbstractIntegrationIT {
 
     private static final Pattern TOKEN_IN_LINK = Pattern.compile("token=([A-Za-z0-9_-]+)");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    /** In-process SMTP on a random port; lifecycle by CLASS so the port is ready at context load. */
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(
-            new ServerSetup(0, "localhost", ServerSetup.PROTOCOL_SMTP))
-            .withPerMethodLifecycle(false);
 
     @Autowired
     private MockMvc mockMvc;
@@ -78,17 +53,6 @@ class EmailVerificationIT {
 
     @Autowired
     private JwtService jwtService;
-
-    @DynamicPropertySource
-    static void mailProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        // GreenMail speaks plain SMTP: the STARTTLS/AUTH required by the real
-        // Gmail (application.properties) is turned off here (research.md D9).
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
-        registry.add("app.base-url", () -> "http://localhost:5173");
-    }
 
     @BeforeEach
     void cleanMailbox() throws Exception {
@@ -120,7 +84,7 @@ class EmailVerificationIT {
         while (System.currentTimeMillis() < deadline && received.isEmpty()) {
             received = mailsFor(email);
             if (received.isEmpty()) {
-                Thread.sleep(50);
+                Thread.sleep(10);
             }
         }
         assertThat(received).as("verification mail for %s", email).isNotEmpty();

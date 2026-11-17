@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -26,27 +27,14 @@ import java.util.concurrent.Future;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
-import com.amano.backend.groupexpense.reminder.ReminderMailService;
 import com.amano.backend.groupexpense.reminder.ReminderMessageBuilder;
-import com.icegreen.greenmail.junit5.GreenMailExtension;
-import com.icegreen.greenmail.util.ServerSetup;
+import com.amano.backend.support.AbstractClockIntegrationIT;
 
 import jakarta.mail.internet.MimeMessage;
 import jakarta.servlet.http.Cookie;
@@ -59,32 +47,10 @@ import tools.jackson.databind.ObjectMapper;
  * The clock is a mock so the 24 h window can be crossed exactly; the mail
  * service is a spy so a single scenario can make the SMTP fail.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class DebtWhistleIT {
+class DebtWhistleIT extends AbstractClockIntegrationIT {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
     private static final ZonedDateTime NOW = LocalDate.parse("2026-11-15").atTime(15, 0).atZone(ZONE);
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(
-            new ServerSetup(0, "localhost", ServerSetup.PROTOCOL_SMTP))
-            .withPerMethodLifecycle(false);
-
-    @DynamicPropertySource
-    static void mailProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
-    }
 
     @Autowired
     private MockMvc mockMvc;
@@ -97,12 +63,6 @@ class DebtWhistleIT {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @MockitoBean
-    private Clock clock;
-
-    @MockitoSpyBean
-    private ReminderMailService mailService;
 
     private long ana;
     private long juan;
@@ -271,6 +231,7 @@ class DebtWhistleIT {
         long cena = debt(groupId, ana, juan, "Cena", "PENDING", "8000.00", "0.00");
         long taxi = debt(groupId, ana, juan, "Taxi", "PENDING", "500.00", "0.00");
         whistle(anaSession, groupId, cena, 201);
+        assertThat(greenMail.waitForIncomingEmail(5_000, 1)).isTrue();
 
         at(NOW.plusHours(6).plusMinutes(20));
         mockMvc.perform(post(path(groupId, taxi)).cookie(anaSession))
@@ -279,7 +240,10 @@ class DebtWhistleIT {
                 .andExpect(jsonPath("$.properties.code").value("WHISTLE_RATE_LIMITED"))
                 .andExpect(jsonPath("$.properties.retryAfterSeconds").value(17 * 3600 + 40 * 60))
                 .andExpect(jsonPath("$.detail").value("Ya le avisaste a Juan Pérez en las últimas 24 horas"));
-        assertThat(greenMail.waitForIncomingEmail(2_000, 2)).isFalse();
+        // Deterministic invariant: the 429 did not persist a whistle for the taxi.
+        assertThat(whistleStatuses(taxi)).isEmpty();
+        // Sustained negative observation: no extra mail during the whole window.
+        assertNoNewMessages(1, Duration.ofSeconds(1));
 
         at(NOW.plusHours(24));
         whistle(anaSession, groupId, taxi, 201);
@@ -322,7 +286,7 @@ class DebtWhistleIT {
             pool.shutdownNow();
         }
         assertThat(greenMail.waitForIncomingEmail(5_000, 1)).isTrue();
-        assertThat(greenMail.waitForIncomingEmail(1_000, 2)).isFalse();
+        assertNoNewMessages(1, Duration.ofSeconds(1));
         assertThat(whistleStatuses(debt)).containsExactly("SENT");
     }
 

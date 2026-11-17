@@ -29,19 +29,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
 import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
@@ -51,6 +43,7 @@ import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
 import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.groups.ActivityEventService;
 import com.amano.backend.groups.ExpenseActivityDetails;
+import com.amano.backend.support.AbstractGroupExpenseIntegrationIT;
 import com.amano.backend.user.Currency;
 
 import jakarta.servlet.http.Cookie;
@@ -65,18 +58,9 @@ import tools.jackson.databind.ObjectMapper;
  * detail (FR-027). Every test builds its own group: Ana (ADMIN, payer), Juan
  * (MEMBER) and the simulated profile Abuela.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class GroupExpenseControllerIT {
+class GroupExpenseControllerIT extends AbstractGroupExpenseIntegrationIT {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -89,12 +73,6 @@ class GroupExpenseControllerIT {
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @MockitoSpyBean
-    private ActivityEventService activityEventService;
-
-    @MockitoBean
-    private BcraExchangeRateClient bcraExchangeRateClient;
 
     @Autowired
     private ExchangeRateProvider exchangeRateProvider;
@@ -116,6 +94,12 @@ class GroupExpenseControllerIT {
 
     @BeforeEach
     void buildGroup() throws Exception {
+        // The recurring job scans every ACTIVE series, so a series left by a
+        // previous method of this class would be generated again and break the
+        // per-method expectations. Retire them before building this method's
+        // fixtures; each method only asserts on the series it creates.
+        jdbc.update("UPDATE group_expenses SET recurrence_status = 'PAUSED' "
+                + "WHERE recurrence_status = 'ACTIVE'");
         if (exchangeRateProvider instanceof CachingExchangeRateProvider caching) {
             caching.clear();
         }

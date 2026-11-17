@@ -11,13 +11,10 @@ import java.util.HexFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.springframework.test.context.TestPropertySource;
 
+import com.amano.backend.support.AbstractIntegrationIT;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
@@ -30,16 +27,8 @@ import com.amano.backend.user.UserRepository;
  * the deadline, cascade their tokens and FREE the address; the resend limits are
  * NOT removed (no FK, they persist as a hash-only footprint).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c",
-        "verification.account-expiration=2s"
-})
-@Testcontainers
-class UnverifiedAccountCleanupIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+@TestPropertySource(properties = "verification.account-expiration=2s")
+class UnverifiedAccountCleanupIT extends AbstractIntegrationIT {
 
     @Autowired
     private UserRepository userRepository;

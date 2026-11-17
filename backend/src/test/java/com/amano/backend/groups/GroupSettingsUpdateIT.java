@@ -12,19 +12,14 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.JsonNode;
@@ -37,19 +32,10 @@ import tools.jackson.databind.node.JsonNodeFactory;
  * state), denies a MEMBER when members_can_edit_group_data = false (403) and
  * reports unknown groups (404).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class GroupSettingsUpdateIT {
+class GroupSettingsUpdateIT extends AbstractIntegrationIT {
 
     /** Real friendships replacing the old stub property (see {@link FriendshipFixtures}). */
     private static final java.util.List<String> FRIEND_FIXTURES = java.util.List.of("friend@example.com");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -63,33 +49,22 @@ class GroupSettingsUpdateIT {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Cookie verifiedSessionOf(String rawEmail) throws Exception {
-        mockMvc.perform(multipart("/api/auth/register")
-                .part(
-                        new MockPart("firstName", "Ana".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("email", rawEmail.getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("password", "Passw0rd!".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("confirmPassword", "Passw0rd!".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("acceptTerms", "true".getBytes(StandardCharsets.UTF_8))))
-                .andExpect(status().isCreated());
-        jdbcTemplate.update(
-                "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", rawEmail);
+    private Cookie verifiedSessionOf(String rawEmail) {
+        jdbcTemplate.update("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES ('Ana', ?, 'x', now(), CURRENT_TIMESTAMP)
+                ON CONFLICT (email) DO UPDATE SET email_verified_at = CURRENT_TIMESTAMP
+                """, rawEmail);
         FriendshipFixtures.link(jdbcTemplate, rawEmail, FRIEND_FIXTURES);
         return new Cookie("amano_auth", jwtService.issueToken(userIdOf(rawEmail)));
     }
 
-    private void registeredFriend() throws Exception {
-        mockMvc.perform(multipart("/api/auth/register")
-                .part(
-                        new MockPart("firstName", "Beto".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("email", "friend@example.com".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("password", "Passw0rd!".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("confirmPassword", "Passw0rd!".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("acceptTerms", "true".getBytes(StandardCharsets.UTF_8))))
-                .andExpect(result -> assertThat(result.getResponse().getStatus()).isIn(201, 409));
-        jdbcTemplate.update(
-                "UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?",
-                "friend@example.com");
+    private void registeredFriend() {
+        jdbcTemplate.update("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES ('Beto', 'friend@example.com', 'x', now(), CURRENT_TIMESTAMP)
+                ON CONFLICT (email) DO UPDATE SET email_verified_at = CURRENT_TIMESTAMP
+                """);
         FriendshipFixtures.link(jdbcTemplate, "friend@example.com", FRIEND_FIXTURES);
     }
 

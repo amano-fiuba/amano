@@ -18,20 +18,15 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.ObjectMapper;
@@ -42,18 +37,9 @@ import tools.jackson.databind.ObjectMapper;
  * and the daily generation (invoked directly with the service's "today"). Covers
  * FR-001..FR-016, including the V5 constraints and the untouched 007 rows.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class RecurringExpenseIT {
+class RecurringExpenseIT extends AbstractIntegrationIT {
 
     private static final String ZONE = "America/Argentina/Buenos_Aires";
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -76,15 +62,12 @@ class RecurringExpenseIT {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Registers an account through the real endpoint, verifies it and returns its session. */
-    private Cookie verifiedSession(String email) throws Exception {
-        mockMvc.perform(multipart("/api/auth/register").part(
-                        part("firstName", "Ana"), part("email", email),
-                        part("password", "S3gura!2026"), part("confirmPassword", "S3gura!2026"),
-                        part("acceptTerms", "true")))
-                .andExpect(status().isCreated());
-        jdbcTemplate.update("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", email);
-        Long userId = jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+    /** Inserts a verified account and returns its session. */
+    private Cookie verifiedSession(String email) {
+        Long userId = jdbcTemplate.queryForObject("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES ('Ana', ?, 'x', now(), CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, email);
         return new Cookie("amano_auth", jwtService.issueToken(userId));
     }
 

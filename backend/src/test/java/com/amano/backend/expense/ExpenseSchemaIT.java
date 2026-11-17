@@ -6,12 +6,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.support.AbstractIntegrationIT;
 
 /**
  * Migration T004: Flyway applies {@code V4__create_expenses.sql} on a real
@@ -19,15 +16,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * context also runs {@code ddl-auto=validate}, so the JPA mapping of
  * {@link Expense} must agree with the migration.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class ExpenseSchemaIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class ExpenseSchemaIT extends AbstractIntegrationIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;

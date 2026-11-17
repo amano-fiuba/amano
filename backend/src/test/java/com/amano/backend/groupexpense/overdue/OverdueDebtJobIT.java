@@ -13,33 +13,20 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
+import com.amano.backend.support.AbstractClockIntegrationIT;
 
 /**
  * 022 D7/T063: integration tests of {@link OverdueDebtJob} against PostgreSQL.
  * The clock is a mock so each test can place "today" exactly on the deadline or
  * the day after; the job bean is the real transactional component.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class OverdueDebtJobIT {
+class OverdueDebtJobIT extends AbstractClockIntegrationIT {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private OverdueDebtJob job;
@@ -49,9 +36,6 @@ class OverdueDebtJobIT {
 
     @Autowired
     private DebtRepository debtRepository;
-
-    @MockitoBean
-    private Clock clock;
 
     private long debtorId;
     private long creditorId;
