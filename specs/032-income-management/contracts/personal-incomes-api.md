@@ -32,6 +32,7 @@ Cabecera obligatoria `Idempotency-Key: <uuid>`. Cuerpo:
 | `date` | sí | `YYYY-MM-DD`; hasta 1 año en el futuro |
 | `category` | sí | Una del catálogo |
 | `paymentMethod` | sí | `CASH`, `TRANSFER`, `VIRTUAL_WALLET`, `OTHER` (medio de cobro) |
+| `deviceTimeZone` | no | Zona IANA del dispositivo para validar "hoy"; UTC si falta o es inválida (como en gastos) |
 | `description` | no | Se recorta; vacía = ausente; mismo largo máximo que en gastos |
 
 - **201** `IncomeResponse`. Reenvío con misma clave y mismo cuerpo: mismo ingreso, sin duplicar (`200`).
