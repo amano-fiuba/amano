@@ -29,8 +29,8 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 **Purpose**: línea base antes de tocar código
 
-- [ ] T001 [P] Ejecutar `mvn -B verify` en `backend/` y anotar el resultado y la cobertura de línea base (debe estar en verde antes de empezar)
-- [ ] T002 [P] Ejecutar `npm run lint && npm run test:coverage` en `frontend/` y anotar el resultado y la cobertura de línea base
+- [x] T001 [P] Ejecutar `mvn -B verify` en `backend/` y anotar el resultado y la cobertura de línea base (debe estar en verde antes de empezar)
+- [x] T002 [P] Ejecutar `npm run lint && npm run test:coverage` en `frontend/` y anotar el resultado y la cobertura de línea base
 
 ---
 
@@ -40,21 +40,21 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 ### Base de datos y backend core
 
-- [ ] T003 Crear `backend/src/main/resources/db/migration/V38__create_incomes.sql` con el `CREATE TABLE incomes` y el índice `ix_incomes_user_date` copiados de `plan.md` → "Esquema de base de datos y migración". Restricciones literales: `amount NUMERIC(11,2) NOT NULL` con `CHECK (amount >= 0.01)`; `currency VARCHAR(3) NOT NULL` con CHECK en las 32 monedas de V29; `income_date DATE NOT NULL`; `category VARCHAR(20) NOT NULL` con CHECK `('SALARY','FREELANCE','SALE','REFUND','OTHER')`; `payment_method VARCHAR(20) NOT NULL` con CHECK `('CASH','TRANSFER','VIRTUAL_WALLET','OTHER')`; `description VARCHAR(200) NULL` con CHECK `char_length(description) <= 200`; `idempotency_key UUID NOT NULL`; `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`; `UNIQUE (user_id, idempotency_key)`; FK a `users(id)` `ON DELETE CASCADE`. Solo `CREATE` (sin `DROP`/`DELETE`)
-- [ ] T004 [P] Crear los enums `IncomeCategory` (`SALARY, FREELANCE, SALE, REFUND, OTHER`) e `IncomePaymentMethod` (`CASH, TRANSFER, VIRTUAL_WALLET, OTHER`) en `BE/income/IncomeCategory.java` e `BE/income/IncomePaymentMethod.java`, con los mismos códigos que los CHECK de T003
-- [ ] T005 Crear la entidad JPA `Income` en `BE/income/Income.java` mapeada a `incomes` (columnas de data-model.md: `userId`, `amount` BigDecimal, `currency` `Currency`, `incomeDate` LocalDate, `category`, `paymentMethod`, `description`, `idempotencyKey` UUID, `createdAt`); solo getters públicos (sin `updated_at` ni setters de edición, los setters son package-private para el servicio). Depende de T003 y T004
-- [ ] T006 Crear `BE/income/IncomeRepository.java` (`JpaRepository<Income, Long>` + `JpaSpecificationExecutor<Income>`) con `findByUserIdAndIdempotencyKey(Long, UUID)`, `findByIdAndUserId(Long, Long)` y una consulta `findIncomeYears(userId)` (años distintos de `income_date`, más reciente primero), siguiendo `ExpenseRepository`
-- [ ] T007 [P] Crear `BT/income/IncomeSchemaIT.java` (base real, como `ExpenseSchemaIT`): la migración V38 aplica y la base rechaza `amount = 0`, categoría o medio de cobro fuera del catálogo, moneda fuera de las 32, descripción de 201 caracteres, y un segundo `(user_id, idempotency_key)` repetido
+- [x] T003 Crear `backend/src/main/resources/db/migration/V38__create_incomes.sql` con el `CREATE TABLE incomes` y el índice `ix_incomes_user_date` copiados de `plan.md` → "Esquema de base de datos y migración". Restricciones literales: `amount NUMERIC(11,2) NOT NULL` con `CHECK (amount >= 0.01)`; `currency VARCHAR(3) NOT NULL` con CHECK en las 32 monedas de V29; `income_date DATE NOT NULL`; `category VARCHAR(20) NOT NULL` con CHECK `('SALARY','FREELANCE','SALE','REFUND','OTHER')`; `payment_method VARCHAR(20) NOT NULL` con CHECK `('CASH','TRANSFER','VIRTUAL_WALLET','OTHER')`; `description VARCHAR(200) NULL` con CHECK `char_length(description) <= 200`; `idempotency_key UUID NOT NULL`; `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`; `UNIQUE (user_id, idempotency_key)`; FK a `users(id)` `ON DELETE CASCADE`. Solo `CREATE` (sin `DROP`/`DELETE`)
+- [x] T004 [P] Crear los enums `IncomeCategory` (`SALARY, FREELANCE, SALE, REFUND, OTHER`) e `IncomePaymentMethod` (`CASH, TRANSFER, VIRTUAL_WALLET, OTHER`) en `BE/income/IncomeCategory.java` e `BE/income/IncomePaymentMethod.java`, con los mismos códigos que los CHECK de T003
+- [x] T005 Crear la entidad JPA `Income` en `BE/income/Income.java` mapeada a `incomes` (columnas de data-model.md: `userId`, `amount` BigDecimal, `currency` `Currency`, `incomeDate` LocalDate, `category`, `paymentMethod`, `description`, `idempotencyKey` UUID, `createdAt`); solo getters públicos (sin `updated_at` ni setters de edición, los setters son package-private para el servicio). Depende de T003 y T004
+- [x] T006 Crear `BE/income/IncomeRepository.java` (`JpaRepository<Income, Long>` + `JpaSpecificationExecutor<Income>`) con `findByUserIdAndIdempotencyKey(Long, UUID)`, `findByIdAndUserId(Long, Long)` y una consulta `findIncomeYears(userId)` (años distintos de `income_date`, más reciente primero), siguiendo `ExpenseRepository`
+- [x] T007 [P] Crear `BT/income/IncomeSchemaIT.java` (base real, como `ExpenseSchemaIT`): la migración V38 aplica y la base rechaza `amount = 0`, categoría o medio de cobro fuera del catálogo, moneda fuera de las 32, descripción de 201 caracteres, y un segundo `(user_id, idempotency_key)` repetido
 
 ### Seguridad y errores
 
-- [ ] T008 Agregar `/api/incomes/**` y `/api/balance/**` al `requestMatchers(...).access(verifiedAccount(userRepository))` de `BE/config/SecurityConfig.java` (hoy solo cubre users, expenses, groups, payments y currencies)
-- [ ] T009 [P] Crear `BE/income/IncomeNotFoundException.java` y su handler en `BE/common/ProblemDetailExceptionHandler.java`: `404` ProblemDetail con título "Ingreso no encontrado" y detalle "No encontramos ese ingreso" (mismo cuerpo para inexistente, ajeno o id no numérico)
+- [x] T008 Agregar `/api/incomes/**` y `/api/balance/**` al `requestMatchers(...).access(verifiedAccount(userRepository))` de `BE/config/SecurityConfig.java` (hoy solo cubre users, expenses, groups, payments y currencies)
+- [x] T009 [P] Crear `BE/income/IncomeNotFoundException.java` y su handler en `BE/common/ProblemDetailExceptionHandler.java`: `404` ProblemDetail con título "Ingreso no encontrado" y detalle "No encontramos ese ingreso" (mismo cuerpo para inexistente, ajeno o id no numérico)
 
 ### Piezas compartidas del frontend
 
-- [ ] T010 [P] Crear `FE/api/problemDetail.js` exportando `problemOf` y `safeFields` (hoy privados en `FE/api/expenseClient.js`) y hacer que `FE/api/expenseClient.js` los importe; `FE/api/expenseClient.test.js` sigue pasando sin cambios
-- [ ] T011 [P] Agregar a `FE/validation/expenseCatalog.js` `INCOME_CATEGORY_OPTIONS` (`SALARY` Sueldo, `FREELANCE` Freelance, `SALE` Venta, `REFUND` Reembolso, `OTHER` Otros) e `INCOME_PAYMENT_METHOD_OPTIONS` (`CASH` Efectivo, `TRANSFER` Transferencia, `VIRTUAL_WALLET` Billetera virtual, `OTHER` Otro), y cubrirlos en `FE/validation/expenseCatalog.test.js` (códigos exactos, igual que los CHECK de T003)
+- [x] T010 [P] Crear `FE/api/problemDetail.js` exportando `problemOf` y `safeFields` (hoy privados en `FE/api/expenseClient.js`) y hacer que `FE/api/expenseClient.js` los importe; `FE/api/expenseClient.test.js` sigue pasando sin cambios
+- [x] T011 [P] Agregar a `FE/validation/expenseCatalog.js` `INCOME_CATEGORY_OPTIONS` (`SALARY` Sueldo, `FREELANCE` Freelance, `SALE` Venta, `REFUND` Reembolso, `OTHER` Otros) e `INCOME_PAYMENT_METHOD_OPTIONS` (`CASH` Efectivo, `TRANSFER` Transferencia, `VIRTUAL_WALLET` Billetera virtual, `OTHER` Otro), y cubrirlos en `FE/validation/expenseCatalog.test.js` (códigos exactos, igual que los CHECK de T003)
 
 **Checkpoint**: `mvn -B verify` y `npm run test:coverage` siguen en verde; la tabla `incomes` existe.
 

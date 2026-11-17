@@ -94,6 +94,24 @@ export const PAYMENT_METHOD_OPTIONS = Object.freeze([
   { code: 'OTHER', label: 'Otro' },
 ])
 
+// Feature 032 (specs/032-income-management): personal income catalogs. Codes match the
+// backend IncomeCategory/IncomePaymentMethod enums and the V38 CHECK constraints.
+export const INCOME_CATEGORY_OPTIONS = Object.freeze([
+  { code: 'SALARY', label: 'Sueldo' },
+  { code: 'FREELANCE', label: 'Freelance' },
+  { code: 'SALE', label: 'Venta' },
+  { code: 'REFUND', label: 'Reembolso' },
+  { code: 'OTHER', label: 'Otros' },
+])
+
+// A payment received: the card methods of expenses do not apply.
+export const INCOME_PAYMENT_METHOD_OPTIONS = Object.freeze([
+  { code: 'CASH', label: 'Efectivo' },
+  { code: 'TRANSFER', label: 'Transferencia' },
+  { code: 'VIRTUAL_WALLET', label: 'Billetera virtual' },
+  { code: 'OTHER', label: 'Otro' },
+])
+
 /** Codes of an option catalog, in catalog order. */
 export function codesOf(options) {
   return options.map((option) => option.code)

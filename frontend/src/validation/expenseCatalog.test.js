@@ -4,6 +4,8 @@ import {
   CATEGORY_OPTIONS,
   CURRENCY_OPTIONS,
   FREQUENCY_OPTIONS,
+  INCOME_CATEGORY_OPTIONS,
+  INCOME_PAYMENT_METHOD_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   STATUS_OPTIONS,
   TYPE_OPTIONS,
@@ -81,5 +83,33 @@ describe('expenseCatalog', () => {
     expect(labelOf(STATUS_OPTIONS, 'ACTIVE')).toBe('Activo')
     expect(labelOf(STATUS_OPTIONS, 'PAUSED')).toBe('Pausado')
     expect(labelOf(STATUS_OPTIONS, 'FINISHED')).toBe('Finalizado')
+  })
+
+  it('fixes the income category codes and their Spanish labels (032)', () => {
+    expect(codesOf(INCOME_CATEGORY_OPTIONS)).toEqual([
+      'SALARY',
+      'FREELANCE',
+      'SALE',
+      'REFUND',
+      'OTHER',
+    ])
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'SALARY')).toBe('Sueldo')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'FREELANCE')).toBe('Freelance')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'SALE')).toBe('Venta')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'REFUND')).toBe('Reembolso')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'OTHER')).toBe('Otros')
+  })
+
+  it('fixes the income payment method codes, without the card methods (032)', () => {
+    expect(codesOf(INCOME_PAYMENT_METHOD_OPTIONS)).toEqual([
+      'CASH',
+      'TRANSFER',
+      'VIRTUAL_WALLET',
+      'OTHER',
+    ])
+    expect(labelOf(INCOME_PAYMENT_METHOD_OPTIONS, 'TRANSFER')).toBe('Transferencia')
+    expect(labelOf(INCOME_PAYMENT_METHOD_OPTIONS, 'DEBIT_CARD')).toBe('')
+    expect(Object.isFrozen(INCOME_CATEGORY_OPTIONS)).toBe(true)
+    expect(Object.isFrozen(INCOME_PAYMENT_METHOD_OPTIONS)).toBe(true)
   })
 })
