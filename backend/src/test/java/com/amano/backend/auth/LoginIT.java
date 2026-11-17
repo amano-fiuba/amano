@@ -13,17 +13,13 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 
@@ -31,24 +27,20 @@ import jakarta.servlet.http.Cookie;
  * Contract tests of the real login (feature 004), end to end against PostgreSQL.
  * Replaces SimulatedLoginIT of feature 003 and keeps every rule it proved.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class LoginIT {
+class LoginIT extends AbstractIntegrationIT {
 
     private static final String BAD_CREDENTIALS = "El correo electrónico o la contraseña son incorrectos";
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
+    private String cachedPasswordHash;
 
     private static MockPart part(String name, String value) {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
@@ -63,6 +55,16 @@ class LoginIT {
                         part("confirmPassword", "Password123!"),
                         part("acceptTerms", "true")))
                 .andExpect(status().isCreated());
+    }
+
+    private void seedPendingAccount(String email) {
+        if (cachedPasswordHash == null) {
+            cachedPasswordHash = passwordEncoder.encode("Password123!");
+        }
+        jdbcTemplate.update("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at)
+                VALUES ('Ana', ?, ?, now())
+                """, email, cachedPasswordHash);
     }
 
     private void markVerified(String normalizedEmail) {
@@ -104,7 +106,7 @@ class LoginIT {
     @Test
     void unverifiedCredentialsAreForbiddenWithTheResendIndicator() throws Exception {
         String email = "login.pendiente@example.com";
-        register(email);
+        seedPendingAccount(email);
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -120,7 +122,7 @@ class LoginIT {
     @Test
     void unverifiedAccountWithWrongPasswordDoesNotRevealItsState() throws Exception {
         String email = "login.pendiente.mal@example.com";
-        register(email);
+        seedPendingAccount(email);
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +134,7 @@ class LoginIT {
     @Test
     void wrongPasswordIsUnauthorizedWithoutCookie() throws Exception {
         String email = "login.clave@example.com";
-        register(email);
+        seedPendingAccount(email);
         markVerified(email);
 
         mockMvc.perform(post("/api/auth/login")

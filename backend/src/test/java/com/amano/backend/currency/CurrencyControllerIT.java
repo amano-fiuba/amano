@@ -15,37 +15,22 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
-import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
 import com.amano.backend.groupexpense.exchange.CachingExchangeRateProvider;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
 import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
 import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
+import com.amano.backend.support.AbstractIntegrationIT;
 import com.amano.backend.user.Currency;
 
 import jakarta.servlet.http.Cookie;
 
 /** 027 T012 (contracts/currencies-api.md): GET /api/currencies with the provider replaced by a double. */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class CurrencyControllerIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class CurrencyControllerIT extends AbstractIntegrationIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,9 +43,6 @@ class CurrencyControllerIT {
 
     @MockitoBean(name = "currencyCatalogProvider")
     private CurrencyCatalogProvider catalogProvider;
-
-    @MockitoBean
-    private BcraExchangeRateClient bcraExchangeRateClient;
 
     @Autowired
     private ExchangeRateProvider exchangeRateProvider;

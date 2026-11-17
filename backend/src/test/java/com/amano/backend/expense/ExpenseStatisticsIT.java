@@ -17,22 +17,17 @@ import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
 import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
 import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
+import com.amano.backend.support.AbstractIntegrationIT;
 import com.amano.backend.user.Currency;
 
 import jakarta.servlet.http.Cookie;
@@ -43,16 +38,7 @@ import jakarta.servlet.http.Cookie;
  * inserted directly so dates, currencies and splits are fixed; the exchange rate
  * provider is replaced so no external quote is requested.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class ExpenseStatisticsIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class ExpenseStatisticsIT extends AbstractIntegrationIT {
 
     private static final String DOMAIN = "@stats032.test";
 
@@ -87,15 +73,12 @@ class ExpenseStatisticsIT {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
 
-    private long verifiedUser(String name) throws Exception {
+    private long verifiedUser(String name) {
         String email = name.toLowerCase() + DOMAIN;
-        mockMvc.perform(multipart("/api/auth/register").part(
-                        part("firstName", name), part("email", email),
-                        part("password", "S3gura!2026"), part("confirmPassword", "S3gura!2026"),
-                        part("acceptTerms", "true")))
-                .andExpect(status().isCreated());
-        jdbcTemplate.update("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", email);
-        return jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES (?, ?, 'x', now(), CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, name, email);
     }
 
     private ResultActions statistics(long userId, String year, String month) throws Exception {

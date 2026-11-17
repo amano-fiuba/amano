@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
@@ -17,25 +18,15 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import com.icegreen.greenmail.junit5.GreenMailExtension;
+import com.amano.backend.support.AbstractIntegrationIT;
 import com.icegreen.greenmail.util.GreenMailUtil;
-import com.icegreen.greenmail.util.ServerSetup;
 
 import jakarta.mail.Address;
 import jakarta.mail.internet.MimeMessage;
@@ -50,12 +41,7 @@ import jakarta.mail.internet.MimeMessage;
  * invalidates the previous one) and SC-006 (the remaining time survives a
  * reload because the server is the source of truth).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class EmailResendIT {
+class EmailResendIT extends AbstractIntegrationIT {
 
     private static final String NEUTRAL_MESSAGE =
             "Si el correo existe y no ha sido verificado, se enviará un nuevo enlace de confirmación";
@@ -66,32 +52,11 @@ class EmailResendIT {
 
     private static final Pattern REMAINING_SECONDS = Pattern.compile("\"remainingSeconds\"\\s*:\\s*(\\d+)");
 
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    /** In-process SMTP on a random port; lifecycle by CLASS so the port is ready at context load. */
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(
-            new ServerSetup(0, "localhost", ServerSetup.PROTOCOL_SMTP))
-            .withPerMethodLifecycle(false);
-
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @DynamicPropertySource
-    static void mailProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        // GreenMail speaks plain SMTP: the STARTTLS/AUTH required by the real
-        // Gmail (application.properties) is turned off here (research.md D9).
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
-        registry.add("app.base-url", () -> "http://localhost:5173");
-    }
 
     @BeforeEach
     void cleanMailbox() throws Exception {
@@ -144,7 +109,7 @@ class EmailResendIT {
             if (received.size() >= expected) {
                 return received;
             }
-            Thread.sleep(50);
+            Thread.sleep(10);
         }
         throw new AssertionError("expected at least " + expected + " mail(s) for " + recipient
                 + " but got " + received.size());
@@ -240,8 +205,15 @@ class EmailResendIT {
                 .isEqualTo(first.getResponse().getContentAsString()); // SC-005: identical shape
 
         awaitMailsFor(email, 2); // the mail of the first click arrived
-        Thread.sleep(300); // let any (wrong) second delivery show up
+        // Sustained negative observation plus a deterministic DB invariant: a
+        // wrong second resend would create a third token, even if its mail were slow.
+        assertNoNewMessages(2, Duration.ofSeconds(1));
         assertThat(mailsFor(email)).hasSize(2); // FR-013: no new mail
+        assertThat(jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM email_verification_tokens t
+                JOIN users u ON u.id = t.user_id
+                WHERE u.email = ?
+                """, Integer.class, email)).isEqualTo(2);
     }
 
     /** FR-012/SC-005: an unknown and a verified address answer identically and send nothing. */

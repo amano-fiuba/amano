@@ -12,17 +12,12 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 
@@ -31,16 +26,7 @@ import jakarta.servlet.http.Cookie;
  * PostgreSQL. All tests share the database, so each one uses its own distinctive
  * names/emails and only searches for terms nobody else uses.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class UserSearchIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class UserSearchIT extends AbstractIntegrationIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -55,20 +41,12 @@ class UserSearchIT {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Registers through the real endpoint (account starts PENDING); returns its id. */
-    private long register(String firstName, String lastName, String email) throws Exception {
-        List<MockPart> parts = new ArrayList<>(List.of(
-                part("firstName", firstName),
-                part("email", email),
-                part("password", "Password123!"),
-                part("confirmPassword", "Password123!"),
-                part("acceptTerms", "true")));
-        if (lastName != null) {
-            parts.add(part("lastName", lastName));
-        }
-        mockMvc.perform(multipart("/api/auth/register").part(parts.toArray(MockPart[]::new)))
-                .andExpect(status().isCreated());
-        return jdbcTemplate.queryForObject("SELECT id FROM users WHERE email = ?", Long.class, email);
+    /** Creates an account that starts PENDING; returns its id. */
+    private long register(String firstName, String lastName, String email) {
+        return jdbcTemplate.queryForObject("""
+                INSERT INTO users (first_name, last_name, email, password_hash, terms_accepted_at)
+                VALUES (?, ?, ?, 'x', now()) RETURNING id
+                """, Long.class, firstName, lastName, email);
     }
 
     private long registerVerified(String firstName, String lastName, String email) throws Exception {

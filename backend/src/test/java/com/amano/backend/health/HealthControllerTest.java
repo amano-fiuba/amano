@@ -12,12 +12,11 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.amano.backend.config.JwtCookieAuthenticationFilter;
 import com.amano.backend.config.SecurityConfig;
 import com.amano.backend.user.UserRepository;
 
 @WebMvcTest(HealthController.class)
-@Import({ SecurityConfig.class, JwtCookieAuthenticationFilter.class })
+@Import({ SecurityConfig.class })
 @TestPropertySource(properties = {
         // Security starter is now on the classpath (T011): use the real chain so
         // /api/health stays permitAll (instead of the framework's default 401 chain).

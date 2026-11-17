@@ -17,25 +17,15 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import com.icegreen.greenmail.junit5.GreenMailExtension;
+import com.amano.backend.support.AbstractIntegrationIT;
 import com.icegreen.greenmail.util.GreenMailUtil;
-import com.icegreen.greenmail.util.ServerSetup;
 
 import jakarta.mail.Address;
 import jakarta.mail.internet.MimeMessage;
@@ -47,12 +37,7 @@ import jakarta.mail.internet.MimeMessage;
  * (only verified accounts get the mail), FR-005 (the mailed token's hash is the
  * stored one) and FR-007 (a new request voids the previous token).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class ForgotPasswordIT {
+class ForgotPasswordIT extends AbstractIntegrationIT {
 
     private static final String NEUTRAL_MESSAGE =
             "Si el correo existe, recibirás un enlace para restablecer tu contraseña";
@@ -61,29 +46,11 @@ class ForgotPasswordIT {
 
     private static final Pattern TOKEN_IN_LINK = Pattern.compile("/reset-password\\?token=([A-Za-z0-9_-]+)");
 
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(
-            new ServerSetup(0, "localhost", ServerSetup.PROTOCOL_SMTP))
-            .withPerMethodLifecycle(false);
-
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @DynamicPropertySource
-    static void mailProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
-        registry.add("app.base-url", () -> "http://localhost:5173");
-    }
 
     @BeforeEach
     void cleanMailbox() throws Exception {
@@ -94,17 +61,12 @@ class ForgotPasswordIT {
         return new MockPart(name, value.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Registers through the real endpoint and marks the account as verified. */
-    private void registerVerified(String email) throws Exception {
-        mockMvc.perform(multipart("/api/auth/register").part(
-                        part("firstName", "Ana"),
-                        part("lastName", "Pérez"),
-                        part("email", email),
-                        part("password", "Password123!"),
-                        part("confirmPassword", "Password123!"),
-                        part("acceptTerms", "true")))
-                .andExpect(status().isCreated());
-        jdbcTemplate.update("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", email);
+    /** Creates a verified account in the database. */
+    private void registerVerified(String email) {
+        jdbcTemplate.update("""
+                INSERT INTO users (first_name, last_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES ('Ana', 'Pérez', ?, 'x', now(), CURRENT_TIMESTAMP)
+                """, email);
     }
 
     /** Requests the reset link and asserts the always-200 neutral contract (FR-002). */
@@ -130,7 +92,7 @@ class ForgotPasswordIT {
             if (received.size() >= expected) {
                 return received;
             }
-            Thread.sleep(50);
+            Thread.sleep(10);
         }
         throw new AssertionError("expected at least " + expected + " reset mail(s) for " + recipient
                 + " but got " + received.size());

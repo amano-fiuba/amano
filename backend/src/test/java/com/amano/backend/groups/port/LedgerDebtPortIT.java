@@ -1,7 +1,6 @@
 package com.amano.backend.groups.port;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -10,12 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.support.AbstractIntegrationIT;
 
 /**
  * 017 T025 (US2): the real {@link DebtPort} answers from the {@code debts}
@@ -24,17 +20,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * simulated profile, as debtor. PAID debts and other groups never count, and
  * users and profiles are never mixed even when they share the numeric id.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class LedgerDebtPortIT {
+class LedgerDebtPortIT extends AbstractIntegrationIT {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private DebtPort debtPort;
@@ -208,16 +196,23 @@ class LedgerDebtPortIT {
         assertThat(debtPort.hasPendingDebtsForSimulatedProfile(otherGroupId, abuela)).isFalse();
     }
 
-    /** Next simulated profile of the group gets exactly {@code id} (test-only sequence move). */
+    /** Next simulated profile of the group gets exactly {@code id} (deterministic, no assumption). */
     private long profileWithId(long id, String name) {
-        Long maxProfile = jdbc.queryForObject("SELECT COALESCE(MAX(id), 0) FROM simulated_profiles", Long.class);
-        assumeTrue(id > maxProfile, "the target id must be free in simulated_profiles");
-        jdbc.queryForObject("SELECT setval('simulated_profiles_id_seq', ?)", Long.class, id - 1);
-        long created = jdbc.queryForObject(
-                "INSERT INTO simulated_profiles (group_id, name, email) VALUES (?, ?, ?) RETURNING id",
-                Long.class, groupId, name, name + id + "@ledger.dev");
-        assertThat(created).isEqualTo(id);
-        return created;
+        Long exists = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM simulated_profiles WHERE id = ?", Long.class, id);
+        if (exists == 0) {
+            jdbc.update("""
+                    INSERT INTO simulated_profiles (id, group_id, name, email)
+                    VALUES (?, ?, ?, ?)
+                    """, id, groupId, name, name + id + "@ledger.dev");
+        }
+        // Keep the sequence ahead of every explicit id so later default inserts
+        // (including the next method's @BeforeEach) cannot collide.
+        jdbc.queryForObject("""
+                SELECT setval('simulated_profiles_id_seq',
+                    GREATEST((SELECT COALESCE(MAX(id), 1) FROM simulated_profiles), 1))
+                """, Long.class);
+        return id;
     }
 
     @Test

@@ -18,14 +18,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.MailSendException;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.support.AbstractClockIntegrationIT;
 
 /**
  * 025 T013: delivery failures. The mail service is mocked so each scenario can
@@ -33,29 +29,15 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * The dispatcher must mark FAILED, notify the active admins, never retry and
  * never propagate the failure.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class ReminderFailureIT {
+class ReminderFailureIT extends AbstractClockIntegrationIT {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private ReminderJob job;
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @MockitoBean
-    private Clock clock;
-
-    @MockitoBean
-    private ReminderMailService mailService;
 
     @BeforeEach
     void setUp() {
