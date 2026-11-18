@@ -15,6 +15,9 @@ export const DATE_FORMAT = 'Ingresá la fecha como dd/mm/aaaa'
 export const DATE_INVALID = 'La fecha no existe'
 export const DATE_FUTURE = 'La fecha no puede ser posterior a hoy'
 
+// 032 (FR-009): an income may be dated up to one year after today (a scheduled one).
+export const INCOME_DATE_TOO_FAR = 'La fecha no puede ser más de un año posterior a hoy'
+
 export const DESCRIPTION_MAX_CODE_POINTS = 200
 export const DESCRIPTION_LENGTH =
   'La descripción no puede superar los 200 caracteres'
@@ -223,4 +226,30 @@ function isWhitespaceCodePoint(codePoint) {
     codePoint === 0x205f ||
     codePoint === 0x3000
   )
+}
+
+/** `yyyy-MM-dd` one year after `iso`; 29/02 becomes 28/02 like Java's LocalDate.plusYears. */
+function oneYearAfter(iso) {
+  const [year, month, day] = iso.split('-').map(Number)
+  const next = new Date(Date.UTC(year + 1, month - 1, day))
+  if (next.getUTCMonth() !== month - 1) {
+    next.setUTCDate(0)
+  }
+  return next.toISOString().slice(0, 10)
+}
+
+/**
+ * Empty string when `raw` (dd/mm/aaaa) is a valid income date: it exists and is not
+ * later than one year after `todayIso` (yyyy-MM-dd); otherwise the Spanish message.
+ * Unlike an expense, a future date is allowed.
+ */
+export function validateIncomeDate(raw, todayIso) {
+  const date = parseArgentineDate(raw)
+  if (!date.ok) {
+    return date.error
+  }
+  if (todayIso && date.iso > oneYearAfter(todayIso)) {
+    return INCOME_DATE_TOO_FAR
+  }
+  return ''
 }

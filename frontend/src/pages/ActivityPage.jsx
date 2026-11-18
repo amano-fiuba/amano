@@ -6,6 +6,7 @@ import {
   searchExpenses,
 } from '../api/expenseClient'
 import { useAuth } from '../auth/AuthContext'
+import BalanceCard from '../components/BalanceCard'
 import { SearchIcon } from '../components/NavIcons'
 import { CATEGORY_OPTIONS, PAYMENT_METHOD_OPTIONS, labelOf } from '../validation/expenseCatalog'
 import { formatAmount, formatIsoDate } from '../validation/expenseFormat'
@@ -456,6 +457,16 @@ export default function ActivityPage() {
     <main className="page activity-page" ref={topRef}>
       <HomeLink />
       <h1>Actividad personal</h1>
+
+      <BalanceCard
+        year={criteria.year === ALL_YEARS ? undefined : criteria.year}
+        month={criteria.month || undefined}
+        refreshKey={location.state?.refreshBalance}
+      />
+
+      <p className="activity-page__actions">
+        <Link to="/incomes/new">Nuevo ingreso</Link>
+      </p>
 
       <form
         ref={filtersRef}

@@ -1,16 +1,21 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
 
 vi.mock('../api/expenseClient', async (importOriginal) => ({
   ...await importOriginal(),
   searchExpenses: vi.fn(),
   listExpenseYears: vi.fn(),
 }))
+vi.mock('../api/incomeClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  getBalance: vi.fn(),
+}))
 const setUser = vi.fn()
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ setUser }) }))
 
+import { getBalance } from '../api/incomeClient'
 import {
   listExpenseYears,
   SEARCH_EXPENSES_ERROR_MESSAGE,
@@ -53,6 +58,26 @@ const PIZZA = {
   amount: '1500.00',
 }
 
+const BALANCE = {
+  currency: 'ARS',
+  income: '1000.00',
+  projectedIncome: '0.00',
+  expenses: '400.00',
+  net: '600.00',
+}
+
+function RefreshButton() {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/activity', { state: { refreshBalance: 222 } })}
+    >
+      Simular alta
+    </button>
+  )
+}
+
 function LocationProbe() {
   const location = useLocation()
   return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
@@ -73,6 +98,7 @@ function renderPage(entry = '/activity') {
             <>
               <ActivityPage />
               <LocationProbe />
+              <RefreshButton />
             </>
           }
         />
@@ -94,6 +120,8 @@ beforeEach(() => {
   setWindowHeight(DEFAULT_HEIGHT)
   searchExpenses.mockImplementation(async ({ page }) => pageOf([PIZZA], { page }))
   listExpenseYears.mockResolvedValue({ ok: true, years: [] })
+  getBalance.mockReset()
+  getBalance.mockResolvedValue({ ok: true, balance: BALANCE })
 })
 
 describe('ActivityPage (031)', () => {
@@ -522,5 +550,67 @@ describe('ActivityPage: tamaño de página según el alto (031, FR-022)', () => 
     await new Promise((resolve) => setTimeout(resolve, 250))
 
     expect(searchExpenses).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ActivityPage: balance neto y nuevo ingreso (032)', () => {
+  it('muestra la tarjeta de balance del año actual y el enlace a "Nuevo ingreso"', async () => {
+    renderPage()
+
+    const card = await screen.findByTestId('balance-card')
+    expect(await within(card).findByText('1.000,00 ARS')).toBeInTheDocument()
+    expect(within(card).getByText('400,00 ARS')).toBeInTheDocument()
+    expect(within(card).getByTestId('balance-net')).toHaveTextContent('+600,00 ARS')
+    expect(getBalance).toHaveBeenCalledWith({ year: YEAR, month: undefined })
+    expect(screen.getByRole('link', { name: 'Nuevo ingreso' })).toHaveAttribute(
+      'href',
+      '/incomes/new',
+    )
+  })
+
+  it('el balance sigue el año y el mes elegidos, y "Todos los años" lo pide sin año', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Pizza')
+
+    await user.selectOptions(monthSelect(), '3')
+    await waitFor(() => expect(getBalance).toHaveBeenLastCalledWith({ year: YEAR, month: '3' }))
+
+    await user.selectOptions(yearSelect(), 'all')
+    await waitFor(() =>
+      expect(getBalance).toHaveBeenLastCalledWith({ year: undefined, month: undefined }),
+    )
+  })
+
+  it('al llegar con state.refreshBalance vuelve a pedir el balance y muestra el valor nuevo', async () => {
+    getBalance
+      .mockResolvedValueOnce({ ok: true, balance: BALANCE })
+      .mockResolvedValueOnce({
+        ok: true,
+        balance: { ...BALANCE, income: '1850.00', net: '1450.00' },
+      })
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByText('1.000,00 ARS')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Simular alta' }))
+
+    expect(await screen.findByText('1.850,00 ARS')).toBeInTheDocument()
+    expect(screen.queryByText('1.000,00 ARS')).not.toBeInTheDocument()
+    expect(screen.getByTestId('balance-net')).toHaveTextContent('+1.450,00 ARS')
+    expect(getBalance).toHaveBeenCalledTimes(2)
+  })
+
+  it('si el balance falla ofrece reintentar sin afectar la lista de gastos', async () => {
+    getBalance.mockResolvedValueOnce({ ok: false, network: true })
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(await screen.findByText('Pizza')).toBeInTheDocument()
+    const card = await screen.findByTestId('balance-card')
+    await user.click(await within(card).findByRole('button', { name: 'Reintentar' }))
+
+    expect(await within(screen.getByTestId('balance-card')).findByText('1.000,00 ARS'))
+      .toBeInTheDocument()
   })
 })

@@ -9,9 +9,17 @@ export const SUMMARY_BACK_LABEL = 'Volver'
 /**
  * Final summary before saving an expense (027, pedido del 2026-11-08): what will
  * be saved, and "Confirmar" / "Volver". Going back keeps everything that was
- * typed. `rows` are { label, value } pairs; `shares` (optional) the split per person.
+ * typed. `title` defaults to the expense one (032 passes the income title); `rows` are { label, value } pairs; `shares` (optional) the split per person.
  */
-export default function ExpenseSummaryDialog({ rows, shares, error, confirming = false, onConfirm, onCancel }) {
+export default function ExpenseSummaryDialog({
+  title = SUMMARY_TITLE,
+  rows,
+  shares,
+  error,
+  confirming = false,
+  onConfirm,
+  onCancel,
+}) {
   const titleId = useId()
   const confirmRef = useRef(null)
 
@@ -35,7 +43,7 @@ export default function ExpenseSummaryDialog({ rows, shares, error, confirming =
         className="choice-dialog expense-summary"
         onKeyDown={handleKeyDown}
       >
-        <h3 id={titleId}>{SUMMARY_TITLE}</h3>
+        <h3 id={titleId}>{title}</h3>
         <div className="expense-summary__body">
           <dl className="expense-summary__rows">
             {rows.map(({ label, value }) => (

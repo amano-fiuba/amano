@@ -10,11 +10,13 @@ import {
   DATE_INVALID,
   DATE_REQUIRED,
   DESCRIPTION_LENGTH,
+  INCOME_DATE_TOO_FAR,
   normalizeDescription,
   parseArgentineAmount,
   parseArgentineDate,
   preferredCurrency,
   validateDescription,
+  validateIncomeDate,
 } from './expenseValidation'
 
 describe('parseArgentineAmount', () => {
@@ -184,5 +186,33 @@ describe('validateDescription', () => {
 
   it('treats whitespace-only descriptions as absent', () => {
     expect(validateDescription('   ')).toBe('')
+  })
+})
+
+describe('validateIncomeDate (032)', () => {
+  it('accepts today, a past date and a scheduled one within a year', () => {
+    expect(validateIncomeDate('17/11/2026', '2026-11-17')).toBe('')
+    expect(validateIncomeDate('01/01/2020', '2026-11-17')).toBe('')
+    expect(validateIncomeDate('17/02/2027', '2026-11-17')).toBe('')
+  })
+
+  it('accepts exactly one year after today and rejects one day later', () => {
+    expect(validateIncomeDate('17/11/2027', '2026-11-17')).toBe('')
+    expect(validateIncomeDate('18/11/2027', '2026-11-17')).toBe(INCOME_DATE_TOO_FAR)
+  })
+
+  it('treats 29/02 as 28/02 of the next year, like the backend', () => {
+    expect(validateIncomeDate('28/02/2025', '2024-02-29')).toBe('')
+    expect(validateIncomeDate('01/03/2025', '2024-02-29')).toBe(INCOME_DATE_TOO_FAR)
+  })
+
+  it('reports the same format errors as an expense date', () => {
+    expect(validateIncomeDate('', '2026-11-17')).toBe(DATE_REQUIRED)
+    expect(validateIncomeDate('2026-11-17', '2026-11-17')).toBe(DATE_FORMAT)
+    expect(validateIncomeDate('31/02/2026', '2026-11-17')).toBe(DATE_INVALID)
+  })
+
+  it('does not limit the date when today is unknown', () => {
+    expect(validateIncomeDate('01/01/2099', null)).toBe('')
   })
 })

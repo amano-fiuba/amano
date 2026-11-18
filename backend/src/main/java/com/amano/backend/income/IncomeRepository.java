@@ -1,5 +1,6 @@
 package com.amano.backend.income;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+
+import com.amano.backend.common.CurrencyDateTotal;
 
 /**
  * Persistence for {@code incomes}. The unique index
@@ -27,4 +30,15 @@ public interface IncomeRepository extends JpaRepository<Income, Long>,
     @Query("select distinct year(i.incomeDate) as y from Income i "
             + "where i.userId = :userId order by y desc")
     List<Integer> findIncomeYears(@Param("userId") Long userId);
+
+    /**
+     * Incomes of the user in {@code [from, to]}, summed per currency and income date:
+     * what the personal balance converts (FR-010). One row per {@code (currency, date)}.
+     */
+    @Query("select new com.amano.backend.common.CurrencyDateTotal("
+            + "i.currency, i.incomeDate, sum(i.amount)) from Income i "
+            + "where i.userId = :userId and i.incomeDate >= :from and i.incomeDate <= :to "
+            + "group by i.currency, i.incomeDate")
+    List<CurrencyDateTotal> sumByCurrencyAndDate(@Param("userId") Long userId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to);
 }

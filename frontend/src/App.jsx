@@ -25,6 +25,7 @@ const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'))
 const UsersSearchPage = lazy(() => import('./pages/UsersSearchPage'))
 const FriendsPage = lazy(() => import('./pages/FriendsPage'))
 const NewExpensePage = lazy(() => import('./pages/NewExpensePage'))
+const NewIncomePage = lazy(() => import('./pages/NewIncomePage'))
 const RecurringExpensesPage = lazy(() => import('./pages/RecurringExpensesPage'))
 const GroupRecurringExpensesPage = lazy(() => import('./pages/groups/GroupRecurringExpensesPage'))
 const GroupListView = lazy(() => import('./pages/groups/GroupListView'))
@@ -80,6 +81,15 @@ export function AppRoutes() {
           element={
             <ProtectedRoute>
               <NewExpensePage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Registro de ingreso personal (specs/032-income-management, US1). */}
+        <Route
+          path="/incomes/new"
+          element={
+            <ProtectedRoute>
+              <NewIncomePage />
             </ProtectedRoute>
           }
         />
