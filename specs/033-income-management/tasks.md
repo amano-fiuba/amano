@@ -194,11 +194,11 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T070 Ejecutar `mvn -B verify` en `backend/` y confirmar verde con cobertura de líneas ≥ 85 % (JaCoCo); informar el porcentaje real
-- [ ] T071 Ejecutar `npm run lint && npm run test:coverage && npm run build` en `frontend/` y confirmar verde con cobertura ≥ 85 %; informar el porcentaje real
+- [x] T070 Ejecutar `mvn -B verify` en `backend/` y confirmar verde con cobertura de líneas ≥ 85 % (JaCoCo); informar el porcentaje real
+- [x] T071 Ejecutar `npm run lint && npm run test:coverage && npm run build` en `frontend/` y confirmar verde con cobertura ≥ 85 %; informar el porcentaje real
 - [ ] T072 Recorrer `specs/033-income-management/quickstart.md` (curl y pantallas) contra el entorno local y anotar el resultado de cada escenario
-- [ ] T073 Revisar el diff: sin código de depuración, imports sin uso ni cambios en `/api/expenses/**`, `/api/groups/**` ni en tablas existentes; confirmar con `git diff --stat` que solo hay archivos de la feature y que no hay `PATCH`/`PUT`/`DELETE` nuevos
-- [ ] T074 Actualizar los casilleros de `specs/033-income-management/checklists/requirements.md` si algún requisito cambió durante la implementación, y marcar las tareas completadas en este archivo
+- [x] T073 Revisar el diff: sin código de depuración, imports sin uso ni cambios en `/api/expenses/**`, `/api/groups/**` ni en tablas existentes; confirmar con `git diff --stat` que solo hay archivos de la feature y que no hay `PATCH`/`PUT`/`DELETE` nuevos
+- [x] T074 Actualizar los casilleros de `specs/033-income-management/checklists/requirements.md` si algún requisito cambió durante la implementación, y marcar las tareas completadas en este archivo
 
 ---
 
