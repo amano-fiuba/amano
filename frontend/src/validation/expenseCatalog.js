@@ -66,6 +66,15 @@ export const CATEGORY_OPTIONS = Object.freeze([
   { code: 'OTHER', label: 'Otros' },
 ])
 
+/**
+ * Fixed color of a category in the statistics (032, FR-016, plan D14): the same in
+ * both pies and every month. The values live in StatisticsPage.scss as CSS custom
+ * properties, one per theme.
+ */
+export function categoryColor(code) {
+  return `var(--color-categoria-${String(code).toLowerCase()})`
+}
+
 export const TYPE_OPTIONS = Object.freeze([
   { code: 'RECURRING', label: 'Recurrente' },
   { code: 'ONE_TIME', label: 'Único' },

@@ -228,3 +228,46 @@ export async function getExpense(id) {
     return { ok: false, network: true }
   }
 }
+
+// Feature 032 (specs/032-estadisticas-gastos/contracts/expense-statistics-api.md).
+export const STATISTICS_ERROR_MESSAGE =
+  'No pudimos cargar tus estadísticas. Intentá nuevamente'
+
+function breakdownOf(value) {
+  return {
+    total: typeof value?.total === 'string' ? value.total : '0.00',
+    categories: Array.isArray(value?.categories) ? value.categories : [],
+  }
+}
+
+/**
+ * GET /api/expenses/statistics?year=&month=: { ok: true, statistics } on 200,
+ * { ok: false, status } on 4xx (400 invalid period, 401 no session) and
+ * { ok: false, network: true } on 5xx or network failures.
+ */
+export async function getExpenseStatistics({ year, month }) {
+  const params = new URLSearchParams({ year: String(year), month: String(month) })
+  try {
+    const response = await fetch(`/api/expenses/statistics?${params}`, { credentials: 'include' })
+    if (response.ok) {
+      const body = (await response.json()) ?? {}
+      return {
+        ok: true,
+        statistics: {
+          currency: typeof body.currency === 'string' ? body.currency : 'ARS',
+          total: typeof body.total === 'string' ? body.total : '0.00',
+          excludedCount: Number.isInteger(body.excludedCount) ? body.excludedCount : 0,
+          personal: breakdownOf(body.personal),
+          group: breakdownOf(body.group),
+          years: Array.isArray(body.years) ? body.years.filter(Number.isInteger) : [],
+        },
+      }
+    }
+    if (response.status >= 500) {
+      return { ok: false, network: true }
+    }
+    return { ok: false, status: response.status }
+  } catch {
+    return { ok: false, network: true }
+  }
+}

@@ -1,0 +1,142 @@
+// Estadísticas de gastos (032). Colores fijos por categoría (FR-016, plan D14):
+// los ocho primeros son la paleta categórica validada para daltonismo, el noveno
+// un verde azulado validado junto a ellos y "Otros" un gris neutro. Cada modo
+// tiene sus propios tonos, validados contra su superficie.
+:root {
+  --color-categoria-food: #2a78d6;
+  --color-categoria-transport: #eb6834;
+  --color-categoria-housing: #1baf7a;
+  --color-categoria-services: #eda100;
+  --color-categoria-health: #e87ba4;
+  --color-categoria-education: #008300;
+  --color-categoria-leisure: #6250d6;
+  --color-categoria-shopping: #e34948;
+  --color-categoria-pets: #0e8fa8;
+  --color-categoria-other: #8b8f8e;
+}
+
+:root[data-theme='dark'] {
+  --color-categoria-food: #3987e5;
+  --color-categoria-transport: #d95926;
+  --color-categoria-housing: #199e70;
+  --color-categoria-services: #c98500;
+  --color-categoria-health: #d55181;
+  --color-categoria-education: #0ca30c;
+  --color-categoria-leisure: #9085e9;
+  --color-categoria-shopping: #e66767;
+  --color-categoria-pets: #1fa5c0;
+  --color-categoria-other: #8a9a9f;
+}
+
+.statistics-page {
+  max-width: 960px;
+}
+
+.statistics-filters {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.statistics-total {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 1rem;
+
+  span,
+  small {
+    color: var(--color-texto-suave);
+  }
+
+  strong {
+    font-size: 1.75rem;
+    color: var(--color-texto);
+  }
+}
+
+.statistics-excluded {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-superficie-fuerte);
+}
+
+.statistics-breakdowns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.statistics-breakdown {
+  padding: 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+}
+
+.statistics-breakdown__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+
+  h2 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+}
+
+.statistics-breakdown__empty {
+  color: var(--color-texto-suave);
+}
+
+.statistics-breakdown__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.statistics-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+
+  li {
+    display: grid;
+    grid-template-columns: 0.85rem minmax(0, 1fr) auto 4.5rem;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.statistics-legend__swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
+}
+
+.statistics-legend__amount,
+.statistics-legend__percentage {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.statistics-legend__percentage {
+  color: var(--color-texto-suave);
+}
+
+@media (max-width: 720px) {
+  .statistics-breakdowns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statistics-filters select {
+    flex: 1 1 0;
+  }
+}

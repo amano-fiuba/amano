@@ -1,3 +1,5 @@
+import { MONTH_NAMES } from '../../validation/months'
+
 // Constants and pure helpers shared by the expense and income views of the personal
 // activity (specs/031-buscar-en-actividad-personal, specs/033-income-management).
 // Extracted from ActivityPage.jsx without changing their behavior.
@@ -13,20 +15,7 @@ export const MAX_LENGTH = 100
 export const DEBOUNCE_MS = 400
 export const ALL_YEARS = 'all'
 export const ALL_MONTHS = ''
-export const MONTHS = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
-]
+export const MONTHS = MONTH_NAMES
 
 // Page size from the screen height (FR-022, plan D13): the cards that fit below
 // the filters without scrolling, between 5 and 20.

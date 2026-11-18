@@ -45,6 +45,17 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>,
     List<CurrencyDateTotal> sumByCurrencyAndDate(@Param("userId") Long userId,
             @Param("from") LocalDate from, @Param("to") LocalDate to);
 
+    /**
+     * Personal expenses of a user between two expense dates (inclusive), summed by
+     * category, currency and date for the statistics (032, FR-006, plan D2).
+     */
+    @Query("select new com.amano.backend.expense.CategorySubtotal("
+            + "e.category, e.currency, e.expenseDate, sum(e.amount), count(e)) "
+            + "from Expense e where e.userId = :userId and e.expenseDate between :from and :to "
+            + "group by e.category, e.currency, e.expenseDate")
+    List<CategorySubtotal> sumByCategoryCurrencyAndDate(@Param("userId") Long userId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to);
+
     /** Series of a user for the "Gastos recurrentes" screen, newest first (009, FR-012). */
     List<Expense> findByUserIdAndRecurrenceFrequencyIsNotNullOrderByCreatedAtDescIdDesc(Long userId);
 
