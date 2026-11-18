@@ -158,4 +158,14 @@ describe('IncomeDetailPage (033, FR-016)', () => {
     renderPage({ from: 'https://otro-sitio.example/' })
     expect(await screen.findByRole('link', { name: /Volver/ })).toHaveAttribute('href', '/activity')
   })
+
+  it('no ofrece botones ni enlaces para editar o eliminar el ingreso (US3)', async () => {
+    getIncome.mockResolvedValue({ ok: true, income: SALARY })
+
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Sueldo octubre' })
+    expect(screen.queryByRole('button', { name: /editar|eliminar|borrar|modificar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /editar|eliminar|borrar|modificar/i })).not.toBeInTheDocument()
+  })
 })

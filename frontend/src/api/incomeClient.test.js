@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as incomeClient from './incomeClient'
 import {
   createIncome,
   getBalance,
@@ -288,5 +289,15 @@ describe('listIncomeYears (033)', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
     expect(await listIncomeYears()).toEqual({ ok: false, network: true })
+  })
+})
+
+describe('incomeClient: registros inmutables (033, US3)', () => {
+  it('no exporta funciones de actualización ni de borrado', () => {
+    const names = Object.keys(incomeClient).filter((name) => typeof incomeClient[name] === 'function')
+    expect(names.sort()).toEqual(
+      ['createIncome', 'getBalance', 'getIncome', 'listIncomeYears', 'searchIncomes'].sort(),
+    )
+    expect(names.some((name) => /update|edit|patch|put|delete|remove/i.test(name))).toBe(false)
   })
 })

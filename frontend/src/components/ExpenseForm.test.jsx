@@ -1144,6 +1144,28 @@ describe('ExpenseForm modo ingreso (033, US1)', () => {
     expect(screen.getByLabelText('Monto')).toHaveValue('850.000,00')
   })
 
+  it('un fallo de red conserva la clave en el reintento y el éxito la renueva (US3)', async () => {
+    const user = userEvent.setup()
+    createIncome
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValue({ ok: true, income: { id: 1 } })
+    renderIncomeForm()
+    await completeIncome(user)
+
+    await save(user)
+    await screen.findByTestId('expense-error')
+    await save(user)
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(2))
+    const firstKey = createIncome.mock.calls[0][1]
+    expect(createIncome.mock.calls[1][1]).toBe(firstKey)
+
+    await screen.findByRole('status')
+    await completeIncome(user)
+    await save(user)
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(3))
+    expect(createIncome.mock.calls[2][1]).not.toBe(firstKey)
+  })
+
   it('ante 422 muestra el detalle, renueva la clave y conserva los datos', async () => {
     const user = userEvent.setup()
     createIncome

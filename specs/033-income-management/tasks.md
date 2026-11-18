@@ -167,11 +167,11 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 **Independent Test**: ingreso de 100 USD → equivalente en la moneda principal y aporte al balance; ingreso con fecha futura → "Proyectado", no suma al neto hasta su fecha.
 
-- [ ] T061 [P] [US4] Crear `BT/income/IncomeFutureDateIT.java`: fecha hoy + 1 año aceptada, hoy + 1 año + 1 día → `400` en `fields.date`, `projected=true` para fecha futura y `false` para hoy
-- [ ] T062 [P] [US4] Crear `BT/balance/BalanceMultiCurrencyIT.java`: ingreso en USD convertido con la cotización de su fecha, gasto en otra moneda, cuenta con moneda principal distinta de ARS, ingreso proyectado suma en `projectedIncome` y no en `net`, y un ingreso que cruza a "efectivizado" cuando su fecha llega, ingreso proyectado en USD sin cotización de su fecha futura usa la cotización de hoy (fallback) y suma a `projectedIncome`; sin cotización de hoy tampoco, `projectedIncome` se omite y el balance responde `200`; solo la cotización faltante de un gasto o de un ingreso efectivizado produce `503`
+- [x] T061 [P] [US4] Crear `BT/income/IncomeFutureDateIT.java`: fecha hoy + 1 año aceptada, hoy + 1 año + 1 día → `400` en `fields.date`, `projected=true` para fecha futura y `false` para hoy
+- [x] T062 [P] [US4] Crear `BT/balance/BalanceMultiCurrencyIT.java`: ingreso en USD convertido con la cotización de su fecha, gasto en otra moneda, cuenta con moneda principal distinta de ARS, ingreso proyectado suma en `projectedIncome` y no en `net`, y un ingreso que cruza a "efectivizado" cuando su fecha llega, ingreso proyectado en USD sin cotización de su fecha futura usa la cotización de hoy (fallback) y suma a `projectedIncome`; sin cotización de hoy tampoco, `projectedIncome` se omite y el balance responde `200`; solo la cotización faltante de un gasto o de un ingreso efectivizado produce `503`
 - [x] T063 [US4] En `FE/components/ExpenseForm.jsx` (`kind="INCOME"`): si la fecha es posterior a hoy mostrar `<p role="status">Se contará en el balance a partir de esa fecha</p>`; no pedir cotización para fechas futuras (el efecto de estimado ya exige `quoteDate.iso <= todayIso`: mantenerlo y cubrirlo). Depende de T029
-- [ ] T064 [US4] En `FE/components/BalanceCard.jsx` agregar la línea secundaria "Proyectado: +X" cuando `projectedIncome` > 0; en `FE/pages/ActivityPage.jsx` mostrar el equivalente `≈ MONEDA monto` de `conversions` en las filas de ingresos en otra moneda. Depende de T036, T055
-- [ ] T065 [P] [US4] Ampliar `FE/components/ExpenseForm.test.jsx` (aviso con fecha futura, sin aviso con hoy, sin estimado con fecha futura), `FE/components/BalanceCard.test.jsx` (línea "Proyectado") y `FE/pages/ActivityPage.test.jsx` (equivalente y "Proyectado" en la lista)
+- [x] T064 [US4] En `FE/components/BalanceCard.jsx` agregar la línea secundaria "Proyectado: +X" cuando `projectedIncome` > 0; en `FE/pages/ActivityPage.jsx` mostrar el equivalente `≈ MONEDA monto` de `conversions` en las filas de ingresos en otra moneda. Depende de T036, T055
+- [x] T065 [P] [US4] Ampliar `FE/components/ExpenseForm.test.jsx` (aviso con fecha futura, sin aviso con hoy, sin estimado con fecha futura), `FE/components/BalanceCard.test.jsx` (línea "Proyectado") y `FE/pages/ActivityPage.test.jsx` (equivalente y "Proyectado" en la lista)
 
 **Checkpoint**: monedas y proyectados verificados.
 
@@ -183,10 +183,10 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 **Independent Test**: dos altas con la misma clave dejan un solo ingreso (también en paralelo); `PATCH`/`PUT`/`DELETE` responden `405`; la interfaz no ofrece acciones de edición o borrado.
 
-- [ ] T066 [P] [US3] Crear `BT/income/IncomeImmutabilityIT.java`: `PATCH`, `PUT` y `DELETE` sobre `/api/incomes/{id}` y sobre `/api/incomes` → `405` ProblemDetail; el ingreso queda intacto; además un test de reflexión que comprueba que `IncomeController` no declara `@PatchMapping`, `@PutMapping` ni `@DeleteMapping`
-- [ ] T067 [P] [US3] Crear `BT/income/IncomeConcurrentRegistrationIT.java`: dos `POST` simultáneos con la misma clave y cuerpo producen una sola fila (una respuesta `201` y otra `200`), y con cuerpos distintos una `422`
-- [ ] T068 [P] [US3] Agregar en `FE/api/incomeClient.test.js` una prueba de que el módulo no exporta funciones de actualización ni borrado, y en `FE/pages/IncomeDetailPage.test.jsx` y `FE/pages/ActivityPage.test.jsx` que no hay botones "Editar" ni "Eliminar" de ingresos
-- [ ] T069 [P] [US3] Ampliar `FE/components/ExpenseForm.test.jsx`: un fallo de red conserva la misma `Idempotency-Key` en el reintento y un éxito la renueva (modo `INCOME`)
+- [x] T066 [P] [US3] Crear `BT/income/IncomeImmutabilityIT.java`: `PATCH`, `PUT` y `DELETE` sobre `/api/incomes/{id}` y sobre `/api/incomes` → `405` ProblemDetail; el ingreso queda intacto; además un test de reflexión que comprueba que `IncomeController` no declara `@PatchMapping`, `@PutMapping` ni `@DeleteMapping`
+- [x] T067 [P] [US3] Crear `BT/income/IncomeConcurrentRegistrationIT.java`: dos `POST` simultáneos con la misma clave y cuerpo producen una sola fila (una respuesta `201` y otra `200`), y con cuerpos distintos una `422`
+- [x] T068 [P] [US3] Agregar en `FE/api/incomeClient.test.js` una prueba de que el módulo no exporta funciones de actualización ni borrado, y en `FE/pages/IncomeDetailPage.test.jsx` y `FE/pages/ActivityPage.test.jsx` que no hay botones "Editar" ni "Eliminar" de ingresos
+- [x] T069 [P] [US3] Ampliar `FE/components/ExpenseForm.test.jsx`: un fallo de red conserva la misma `Idempotency-Key` en el reintento y un éxito la renueva (modo `INCOME`)
 
 **Checkpoint**: la regla de inmutabilidad y la idempotencia quedan demostradas.
 

@@ -682,6 +682,14 @@ describe('ActivityPage: vista Ingresos (033, US2)', () => {
     expect(screen.getByTestId('balance-card')).toBeInTheDocument()
   })
 
+  it('las filas de ingresos no tienen botones para editar o eliminar (US3)', async () => {
+    renderPage('/activity?view=incomes')
+
+    await screen.findByRole('link', { name: /Sueldo octubre/ })
+    expect(screen.queryByRole('button', { name: /editar|eliminar|borrar|modificar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /editar|eliminar|borrar|modificar/i })).not.toBeInTheDocument()
+  })
+
   it('muestra la categoría sin descripción, las equivalencias y la insignia "Proyectado"', async () => {
     searchIncomes.mockResolvedValue(
       incomePageOf([
