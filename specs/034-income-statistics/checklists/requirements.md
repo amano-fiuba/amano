@@ -34,7 +34,7 @@
 - Clarificaciones resueltas el 2026-11-18:
   1. La comparación resta el total combinado de gastos de 032: gastos personales más la parte de gastos grupales y con amigos (FR-017, SC-004).
   2. Los ingresos proyectados (fecha futura en UTC) se excluyen de la torta, del total de ingresos y de la comparación hasta que su fecha llegue, igual que en el balance de 033 (FR-008).
-  3. La comparación se muestra como una dona de dos porciones (ingresos y gastos) con los totales como etiquetas y el balance del período destacado (FR-015, FR-016).
+  3. La comparación se muestra como una torta de dos porciones (ingresos y gastos), reutilizando el componente `PieChart`, con los totales como etiquetas y el balance del período destacado debajo del gráfico (FR-015, FR-016).
   4. Los gastos se organizan en un carrusel de dos slides con swipe horizontal, puntos y flechas accesibles; el bloque de ingresos y la comparación son fijos (FR-002, FR-003, FR-030, FR-031).
   5. El slide activo no forma parte de la dirección, se conserva al cambiar de período y vuelve al Slide 1 al recargar (FR-005, FR-006).
   6. El selector de año no ofrece años con solo ingresos proyectados, salvo que sea el año actual (FR-004).

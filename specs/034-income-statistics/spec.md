@@ -14,7 +14,7 @@
 - **Reutiliza los ingresos personales de 033**: monto, moneda, fecha del ingreso, categoría (`SALARY`, `FREELANCE`, `SALE`, `REFUND`, `OTHER`) y carácter proyectado (fecha posterior a hoy en UTC). No se agregan campos ni migraciones.
 - **Reutiliza de 032** la definición de gastos personales y de la parte de la persona en gastos grupales y con amigos, la regla de moneda del cálculo, la conversión con la cotización de la fecha del movimiento y la exclusión de importes sin cotización con su aviso.
 - **Reutiliza de 031/033** los selectores de mes y año, la regla de que el mes y el año de un movimiento son los de su fecha, y el listado de años con movimientos.
-- **Reutiliza el componente de torta** (`PieChart`) para las categorías y agrega un gráfico de dona para la comparación y un carrusel accesible para los gastos.
+- **Reutiliza el componente de torta** (`PieChart`) para las categorías y para la comparación de dos porciones, y agrega un carrusel accesible para los gastos.
 - **No modifica** el balance de 033 (`/api/balance`), la actividad personal, los saldos de grupo, los presupuestos grupales ni la propuesta de liquidación.
 
 ## Fuera de alcance
@@ -22,7 +22,7 @@
 - Ingresos grupales, compartidos o con amigos: los ingresos siguen siendo exclusivamente personales.
 - Comparación año contra año, evolución mensual, promedios, tendencias o proyecciones de ahorro.
 - Otros períodos: año completo, rangos de fechas arbitrarios o varios meses a la vez.
-- Otras agrupaciones de ingresos (por medio de cobro, por moneda, por descripción) y otros gráficos distintos de las tortas por categoría y la dona comparativa.
+- Otras agrupaciones de ingresos (por medio de cobro, por moneda, por descripción) y otros gráficos distintos de las tortas por categoría y la torta comparativa.
 - Reproducción automática del carrusel, desplazamiento infinito, efectos 3D o transiciones llamativas.
 - Editar, eliminar o reclasificar ingresos desde la pantalla de estadísticas.
 - Abrir desde una categoría del gráfico la lista de sus ingresos.
@@ -37,7 +37,7 @@
 - Q: ¿Qué gastos resta la comparación "ingresos vs. gastos"? → A: Los gastos personales **más** la parte de la persona en los gastos grupales y con amigos, es decir, el mismo total combinado que ya muestra 032.
 - Q: ¿Los ingresos proyectados (fecha futura) cuentan en la torta y en la comparación del período? → A: No. Se excluyen hasta que su fecha llegue, igual que en el balance neto de 033; solo cuentan los ingresos efectivizados.
 - Q: ¿Cómo se presenta la comparación ingresos vs. gastos? → A: Con un único gráfico comparativo de ingresos y gastos, con los totales como etiquetas; no se muestra un bloque separado de tres cifras.
-- Q: ¿Qué tipo de gráfico comparativo se usa? → A: Una dona de dos porciones, una para ingresos y otra para gastos, con sus importes como etiquetas y el balance del período destacado.
+- Q: ¿Qué tipo de gráfico comparativo se usa? → A: Una torta comparativa de dos porciones, una para ingresos y otra para gastos, reutilizando el mismo componente `PieChart` de las categorías, con sus importes como etiquetas y el balance del período destacado debajo del gráfico.
 - Q: ¿El selector de año incluye años que solo tienen ingresos proyectados? → A: No. Solo se ofrecen años con al menos un ingreso efectivizado, un gasto personal o una parte de gasto grupal; el año actual siempre aparece.
 - Q: ¿Cómo se navega entre gastos personales y grupales? → A: Con un carrusel horizontal de dos slides, puntos indicadores y flechas accesibles; el bloque de ingresos y el comparativo son bloques fijos, no slides del carrusel.
 - Q: ¿El carrusel vuelve al primer slide al cambiar de período? → A: No. Conserva el slide activo al cambiar mes o año; al recargar la pantalla vuelve al Slide 1 y el slide no forma parte de la dirección.
@@ -48,7 +48,7 @@
 - **Carrusel de gastos**: dos slides, "Gastos personales por categoría" y "Gastos grupales por categoría". Se muestra un solo slide a la vez. Tiene puntos indicadores, botones "Anterior" y "Siguiente" y admite swipe horizontal. No se reproduce automáticamente ni se envuelve: en el primer slide "Anterior" está deshabilitado y en el último "Siguiente" está deshabilitado.
 - **Slide activo**: al entrar a la pantalla o recargarla se abre el Slide 1. Cambiar mes o año conserva el slide activo. Cambiar de slide no agrega entradas al historial ni modifica la dirección.
 - **Bloque de ingresos**: es un bloque independiente con una sola torta, "Ingresos personales por categoría". No es un slide del carrusel y no tiene controles de navegación propios.
-- **Bloque comparativo**: dona de dos porciones (ingresos y gastos combinados) con los totales como etiquetas y el balance del período destacado. Es visible siempre que el período tenga al menos un ingreso o gasto incluido.
+- **Bloque comparativo**: torta comparativa de dos porciones (ingresos y gastos combinados) con los totales como etiquetas, reutilizando `PieChart`, y el balance del período destacado debajo del gráfico. Es visible siempre que el período tenga al menos un ingreso o gasto incluido.
 - Los totales de cada slide y del bloque de ingresos siguen visibles en su propio bloque.
 - "Mes/año" significa un mes concreto dentro de un año, igual que en 032; no se agrega un selector de año completo.
 - La moneda del cálculo es la misma que usan las estadísticas de gastos y el balance: la primera moneda preferida según el orden del catálogo, o ARS si no hay ninguna. Una sola moneda para ingresos, gastos y comparación.
@@ -112,20 +112,20 @@ Martín está revisando sus finanzas del mes. En el bloque de gastos ve el Slide
 
 ### User Story 3 - Comparar ingresos y gastos del mes (Priority: P2)
 
-Lucía quiere saber si este mes gastó más de lo que cobró. En el bloque comparativo ve una dona de dos porciones, una de ingresos y otra de gastos combinados, con sus totales como etiquetas y el balance del período destacado. Al cambiar de mes o de slide, la comparación se mantiene o se recalcula según corresponda.
+Lucía quiere saber si este mes gastó más de lo que cobró. En el bloque comparativo ve una torta de dos porciones, una de ingresos y otra de gastos combinados, con sus totales como etiquetas y el balance del período destacado debajo del gráfico. Al cambiar de mes o de slide, la comparación se mantiene o se recalcula según corresponda.
 
 **Why this priority**: es el valor diferencial de la feature ("comparar sus hábitos de ingreso vs. gasto"), pero la distribución por categoría ya entrega valor sin la comparación.
 
-**Independent Test**: con ingresos y gastos personales y grupales conocidos en el mes, verificar que la dona muestra ambos totales y que el balance resta el total combinado de gastos; cambiar de mes y comprobar el recálculo.
+**Independent Test**: con ingresos y gastos personales y grupales conocidos en el mes, verificar que la torta comparativa muestra ambos totales, que el balance debajo resta el total combinado de gastos y que al cambiar de mes se recalcula.
 
 **Acceptance Scenarios**:
 
-1. **Given** ingresos incluidos por 1.000.000, gastos personales por 300.000 y una parte de gastos grupales por 100.000 en el período, **When** se abre la pantalla, **Then** la dona tiene una porción de ingresos y otra de gastos proporcionales, etiqueta "Ingresos ARS 1.000.000,00" y "Gastos ARS 400.000,00", y destaca "Balance del período +ARS 600.000,00".
-2. **Given** gastos incluidos mayores que los ingresos, **When** se muestra la dona, **Then** el balance del período es negativo y se distingue con signo explícito y con un ícono o texto además del color.
-3. **Given** un mes sin ingresos, **When** se muestra la dona, **Then** los ingresos son "ARS 0,00" y el balance del período es el negativo de los gastos incluidos.
-4. **Given** un mes sin gastos, **When** se muestra la dona, **Then** los gastos son "ARS 0,00" y el balance del período coincide con los ingresos incluidos.
-5. **Given** la comparación visible, **When** la persona cambia de slide en el carrusel de gastos, **Then** la dona no cambia (es del período, no del slide).
-6. **Given** la comparación visible, **When** la persona cambia de mes o de año, **Then** la dona se recalcula para el nuevo período.
+1. **Given** ingresos incluidos por 1.000.000, gastos personales por 300.000 y una parte de gastos grupales por 100.000 en el período, **When** se abre la pantalla, **Then** la torta comparativa tiene una porción de ingresos y otra de gastos proporcionales, etiqueta "Ingresos ARS 1.000.000,00" y "Gastos ARS 400.000,00", y destaca debajo "Balance del período +ARS 600.000,00".
+2. **Given** gastos incluidos mayores que los ingresos, **When** se muestra la torta comparativa, **Then** el balance del período es negativo y se distingue con signo explícito y con un ícono o texto además del color.
+3. **Given** un mes sin ingresos, **When** se muestra la torta comparativa, **Then** los ingresos son "ARS 0,00" y el balance del período es el negativo de los gastos incluidos.
+4. **Given** un mes sin gastos, **When** se muestra la torta comparativa, **Then** los gastos son "ARS 0,00" y el balance del período coincide con los ingresos incluidos.
+5. **Given** la comparación visible, **When** la persona cambia de slide en el carrusel de gastos, **Then** la torta comparativa no cambia (es del período, no del slide).
+6. **Given** la comparación visible, **When** la persona cambia de mes o de año, **Then** la torta comparativa se recalcula para el nuevo período.
 7. **Given** la comparación, **When** se muestra, **Then** indica la moneda del cálculo y no se presentan como definitivos importes que hayan quedado fuera por falta de cotización.
 
 ---
@@ -140,12 +140,12 @@ Lucía quiere revisar los ingresos de octubre. Elige el mes en el selector y ve 
 
 **Acceptance Scenarios**:
 
-1. **Given** ingresos en octubre y noviembre del año actual, **When** elige "Octubre", **Then** el bloque de ingresos y la dona comparativa muestran solo los movimientos de octubre.
+1. **Given** ingresos en octubre y noviembre del año actual, **When** elige "Octubre", **Then** el bloque de ingresos y la torta comparativa muestran solo los movimientos de octubre.
 2. **Given** "Octubre" elegido, **When** cambia el año a 2025, **Then** el mes y el slide activo se conservan y se ven las estadísticas de octubre de 2025.
 3. **Given** años con gastos, años con ingresos efectivizados y años con solo ingresos proyectados, **When** abre el selector de año, **Then** ve el año actual y todos los años con al menos un gasto personal, una parte grupal o un ingreso efectivizado, en orden descendente y sin repetir, sin los años que solo tienen ingresos proyectados.
 4. **Given** un mes sin ingresos efectivizados pero con gastos, **When** se abre la pantalla, **Then** el bloque de ingresos muestra "No tuviste ingresos efectivizados en marzo de 2026." con un enlace para registrar un ingreso, sin torta ni total de ingresos.
 5. **Given** un mes sin gastos personales pero con gastos grupales, **When** se ve el Slide 1, **Then** muestra su mensaje de vacío; el Slide 2 sigue mostrando su torta y se puede alcanzar deslizando o con las flechas.
-6. **Given** un mes sin ingresos ni gastos, **When** se abre la pantalla, **Then** se muestra un mensaje de período vacío con enlaces para registrar un gasto o un ingreso, sin carrusel, dona, tortas ni totales.
+6. **Given** un mes sin ingresos ni gastos, **When** se abre la pantalla, **Then** se muestra un mensaje de período vacío con enlaces para registrar un gasto o un ingreso, sin carrusel, torta comparativa, tortas ni totales.
 7. **Given** un nuevo ingreso registrado en el mes elegido, **When** vuelve a abrir las estadísticas de ese mes, **Then** el ingreso ya está incluido.
 8. **Given** un mes o un año inválido en la dirección, **When** se abre la pantalla, **Then** se usa el mes y el año actuales.
 
@@ -172,16 +172,16 @@ Lucía cobra en pesos y en dólares. En el bloque de ingresos, ambos se suman co
 
 ### Edge Cases
 
-- **Mes sin ingresos**: el bloque de ingresos muestra su mensaje de vacío con enlace para registrar un ingreso; la dona comparativa sigue mostrando gastos y un balance del período negativo si los hay.
-- **Mes sin ingresos ni gastos**: mensaje de período vacío con ambos enlaces; no se muestran carrusel, dona ni tortas.
+- **Mes sin ingresos**: el bloque de ingresos muestra su mensaje de vacío con enlace para registrar un ingreso; la torta comparativa sigue mostrando gastos y un balance del período negativo si los hay.
+- **Mes sin ingresos ni gastos**: mensaje de período vacío con ambos enlaces; no se muestran carrusel, torta comparativa ni tortas.
 - **Un slide de gastos sin datos**: el carrusel sigue siendo navegable y ese slide muestra su mensaje de vacío; el otro slide conserva su torta.
 - **Una sola categoría de ingreso**: círculo completo con esa categoría al 100,0 %.
 - **Categoría de ingreso con importe muy chico** (por ejemplo, 0,3 %): aparece en la lista con su importe y porcentaje; en el gráfico puede ser una porción casi invisible.
 - **Ingreso proyectado** (fecha futura): no cuenta en la torta, el total de ingresos ni la comparación del período hasta que su fecha llegue. Si el mes futuro no tiene otros ingresos, el bloque muestra su mensaje de vacío aunque existan cobros agendados.
 - **Ingreso con cotización faltante**: se excluye de la torta y de la comparación, y se informa la cantidad; el resto de la pantalla se muestra normalmente.
 - **Todos los ingresos del mes sin cotización**: el bloque de ingresos muestra el aviso de excluidos y su mensaje de vacío; la comparación usa solo los importes incluidos.
-- **Dona con un solo tipo con importe**: si hay ingresos y no gastos (o al revés), la dona es un círculo completo de la porción con importe y la otra se etiqueta "ARS 0,00".
-- **Dona con ambos totales en cero**: no se muestra dona ni balance; rige el mensaje de período vacío.
+- **Torta comparativa con un solo tipo con importe**: si hay ingresos y no gastos (o al revés), la torta es un círculo completo de la porción con importe y la otra se etiqueta "ARS 0,00".
+- **Torta comparativa con ambos totales en cero**: no se muestra la torta ni el balance; rige el mensaje de período vacío.
 - **Importes muy dispares**: la porción menor puede ser casi invisible, pero las etiquetas y la leyenda muestran ambos totales y el balance.
 - **Carrusel en los extremos**: no hay desplazamiento circular; "Anterior" está deshabilitado en el Slide 1 y "Siguiente" en el Slide 2.
 - **Swipe corto o vertical**: un gesto por debajo del umbral o predominantemente vertical no cambia de slide ni bloquea el desplazamiento vertical de la página.
@@ -192,8 +192,8 @@ Lucía cobra en pesos y en dólares. En el bloque de ingresos, ambos se suman co
 - **Mes o año inválido en la dirección** (por ejemplo, `month=13`, `year=20x5`): se toman el mes y el año actuales.
 - **Error de red o del servidor**: mensaje fijo "No pudimos cargar tus estadísticas. Intentá nuevamente" con un botón "Reintentar", sin datos viejos ni parciales. Si falla cualquiera de las consultas que alimentan la pantalla, no se muestran bloques parciales.
 - **Sesión expirada o cuenta no verificada**: responde como el resto de las pantallas protegidas (redirección al acceso / 401).
-- **Pantalla angosta (celular)**: el carrusel ocupa el ancho disponible, muestra un slide por vez, la torta y su lista se apilan en una columna y la dona comparativa también.
-- **Lectura con lector de pantalla**: el carrusel, la torta, la lista y la dona exponen etiquetas textuales; el slide activo, los totales y el signo del balance no se comunican solo por color o posición.
+- **Pantalla angosta (celular)**: el carrusel ocupa el ancho disponible, muestra un slide por vez, la torta y su lista se apilan en una columna y la torta comparativa con su balance también.
+- **Lectura con lector de pantalla**: el carrusel, la torta, la lista y la torta comparativa exponen etiquetas textuales; el slide activo, los totales y el signo del balance no se comunican solo por color o posición.
 - **Movimiento reducido**: con `prefers-reduced-motion`, el cambio de slide es inmediato o con una transición mínima y sigue siendo comprensible.
 
 ## Requirements *(mandatory)*
@@ -223,7 +223,7 @@ Lucía cobra en pesos y en dólares. En el bloque de ingresos, ambos se suman co
 
 **Comparación ingresos vs. gastos (US3)**
 
-- **FR-015**: La pantalla MUST mostrar un **bloque comparativo en forma de dona de dos porciones**, una para el total de ingresos incluidos y otra para el total de gastos incluidos, con ambos importes como etiquetas y el balance del período destacado, en la moneda del cálculo. La dona MUST poder interpretarse sin depender del color (etiquetas y leyenda textual).
+- **FR-015**: La pantalla MUST mostrar un **bloque comparativo en forma de torta de dos porciones**, una para el total de ingresos incluidos y otra para el total de gastos incluidos, reutilizando el mismo componente `PieChart` de las categorías, con ambos importes como etiquetas y el balance del período destacado **debajo del gráfico**, en la moneda del cálculo. La comparación MUST poder interpretarse sin depender del color (etiquetas y leyenda textual).
 - **FR-016**: El bloque comparativo MUST mostrar el **balance del período** (total de ingresos incluidos menos total de gastos incluidos) como etiqueta destacada, con signo explícito cuando sea positivo y cuando sea negativo y sin depender solo del color para distinguirlos. El balance MUST calcularse a partir de los totales redondeados que se muestran, para que la etiqueta coincida con ellos.
 - **FR-017**: El total de gastos de la comparación MUST ser el total combinado de gastos de 032: los gastos personales por su monto completo más la parte de la persona en los gastos grupales y con amigos, con las mismas conversiones y exclusiones que los slides de gastos.
 - **FR-018**: El bloque comparativo MUST ser del período y MUST permanecer igual al cambiar de slide; MUST recalcularse al cambiar de mes o de año.
@@ -234,7 +234,7 @@ Lucía cobra en pesos y en dólares. En el bloque de ingresos, ambos se suman co
 - **FR-020**: El bloque de ingresos MUST mostrar una torta con una porción por categoría, proporcional a su porcentaje, y junto a ella la lista de categorías en el mismo orden, cada una con su nombre en español, su importe con la moneda, su porcentaje y el color de su porción.
 - **FR-021**: Apuntar o tocar una porción de la torta de ingresos MUST mostrar el nombre de la categoría, su importe y su porcentaje.
 - **FR-022**: Cada categoría de ingreso MUST tener siempre el mismo color en cualquier período y tema, y la información MUST poder leerse sin depender del color (nombre, importe y porcentaje en texto).
-- **FR-023**: Si el período no tiene ingresos efectivizados, el bloque de ingresos MUST mostrar "No tuviste ingresos efectivizados en <mes> de <año>." con un enlace para registrar un ingreso, sin torta ni total de ingresos. Cada slide de gastos MUST mostrar el mensaje de vacío correspondiente de 032 cuando su tipo no tenga gastos. Si no hay ingresos ni gastos, MUST mostrarse un mensaje de período vacío con enlaces para registrar un gasto o un ingreso, sin carrusel, dona ni tortas.
+- **FR-023**: Si el período no tiene ingresos efectivizados, el bloque de ingresos MUST mostrar "No tuviste ingresos efectivizados en <mes> de <año>." con un enlace para registrar un ingreso, sin torta ni total de ingresos. Cada slide de gastos MUST mostrar el mensaje de vacío correspondiente de 032 cuando su tipo no tenga gastos. Si no hay ingresos ni gastos, MUST mostrarse un mensaje de período vacío con enlaces para registrar un gasto o un ingreso, sin carrusel, torta comparativa ni tortas.
 - **FR-024**: Si hubo ingresos excluidos por falta de cotización (FR-011), la pantalla MUST avisarlo con su cantidad, de forma independiente del aviso de gastos excluidos de 032.
 - **FR-025**: La pantalla MUST mantener la indicación de la moneda del cálculo, la navegación por teclado, las etiquetas accesibles y el diseño adaptable a pantallas angostas de 032.
 - **FR-031**: El gesto de swipe MUST reconocer el desplazamiento horizontal dominante sobre el carrusel, MUST NOT activarse con un desplazamiento vertical y MUST NOT bloquear el scroll vertical de la página. Un gesto por debajo del umbral de distancia o velocidad MUST NOT cambiar de slide.
@@ -257,11 +257,11 @@ Lucía cobra en pesos y en dólares. En el bloque de ingresos, ambos se suman co
 ## UI/UX
 
 - **Ubicación**: misma pantalla `/statistics` de 032. Orden vertical: selectores de mes y año, bloque comparativo, carrusel de gastos y bloque de ingresos.
-- **Bloque comparativo**: dona de dos porciones (Ingresos y Gastos) con sus totales como etiquetas y una leyenda textual, más el **balance del período** destacado con signo explícito. Es visible siempre que el período tenga movimientos incluidos.
+- **Bloque comparativo**: torta de dos porciones (Ingresos y Gastos) reutilizando `PieChart`, con sus totales como etiquetas y una leyenda textual, más el **balance del período** destacado debajo del gráfico con signo explícito. Es visible siempre que el período tenga movimientos incluidos.
 - **Carrusel de gastos**: un slide visible, "Gastos personales por categoría" o "Gastos grupales por categoría", cada uno con su torta, su total y su lista. Debajo, dos puntos indicadores; a los lados o debajo, botones "Anterior" y "Siguiente" con nombres accesibles. Swipe horizontal, teclado y mouse producen el mismo cambio. No hay autoplay ni loop.
 - **Bloque de ingresos**: torta y lista de categorías con el mismo tratamiento visual que los slides de gastos, con colores propios de las categorías de ingreso. No tiene controles de carrusel.
 - **Estados**: carga, vacío por bloque, vacío total, avisos de importes excluidos y error con reintento. Los mensajes de vacío de gastos se conservan.
-- **Responsive/accesibilidad**: en pantallas angostas el carrusel ocupa el ancho disponible y muestra un slide por vez; la torta y su lista se apilan; la dona comparativa también. El slide activo, la posición, los totales y el signo del balance se comunican también de forma textual.
+- **Responsive/accesibilidad**: en pantallas angostas el carrusel ocupa el ancho disponible y muestra un slide por vez; la torta y su lista se apilan; la torta comparativa con su balance también. El slide activo, la posición, los totales y el signo del balance se comunican también de forma textual.
 - **Movimiento**: transición breve entre slides, desactivada o reducida con `prefers-reduced-motion`.
 
 ## Success Criteria *(mandatory)*

@@ -112,7 +112,7 @@ pedido falla, el frontend no muestra bloques parciales (FR-027).
   totales **ya redondeados**, formateado a dos decimales con signo cuando es
   negativo (FR-016, SC-004).
 - Se devuelve siempre, también cuando ambos totales son `"0.00"`; en ese caso la
-  interfaz no dibuja la dona y muestra el estado de período vacío (FR-023).
+  interfaz no dibuja la torta comparativa y muestra el estado de período vacío (FR-023).
 
 ### Ejemplos de casos límite
 

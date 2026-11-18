@@ -6,7 +6,7 @@
 
 ## Summary
 
-Extender la pantalla `/statistics` de 032 con un bloque de ingresos personales, un bloque comparativo de ingresos contra gastos combinados y un carrusel de dos slides para los gastos personales y grupales. El backend expone un único `GET /api/stats/summary?year=&month=` que compone la agregación de gastos ya existente (032) con una agregación nueva de ingresos efectivizados (033), devuelve la comparación y los años unificados. El frontend reemplaza las dos tortas simultáneas por un carrusel accesible (swipe, flechas, puntos y teclado), agrega una dona comparativa y mantiene la torta de ingresos. Sin migraciones ni dependencias nuevas.
+Extender la pantalla `/statistics` de 032 con un bloque de ingresos personales, un bloque comparativo de ingresos contra gastos combinados y un carrusel de dos slides para los gastos personales y grupales. El backend expone un único `GET /api/stats/summary?year=&month=` que compone la agregación de gastos ya existente (032) con una agregación nueva de ingresos efectivizados (033), devuelve la comparación y los años unificados. El frontend reemplaza las dos tortas simultáneas por un carrusel accesible (swipe, flechas, puntos y teclado), agrega una torta comparativa de dos porciones reutilizando el `PieChart` existente y mantiene la torta de ingresos. Sin migraciones ni dependencias nuevas.
 
 ## Technical Context
 
@@ -35,7 +35,7 @@ Extender la pantalla `/statistics` de 032 con un bloque de ingresos personales, 
 | I. Arquitectura | Nuevo paquete `statistics` como capa de composición; reutiliza `ExpenseStatisticsService` y la consulta de ingresos del paquete `income`. Frontend con componentes propios en `components/charts` y `components/`. |
 | II. SDD | spec → plan → tasks antes de implementar; trazabilidad FR → tarea. |
 | III. Incremental | US1 y US2 (P1) primero; US3–US5 después. El carrusel y los bloques se pueden validar por separado. |
-| IV. Alcance | Solo lo acordado: dos slides de gastos, bloque de ingresos, dona comparativa y carrusel accesible. Sin autoplay, loop, año completo ni nuevas agrupaciones. |
+| IV. Alcance | Solo lo acordado: dos slides de gastos, bloque de ingresos, torta comparativa y carrusel accesible. Sin autoplay, loop, año completo ni nuevas agrupaciones. |
 | V. Pruebas | Unitarias, integración y frontend; regresión de 032/033; cobertura ≥ 85 % con `mvn -B verify` y `npm run test:coverage`. |
 | VI. Reglas de negocio | Solo lectura. Ingresos efectivizados, gastos combinados de 032 y conversión por fecha. No altera saldos, deudas ni balance de 033. |
 | VII. Contratos REST | Nuevo endpoint documentado en [contracts/statistics-summary-api.md](./contracts/statistics-summary-api.md); `/api/expenses/statistics` y `/api/balance` no cambian. |
@@ -60,7 +60,7 @@ Extender la pantalla `/statistics` de 032 con un bloque de ingresos personales, 
 - **D11 – Un solo pedido en el frontend**: `getStatisticsSummary({ year, month })` en `api/statisticsClient.js` devuelve `{ ok, statistics }`, `{ ok: false, status }` o `{ ok: false, network: true }`. La página deja de pedir `getExpenseStatistics` y muestra un único estado de carga/error; si falla el pedido no se muestran bloques parciales (FR-027).
 - **D12 – Carrusel controlado y accesible**: `components/Carousel.jsx` recibe `slides`, `index`, `onIndexChange` y `ariaLabel`. El índice vive en `StatisticsPage`, fuera del componente de resultados, para conservar el slide al cambiar el período (FR-005) y volver al Slide 1 al recargar (FR-006). El carrusel usa `role="region"` con `aria-roledescription="carrusel"`, cada slide `role="group"` con `aria-roledescription="slide"` y `aria-label="1 de 2"`, puntos `<button>` con `aria-label` y `aria-current`, y botones "Anterior"/"Siguiente" deshabilitados en los extremos. No hay autoplay ni loop.
 - **D13 – Swipe sin romper el scroll**: `touch-action: pan-y` en el contenedor; se escuchan eventos de puntero/touch y solo se cambia de slide cuando el desplazamiento horizontal supera un umbral (por ejemplo, 40 px) y es mayor que el vertical. Un gesto corto o vertical no cambia de slide ni llama a `preventDefault` (FR-031). Las flechas del teclado `ArrowLeft`/`ArrowRight` y los botones ofrecen la misma navegación.
-- **D14 – Dona comparativa**: `components/charts/DonutChart.jsx` dibuja dos arcos SVG con radio interior sobre la geometría compartida de `PieChart` (se extrae `charts/geometry.js`). Cada porción es enfocable, tiene `aria-label` con importe y porcentaje, y la leyenda textual muestra ambos totales y el balance. Una sola porción con importe se dibuja como anillo completo; ambos totales en cero no muestran dona (FR-015, FR-016).
+- **D14 – Comparación con `PieChart` reutilizado**: el bloque comparativo usa el componente `PieChart` existente con dos porciones, Ingresos y Gastos, sin crear un componente de gráfico nuevo; mantiene su geometría actual en `charts/geometry.js`. Cada porción es enfocable y muestra su importe y porcentaje; la leyenda textual lista ambos totales y el balance del período se renderiza destacado debajo del gráfico. Una sola porción con importe se dibuja como círculo completo; si ambos totales son cero no se dibuja el gráfico y rige el estado de período vacío (FR-015, FR-016).
 - **D15 – Colores de ingreso**: nuevas variables CSS `--color-ingreso-<código>` en `StatisticsPage.scss` para los temas claro y oscuro, y `incomeCategoryColor(code)` en `expenseCatalog.js`. La paleta es distinta de la de gastos y los nombres/importes/porcentajes de la lista mantienen la información sin depender del color (FR-022).
 - **D16 – Reutilización de `Breakdown`**: el componente actual de torta + lista se parametriza con `options` y `colorOf`, para usarlo tanto en gastos como en ingresos sin duplicar la lista ni el detalle al pasar el mouse.
 - **D17 – Estado en la dirección**: se conserva `?year=&month=` de 032, con `replace`; el slide no se escribe en la dirección. Un valor inválido se trata como el actual. El año actual lo decide el navegador.
@@ -107,20 +107,17 @@ frontend/src/
 ├── components/Carousel.jsx                    # NUEVO: carrusel accesible con swipe
 ├── components/Carousel.scss                   # NUEVO
 ├── components/Carousel.test.jsx               # NUEVO
-├── components/charts/DonutChart.jsx           # NUEVO: dona comparativa
-├── components/charts/DonutChart.scss          # NUEVO
-├── components/charts/DonutChart.test.jsx      # NUEVO
-├── components/charts/geometry.js              # NUEVO: geometría compartida de arcos
-├── components/charts/PieChart.jsx             # usa geometry.js
-├── components/charts/PieChart.test.jsx        # regresión
+├── components/charts/PieChart.jsx             # reutilizado para gastos, ingresos y comparación
+├── components/charts/PieChart.test.jsx        # regresión + comparación de dos porciones
+├── components/charts/geometry.js              # geometría de PieChart
 ├── pages/StatisticsPage.jsx                   # carrusel + ingresos + comparación
-├── pages/StatisticsPage.scss                  # estilos del carrusel, dona y colores de ingreso
+├── pages/StatisticsPage.scss                  # estilos del carrusel, torta comparativa y colores de ingreso
 ├── pages/StatisticsPage.test.jsx              # actualizado
 ├── validation/expenseCatalog.js               # + incomeCategoryColor
 └── validation/expenseCatalog.test.js          # + color de ingreso
 ```
 
-**Structure Decision**: monorepo web existente. El paquete `statistics` es una capa de composición de solo lectura: reutiliza la agregación de gastos de 032 y agrega la de ingresos de 033 sin modificar sus reglas de dominio. El carrusel y la dona son componentes de presentación reutilizables en `components/`.
+**Structure Decision**: monorepo web existente. El paquete `statistics` es una capa de composición de solo lectura: reutiliza la agregación de gastos de 032 y agrega la de ingresos de 033 sin modificar sus reglas de dominio. El carrusel es un componente de presentación reutilizable y la comparación reutiliza directamente `PieChart`, sin un componente de gráfico adicional.
 
 ## Riesgos
 
