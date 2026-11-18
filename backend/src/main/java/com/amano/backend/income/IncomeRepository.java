@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.amano.backend.common.CurrencyDateTotal;
+import com.amano.backend.statistics.IncomeCategorySubtotal;
 
 /**
  * Persistence for {@code incomes}. The unique index
@@ -41,4 +42,24 @@ public interface IncomeRepository extends JpaRepository<Income, Long>,
             + "group by i.currency, i.incomeDate")
     List<CurrencyDateTotal> sumByCurrencyAndDate(@Param("userId") Long userId,
             @Param("from") LocalDate from, @Param("to") LocalDate to);
+
+    /**
+     * Received incomes (not after {@code today}) in {@code [from, to]}, summed per
+     * category, currency and income date: what the statistics convert
+     * (specs/034-income-statistics, plan D3, D4).
+     */
+    @Query("select new com.amano.backend.statistics.IncomeCategorySubtotal("
+            + "i.category, i.currency, i.incomeDate, sum(i.amount), count(i)) from Income i "
+            + "where i.userId = :userId and i.incomeDate >= :from and i.incomeDate <= :to "
+            + "and i.incomeDate <= :today "
+            + "group by i.category, i.currency, i.incomeDate")
+    List<IncomeCategorySubtotal> sumByCategoryCurrencyAndDate(@Param("userId") Long userId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to,
+            @Param("today") LocalDate today);
+
+    /** Years (by income date) with at least one received income, newest first (plan D8). */
+    @Query("select distinct year(i.incomeDate) as y from Income i "
+            + "where i.userId = :userId and i.incomeDate <= :today order by y desc")
+    List<Integer> findReceivedIncomeYears(@Param("userId") Long userId,
+            @Param("today") LocalDate today);
 }

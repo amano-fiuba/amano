@@ -7,11 +7,9 @@ import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -19,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
-import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
+import com.amano.backend.statistics.StatisticsConverter;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
@@ -57,7 +55,8 @@ public class ExpenseStatisticsService {
         YearMonth period = validate(rawYear, rawMonth);
         LocalDate from = period.atDay(1);
         LocalDate to = period.atEndOfMonth();
-        Converter converter = new Converter(calculationCurrency(userId));
+        StatisticsConverter converter = new StatisticsConverter(calculationCurrency(userId),
+                exchangeRateProvider);
 
         ExpenseStatisticsResponse.Breakdown personal = breakdown(
                 expenseRepository.sumByCategoryCurrencyAndDate(userId, from, to), converter);
@@ -67,7 +66,7 @@ public class ExpenseStatisticsService {
         BigDecimal total = new BigDecimal(personal.total()).add(new BigDecimal(group.total()));
 
         return new ExpenseStatisticsResponse(period.getYear(), period.getMonthValue(),
-                converter.target, money(total), converter.excluded, personal, group,
+                converter.target(), money(total), converter.excluded(), personal, group,
                 sharedRepository.findYears(userId));
     }
 
@@ -121,10 +120,11 @@ public class ExpenseStatisticsService {
      * the end, over the unrounded sums (plan D7).
      */
     private static ExpenseStatisticsResponse.Breakdown breakdown(List<CategorySubtotal> subtotals,
-            Converter converter) {
+            StatisticsConverter converter) {
         Map<ExpenseCategory, BigDecimal> sums = new EnumMap<>(ExpenseCategory.class);
         for (CategorySubtotal subtotal : subtotals) {
-            converter.convert(subtotal)
+            converter.convert(subtotal.currency(), subtotal.date(), subtotal.amount(),
+                            subtotal.count())
                     .ifPresent(amount -> sums.merge(subtotal.category(), amount, BigDecimal::add));
         }
         BigDecimal total = sums.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -145,46 +145,5 @@ public class ExpenseStatisticsService {
 
     private static String percentage(BigDecimal amount, BigDecimal total) {
         return amount.multiply(HUNDRED).divide(total, 1, RoundingMode.HALF_UP).toPlainString();
-    }
-
-    /**
-     * Converts subtotals to the calculation currency, asking each quote once per
-     * (currency, date) within the request; a subtotal without a quote is dropped
-     * and its expenses counted as excluded (FR-009, FR-010, plan D6).
-     */
-    private final class Converter {
-
-        private record QuoteKey(Currency from, LocalDate date) {
-        }
-
-        private final Currency target;
-        private final Map<QuoteKey, Optional<BigDecimal>> rates = new HashMap<>();
-        private long excluded;
-
-        private Converter(Currency target) {
-            this.target = target;
-        }
-
-        Optional<BigDecimal> convert(CategorySubtotal subtotal) {
-            if (subtotal.currency() == target) {
-                return Optional.of(subtotal.amount());
-            }
-            Optional<BigDecimal> rate = rates.computeIfAbsent(
-                    new QuoteKey(subtotal.currency(), subtotal.date()), this::quote);
-            if (rate.isEmpty()) {
-                excluded += subtotal.count();
-                return Optional.empty();
-            }
-            return Optional.of(subtotal.amount().multiply(rate.get()));
-        }
-
-        private Optional<BigDecimal> quote(QuoteKey key) {
-            try {
-                return Optional.of(exchangeRateProvider.getQuote(key.from(), target, key.date()).rate());
-            }
-            catch (ExchangeRateUnavailableException unavailable) {
-                return Optional.empty();
-            }
-        }
     }
 }

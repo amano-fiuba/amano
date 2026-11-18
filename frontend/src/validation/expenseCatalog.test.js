@@ -9,7 +9,9 @@ import {
   PAYMENT_METHOD_OPTIONS,
   STATUS_OPTIONS,
   TYPE_OPTIONS,
+  categoryColor,
   codesOf,
+  incomeCategoryColor,
   labelOf,
 } from './expenseCatalog'
 
@@ -111,5 +113,18 @@ describe('expenseCatalog', () => {
     expect(labelOf(INCOME_PAYMENT_METHOD_OPTIONS, 'DEBIT_CARD')).toBe('')
     expect(Object.isFrozen(INCOME_CATEGORY_OPTIONS)).toBe(true)
     expect(Object.isFrozen(INCOME_PAYMENT_METHOD_OPTIONS)).toBe(true)
+  })
+})
+
+describe('colores de las estadísticas (032, 034)', () => {
+  it('cada categoría de ingreso usa su variable CSS, distinta de la de gastos', () => {
+    expect(incomeCategoryColor('SALARY')).toBe('var(--color-ingreso-salary)')
+    const colors = INCOME_CATEGORY_OPTIONS.map((option) => incomeCategoryColor(option.code))
+    expect(new Set(colors).size).toBe(INCOME_CATEGORY_OPTIONS.length)
+    expect(colors).not.toContain(categoryColor('OTHER'))
+  })
+
+  it('la categoría de gasto sigue usando su variable CSS', () => {
+    expect(categoryColor('FOOD')).toBe('var(--color-categoria-food)')
   })
 })
