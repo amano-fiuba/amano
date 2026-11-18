@@ -30,7 +30,7 @@ import com.amano.backend.user.Currency;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
-/** Unit tests of the personal balance (specs/032-income-management, FR-010 to FR-012). */
+/** Unit tests of the personal balance (specs/033-income-management, FR-010 to FR-012). */
 class BalanceServiceTest {
 
     private static final Long USER_ID = 3L;

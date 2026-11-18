@@ -16,19 +16,11 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
-import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
 import com.amano.backend.groupexpense.exchange.CachingExchangeRateProvider;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
 import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
@@ -36,28 +28,17 @@ import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.user.Currency;
 
 import jakarta.servlet.http.Cookie;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 /**
- * {@code GET /api/balance} over a real PostgreSQL (specs/032-income-management, US1):
+ * {@code GET /api/balance} over a real PostgreSQL (specs/033-income-management, US1):
  * net = income - expenses in the main currency, period filters, quotes of each
  * movement's date, scheduled incomes outside the net and the 503 only for
  * expenses and received incomes.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class BalanceIT {
+class BalanceIT extends AbstractIntegrationIT {
 
     private static final LocalDate TODAY = LocalDate.now(ZoneOffset.UTC);
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    @MockitoBean
-    private BcraExchangeRateClient bcra;
 
     @Autowired
     private ExchangeRateProvider exchangeRateProvider;
@@ -76,8 +57,8 @@ class BalanceIT {
         if (exchangeRateProvider instanceof CachingExchangeRateProvider caching) {
             caching.clear();
         }
-        reset(bcra);
-        doThrow(new ExchangeRateUnavailableException()).when(bcra).getQuote(any(), any(), any());
+        reset(bcraExchangeRateClient);
+        doThrow(new ExchangeRateUnavailableException()).when(bcraExchangeRateClient).getQuote(any(), any(), any());
     }
 
     private static ExchangeRateQuote quote(String rate, LocalDate date) {
@@ -198,8 +179,8 @@ class BalanceIT {
         LocalDate expenseDate = TODAY.minusDays(4);
         income(userId, "100.00", "USD", incomeDate);
         expense(userId, "10.00", "USD", expenseDate);
-        doReturn(quote("1000", incomeDate)).when(bcra).getQuote(Currency.USD, Currency.ARS, incomeDate);
-        doReturn(quote("900", expenseDate)).when(bcra).getQuote(Currency.USD, Currency.ARS, expenseDate);
+        doReturn(quote("1000", incomeDate)).when(bcraExchangeRateClient).getQuote(Currency.USD, Currency.ARS, incomeDate);
+        doReturn(quote("900", expenseDate)).when(bcraExchangeRateClient).getQuote(Currency.USD, Currency.ARS, expenseDate);
 
         balance(userId, "")
                 .andExpect(jsonPath("$.income").value("100000.00"))
@@ -213,7 +194,7 @@ class BalanceIT {
         jdbcTemplate.update("INSERT INTO user_currencies (user_id, currency_code) VALUES (?, 'USD')", userId);
         LocalDate date = TODAY.minusDays(3);
         income(userId, "1000.00", "ARS", date);
-        doReturn(quote("0.001", date)).when(bcra).getQuote(Currency.ARS, Currency.USD, date);
+        doReturn(quote("0.001", date)).when(bcraExchangeRateClient).getQuote(Currency.ARS, Currency.USD, date);
 
         balance(userId, "")
                 .andExpect(jsonPath("$.currency").value("USD"))
@@ -226,7 +207,7 @@ class BalanceIT {
         LocalDate future = TODAY.plusDays(20);
         income(userId, "1000.00", "ARS", TODAY.minusDays(1));
         income(userId, "10.00", "USD", future);
-        doReturn(quote("1200", TODAY)).when(bcra).getQuote(Currency.USD, Currency.ARS, TODAY);
+        doReturn(quote("1200", TODAY)).when(bcraExchangeRateClient).getQuote(Currency.USD, Currency.ARS, TODAY);
 
         balance(userId, "")
                 .andExpect(status().isOk())

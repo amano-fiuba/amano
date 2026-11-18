@@ -49,7 +49,7 @@ export const PERSONAL_QUOTE_ERROR =
   'No pudimos obtener la cotización en este momento. Podés guardar el gasto igual.'
 export const PERSONAL_QUOTE_DEBOUNCE_MS = 400
 
-// 032 (specs/032-income-management): the same form registers a personal income.
+// 033 (specs/033-income-management): the same form registers a personal income.
 export const INCOME_SUCCESS_MESSAGE = 'El ingreso se guardó correctamente'
 export const INCOME_DISCARD_CONFIRM = '¿Descartar el ingreso? Se perderán los datos cargados'
 export const INCOME_SUMMARY_TITLE = 'Confirmá el ingreso'
@@ -83,7 +83,7 @@ const EXPENSE_FIELD_NAMES = [
   'description',
 ]
 
-// An income has no type nor frequency (specs/032-income-management, FR-001).
+// An income has no type nor frequency (specs/033-income-management, FR-001).
 const INCOME_FIELD_NAMES = ['amount', 'currency', 'date', 'category', 'paymentMethod', 'description']
 
 /**
@@ -97,7 +97,7 @@ const INCOME_FIELD_NAMES = ['amount', 'currency', 'date', 'category', 'paymentMe
  * currencies plus "Ver más" (BCRA catalog), group-like card surface and a
  * Cancelar / Guardar footer. Never a shared-expense panel. "Guardar" opens a final
  * summary; the expense is saved only after "Confirmar".
- * Feature 032 (specs/032-income-management): `kind="INCOME"` registers a personal
+ * Feature 033 (specs/033-income-management): `kind="INCOME"` registers a personal
  * income with the same form: income categories, a required "Medio de cobro", no type
  * nor frequency, a date up to one year ahead (a future date is a scheduled income),
  * and `createIncome`. The optional `onSaved(result)` runs after a successful save

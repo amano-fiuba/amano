@@ -9,13 +9,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.support.AbstractIntegrationIT;
 
 /**
  * 018 T005/T006: Flyway applies {@code V14__create_payments.sql} on a real
@@ -23,15 +20,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * by hand. Starting the context also runs {@code ddl-auto=validate}, so the
  * {@code Payment} mapping must agree with the migration (T012).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class PaymentMigrationIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class PaymentMigrationIT extends AbstractIntegrationIT {
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -214,7 +203,11 @@ class PaymentMigrationIT {
 
         jdbc.update("DELETE FROM simulated_profiles WHERE id = ?", profileId);
 
-        var row = jdbc.queryForMap("SELECT payer_simulated_profile_id, payer_name FROM payments WHERE payer_type = 'SIMULATED'");
+        var row = jdbc.queryForMap("""
+                SELECT payer_simulated_profile_id, payer_name
+                FROM payments
+                WHERE payer_type = 'SIMULATED' AND debt_id = ?
+                """, debtId);
         assertThat(row.get("payer_simulated_profile_id")).isNull();
         assertThat(row.get("payer_name")).isEqualTo("Pagador");
     }

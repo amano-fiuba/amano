@@ -1,5 +1,5 @@
 // Helpers shared by the API clients to read a ProblemDetail (RFC 9457) error body.
-// Extracted from expenseClient.js (032) so the income client reuses them.
+// Extracted from expenseClient.js (033) so the income client reuses them.
 
 /** Field errors of a ProblemDetail, keeping only string messages. */
 export function safeFields(fields) {

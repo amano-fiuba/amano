@@ -85,7 +85,7 @@ describe('expenseCatalog', () => {
     expect(labelOf(STATUS_OPTIONS, 'FINISHED')).toBe('Finalizado')
   })
 
-  it('fixes the income category codes and their Spanish labels (032)', () => {
+  it('fixes the income category codes and their Spanish labels (033)', () => {
     expect(codesOf(INCOME_CATEGORY_OPTIONS)).toEqual([
       'SALARY',
       'FREELANCE',
@@ -100,7 +100,7 @@ describe('expenseCatalog', () => {
     expect(labelOf(INCOME_CATEGORY_OPTIONS, 'OTHER')).toBe('Otros')
   })
 
-  it('fixes the income payment method codes, without the card methods (032)', () => {
+  it('fixes the income payment method codes, without the card methods (033)', () => {
     expect(codesOf(INCOME_PAYMENT_METHOD_OPTIONS)).toEqual([
       'CASH',
       'TRANSFER',

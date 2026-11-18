@@ -6,7 +6,7 @@ import java.util.Map;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 /**
- * Input payload of {@code POST /api/incomes} (specs/032-income-management/contracts/personal-incomes-api.md). Kept as
+ * Input payload of {@code POST /api/incomes} (specs/033-income-management/contracts/personal-incomes-api.md). Kept as
  * a class (not a record) so the unknown-property hook can capture every property
  * the request does not declare; the service uses that map to reject reserved
  * properties (FR-001). All values stay as received: normalization and

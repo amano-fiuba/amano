@@ -1,18 +1,22 @@
 package com.amano.backend.income;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,16 +26,23 @@ import com.amano.backend.expense.ExpenseClassification;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.ExpenseDescriptionNormalizer;
 import com.amano.backend.expense.IdempotencyConflictException;
+import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
+import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
+import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.user.Currency;
+import com.amano.backend.user.User;
+import com.amano.backend.user.UserRepository;
 
 /**
- * Registration of a personal income (specs/032-income-management, US1). It follows
+ * Registration of a personal income (specs/033-income-management, US1). It follows
  * {@code ExpenseService}: the owner is always the SESSION principal, every invalid
  * field is accumulated in one pass before any write (so a missing value can never
  * surface as a {@code NullPointerException}), and an existing
  * {@code (user, Idempotency-Key)} is replayed when the normalized payload matches and
  * rejected with {@code 422} when it differs (FR-005); the unique index is the
- * concurrency backstop. Incomes are immutable: this service only creates them.
+ * concurrency backstop. Incomes are immutable: this service only creates and reads
+ * them. Reads (detail and search pages) also carry the equivalent of each income in the
+ * person's preferred currencies, as the expense activity does (031).
  */
 @Service
 public class IncomeService {
@@ -52,9 +63,20 @@ public class IncomeService {
             "splits", "divisions", "shares", "debts", "friends", "groups");
 
     private final IncomeRepository incomeRepository;
+    private final UserRepository userRepository;
+    private final ExchangeRateProvider exchangeRateProvider;
 
+    /** Kept for the unit tests that only exercise registration. */
     public IncomeService(IncomeRepository incomeRepository) {
+        this(incomeRepository, null, null);
+    }
+
+    @Autowired
+    public IncomeService(IncomeRepository incomeRepository, UserRepository userRepository,
+            ExchangeRateProvider exchangeRateProvider) {
         this.incomeRepository = incomeRepository;
+        this.userRepository = userRepository;
+        this.exchangeRateProvider = exchangeRateProvider;
     }
 
     /** Result of a registration: the representation plus whether a row was inserted. */
@@ -91,6 +113,75 @@ public class IncomeService {
         income.setIdempotencyKey(idempotencyKey);
 
         return new Registration(IncomeResponse.from(incomeRepository.save(income)), true);
+    }
+
+    /**
+     * Detail of one of the user's incomes with its conversions (FR-016). A missing or
+     * foreign id is the same neutral 404 (FR-007).
+     */
+    @Transactional(readOnly = true)
+    public IncomeResponse getIncome(Long userId, Long incomeId) {
+        Income income = incomeRepository.findByIdAndUserId(incomeId, userId)
+                .orElseThrow(IncomeNotFoundException::new);
+        return IncomeResponse.from(income, conversionsOf(income, preferredCurrencies(userId)));
+    }
+
+    /**
+     * Representations of the user's incomes as the activity shows them: each one also
+     * carries its equivalent in the user's preferred currencies (ARS when none is
+     * configured), skipping its own currency. A missing quote only omits that
+     * conversion, it never fails the page.
+     */
+    public List<IncomeResponse> withConversions(Long userId, List<Income> incomes) {
+        Set<Currency> preferred = preferredCurrencies(userId);
+        return incomes.stream()
+                .map(income -> IncomeResponse.from(income, conversionsOf(income, preferred)))
+                .toList();
+    }
+
+    /** Preferred currencies of the account, defaulting to ARS at read time (002 FR-011). */
+    private Set<Currency> preferredCurrencies(Long userId) {
+        if (userRepository == null) {
+            return Set.of(Currency.ARS);
+        }
+        return userRepository.findById(userId)
+                .map(User::getCurrencies)
+                .filter(currencies -> !currencies.isEmpty())
+                .orElse(Set.of(Currency.ARS));
+    }
+
+    /**
+     * Converts the income to every preferred currency except its own, with the quote of
+     * its income date. Currencies are visited in enum order so the list is stable; an
+     * unavailable quote for one target (typical for a scheduled income) is skipped
+     * without affecting the others.
+     */
+    private List<IncomeResponse.Conversion> conversionsOf(Income income, Set<Currency> preferred) {
+        List<IncomeResponse.Conversion> conversions = new ArrayList<>();
+        if (exchangeRateProvider == null) {
+            return conversions;
+        }
+        for (Currency target : Currency.values()) {
+            if (!preferred.contains(target) || target == income.getCurrency()) {
+                continue;
+            }
+            try {
+                ExchangeRateQuote quote = exchangeRateProvider.getQuote(
+                        income.getCurrency(), target, income.getIncomeDate());
+                if (quote == null || quote.rate() == null) {
+                    continue;
+                }
+                BigDecimal converted = income.getAmount()
+                        .multiply(quote.rate())
+                        .setScale(2, RoundingMode.HALF_UP);
+                conversions.add(new IncomeResponse.Conversion(target.name(),
+                        converted.toPlainString()));
+            }
+            catch (ExchangeRateUnavailableException unavailable) {
+                // No quote for this pair/date: silently omit this conversion.
+            }
+        }
+        return conversions;
     }
 
     /**

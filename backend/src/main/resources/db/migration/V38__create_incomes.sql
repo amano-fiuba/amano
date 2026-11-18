@@ -1,5 +1,5 @@
 -- V38__create_incomes.sql
--- Feature 032-income-management (specs/032-income-management/data-model.md).
+-- Feature 033-income-management (specs/033-income-management/data-model.md).
 -- Ingresos personales inmutables: la aplicación solo inserta y consulta.
 -- Sin DELETE (regla del equipo): solo CREATE TABLE.
 

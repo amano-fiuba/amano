@@ -24,17 +24,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.ObjectMapper;
@@ -45,22 +40,13 @@ import tools.jackson.databind.ObjectMapper;
  * back exactly from NUMERIC(11,2), invalid catalogs never persist a row and the
  * idempotency key is resolved both sequentially and under real concurrency.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class RegisterExpenseIT {
+class RegisterExpenseIT extends AbstractIntegrationIT {
 
     private static final String FIELDS = "fields";
     private static final List<String> SC004_AMOUNTS = List.of(
             "0.01", "0.10", "0.99", "1.00", "1.10", "10.10", "100.01", "1234.56",
             "999999.99", "123456789.01", "999999999.98", "999999999.99");
     private static final List<String> CURRENCIES = List.of("ARS", "USD", "EUR");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -91,22 +77,11 @@ class RegisterExpenseIT {
         return sessionOf(normalizedEmail);
     }
 
-    private void registerAccount(String rawEmail, String password, String firstName)
-            throws Exception {
-        var firstNamePart = new org.springframework.mock.web.MockPart(
-                "firstName", firstName.getBytes(StandardCharsets.UTF_8));
-        var emailPart = new org.springframework.mock.web.MockPart(
-                "email", rawEmail.getBytes(StandardCharsets.UTF_8));
-        var passwordPart = new org.springframework.mock.web.MockPart(
-                "password", password.getBytes(StandardCharsets.UTF_8));
-        var confirmPart = new org.springframework.mock.web.MockPart(
-                "confirmPassword", password.getBytes(StandardCharsets.UTF_8));
-        var termsPart = new org.springframework.mock.web.MockPart(
-                "acceptTerms", "true".getBytes(StandardCharsets.UTF_8));
-
-        mockMvc.perform(multipart("/api/auth/register")
-                        .part(firstNamePart, emailPart, passwordPart, confirmPart, termsPart))
-                .andExpect(status().isCreated());
+    private void registerAccount(String rawEmail, String password, String firstName) {
+        jdbcTemplate.update("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at)
+                VALUES (?, ?, 'x', now())
+                """, firstName.trim(), rawEmail.trim().toLowerCase());
     }
 
     private static Map<String, String> validPayload(String date) {

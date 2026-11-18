@@ -17,25 +17,15 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.RegisterExtension;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
-import com.icegreen.greenmail.junit5.GreenMailExtension;
+import com.amano.backend.support.AbstractIntegrationIT;
 import com.icegreen.greenmail.util.GreenMailUtil;
-import com.icegreen.greenmail.util.ServerSetup;
 
 import jakarta.mail.internet.MimeMessage;
 
@@ -47,48 +37,18 @@ import jakarta.mail.internet.MimeMessage;
  * FR-009/FR-015 (re-registration over pending invalidates the first token) and
  * D2 (only the SHA-256 hash reaches the database, never the clear token).
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class RegistrationVerificationIT {
+class RegistrationVerificationIT extends AbstractIntegrationIT {
 
     /** Link base asserted in the mail body (research.md section 4: the Vite dev server). */
     private static final String BASE_URL = "http://localhost:5173";
 
     private static final Pattern TOKEN_IN_LINK = Pattern.compile("token=([A-Za-z0-9_-]+)");
 
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
-
-    /**
-     * In-process SMTP on a random port: the tests never touch real Gmail (D9).
-     * Lifecycle by CLASS (not the constructor' s default per method): the port
-     * must be resolved when the Spring context loads, before the first test.
-     */
-    @RegisterExtension
-    static GreenMailExtension greenMail = new GreenMailExtension(
-            new ServerSetup(0, "localhost", ServerSetup.PROTOCOL_SMTP))
-            .withPerMethodLifecycle(false);
-
     @Autowired
     private MockMvc mockMvc;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    @DynamicPropertySource
-    static void mailProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.mail.host", () -> "localhost");
-        registry.add("spring.mail.port", () -> greenMail.getSmtp().getPort());
-        // GreenMail speaks plain SMTP: the STARTTLS/AUTH required by the real
-        // Gmail (application.properties) is turned off here (research.md D9).
-        registry.add("spring.mail.properties.mail.smtp.starttls.enable", () -> "false");
-        registry.add("spring.mail.properties.mail.smtp.auth", () -> "false");
-        registry.add("app.base-url", () -> BASE_URL);
-    }
 
     @BeforeEach
     void cleanMailbox() throws Exception {
@@ -132,7 +92,7 @@ class RegistrationVerificationIT {
             if (received.size() >= expected) {
                 return received;
             }
-            Thread.sleep(50);
+            Thread.sleep(10);
         }
         throw new AssertionError("expected at least " + expected + " verification mail(s) for "
                 + recipient + " but got " + received.size());

@@ -189,7 +189,7 @@ describe('validateDescription', () => {
   })
 })
 
-describe('validateIncomeDate (032)', () => {
+describe('validateIncomeDate (033)', () => {
   it('accepts today, a past date and a scheduled one within a year', () => {
     expect(validateIncomeDate('17/11/2026', '2026-11-17')).toBe('')
     expect(validateIncomeDate('01/01/2020', '2026-11-17')).toBe('')

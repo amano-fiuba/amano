@@ -8,7 +8,7 @@ export const PROFILE_FALLBACK_NOTICE =
 
 /**
  * Defaults shared by the personal registration screens (new expense, 007/027, and new
- * income, 032): today's date of the device zone preloaded by `useCurrentDate` and the
+ * income, 033): today's date of the device zone preloaded by `useCurrentDate` and the
  * profile currency resolved with me(). Any unreadable profile falls back to ARS; only
  * a network/5xx failure sets the non-blocking `notice` (a 401 is handled by
  * ProtectedRoute). The currency select lists the profile currencies first (027,

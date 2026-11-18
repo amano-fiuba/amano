@@ -48,7 +48,7 @@ beforeEach(() => {
   createIncome.mockReset()
 })
 
-describe('NewIncomePage (032)', () => {
+describe('NewIncomePage (033)', () => {
   it('muestra "Nuevo ingreso" con la moneda preferida y la fecha de hoy', async () => {
     me.mockResolvedValue({ ok: true, profile: { currencies: ['USD'] } })
 

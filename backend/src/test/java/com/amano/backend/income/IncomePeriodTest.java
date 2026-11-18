@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.amano.backend.common.FieldValidationException;
 
-/** The period filter shared by the balance and the income search (specs/032, FR-008/FR-010). */
+/** The period filter shared by the balance and the income search (specs/033, FR-008/FR-010). */
 class IncomePeriodTest {
 
     @Test

@@ -214,7 +214,7 @@ public class ProblemDetailExceptionHandler {
         return problem;
     }
 
-    /** Missing or foreign personal income (feature 032, FR-007): one neutral 404. */
+    /** Missing or foreign personal income (feature 033, FR-007): one neutral 404. */
     @ExceptionHandler(IncomeNotFoundException.class)
     public ProblemDetail handleIncomeNotFound(IncomeNotFoundException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(

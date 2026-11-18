@@ -21,7 +21,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * A personal income (table {@code incomes}, specs/032-income-management/data-model.md).
+ * A personal income (table {@code incomes}, specs/033-income-management/data-model.md).
  * It belongs to a single person ({@link #userId}) and is immutable once registered
  * (FR-006): the setters are package-private, so only the income service can fill a
  * new instance and nothing outside the package can change a persisted one. Pure

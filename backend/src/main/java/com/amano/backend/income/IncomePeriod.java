@@ -10,7 +10,7 @@ import com.amano.backend.common.FieldValidationException;
 
 /**
  * Period filter shared by the income search and the personal balance
- * (specs/032-income-management, contracts/personal-incomes-api.md): an optional
+ * (specs/033-income-management, contracts/personal-incomes-api.md): an optional
  * {@code year}, a {@code month} of that year, and an optional {@code from}/{@code to}
  * date range (both included). The filters intersect. The result is always a closed
  * range of dates ({@link #start()} to {@link #end()}), with far bounds when nothing

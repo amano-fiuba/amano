@@ -34,18 +34,18 @@ import jakarta.persistence.criteria.Predicate;
 @Service
 public class ExpenseSearchService {
 
-    static final int MIN_LENGTH = 2;
-    static final int MAX_LENGTH = 100;
-    static final int DEFAULT_PAGE_SIZE = 20;
-    static final int MAX_PAGE_SIZE = 50;
+    public static final int MIN_LENGTH = 2;
+    public static final int MAX_LENGTH = 100;
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final int MAX_PAGE_SIZE = 50;
 
-    static final String TERM_TOO_SHORT = "Ingresá al menos 2 caracteres para buscar";
-    static final String TERM_TOO_LONG = "La búsqueda admite hasta 100 caracteres";
+    public static final String TERM_TOO_SHORT = "Ingresá al menos 2 caracteres para buscar";
+    public static final String TERM_TOO_LONG = "La búsqueda admite hasta 100 caracteres";
     static final String YEAR_INVALID = "El año no es válido";
     static final String MONTH_INVALID = "El mes no es válido";
     static final String MONTH_WITHOUT_YEAR = "Elegí un año para filtrar por mes";
-    static final String PAGE_INVALID = "La página no es válida";
-    static final String SIZE_INVALID = "El tamaño de página no es válido";
+    public static final String PAGE_INVALID = "La página no es válida";
+    public static final String SIZE_INVALID = "El tamaño de página no es válido";
 
     private static final Sort NEWEST_FIRST =
             Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id"));
@@ -55,8 +55,8 @@ public class ExpenseSearchService {
      * holds the same letters without their diacritic, position by position. No
      * {@code unaccent} extension is required (plan D2).
      */
-    static final String ACCENTED = "ÁÀÂÄÃÉÈÊËÍÌÎÏÓÒÔÖÕÚÙÛÜÑÇáàâäãéèêëíìîïóòôöõúùûüñç";
-    static final String PLAIN = stripAccents(ACCENTED);
+    public static final String ACCENTED = "ÁÀÂÄÃÉÈÊËÍÌÎÏÓÒÔÖÕÚÙÛÜÑÇáàâäãéèêëíìîïóòôöõúùûüñç";
+    public static final String PLAIN = stripAccents(ACCENTED);
 
     private static final char LIKE_ESCAPE = '\\';
 
@@ -192,7 +192,7 @@ public class ExpenseSearchService {
     }
 
     /** {@code %}, {@code _} and the escape itself are searched literally (edge cases). */
-    static String escapeLike(String term) {
+    public static String escapeLike(String term) {
         StringBuilder escaped = new StringBuilder(term.length());
         for (char character : term.toCharArray()) {
             if (character == LIKE_ESCAPE || character == '%' || character == '_') {

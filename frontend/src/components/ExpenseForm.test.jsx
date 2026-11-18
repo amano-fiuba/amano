@@ -917,7 +917,7 @@ describe('ExpenseForm: resumen final antes de guardar (027)', () => {
   })
 })
 
-// --- 032: the same form registers a personal income (kind="INCOME") ---------------------
+// --- 033: the same form registers a personal income (kind="INCOME") ---------------------
 
 function renderIncomeForm(props = {}) {
   return renderForm({ kind: 'INCOME', ...props })
@@ -930,7 +930,7 @@ async function completeIncome(user) {
   await user.type(screen.getByLabelText('Descripción'), 'Sueldo octubre')
 }
 
-describe('ExpenseForm modo ingreso (032, US1)', () => {
+describe('ExpenseForm modo ingreso (033, US1)', () => {
   it('ofrece las categorías y el medio de cobro de ingresos, sin tipo ni frecuencia', () => {
     renderIncomeForm()
 

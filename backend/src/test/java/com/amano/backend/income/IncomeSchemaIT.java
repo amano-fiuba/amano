@@ -10,30 +10,18 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 /**
- * Migration T003/T007 (specs/032-income-management): Flyway applies
+ * Migration T003/T007 (specs/033-income-management): Flyway applies
  * {@code V38__create_incomes.sql} on a real PostgreSQL, the schema matches
  * data-model.md and the CHECK, UNIQUE and FOREIGN KEY constraints reject invalid
  * rows. Starting the Spring context also runs {@code ddl-auto=validate}, so the
  * JPA mapping of {@link Income} must agree with the migration.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-class IncomeSchemaIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class IncomeSchemaIT extends AbstractIntegrationIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;

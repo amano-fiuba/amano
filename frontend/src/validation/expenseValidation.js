@@ -15,7 +15,7 @@ export const DATE_FORMAT = 'Ingresá la fecha como dd/mm/aaaa'
 export const DATE_INVALID = 'La fecha no existe'
 export const DATE_FUTURE = 'La fecha no puede ser posterior a hoy'
 
-// 032 (FR-009): an income may be dated up to one year after today (a scheduled one).
+// 033 (FR-009): an income may be dated up to one year after today (a scheduled one).
 export const INCOME_DATE_TOO_FAR = 'La fecha no puede ser más de un año posterior a hoy'
 
 export const DESCRIPTION_MAX_CODE_POINTS = 200

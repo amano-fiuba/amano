@@ -14,7 +14,7 @@ import com.amano.backend.income.IncomePeriod;
 
 /**
  * {@code GET /api/balance}: the personal balance of the session user
- * (specs/032-income-management, contracts/personal-incomes-api.md). The period comes
+ * (specs/033-income-management, contracts/personal-incomes-api.md). The period comes
  * from the optional {@code year}, {@code month}, {@code from} and {@code to}
  * parameters, validated by {@link IncomePeriod} (400 with {@code properties.fields}).
  * Read only: the balance is calculated, never stored or edited.

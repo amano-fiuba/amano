@@ -13,18 +13,13 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.ObjectMapper;
@@ -35,16 +30,7 @@ import tools.jackson.databind.ObjectMapper;
  * 011/012 lets the user search, add and create groups with that friend; a
  * pending or rejected request does not. No stub property, no fixtures.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class GroupRealFriendshipIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class GroupRealFriendshipIT extends AbstractIntegrationIT {
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,16 +44,11 @@ class GroupRealFriendshipIT {
     @Autowired
     private ObjectMapper objectMapper;
 
-    private Cookie verifiedSessionOf(String email, String firstName) throws Exception {
-        mockMvc.perform(multipart("/api/auth/register")
-                .part(
-                        new MockPart("firstName", firstName.getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("email", email.getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("password", "Passw0rd!".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("confirmPassword", "Passw0rd!".getBytes(StandardCharsets.UTF_8)),
-                        new MockPart("acceptTerms", "true".getBytes(StandardCharsets.UTF_8))))
-                .andExpect(status().isCreated());
-        jdbcTemplate.update("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE email = ?", email);
+    private Cookie verifiedSessionOf(String email, String firstName) {
+        jdbcTemplate.update("""
+                INSERT INTO users (first_name, email, password_hash, terms_accepted_at, email_verified_at)
+                VALUES (?, ?, 'x', now(), CURRENT_TIMESTAMP)
+                """, firstName, email);
         return new Cookie("amano_auth", jwtService.issueToken(userIdOf(email)));
     }
 

@@ -23,7 +23,7 @@ import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.expense.IdempotencyConflictException;
 import com.amano.backend.user.Currency;
 
-/** Unit tests of the personal income registration (specs/032-income-management, US1). */
+/** Unit tests of the personal income registration (specs/033-income-management, US1). */
 class IncomeServiceTest {
 
     private static final Long USER_ID = 7L;

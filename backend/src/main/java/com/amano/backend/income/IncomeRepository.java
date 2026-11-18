@@ -16,7 +16,7 @@ import com.amano.backend.common.CurrencyDateTotal;
  * Persistence for {@code incomes}. The unique index
  * {@code uq_incomes_user_idempotency_key} is the race-proof backstop of the
  * idempotent registration, as {@code uq_expenses_user_idempotency_key} is for
- * expenses (specs/032-income-management/research.md R2).
+ * expenses (specs/033-income-management/research.md R2).
  */
 public interface IncomeRepository extends JpaRepository<Income, Long>,
         JpaSpecificationExecutor<Income> {

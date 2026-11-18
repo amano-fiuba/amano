@@ -22,7 +22,7 @@ beforeEach(() => {
   getBalance.mockReset()
 })
 
-describe('BalanceCard (032)', () => {
+describe('BalanceCard (033)', () => {
   it('mientras carga muestra la estructura con marcadores y está ocupada', async () => {
     getBalance.mockReturnValue(new Promise(() => {}))
 

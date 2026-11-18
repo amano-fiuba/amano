@@ -35,7 +35,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>,
 
     /**
      * Expenses already registered in {@code [from, to]}, summed per currency and
-     * expense date: what the personal balance converts (specs/032-income-management,
+     * expense date: what the personal balance converts (specs/033-income-management,
      * FR-010). One row per {@code (currency, date)}.
      */
     @Query("select new com.amano.backend.common.CurrencyDateTotal("

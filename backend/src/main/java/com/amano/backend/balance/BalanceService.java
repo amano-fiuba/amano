@@ -22,7 +22,7 @@ import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
 /**
- * Personal balance (specs/032-income-management, FR-010 to FR-012): the incomes
+ * Personal balance (specs/033-income-management, FR-010 to FR-012): the incomes
  * already received minus the expenses already registered in a period, in the
  * account's main currency. Movements are summed per {@code (currency, date)} in the
  * database and each group is converted with the quote of its own date, so a closed

@@ -8,7 +8,7 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
- * Public representation of a personal income (specs/032-income-management,
+ * Public representation of a personal income (specs/033-income-management,
  * contracts/personal-incomes-api.md). The amount is a canonical two-decimal string.
  * {@link #projected} is derived from the date, never stored: an income dated after
  * today (UTC) is a scheduled one that does not count in the balance yet (FR-009).

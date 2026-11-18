@@ -16,7 +16,7 @@ function signedAmount(canonical, { explicitPlus = false } = {}) {
 }
 
 /**
- * Personal balance card (specs/032-income-management, FR-015): income, expenses and
+ * Personal balance card (specs/033-income-management, FR-015): income, expenses and
  * the net balance of the period in the account's main currency. The net is the
  * highlighted figure, with an explicit sign plus a distinct icon and wording for a
  * negative one (never only colour). It asks `GET /api/balance` every time it mounts

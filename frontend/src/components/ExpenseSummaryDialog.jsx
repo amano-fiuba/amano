@@ -9,7 +9,7 @@ export const SUMMARY_BACK_LABEL = 'Volver'
 /**
  * Final summary before saving an expense (027, pedido del 2026-11-08): what will
  * be saved, and "Confirmar" / "Volver". Going back keeps everything that was
- * typed. `title` defaults to the expense one (032 passes the income title); `rows` are { label, value } pairs; `shares` (optional) the split per person.
+ * typed. `title` defaults to the expense one (033 passes the income title); `rows` are { label, value } pairs; `shares` (optional) the split per person.
  */
 export default function ExpenseSummaryDialog({
   title = SUMMARY_TITLE,

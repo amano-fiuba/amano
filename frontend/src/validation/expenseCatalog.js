@@ -94,7 +94,7 @@ export const PAYMENT_METHOD_OPTIONS = Object.freeze([
   { code: 'OTHER', label: 'Otro' },
 ])
 
-// Feature 032 (specs/032-income-management): personal income catalogs. Codes match the
+// Feature 033 (specs/033-income-management): personal income catalogs. Codes match the
 // backend IncomeCategory/IncomePaymentMethod enums and the V38 CHECK constraints.
 export const INCOME_CATEGORY_OPTIONS = Object.freeze([
   { code: 'SALARY', label: 'Sueldo' },
