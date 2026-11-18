@@ -409,11 +409,11 @@ export default function ActivityPage() {
           </button>
         </div>
         {showingIncomes ? (
-          <Link className="activity-page__new" to="/incomes/new">
+          <Link className="buttonLink" to="/incomes/new">
             Nuevo ingreso
           </Link>
         ) : (
-          <Link className="activity-page__new" to="/expenses/new">
+          <Link className="buttonLink" to="/expenses/new">
             Nuevo gasto
           </Link>
         )}
