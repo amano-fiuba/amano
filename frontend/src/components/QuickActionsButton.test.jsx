@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -19,6 +19,7 @@ function renderButton() {
         <Route path="/" element={<QuickActionsButton />} />
         <Route path="/expenses/new" element={<p>Pantalla de gasto personal</p>} />
         <Route path="/groups/new" element={<p>Pantalla de crear grupo</p>} />
+        <Route path="/incomes/new" element={<p>Pantalla de ingreso personal</p>} />
         <Route path="/groups/:id/expenses/new" element={<p>Nuevo gasto del grupo</p>} />
         <Route path="/friends/:friendId/expenses/new" element={<p>Nuevo gasto con amigo</p>} />
       </Routes>
@@ -73,6 +74,34 @@ describe('QuickActionsButton (015, US4)', () => {
       'href',
       '/expenses/recurring',
     )
+  })
+
+  it('ofrece "Registrar ingreso" entre "Registrar gasto" y "Gastos recurrentes"', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    await openMenu(user)
+
+    const menu = screen.getByRole('menu', { name: 'Acciones rápidas' })
+    const items = within(menu).getAllByRole('menuitem', { hidden: false })
+    const labels = items.map((item) => item.textContent)
+    expect(labels.indexOf('Registrar ingreso')).toBe(labels.indexOf('Registrar gasto') + 1)
+    expect(labels.indexOf('Gastos recurrentes')).toBe(labels.indexOf('Registrar ingreso') + 1)
+    expect(screen.getByRole('menuitem', { name: 'Registrar ingreso' })).toHaveAttribute(
+      'href',
+      '/incomes/new',
+    )
+  })
+
+  it('"Registrar ingreso" abre el alta de ingreso y cierra el menú', async () => {
+    const user = userEvent.setup()
+    renderButton()
+
+    await openMenu(user)
+    await user.click(screen.getByRole('menuitem', { name: 'Registrar ingreso' }))
+
+    expect(screen.getByText('Pantalla de ingreso personal')).toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('se cierra al elegir una opción', async () => {
@@ -207,6 +236,9 @@ describe('QuickActionsButton: submenú "Registrar gasto" (027, US1)', () => {
 
     await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('menuitem', { name: 'Registrar gasto' })).toHaveFocus()
+
+    await user.keyboard('{ArrowDown}')
+    expect(screen.getByRole('menuitem', { name: 'Registrar ingreso' })).toHaveFocus()
 
     await user.keyboard('{ArrowDown}')
     expect(screen.getByRole('menuitem', { name: 'Gastos recurrentes' })).toHaveFocus()

@@ -2,17 +2,10 @@
 // idempotency key identifies one save operation and travels as a header; the
 // device time zone is part of the payload (D1/D5). Amounts arrive canonical.
 
+import { problemOf, safeFields } from './problemDetail'
+
 export const EXPENSE_NETWORK_ERROR_MESSAGE =
   'No se pudo guardar el gasto. Intenta nuevamente'
-
-function safeFields(fields) {
-  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
-    return {}
-  }
-  return Object.fromEntries(
-    Object.entries(fields).filter(([, message]) => typeof message === 'string'),
-  )
-}
 
 /**
  * Returns { ok: true, expense } on 201/200, { ok: false, status, fields, detail }
@@ -68,14 +61,6 @@ export const RECURRING_LOAD_ERROR_MESSAGE =
   'No se pudieron cargar tus gastos recurrentes. Intentá nuevamente'
 export const RECURRING_UPDATE_ERROR_MESSAGE =
   'No se pudo actualizar el gasto recurrente. Intentá nuevamente'
-
-async function problemOf(response) {
-  try {
-    return await response.json()
-  } catch {
-    return {}
-  }
-}
 
 /**
  * GET /api/expenses/recurring: { ok: true, expenses } on 200, { ok: false, status }

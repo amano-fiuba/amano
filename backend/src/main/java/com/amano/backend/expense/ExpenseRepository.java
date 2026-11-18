@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.amano.backend.common.CurrencyDateTotal;
+
 /**
  * Persistence for {@code expenses}. The unique index
  * {@code uq_expenses_user_idempotency_key} (FR-027) is the race-proof backstop;
@@ -30,6 +32,18 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>,
     @Query("select distinct year(e.expenseDate) as y from Expense e "
             + "where e.userId = :userId order by y desc")
     List<Integer> findExpenseYears(@Param("userId") Long userId);
+
+    /**
+     * Expenses already registered in {@code [from, to]}, summed per currency and
+     * expense date: what the personal balance converts (specs/033-income-management,
+     * FR-010). One row per {@code (currency, date)}.
+     */
+    @Query("select new com.amano.backend.common.CurrencyDateTotal("
+            + "e.currency, e.expenseDate, sum(e.amount)) from Expense e "
+            + "where e.userId = :userId and e.expenseDate >= :from and e.expenseDate <= :to "
+            + "group by e.currency, e.expenseDate")
+    List<CurrencyDateTotal> sumByCurrencyAndDate(@Param("userId") Long userId,
+            @Param("from") LocalDate from, @Param("to") LocalDate to);
 
     /**
      * Personal expenses of a user between two expense dates (inclusive), summed by

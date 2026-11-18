@@ -1,16 +1,28 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
 
 vi.mock('../api/expenseClient', async (importOriginal) => ({
   ...await importOriginal(),
   searchExpenses: vi.fn(),
   listExpenseYears: vi.fn(),
 }))
+vi.mock('../api/incomeClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  getBalance: vi.fn(),
+  searchIncomes: vi.fn(),
+  listIncomeYears: vi.fn(),
+}))
 const setUser = vi.fn()
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ setUser }) }))
 
+import {
+  SEARCH_INCOMES_ERROR_MESSAGE,
+  getBalance,
+  listIncomeYears,
+  searchIncomes,
+} from '../api/incomeClient'
 import {
   listExpenseYears,
   SEARCH_EXPENSES_ERROR_MESSAGE,
@@ -53,6 +65,42 @@ const PIZZA = {
   amount: '1500.00',
 }
 
+const SUELDO = {
+  id: 7,
+  description: 'Sueldo octubre',
+  category: 'SALARY',
+  paymentMethod: 'TRANSFER',
+  date: '2026-11-03',
+  currency: 'ARS',
+  amount: '850000.00',
+  projected: false,
+}
+
+/** A page of the income search answer; by default the asked page exists. */
+function incomePageOf(incomes, { page = 1, totalElements = incomes.length, totalPages = page } = {}) {
+  return { ok: true, incomes, page, totalElements, totalPages }
+}
+
+const BALANCE = {
+  currency: 'ARS',
+  income: '1000.00',
+  projectedIncome: '0.00',
+  expenses: '400.00',
+  net: '600.00',
+}
+
+function RefreshButton() {
+  const navigate = useNavigate()
+  return (
+    <button
+      type="button"
+      onClick={() => navigate('/activity', { state: { refreshBalance: 222 } })}
+    >
+      Simular alta
+    </button>
+  )
+}
+
 function LocationProbe() {
   const location = useLocation()
   return <output data-testid="location">{`${location.pathname}${location.search}`}</output>
@@ -73,6 +121,7 @@ function renderPage(entry = '/activity') {
             <>
               <ActivityPage />
               <LocationProbe />
+              <RefreshButton />
             </>
           }
         />
@@ -94,6 +143,12 @@ beforeEach(() => {
   setWindowHeight(DEFAULT_HEIGHT)
   searchExpenses.mockImplementation(async ({ page }) => pageOf([PIZZA], { page }))
   listExpenseYears.mockResolvedValue({ ok: true, years: [] })
+  getBalance.mockReset()
+  getBalance.mockResolvedValue({ ok: true, balance: BALANCE })
+  searchIncomes.mockReset()
+  searchIncomes.mockImplementation(async ({ page }) => incomePageOf([SUELDO], { page }))
+  listIncomeYears.mockReset()
+  listIncomeYears.mockResolvedValue({ ok: true, years: [] })
 })
 
 describe('ActivityPage (031)', () => {
@@ -522,5 +577,313 @@ describe('ActivityPage: tamaño de página según el alto (031, FR-022)', () => 
     await new Promise((resolve) => setTimeout(resolve, 250))
 
     expect(searchExpenses).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('ActivityPage: balance neto y nuevo ingreso (033)', () => {
+  it('muestra la tarjeta de balance del año actual y, en gastos, el enlace a "Nuevo gasto"', async () => {
+    renderPage()
+
+    const card = await screen.findByTestId('balance-card')
+    expect(await within(card).findByText('1.000,00 ARS')).toBeInTheDocument()
+    expect(within(card).getByText('400,00 ARS')).toBeInTheDocument()
+    expect(within(card).getByTestId('balance-net')).toHaveTextContent('+600,00 ARS')
+    expect(getBalance).toHaveBeenCalledWith({ year: YEAR, month: undefined })
+    expect(screen.getByRole('link', { name: 'Nuevo gasto' })).toHaveAttribute(
+      'href',
+      '/expenses/new',
+    )
+    expect(screen.queryByRole('link', { name: 'Nuevo ingreso' })).not.toBeInTheDocument()
+  })
+
+  it('el balance sigue el año y el mes elegidos, y "Todos los años" lo pide sin año', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Pizza')
+
+    await user.selectOptions(monthSelect(), '3')
+    await waitFor(() => expect(getBalance).toHaveBeenLastCalledWith({ year: YEAR, month: '3' }))
+
+    await user.selectOptions(yearSelect(), 'all')
+    await waitFor(() =>
+      expect(getBalance).toHaveBeenLastCalledWith({ year: undefined, month: undefined }),
+    )
+  })
+
+  it('al llegar con state.refreshBalance vuelve a pedir el balance y muestra el valor nuevo', async () => {
+    getBalance
+      .mockResolvedValueOnce({ ok: true, balance: BALANCE })
+      .mockResolvedValueOnce({
+        ok: true,
+        balance: { ...BALANCE, income: '1850.00', net: '1450.00' },
+      })
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByText('1.000,00 ARS')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Simular alta' }))
+
+    expect(await screen.findByText('1.850,00 ARS')).toBeInTheDocument()
+    expect(screen.queryByText('1.000,00 ARS')).not.toBeInTheDocument()
+    expect(screen.getByTestId('balance-net')).toHaveTextContent('+1.450,00 ARS')
+    expect(getBalance).toHaveBeenCalledTimes(2)
+  })
+
+  it('si el balance falla ofrece reintentar sin afectar la lista de gastos', async () => {
+    getBalance.mockResolvedValueOnce({ ok: false, network: true })
+    const user = userEvent.setup()
+    renderPage()
+
+    expect(await screen.findByText('Pizza')).toBeInTheDocument()
+    const card = await screen.findByTestId('balance-card')
+    await user.click(await within(card).findByRole('button', { name: 'Reintentar' }))
+
+    expect(await within(screen.getByTestId('balance-card')).findByText('1.000,00 ARS'))
+      .toBeInTheDocument()
+  })
+})
+
+describe('ActivityPage: vista Ingresos (033, US2)', () => {
+  const incomesButton = () => screen.getByRole('button', { name: 'Ingresos' })
+  const expensesButton = () => screen.getByRole('button', { name: 'Gastos' })
+
+  it('empieza en Gastos y el control segmentado cambia a Ingresos con view=incomes', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Pizza')
+    expect(expensesButton()).toHaveAttribute('aria-pressed', 'true')
+    expect(incomesButton()).toHaveAttribute('aria-pressed', 'false')
+    expect(searchIncomes).not.toHaveBeenCalled()
+
+    await user.click(incomesButton())
+
+    expect(await screen.findByText('Sueldo octubre')).toBeInTheDocument()
+    expect(location()).toHaveTextContent('view=incomes')
+    expect(incomesButton()).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Pizza')).not.toBeInTheDocument()
+    expect(searchIncomes).toHaveBeenCalledWith(query())
+    expect(screen.getByRole('list', { name: 'Ingresos' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Nuevo ingreso' })).toHaveAttribute(
+      'href',
+      '/incomes/new',
+    )
+    expect(screen.queryByRole('link', { name: 'Nuevo gasto' })).not.toBeInTheDocument()
+  })
+
+  it('entrar con view=incomes muestra los ingresos como tarjetas con enlace al detalle', async () => {
+    renderPage('/activity?view=incomes')
+
+    const link = await screen.findByRole('link', { name: /Sueldo octubre/ })
+    expect(link).toHaveAttribute('href', '/incomes/7')
+    expect(screen.getByText('ARS 850.000,00')).toBeInTheDocument()
+    expect(screen.getByText(/03\/11\/2026 · Sueldo · Transferencia/)).toBeInTheDocument()
+    expect(screen.queryByTestId('projected-badge')).not.toBeInTheDocument()
+    expect(searchExpenses).not.toHaveBeenCalled()
+    expect(screen.getByTestId('balance-card')).toBeInTheDocument()
+  })
+
+  it('las filas de ingresos no tienen botones para editar o eliminar (US3)', async () => {
+    renderPage('/activity?view=incomes')
+
+    await screen.findByRole('link', { name: /Sueldo octubre/ })
+    expect(screen.queryByRole('button', { name: /editar|eliminar|borrar|modificar/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /editar|eliminar|borrar|modificar/i })).not.toBeInTheDocument()
+  })
+
+  it('muestra la categoría sin descripción, las equivalencias y la insignia "Proyectado"', async () => {
+    searchIncomes.mockResolvedValue(
+      incomePageOf([
+        {
+          ...SUELDO,
+          id: 8,
+          description: undefined,
+          category: 'FREELANCE',
+          currency: 'USD',
+          amount: '100.00',
+          conversions: [{ currency: 'ARS', amount: '150000.00' }],
+          projected: true,
+          date: '2027-01-05',
+        },
+      ]),
+    )
+
+    renderPage('/activity?view=incomes')
+
+    expect(await screen.findByText('Freelance')).toBeInTheDocument()
+    expect(screen.getByText('USD 100,00')).toBeInTheDocument()
+    expect(screen.getByText('≈ ARS 150.000,00')).toBeInTheDocument()
+    expect(screen.getByTestId('projected-badge')).toHaveTextContent('Proyectado')
+  })
+
+  it('al cambiar de vista conserva el texto, el año y el mes, y vuelve sin view', async () => {
+    const user = userEvent.setup()
+    renderPage('/activity?q=sueldo&year=2024&month=3')
+    await screen.findByText('Pizza')
+
+    await user.click(incomesButton())
+
+    await screen.findByText('Sueldo octubre')
+    expect(location()).toHaveTextContent('q=sueldo')
+    expect(location()).toHaveTextContent('year=2024')
+    expect(location()).toHaveTextContent('month=3')
+    expect(location()).toHaveTextContent('view=incomes')
+    expect(searchIncomes).toHaveBeenLastCalledWith(
+      query({ term: 'sueldo', year: '2024', month: '3' }),
+    )
+    expect(searchbox()).toHaveValue('sueldo')
+
+    await user.click(expensesButton())
+
+    await screen.findByText('Pizza')
+    expect(location()).not.toHaveTextContent('view=')
+    expect(location()).toHaveTextContent('q=sueldo')
+  })
+
+  it('volver a la misma vista no consulta de nuevo', async () => {
+    const user = userEvent.setup()
+    renderPage('/activity?view=incomes')
+    await screen.findByText('Sueldo octubre')
+    searchIncomes.mockClear()
+
+    await user.click(incomesButton())
+
+    expect(searchIncomes).not.toHaveBeenCalled()
+  })
+
+  it('busca ingresos al escribir, mantiene la vista y muestra el contador', async () => {
+    searchIncomes.mockImplementation(async ({ term }) =>
+      term ? incomePageOf([SUELDO], { totalElements: 1 }) : incomePageOf([SUELDO]),
+    )
+    const user = userEvent.setup()
+    renderPage('/activity?view=incomes')
+    await screen.findByText('Sueldo octubre')
+
+    await user.type(searchbox(), 'sueldo{Enter}')
+
+    await waitFor(() => expect(searchIncomes).toHaveBeenLastCalledWith(query({ term: 'sueldo' })))
+    expect(await screen.findByText('1 resultado')).toBeInTheDocument()
+    expect(location()).toHaveTextContent('view=incomes')
+    expect(location()).toHaveTextContent('q=sueldo')
+    expect(searchExpenses).not.toHaveBeenCalled()
+  })
+
+  it('sin coincidencias informa que no se encontraron resultados', async () => {
+    searchIncomes.mockImplementation(async ({ term }) =>
+      term ? incomePageOf([], { totalElements: 0, totalPages: 0 }) : incomePageOf([SUELDO]),
+    )
+    const user = userEvent.setup()
+    renderPage('/activity?view=incomes')
+    await screen.findByText('Sueldo octubre')
+
+    await user.type(searchbox(), 'zzz{Enter}')
+
+    expect(await screen.findByText(NO_RESULTS_MESSAGE)).toBeInTheDocument()
+  })
+
+  it('el año y el mes se piden al backend y los años salen de los ingresos', async () => {
+    listIncomeYears.mockResolvedValue({ ok: true, years: [2024, 2023] })
+    const user = userEvent.setup()
+    renderPage('/activity?view=incomes')
+    await screen.findByText('Sueldo octubre')
+
+    await waitFor(() =>
+      expect(within(yearSelect()).getAllByRole('option').map((option) => option.value)).toEqual(
+        expect.arrayContaining([YEAR, '2024', '2023', 'all']),
+      ),
+    )
+    expect(listIncomeYears).toHaveBeenCalled()
+    expect(listExpenseYears).toHaveBeenCalledTimes(0)
+
+    await user.selectOptions(yearSelect(), '2024')
+    await waitFor(() => expect(searchIncomes).toHaveBeenLastCalledWith(query({ year: '2024' })))
+    await user.selectOptions(monthSelect(), '5')
+    await waitFor(() =>
+      expect(searchIncomes).toHaveBeenLastCalledWith(query({ year: '2024', month: '5' })),
+    )
+    await user.selectOptions(yearSelect(), 'all')
+    await waitFor(() =>
+      expect(searchIncomes).toHaveBeenLastCalledWith(query({ year: null, month: null })),
+    )
+    expect(monthSelect()).toBeDisabled()
+  })
+
+  it('la lista de años sigue a la vista: gastos usa los años de gastos', async () => {
+    listExpenseYears.mockResolvedValue({ ok: true, years: [2022] })
+    listIncomeYears.mockResolvedValue({ ok: true, years: [2021] })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByText('Pizza')
+    await waitFor(() => expect(within(yearSelect()).getByRole('option', { name: '2022' })).toBeInTheDocument())
+
+    await user.click(incomesButton())
+
+    await waitFor(() => expect(within(yearSelect()).getByRole('option', { name: '2021' })).toBeInTheDocument())
+    expect(within(yearSelect()).queryByRole('option', { name: '2022' })).not.toBeInTheDocument()
+  })
+
+  it('sin ingresos en el año invita a registrar el primero', async () => {
+    searchIncomes.mockResolvedValue(incomePageOf([], { totalElements: 0, totalPages: 0 }))
+
+    renderPage('/activity?view=incomes')
+
+    expect(await screen.findByText(new RegExp(`No registraste ingresos en ${YEAR}`))).toBeInTheDocument()
+    const links = screen.getAllByRole('link', { name: /Registrar un ingreso|Nuevo ingreso/ })
+    expect(links.map((link) => link.getAttribute('href'))).toEqual(['/incomes/new', '/incomes/new'])
+  })
+
+  it('con un mes o todos los años el vacío lo nombra', async () => {
+    searchIncomes.mockResolvedValue(incomePageOf([], { totalElements: 0, totalPages: 0 }))
+
+    const { unmount } = renderPage('/activity?view=incomes&month=3')
+    expect(await screen.findByText(new RegExp(`No registraste ingresos en marzo de ${YEAR}`)))
+      .toBeInTheDocument()
+    unmount()
+
+    renderPage('/activity?view=incomes&year=all')
+    expect(await screen.findByText(/Todavía no registraste ingresos/)).toBeInTheDocument()
+  })
+
+  it('pagina los ingresos y conserva la vista en la dirección', async () => {
+    searchIncomes.mockImplementation(async ({ page }) =>
+      incomePageOf([{ ...SUELDO, id: page }], { page, totalElements: 14, totalPages: 2 }),
+    )
+    const user = userEvent.setup()
+    renderPage('/activity?view=incomes')
+    await screen.findByRole('link', { name: /Sueldo octubre/ })
+
+    await user.click(screen.getByRole('button', { name: 'Página 2' }))
+
+    await waitFor(() => expect(searchIncomes).toHaveBeenLastCalledWith(query({ page: 2 })))
+    expect(location()).toHaveTextContent('view=incomes')
+    expect(location()).toHaveTextContent('page=2')
+  })
+
+  it('si la página pedida no existe adopta la que devuelve el backend', async () => {
+    searchIncomes.mockResolvedValue(incomePageOf([SUELDO], { page: 2, totalElements: 8, totalPages: 2 }))
+
+    renderPage('/activity?view=incomes&page=9')
+
+    await waitFor(() => expect(location()).toHaveTextContent('page=2'))
+  })
+
+  it('ante un error permite reintentar sin afectar el balance', async () => {
+    searchIncomes.mockResolvedValueOnce({ ok: false, network: true })
+    const user = userEvent.setup()
+    renderPage('/activity?view=incomes')
+
+    expect(await screen.findByText(SEARCH_INCOMES_ERROR_MESSAGE)).toBeInTheDocument()
+    expect(within(screen.getByTestId('balance-card')).getByTestId('balance-net')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }))
+
+    expect(await screen.findByText('Sueldo octubre')).toBeInTheDocument()
+    expect(searchIncomes).toHaveBeenCalledTimes(2)
+  })
+
+  it('una sesión vencida cierra la sesión', async () => {
+    searchIncomes.mockResolvedValue({ ok: false, status: 401 })
+
+    renderPage('/activity?view=incomes')
+
+    await waitFor(() => expect(setUser).toHaveBeenCalledWith(null))
   })
 })

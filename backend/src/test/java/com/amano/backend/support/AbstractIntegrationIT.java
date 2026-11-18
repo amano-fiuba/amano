@@ -109,6 +109,7 @@ public abstract class AbstractIntegrationIT {
             "groups",
             "friendship_requests",
             "expenses",
+            "incomes",
             "password_reset_tokens",
             "email_verification_tokens",
             "email_resend_limits",

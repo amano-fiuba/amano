@@ -1,56 +1,56 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
+import { listIncomeYears } from '../api/incomeClient'
 import {
   listExpenseYears,
   SEARCH_EXPENSES_ERROR_MESSAGE,
   searchExpenses,
 } from '../api/expenseClient'
 import { useAuth } from '../auth/AuthContext'
-import { SearchIcon } from '../components/NavIcons'
+import BalanceCard from '../components/BalanceCard'
 import { CATEGORY_OPTIONS, PAYMENT_METHOD_OPTIONS, labelOf } from '../validation/expenseCatalog'
 import { formatAmount, formatIsoDate } from '../validation/expenseFormat'
-import { MONTH_NAMES } from '../validation/months'
 import './MainPage.scss'
 import './groups/groups.scss'
 import HomeLink from '../components/HomeLink'
+import IncomeResults from '../components/activity/IncomeResults'
+import Pagination from '../components/activity/Pagination'
+import SearchFilters from '../components/activity/SearchFilters'
+import {
+  ALL_MONTHS,
+  ALL_YEARS,
+  DEBOUNCE_MS,
+  ESTIMATED_ROW_HEIGHT,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+  MONTHS,
+  NO_RESULTS_MESSAGE,
+  RESIZE_PAUSE_MS,
+  SEARCH_PLACEHOLDER,
+  TOO_SHORT_MESSAGE,
+  currentYear,
+  isSearchable,
+  pageSizeFor,
+  rowHeightOf,
+} from '../components/activity/activityHelpers'
 
-// Exact messages of specs/031-buscar-en-actividad-personal, exported for the tests.
-export const SEARCH_PLACEHOLDER = 'Buscar por categoría, descripción, medio de pago'
-export const TOO_SHORT_MESSAGE = 'Ingresá al menos 2 caracteres para buscar'
-export const NO_RESULTS_MESSAGE = 'No se encontraron resultados'
-
-const MIN_LENGTH = 2
-const MAX_LENGTH = 100
-// Pause after the last keystroke before querying (FR-001): one query per pause.
-export const DEBOUNCE_MS = 400
-export const ALL_YEARS = 'all'
-export const ALL_MONTHS = ''
-const MONTHS = MONTH_NAMES
-
-// Page size from the screen height (FR-022, plan D13): the cards that fit below
-// the filters without scrolling, between 5 and 20.
-export const MIN_PAGE_SIZE = 5
-export const MAX_PAGE_SIZE = 20
-// Height of one card plus the gap until the first ones are measured.
-const ESTIMATED_ROW_HEIGHT = 86
-// Space kept below the list for the counter, the pagination and the page margin.
-const RESERVED_HEIGHT = 120
-const FILTERS_MARGIN = 16
-const RESIZE_PAUSE_MS = 150
-// With more pages than this, only the first, the last and the current with its
-// neighbours are shown (FR-021).
-const MAX_PLAIN_PAGES = 7
-
-function currentYear() {
-  return String(new Date().getFullYear())
+// The messages and limits stay importable from the page, where the tests expect them.
+export {
+  ALL_MONTHS,
+  ALL_YEARS,
+  DEBOUNCE_MS,
+  MAX_PAGE_SIZE,
+  MIN_PAGE_SIZE,
+  NO_RESULTS_MESSAGE,
+  SEARCH_PLACEHOLDER,
+  TOO_SHORT_MESSAGE,
 }
 
-function isSearchable(term) {
-  return term.length >= MIN_LENGTH && term.length <= MAX_LENGTH
-}
+const VIEW_EXPENSES = 'expenses'
+const VIEW_INCOMES = 'incomes'
 
 /**
- * Criteria in force, read from the address (`?q=&year=&month=&page=`, plan D7,
+ * Criteria in force, read from the address (`?q=&year=&month=&page=&view=`, plan D7,
  * D12, D14). Without `year` the screen shows the current year; an invalid year
  * falls back to it, an invalid month to the whole year (also with "Todos los
  * años"), an invalid page to the first one and a term that is too short or too
@@ -64,12 +64,17 @@ function criteriaFromParams(params) {
   const month = year !== ALL_YEARS && /^(1[0-2]|[1-9])$/.test(rawMonth) ? rawMonth : ALL_MONTHS
   const rawPage = params.get('page') ?? ''
   const page = /^\d{1,6}$/.test(rawPage) && Number(rawPage) >= 1 ? Number(rawPage) : 1
-  return { term: isSearchable(rawTerm) ? rawTerm : '', year, month, page }
+  // 033: `view=incomes` shows the personal incomes; anything else is the expenses.
+  const view = params.get('view') === VIEW_INCOMES ? VIEW_INCOMES : VIEW_EXPENSES
+  return { term: isSearchable(rawTerm) ? rawTerm : '', year, month, page, view }
 }
 
 /** Address of some criteria: the defaults (no term, current year, all months, page 1) are left out. */
-function paramsOf({ term, year, month, page }) {
+function paramsOf({ term, year, month, page, view }) {
   const params = {}
+  if (view === VIEW_INCOMES) {
+    params.view = VIEW_INCOMES
+  }
   if (term) {
     params.q = term
   }
@@ -83,52 +88,6 @@ function paramsOf({ term, year, month, page }) {
     params.page = String(page)
   }
   return params
-}
-
-/** Current year, years with expenses (newest first) and the one in the address. */
-function yearOptionsOf(years, selected) {
-  const set = new Set([currentYear(), ...years.map(String)])
-  if (selected && selected !== ALL_YEARS) {
-    set.add(selected)
-  }
-  return [...set].sort((a, b) => Number(b) - Number(a))
-}
-
-/** Cards that fit between the filters and the bottom of the window (FR-022). */
-function pageSizeFor(filters, rowHeight) {
-  const top = filters ? filters.getBoundingClientRect().bottom + window.scrollY : 0
-  const available = window.innerHeight - top - FILTERS_MARGIN - RESERVED_HEIGHT
-  const fitting = Math.floor(available / rowHeight)
-  return Math.min(MAX_PAGE_SIZE, Math.max(MIN_PAGE_SIZE, fitting))
-}
-
-/** Height of one card plus the gap between cards, or null when not laid out. */
-function rowHeightOf(list) {
-  const count = list.children.length
-  const height = list.getBoundingClientRect().height
-  if (count === 0 || height <= 0) {
-    return null
-  }
-  const gap = Number.parseFloat(window.getComputedStyle(list).rowGap) || 0
-  return (height + gap) / count
-}
-
-/** Page numbers to show, with '…' in the jumps (FR-021). */
-function pagesOf(current, total) {
-  if (total <= MAX_PLAIN_PAGES) {
-    return Array.from({ length: total }, (_, index) => index + 1)
-  }
-  const shown = [1, current - 1, current, current + 1, total]
-    .filter((page, index, all) => page >= 1 && page <= total && all.indexOf(page) === index)
-    .sort((a, b) => a - b)
-  const items = []
-  shown.forEach((page, index) => {
-    if (index > 0 && page - shown[index - 1] > 1) {
-      items.push(`gap-${page}`)
-    }
-    items.push(page)
-  })
-  return items
 }
 
 // Each expense is a card with a chevron, like the rows of "Mis grupos" (FR-013).
@@ -160,39 +119,6 @@ function ExpenseItem({ expense, from }) {
         </span>
       </Link>
     </li>
-  )
-}
-
-function Pagination({ page, totalPages, onChange }) {
-  return (
-    <nav className="activity-pagination" aria-label="Paginación">
-      <button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)}>
-        ‹ Anterior
-      </button>
-      <ol>
-        {pagesOf(page, totalPages).map((item) =>
-          typeof item === 'number' ? (
-            <li key={item}>
-              <button
-                type="button"
-                aria-label={`Página ${item}`}
-                aria-current={item === page ? 'page' : undefined}
-                onClick={() => onChange(item)}
-              >
-                {item}
-              </button>
-            </li>
-          ) : (
-            <li key={item} aria-hidden="true" className="activity-pagination__gap">
-              …
-            </li>
-          ),
-        )}
-      </ol>
-      <button type="button" disabled={page >= totalPages} onClick={() => onChange(page + 1)}>
-        Siguiente ›
-      </button>
-    </nav>
   )
 }
 
@@ -318,7 +244,8 @@ export default function ActivityPage() {
   const location = useLocation()
   const criteria = criteriaFromParams(searchParams)
   const [term, setTerm] = useState(criteria.term)
-  const [years, setYears] = useState([])
+  // Years with movements of the view they belong to (033): the other view's are ignored.
+  const [yearsOf, setYearsOf] = useState({ view: null, years: [] })
   const [pageSize, setPageSize] = useState(null)
   const topRef = useRef(null)
   const filtersRef = useRef(null)
@@ -327,16 +254,19 @@ export default function ActivityPage() {
 
   useEffect(() => {
     let cancelled = false
-    listExpenseYears().then((result) => {
+    const view = criteria.view
+    const load = view === VIEW_INCOMES ? listIncomeYears : listExpenseYears
+    load().then((result) => {
       // Without the years the selector still offers the current one and "Todos".
       if (!cancelled && result.ok) {
-        setYears(result.years)
+        setYearsOf({ view, years: result.years })
       }
     })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [criteria.view])
+  const years = yearsOf.view === criteria.view ? yearsOf.years : []
 
   const trimmed = term.trim()
   const from = `${location.pathname}${location.search}`
@@ -348,7 +278,7 @@ export default function ActivityPage() {
     const value = rawTerm.trim()
     const nextTerm = isSearchable(value) ? value : ''
     if (nextTerm !== criteria.term || year !== criteria.year || month !== criteria.month) {
-      navigate({ term: nextTerm, year, month, page: 1 })
+      navigate({ term: nextTerm, year, month, page: 1, view: criteria.view })
     }
   }
 
@@ -437,6 +367,16 @@ export default function ActivityPage() {
 
   const handlePageResolved = (page) => navigate({ ...criteria, page })
 
+  // Changing between expenses and incomes keeps the text, year and month (033).
+  const handleView = (view) => {
+    if (view !== criteria.view) {
+      navigate({ ...criteria, view, page: 1 })
+    }
+  }
+
+  const showingIncomes = criteria.view === VIEW_INCOMES
+  const ResultsView = showingIncomes ? IncomeResults : ActivityResults
+
   // Typing a new term: "Buscando…" until the pause puts it in force.
   const isTyping = isSearchable(trimmed) && trimmed !== criteria.term
 
@@ -445,65 +385,57 @@ export default function ActivityPage() {
       <HomeLink />
       <h1>Actividad personal</h1>
 
-      <form
-        ref={filtersRef}
-        className="activity-search"
-        role="search"
-        onSubmit={handleSubmit}
-        noValidate
-      >
-        <div className="activity-search__row">
-          <div className="activity-search__field">
-            <SearchIcon />
-            <input
-              type="search"
-              aria-label={SEARCH_PLACEHOLDER}
-              placeholder={SEARCH_PLACEHOLDER}
-              maxLength={MAX_LENGTH}
-              autoComplete="off"
-              enterKeyHint="search"
-              value={term}
-              onChange={handleTermChange}
-            />
-          </div>
-          <div className="activity-search__selects">
-            <select
-              className="list-search__sort"
-              aria-label="Mes"
-              value={criteria.month}
-              disabled={criteria.year === ALL_YEARS}
-              onChange={handleMonthChange}
-            >
-              <option value={ALL_MONTHS}>Todos los meses</option>
-              {MONTHS.map((name, index) => (
-                <option key={name} value={String(index + 1)}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <select
-              className="list-search__sort"
-              aria-label="Año"
-              value={criteria.year}
-              onChange={handleYearChange}
-            >
-              {yearOptionsOf(years, criteria.year).map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-              <option value={ALL_YEARS}>Todos los años</option>
-            </select>
-          </div>
+      <BalanceCard
+        year={criteria.year === ALL_YEARS ? undefined : criteria.year}
+        month={criteria.month || undefined}
+        refreshKey={location.state?.refreshBalance}
+      />
+
+      <div className="activity-page__toolbar">
+        <div className="activity-view" role="group" aria-label="Tipo de movimiento">
+          <button
+            type="button"
+            aria-pressed={!showingIncomes}
+            onClick={() => handleView(VIEW_EXPENSES)}
+          >
+            Gastos
+          </button>
+          <button
+            type="button"
+            aria-pressed={showingIncomes}
+            onClick={() => handleView(VIEW_INCOMES)}
+          >
+            Ingresos
+          </button>
         </div>
-        {trimmed.length === 1 && <p className="activity-search__notice">{TOO_SHORT_MESSAGE}</p>}
-      </form>
+        {showingIncomes ? (
+          <Link className="buttonLink" to="/incomes/new">
+            Nuevo ingreso
+          </Link>
+        ) : (
+          <Link className="buttonLink" to="/expenses/new">
+            Nuevo gasto
+          </Link>
+        )}
+      </div>
+
+      <SearchFilters
+        formRef={filtersRef}
+        term={term}
+        month={criteria.month}
+        year={criteria.year}
+        years={years}
+        onTermChange={handleTermChange}
+        onMonthChange={handleMonthChange}
+        onYearChange={handleYearChange}
+        onSubmit={handleSubmit}
+      />
 
       {isTyping || pageSize === null ? (
         <p aria-busy="true">Buscando…</p>
       ) : (
-        <ActivityResults
-          key={`${criteria.term}|${criteria.year}|${criteria.month}`}
+        <ResultsView
+          key={`${criteria.view}|${criteria.term}|${criteria.year}|${criteria.month}`}
           term={criteria.term}
           year={criteria.year}
           month={criteria.month}

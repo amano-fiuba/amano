@@ -12,6 +12,10 @@ vi.mock('../api/currencyClient', () => ({
     ],
   }),
 }))
+vi.mock('../api/incomeClient', () => ({
+  INCOME_NETWORK_ERROR_MESSAGE: 'No se pudo guardar el ingreso. Intenta nuevamente',
+  createIncome: vi.fn(),
+}))
 vi.mock('../api/expenseClient', () => ({
   EXPENSE_NETWORK_ERROR_MESSAGE:
     'No se pudo guardar el gasto. Intenta nuevamente',
@@ -19,6 +23,7 @@ vi.mock('../api/expenseClient', () => ({
 }))
 
 import { createExpense } from '../api/expenseClient'
+import { createIncome } from '../api/incomeClient'
 import { getCurrencyQuote } from '../api/currencyClient'
 import { SNACKBAR_VISIBLE_MS } from './Snackbar'
 import ExpenseForm, {
@@ -30,6 +35,11 @@ import ExpenseForm, {
   FREQUENCY_REQUIRED_MESSAGE,
   EXPENSE_SESSION_EXPIRED_MESSAGE,
   EXPENSE_SUCCESS_MESSAGE,
+  INCOME_DISCARD_CONFIRM,
+  INCOME_FUTURE_NOTICE,
+  INCOME_PAYMENT_REQUIRED,
+  INCOME_QUOTE_NOTE,
+  INCOME_SUCCESS_MESSAGE,
 } from './ExpenseForm'
 import {
   AMOUNT_DECIMALS,
@@ -42,6 +52,7 @@ import {
   DATE_INVALID,
   DATE_REQUIRED,
   DESCRIPTION_LENGTH,
+  INCOME_DATE_TOO_FAR,
 } from '../validation/expenseValidation'
 
 const TODAY = '21/10/2026'
@@ -76,6 +87,7 @@ async function save(user) {
 
 beforeEach(() => {
   createExpense.mockReset()
+  createIncome.mockReset()
   getCurrencyQuote.mockReset()
   getCurrencyQuote.mockResolvedValue({ ok: true, quote: { rate: 1500, rateSource: 'BCRA' } })
 })
@@ -902,5 +914,301 @@ describe('ExpenseForm: resumen final antes de guardar (027)', () => {
 
     expect(await screen.findByText('La categoría es obligatoria')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+// --- 033: the same form registers a personal income (kind="INCOME") ---------------------
+
+function renderIncomeForm(props = {}) {
+  return renderForm({ kind: 'INCOME', ...props })
+}
+
+async function completeIncome(user) {
+  await user.type(screen.getByLabelText('Monto'), '850.000,00')
+  await user.selectOptions(screen.getByLabelText('Categoría'), 'SALARY')
+  await user.selectOptions(screen.getByLabelText('Medio de cobro'), 'TRANSFER')
+  await user.type(screen.getByLabelText('Descripción'), 'Sueldo octubre')
+}
+
+describe('ExpenseForm modo ingreso (033, US1)', () => {
+  it('ofrece las categorías y el medio de cobro de ingresos, sin tipo ni frecuencia', () => {
+    renderIncomeForm()
+
+    const categories = within(screen.getByLabelText('Categoría')).getAllByRole('option')
+    expect(categories.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining(['Sueldo', 'Freelance', 'Venta', 'Reembolso', 'Otros']),
+    )
+    expect(screen.queryByRole('option', { name: 'Alimentos' })).not.toBeInTheDocument()
+    const methods = within(screen.getByLabelText('Medio de cobro')).getAllByRole('option')
+    expect(methods.map((option) => option.textContent)).toEqual(
+      expect.arrayContaining(['Efectivo', 'Transferencia', 'Billetera virtual', 'Otro']),
+    )
+    expect(screen.queryByRole('option', { name: 'Tarjeta de crédito' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Tipo de gasto')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Frecuencia')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Medio de pago')).not.toBeInTheDocument()
+  })
+
+  it('exige categoría y medio de cobro, y no abre el resumen con datos inválidos', async () => {
+    const user = userEvent.setup()
+    renderIncomeForm()
+
+    await user.click(submitButton())
+
+    expect(await screen.findByText('La categoría es obligatoria')).toBeInTheDocument()
+    expect(screen.getByText(INCOME_PAYMENT_REQUIRED)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(createIncome).not.toHaveBeenCalled()
+  })
+
+  it('muestra el resumen "Confirmá el ingreso" y envía el payload sin tipo ni frecuencia', async () => {
+    const user = userEvent.setup()
+    createIncome.mockResolvedValue({ ok: true, income: { id: 1 } })
+    renderIncomeForm()
+    await completeIncome(user)
+
+    await user.click(submitButton())
+
+    const dialog = await screen.findByRole('dialog', { name: 'Confirmá el ingreso' })
+    const summary = within(dialog)
+    expect(summary.getByText('Categoría').nextSibling).toHaveTextContent('Sueldo')
+    expect(summary.getByText('Medio de cobro').nextSibling).toHaveTextContent('Transferencia')
+    expect(summary.queryByText('Tipo de gasto')).not.toBeInTheDocument()
+    expect(createIncome).not.toHaveBeenCalled()
+    await user.click(summary.getByRole('button', { name: 'Confirmar' }))
+
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(1))
+    const [payload, key] = createIncome.mock.calls[0]
+    expect(payload).toMatchObject({
+      amount: '850000.00',
+      currency: 'USD',
+      date: '2026-10-21',
+      category: 'SALARY',
+      paymentMethod: 'TRANSFER',
+      description: 'Sueldo octubre',
+    })
+    expect(payload).not.toHaveProperty('type')
+    expect(payload).not.toHaveProperty('frequency')
+    expect(payload.deviceTimeZone).toEqual(expect.any(String))
+    expect(key).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
+    expect(createExpense).not.toHaveBeenCalled()
+  })
+
+  it('tras guardar muestra el éxito del ingreso, reinicia el formulario y avisa con onSaved', async () => {
+    const user = userEvent.setup()
+    const onSaved = vi.fn()
+    createIncome.mockResolvedValue({ ok: true, income: { id: 7 } })
+    renderIncomeForm({ onSaved })
+    await completeIncome(user)
+
+    await save(user)
+
+    expect(await screen.findByRole('status')).toHaveTextContent(INCOME_SUCCESS_MESSAGE)
+    expect(onSaved).toHaveBeenCalledWith({ ok: true, income: { id: 7 } })
+    expect(screen.getByLabelText('Monto')).toHaveValue('')
+  })
+
+  it('el flujo de gasto no cambia: sin onSaved solo reinicia y no llama a createIncome', async () => {
+    const user = userEvent.setup()
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 1 } })
+    renderForm()
+    await completeRequired(user)
+
+    await save(user)
+
+    expect(await screen.findByRole('status')).toHaveTextContent(EXPENSE_SUCCESS_MESSAGE)
+    expect(createIncome).not.toHaveBeenCalled()
+  })
+
+  it('permite una fecha futura hasta un año y rechaza una posterior', async () => {
+    const user = userEvent.setup()
+    renderIncomeForm()
+    await completeIncome(user)
+
+    changeValue('Fecha', '21/10/2027')
+    createIncome.mockResolvedValue({ ok: true, income: { id: 1 } })
+    await save(user)
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(1))
+    expect(createIncome.mock.calls[0][0].date).toBe('2027-10-21')
+
+    await completeIncome(user)
+    changeValue('Fecha', '22/10/2027')
+    await save(user)
+    expect(await screen.findByText(INCOME_DATE_TOO_FAR)).toBeInTheDocument()
+    expect(createIncome).toHaveBeenCalledTimes(1)
+  })
+
+  it('inicia con la fecha de hoy y usa el mismo selector de fecha que gastos', () => {
+    const { unmount } = renderIncomeForm()
+    expect(screen.getByLabelText('Fecha')).toHaveValue(TODAY)
+    expect(screen.getByRole('button', { name: 'Abrir calendario' })).toBeInTheDocument()
+    unmount()
+
+    renderForm()
+    expect(screen.getByLabelText('Fecha')).toHaveValue(TODAY)
+    expect(screen.getByRole('button', { name: 'Abrir calendario' })).toBeInTheDocument()
+  })
+
+  it('con una fecha futura muestra el aviso informativo y con hoy o el pasado no', async () => {
+    renderIncomeForm()
+    expect(screen.queryByText(INCOME_FUTURE_NOTICE)).not.toBeInTheDocument()
+
+    changeValue('Fecha', '22/10/2026')
+    const notice = await screen.findByText(INCOME_FUTURE_NOTICE)
+    expect(notice).toHaveAttribute('role', 'status')
+
+    changeValue('Fecha', '21/10/2026')
+    await waitFor(() => expect(screen.queryByText(INCOME_FUTURE_NOTICE)).not.toBeInTheDocument())
+    changeValue('Fecha', '01/01/2020')
+    expect(screen.queryByText(INCOME_FUTURE_NOTICE)).not.toBeInTheDocument()
+  })
+
+  it('el aviso no aparece con una fecha inválida ni pasado el límite de un año', async () => {
+    renderIncomeForm()
+
+    changeValue('Fecha', '31/02/2027')
+    expect(screen.queryByText(INCOME_FUTURE_NOTICE)).not.toBeInTheDocument()
+    changeValue('Fecha', '22/10/2027')
+    expect(screen.queryByText(INCOME_FUTURE_NOTICE)).not.toBeInTheDocument()
+    changeValue('Fecha', '21/10/2027')
+    expect(await screen.findByText(INCOME_FUTURE_NOTICE)).toBeInTheDocument()
+  })
+
+  it('elegir un día futuro en el calendario muestra el aviso', async () => {
+    const user = userEvent.setup()
+    renderIncomeForm()
+
+    await user.click(screen.getByRole('button', { name: 'Abrir calendario' }))
+    await user.click(screen.getByRole('button', { name: '22 de octubre de 2026' }))
+
+    expect(screen.getByLabelText('Fecha')).toHaveValue('22/10/2026')
+    expect(await screen.findByText(INCOME_FUTURE_NOTICE)).toBeInTheDocument()
+  })
+
+  it('con una fecha futura no pide cotización ni muestra el estimado en pesos', async () => {
+    const user = userEvent.setup()
+    renderIncomeForm()
+
+    changeValue('Fecha', '22/10/2026')
+    await user.type(screen.getByLabelText('Monto'), '10,00')
+
+    expect(await screen.findByText(INCOME_FUTURE_NOTICE)).toBeInTheDocument()
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    expect(getCurrencyQuote).not.toHaveBeenCalled()
+    expect(screen.queryByText(INCOME_QUOTE_NOTE)).not.toBeInTheDocument()
+  })
+
+  it('el formulario de gasto nunca muestra el aviso de ingreso programado', async () => {
+    renderForm()
+
+    changeValue('Fecha', '22/10/2026')
+
+    expect(screen.queryByText(INCOME_FUTURE_NOTICE)).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('Fecha')).toHaveValue('22/10/2026')
+  })
+
+  it('el calendario de un ingreso no bloquea los días futuros', async () => {
+    const user = userEvent.setup()
+    renderIncomeForm()
+
+    await user.click(screen.getByRole('button', { name: 'Abrir calendario' }))
+
+    expect(screen.getByRole('button', { name: '22 de octubre de 2026' })).toBeEnabled()
+  })
+
+  it('en otra moneda estima en pesos con el texto del ingreso', async () => {
+    const user = userEvent.setup()
+    getCurrencyQuote.mockResolvedValue({ ok: true, quote: { rate: 1000 } })
+    renderIncomeForm()
+
+    await user.type(screen.getByLabelText('Monto'), '10,00')
+
+    expect(await screen.findByText(INCOME_QUOTE_NOTE)).toBeInTheDocument()
+  })
+
+  it('muestra los errores por campo del servidor junto a cada campo', async () => {
+    const user = userEvent.setup()
+    createIncome.mockResolvedValue({
+      ok: false,
+      status: 400,
+      fields: { amount: 'El monto debe ser mayor a cero', paymentMethod: 'El medio de cobro no es válido' },
+    })
+    renderIncomeForm()
+    await completeIncome(user)
+
+    await save(user)
+
+    const amount = await screen.findByText('El monto debe ser mayor a cero')
+    expect(screen.getByLabelText('Monto')).toHaveAttribute('aria-describedby', amount.id)
+    expect(screen.getByText('El medio de cobro no es válido')).toBeInTheDocument()
+    expect(screen.getByLabelText('Monto')).toHaveValue('850.000,00')
+  })
+
+  it('un fallo de red conserva la clave en el reintento y el éxito la renueva (US3)', async () => {
+    const user = userEvent.setup()
+    createIncome
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValue({ ok: true, income: { id: 1 } })
+    renderIncomeForm()
+    await completeIncome(user)
+
+    await save(user)
+    await screen.findByTestId('expense-error')
+    await save(user)
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(2))
+    const firstKey = createIncome.mock.calls[0][1]
+    expect(createIncome.mock.calls[1][1]).toBe(firstKey)
+
+    await screen.findByRole('status')
+    await completeIncome(user)
+    await save(user)
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(3))
+    expect(createIncome.mock.calls[2][1]).not.toBe(firstKey)
+  })
+
+  it('ante 422 muestra el detalle, renueva la clave y conserva los datos', async () => {
+    const user = userEvent.setup()
+    createIncome
+      .mockResolvedValueOnce({ ok: false, status: 422, reusedKey: true, detail: '' })
+      .mockResolvedValue({ ok: true, income: { id: 1 } })
+    renderIncomeForm()
+    await completeIncome(user)
+
+    await save(user)
+    expect(await screen.findByTestId('expense-error')).toHaveTextContent(EXPENSE_REUSED_KEY_MESSAGE)
+    await save(user)
+
+    await waitFor(() => expect(createIncome).toHaveBeenCalledTimes(2))
+    expect(createIncome.mock.calls[1][1]).not.toBe(createIncome.mock.calls[0][1])
+  })
+
+  it('una falla de red muestra el mensaje del ingreso y una sesión vencida ofrece el login', async () => {
+    const user = userEvent.setup()
+    createIncome
+      .mockResolvedValueOnce({ ok: false, network: true })
+      .mockResolvedValueOnce({ ok: false, status: 401 })
+    renderIncomeForm()
+    await completeIncome(user)
+
+    await save(user)
+    expect(await screen.findByTestId('expense-error')).toHaveTextContent(
+      'No se pudo guardar el ingreso. Intenta nuevamente',
+    )
+    await save(user)
+    expect(await screen.findByRole('link', { name: 'Iniciar sesión' })).toBeInTheDocument()
+  })
+
+  it('"Cancelar" con datos pide confirmar el descarte del ingreso', async () => {
+    const user = userEvent.setup()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const onCancel = vi.fn()
+    renderIncomeForm({ onCancel })
+    await user.type(screen.getByLabelText('Monto'), '5')
+
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(confirm).toHaveBeenCalledWith(INCOME_DISCARD_CONFIRM)
+    expect(onCancel).not.toHaveBeenCalled()
+    confirm.mockRestore()
   })
 })

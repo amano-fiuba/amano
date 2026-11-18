@@ -31,6 +31,7 @@ import com.amano.backend.friendship.FriendshipRequestAlreadyRespondedException;
 import com.amano.backend.friendship.FriendshipRequestNotFoundException;
 import com.amano.backend.friendship.PendingDirectDebtException;
 import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
+import com.amano.backend.income.IncomeNotFoundException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
 import com.amano.backend.groupexpense.whistle.DebtNotWhistleableException;
@@ -210,6 +211,15 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, exception.getMessage());
         problem.setTitle("Gasto no encontrado");
+        return problem;
+    }
+
+    /** Missing or foreign personal income (feature 033, FR-007): one neutral 404. */
+    @ExceptionHandler(IncomeNotFoundException.class)
+    public ProblemDetail handleIncomeNotFound(IncomeNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Ingreso no encontrado");
         return problem;
     }
 
