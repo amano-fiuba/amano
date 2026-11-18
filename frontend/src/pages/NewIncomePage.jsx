@@ -26,7 +26,7 @@ export default function NewIncomePage() {
         today={today}
         initialCurrency={currency}
         preferredCurrencies={preferred}
-        onSaved={() => navigate('/activity', { state: { refreshBalance: Date.now() } })}
+        onSaved={() => navigate('/activity?view=incomes', { state: { refreshBalance: Date.now() } })}
         onCancel={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/'))}
       />
     </main>

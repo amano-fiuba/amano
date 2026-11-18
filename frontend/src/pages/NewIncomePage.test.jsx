@@ -24,7 +24,7 @@ function ActivityProbe() {
   const location = useLocation()
   return (
     <output data-testid="activity">
-      {`actividad:${location.state?.refreshBalance ? 'refrescar' : 'sin-refresco'}`}
+      {`actividad:${location.state?.refreshBalance ? 'refrescar' : 'sin-refresco'}${location.search}`}
     </output>
   )
 }
@@ -80,7 +80,7 @@ describe('NewIncomePage (033)', () => {
     expect(await screen.findByText('Pantalla principal')).toBeInTheDocument()
   })
 
-  it('al guardar con éxito va a /activity con state.refreshBalance', async () => {
+  it('al guardar con éxito va a /activity?view=incomes con state.refreshBalance', async () => {
     me.mockResolvedValue({ ok: true, profile: { currencies: [] } })
     createIncome.mockResolvedValue({ ok: true, income: { id: 1 } })
     const user = userEvent.setup()
@@ -93,7 +93,7 @@ describe('NewIncomePage (033)', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar' }))
     await user.click(await screen.findByRole('button', { name: 'Confirmar' }))
 
-    expect(await screen.findByTestId('activity')).toHaveTextContent('actividad:refrescar')
+    expect(await screen.findByTestId('activity')).toHaveTextContent('actividad:refrescar?view=incomes')
     expect(createIncome).toHaveBeenCalledTimes(1)
   })
 

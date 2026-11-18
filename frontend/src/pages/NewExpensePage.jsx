@@ -27,6 +27,7 @@ export default function NewExpensePage() {
         today={today}
         initialCurrency={currency}
         preferredCurrencies={preferred}
+        onSaved={() => navigate('/activity?view=expenses', { state: { refreshBalance: Date.now() } })}
         onCancel={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/'))}
       />
     </main>
