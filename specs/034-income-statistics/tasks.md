@@ -43,19 +43,19 @@ description: "Task list for Estadísticas y analíticas de ingresos personales"
 
 ---
 
-## Fase 3: Frontend Carrusel y Gráficos
+## Fase 3: Frontend barra comparativa, columnas y gráficos
 
 - [X] T012 [P] Crear `getStatisticsSummary({ year, month })` en frontend/src/api/statisticsClient.js con el patrón de `expenseClient.js`: `{ ok: true, statistics }` en 200, `{ ok: false, status }` en 4xx y `{ ok: false, network: true }` en error de red; exportar `STATISTICS_ERROR_MESSAGE = 'No pudimos cargar tus estadísticas. Intentá nuevamente'` (FR-027, plan D11)
-- [X] T013 [P] Confirmar que el `PieChart` existente cubre la comparación de dos porciones (proporciones, círculo completo con una sola, detalle al enfocar o tocar y `aria-label`); mantener su geometría actual en `charts/geometry.js` y retirar `ringPath` y el código del gráfico anterior (FR-015, FR-016, plan D14)
-- [X] T014 [US3] Definir la composición del bloque comparativo sin un gráfico nuevo: `PieChart` con dos porciones (Ingresos y Gastos), leyenda textual con ambos totales y balance destacado debajo del gráfico (FR-015, FR-016, plan D14)
-- [X] T015 [US2] [P] Crear frontend/src/components/Carousel.jsx y Carousel.scss: `slides`, `index`, `onIndexChange` y `ariaLabel`; `role="region"` con `aria-roledescription="carrusel"`, cada slide `role="group"` con `aria-roledescription="slide"` y `aria-label="<n> de <total>"`; puntos `<button>` con `aria-label` y `aria-current`; botones "Anterior"/"Siguiente" deshabilitados en los extremos; teclas `ArrowLeft`/`ArrowRight`; sin autoplay ni loop (FR-002, FR-030, plan D12)
-- [X] T016 [US2] Implementar el swipe en `Carousel`: eventos de puntero/touch, cambio solo si el desplazamiento horizontal supera el umbral (40 px) y es mayor que el vertical, `touch-action: pan-y` y sin `preventDefault` en gestos cortos o verticales, en frontend/src/components/Carousel.jsx (FR-031, plan D13)
+- [X] T013 [P] Mantener la geometría de `PieChart` en `charts/geometry.js` (`SIZE`, `CENTER`, `RADIUS`, `pointAt`, `slicePath`) y agregar a `PieChart` un tooltip sobre la porción activa (`role="tooltip"`, centroide) con el `detail` del ítem (nombre, monto y porcentaje), quitando el texto de ayuda y el detalle fijo debajo del gráfico; el nombre accesible de la porción conserva nombre, monto y porcentaje (FR-021, plan D14)
+- [X] T014 [US3] Definir la composición de la barra comparativa sin gráfico de torta: segmento verde de ingresos y rojo de gastos, porcentaje dentro de cada segmento, totales y balance debajo (FR-015, FR-016, plan D14)
+- [X] T015 [US2] Retirar `Carousel.jsx`, `Carousel.scss` y `Carousel.test.jsx` (reemplazados por pestañas, FR-002, plan D12)
+- [X] T016 [US2] Implementar en la columna de gastos de `StatisticsPage` las pestañas "Personales"/"Grupales": `role="tablist"`/`tab`/`tabpanel`, `aria-selected`, `aria-controls`, flechas izquierda y derecha sin dar la vuelta y foco móvil (FR-002, FR-030, plan D12)
 - [X] T017 [P] Agregar `incomeCategoryColor(code)` y el catálogo `INCOME_CATEGORY_OPTIONS` ya existente a frontend/src/validation/expenseCatalog.js, devolviendo la variable CSS `var(--color-ingreso-<código>)`; las variables CSS se definen en StatisticsPage.scss (T022) para tema claro y oscuro (FR-022, plan D15)
 - [X] T018 [US1] Parametrizar `Breakdown` (torta + lista) con `options`, `colorOf` y `titleId` para reutilizarlo en gastos e ingresos sin duplicar la lista ni el detalle, en frontend/src/pages/StatisticsPage.jsx (plan D16)
-- [X] T019 [US2] Reescribir frontend/src/pages/StatisticsPage.jsx con el orden acordado: selectores de mes y año, bloque comparativo, carrusel de gastos (Slide 1 personales, Slide 2 grupales) y bloque de ingresos; el índice del carrusel vive en la página, se conserva al cambiar de período y vuelve a 0 al recargar; un solo pedido `getStatisticsSummary` con un único estado de carga/error (FR-001..FR-006, FR-018, FR-023, plan D11, D12, D18)
-- [X] T020 [US3] Agregar a frontend/src/pages/StatisticsPage.jsx el bloque comparativo: torta de dos porciones (Ingresos y Gastos combinados) reutilizando `PieChart`, etiquetas "Ingresos"/"Gastos" con importe, balance del período destacado **debajo del gráfico** con signo explícito, ícono o texto para negativos, y aviso de moneda (FR-015..FR-019)
-- [X] T021 [US4] Conservar y adaptar en frontend/src/pages/StatisticsPage.jsx los estados vacíos: por slide, sin ingresos efectivizados con enlace para registrar un ingreso, y período vacío sin carrusel, torta comparativa ni tortas; mantener los avisos de gastos excluidos y agregar el de ingresos excluidos por separado (FR-023, FR-024)
-- [X] T022 [P] Extender frontend/src/pages/StatisticsPage.scss: carrusel de un slide visible con puntos y flechas, torta comparativa y balance debajo, variables CSS `--color-ingreso-<código>` distintas de las de gasto y legibles en tema claro y oscuro, apilado en pantallas angostas y transición breve desactivada con `prefers-reduced-motion` (FR-025, plan D15)
+- [X] T019 [US2] Reescribir frontend/src/pages/StatisticsPage.jsx con el orden acordado: selectores de mes y año, barra comparativa y dos columnas (ingresos a la izquierda; gastos a la derecha con pestañas Personales y Grupales); el índice de la pestaña vive en la página, se conserva al cambiar de período y vuelve a "Personales" al recargar; un solo pedido `getStatisticsSummary` con un único estado de carga/error (FR-001..FR-006, FR-018, FR-023, plan D11, D12, D18)
+- [X] T020 [US3] Agregar a frontend/src/pages/StatisticsPage.jsx la barra comparativa horizontal (ingresos en verde, gastos en rojo, porcentaje relativo dentro de la barra, etiqueta accesible) y debajo los totales de ingresos y de gastos y el balance del período con signo explícito y texto para negativos, más el aviso de moneda (FR-015..FR-019)
+- [X] T021 [US4] Conservar y adaptar en frontend/src/pages/StatisticsPage.jsx los estados vacíos: por pestaña, sin ingresos efectivizados con enlace para registrar un ingreso, sin gastos con enlace para registrar un gasto (sin pestañas) y período vacío sin barra ni columnas; mantener los avisos de gastos excluidos y los de ingresos excluidos por separado (FR-023, FR-024)
+- [X] T022 [P] Extender frontend/src/pages/StatisticsPage.scss y PieChart.scss: barra comparativa, grilla de dos columnas apilable en pantallas angostas, pestañas, tooltip de la torta y variables CSS `--color-ingreso-<código>` distintas de las de gasto y legibles en tema claro y oscuro (FR-025, plan D15)
 
 ---
 
@@ -67,26 +67,26 @@ description: "Task list for Estadísticas y analíticas de ingresos personales"
 - [X] T026 [P] Integration test (Testcontainers + MockMvc) de `GET /api/stats/summary`: gastos personales y partes grupales, ingresos de varias categorías y monedas, ingresos de otras personas, ingreso proyectado excluido, cotización faltante, años unificados, 400 por `year`/`month` y 401 sin sesión o cuenta no verificada, en backend/src/test/java/com/amano/backend/statistics/StatisticsSummaryIT.java (FR-004, FR-008..FR-014, FR-026, FR-027)
 - [X] T027 [P] Regresión tras extraer `StatisticsConverter`: mismos importes, porcentajes, totales, años y `excludedCount` en `ExpenseStatisticsServiceTest`/`ExpenseStatisticsIT`; además, `GET /api/balance` (033) y los endpoints de saldos, presupuestos y propuestas de liquidación grupales devuelven exactamente los mismos resultados que antes, en backend/src/test/java/com/amano/backend/expense/ExpenseStatisticsServiceTest.java, backend/src/test/java/com/amano/backend/balance/BalanceIT.java, backend/src/test/java/com/amano/backend/groupexpense/GroupBalanceControllerIT.java y backend/src/test/java/com/amano/backend/groupexpense/GroupSettlementControllerIT.java (FR-028, SC-006)
 - [X] T028 [P] Tests de `getStatisticsSummary` en frontend/src/api/statisticsClient.test.js: éxito, 400, 401 y error de red (FR-027, plan D11)
-- [X] T029 [P] Tests de `PieChart` aplicado a la comparación en frontend/src/components/charts/PieChart.test.jsx: dos porciones, círculo completo con una sola, ambos totales en cero sin gráfico, `aria-label` por porción y detalle con importe y porcentaje (FR-015, FR-016)
-- [X] T030 [P] Tests de frontend/src/components/Carousel.test.jsx: Slide 1 inicial, flechas y puntos, extremos deshabilitados, teclado, `aria-label` de posición, swipe horizontal, swipe corto/vertical sin cambio y sin bloquear el scroll, `prefers-reduced-motion` (FR-002, FR-030, FR-031, SC-009)
+- [X] T029 [P] Tests de `PieChart` en frontend/src/components/charts/PieChart.test.jsx: tooltip al pasar el cursor, enfocar o tocar con nombre, monto y porcentaje, sin texto de ayuda ni leyenda debajo, dos porciones, círculo completo con una sola y `aria-label` por porción (FR-015, FR-021)
+- [X] T030 [P] Tests de las pestañas en frontend/src/pages/StatisticsPage.test.jsx: "Personales" inicial, cambio con clic y con flechas, extremos sin vuelta, roles y `aria-selected`, pestaña conservada al cambiar el período (FR-002, FR-030, SC-009)
 - [X] T031 [P] Tests de `incomeCategoryColor` y de los colores de ingreso en frontend/src/validation/expenseCatalog.test.js (FR-022, FR-028)
-- [X] T032 [P] Actualizar frontend/src/pages/StatisticsPage.test.jsx: pedido único, período por defecto y en la dirección, cambio de mes y año conservando slide, carrusel con dos slides, bloque de ingresos, torta comparativa con balance debajo, estados vacíos, avisos de excluidos, error con "Reintentar", sesión vencida y ausencia de bloques parciales (FR-001..FR-006, FR-023..FR-027)
+- [X] T032 [P] Actualizar frontend/src/pages/StatisticsPage.test.jsx: pedido único, período por defecto y en la dirección, cambio de mes y año conservando la pestaña, dos columnas, bloque de ingresos, barra comparativa con totales y balance, tooltip de las tortas, estados vacíos, avisos de excluidos, error con "Reintentar", sesión vencida y ausencia de bloques parciales (FR-001..FR-006, FR-021, FR-023..FR-027)
 
 ---
 
 ## Fase 5: Polish & Cobertura
 
-- [X] T033 Revisar accesibilidad de la pantalla completa: orden de foco, nombres accesibles de carrusel, puntos, flechas y porciones, anuncio del slide activo y del signo del balance, contraste de colores de ingreso en ambos temas y información nunca solo por color (FR-022, FR-025, FR-030, SC-009)
-- [ ] T034 Validar el comportamiento táctil y responsive en pantalla angosta: swipe sin scroll horizontal de la página, scroll vertical intacto, un slide por vez, torta y lista apiladas y torta comparativa con su balance legibles (FR-025, FR-031)
+- [X] T033 Revisar accesibilidad de la pantalla completa: orden de foco, pestañas, nombres accesibles de la barra y de las porciones, signo del balance, contraste de colores de ingreso en ambos temas e información nunca solo por color (FR-022, FR-025, FR-030, SC-009)
+- [ ] T034 Validar el comportamiento táctil y responsive en pantalla angosta: columnas apiladas sin scroll horizontal, tooltip al tocar una porción, torta y lista legibles y barra comparativa con su balance legible (FR-021, FR-025)
 - [X] T035 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; corregir lo que falle e informar la cobertura alcanzada (≥ 85 %, SC-007). Incluir la verificación cronometrada de performance de SC-008: con 1000 ingresos y gastos en el período, la pantalla y sus gráficos deben mostrarse en menos de 2 s desde que se elige el período, sin recargar la página
-- [X] T036 Revisar la trazabilidad FR → tarea y la consistencia entre spec.md, plan.md, contracts/statistics-summary-api.md y este archivo (endpoint, nombres de campos, carrusel y fases); confirmar que la regresión incluye `GET /api/balance` (033) y los saldos, presupuestos y propuestas de liquidación grupales; actualizar `checklists/requirements.md` si cambió alguna clarificación (FR-028, SC-006, constitución II)
+- [X] T036 Revisar la trazabilidad FR → tarea y la consistencia entre spec.md, plan.md, contracts/statistics-summary-api.md y este archivo (endpoint, nombres de campos, columnas y fases); confirmar que la regresión incluye `GET /api/balance` (033) y los saldos, presupuestos y propuestas de liquidación grupales; actualizar `checklists/requirements.md` si cambió alguna clarificación (FR-028, SC-006, constitución II)
 
 ---
 
 ## Dependencies
 
 - Fase 1 → Fase 2. T009 depende de T005–T008; T010 de T009; T011 se puede hacer en paralelo con T009.
-- Fase 3: T012 depende de T003 (contrato); T013–T017 son independientes entre sí (T014 es una definición de diseño); T018–T021 modifican `StatisticsPage.jsx` y se ejecutan en orden; T022 depende de T019–T021.
+- Fase 3: T012 depende de T003 (contrato); T013–T017 son independientes entre sí (T014 es una definición de diseño); T016 y T018–T021 modifican `StatisticsPage.jsx` y se ejecutan en orden; T022 depende de T019–T021.
 - Fase 4 empieza con T023 (validación manual) después de T019–T022; T024–T032 dependen de T023 y del código que prueban.
 - Fase 5 después de la Fase 4. T035 al final, después de T033 y T034.
 
@@ -100,7 +100,7 @@ description: "Task list for Estadísticas y analíticas de ingresos personales"
 
 ## Implementation Strategy
 
-1. **MVP (US1 + US2)**: T001–T022 con foco en el bloque de ingresos y el carrusel; permite validar la pantalla completa con la comparación básica.
+1. **MVP (US1 + US2)**: T001–T022 con foco en el bloque de ingresos y las pestañas de gastos; permite validar la pantalla completa con la comparación básica.
 2. **US3–US5**: comparación, períodos y monedas ya están cubiertos por T009, T018–T021 y T023; completar sus pruebas en T025, T029 y T032.
 3. **Cierre**: pruebas automatizadas (T024–T032), accesibilidad/responsive (T033–T034), cobertura y trazabilidad (T035–T036).
 

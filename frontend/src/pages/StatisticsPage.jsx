@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router'
 import { getStatisticsSummary, STATISTICS_ERROR_MESSAGE } from '../api/statisticsClient'
 import { useAuth } from '../auth/AuthContext'
 import HomeLink from '../components/HomeLink'
-import Carousel from '../components/Carousel'
 import PieChart from '../components/charts/PieChart'
 import {
   CATEGORY_OPTIONS,
@@ -99,20 +98,6 @@ function Breakdown({ title, titleId, breakdown, currency, emptyMessage, options,
             items={items}
             label={`${title}: ${items.map((item) => item.detail).join('; ')}`}
           />
-          <ul className="statistics-legend" aria-label={`Categorías de ${title.toLowerCase()}`}>
-            {items.map((item) => (
-              <li key={item.key}>
-                <span
-                  className="statistics-legend__swatch"
-                  style={{ background: item.color }}
-                  aria-hidden="true"
-                />
-                <span className="statistics-legend__name">{item.label}</span>
-                <span className="statistics-legend__amount">{item.amount}</span>
-                <span className="statistics-legend__percentage">{item.percentage}</span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
     </section>
@@ -121,10 +106,10 @@ function Breakdown({ title, titleId, breakdown, currency, emptyMessage, options,
 
 /**
  * Statistics of one period, keyed by it so an answer for a previous period never
- * replaces a newer one (plan D12, D18). The slide index belongs to the page so it
+ * replaces a newer one (plan D12, D18). The expenses tab belongs to the page so it
  * survives a period change (FR-005).
  */
-function StatisticsResults({ period, onYears, slide, onSlideChange }) {
+function StatisticsResults({ period, onYears, tab, onTabChange }) {
   const { setUser } = useAuth()
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState({ attempt: -1, status: 'loading', data: null })
@@ -205,28 +190,24 @@ function StatisticsResults({ period, onYears, slide, onSlideChange }) {
   const balanceNumber = Number(comparison.balance)
   const balanceSign = balanceNumber < 0 ? '−' : balanceNumber > 0 ? '+' : ''
   const balanceText = `${balanceSign}${money(currency, comparison.balance.replace('-', ''))}`
+  const incomeValue = Number(comparison.income)
+  const expensesValue = Number(comparison.expenses)
+  const comparisonTotal = incomeValue + expensesValue
+  const share = (value) => (comparisonTotal > 0 ? (value / comparisonTotal) * 100 : 0)
   const comparisonItems = [
     {
       key: 'income',
       label: 'Ingresos',
-      color: 'var(--color-ingreso-salary)',
-      value: Number(comparison.income),
+      value: incomeValue,
       amount: money(currency, comparison.income),
     },
     {
       key: 'expenses',
       label: 'Gastos',
-      color: 'var(--color-categoria-shopping)',
-      value: Number(comparison.expenses),
+      value: expensesValue,
       amount: money(currency, comparison.expenses),
     },
-  ]
-  const totalValue = comparisonItems.reduce((sum, item) => sum + item.value, 0)
-  for (const item of comparisonItems) {
-    item.percentage = totalValue > 0 ? formatPercentage(((item.value / totalValue) * 100).toFixed(1)) : ''
-    item.detail = `${item.label} · ${item.amount} · ${item.percentage}`
-  }
-  const chartItems = comparisonItems.filter((item) => item.value > 0)
+  ].map((item) => ({ ...item, percentage: formatPercentage(share(item.value).toFixed(1)) }))
 
   const expenseBreakdown = (title, id, breakdown, emptyMessage) => (
     <Breakdown
@@ -239,11 +220,11 @@ function StatisticsResults({ period, onYears, slide, onSlideChange }) {
       colorOf={categoryColor}
     />
   )
-  const slides = [
+  const tabs = [
     {
       key: 'personal',
-      label: 'Gastos personales',
-      content: expenseBreakdown(
+      label: 'Personales',
+      breakdown: expenseBreakdown(
         'Gastos personales',
         'statistics-personal',
         personal,
@@ -252,8 +233,8 @@ function StatisticsResults({ period, onYears, slide, onSlideChange }) {
     },
     {
       key: 'group',
-      label: 'Gastos grupales',
-      content: expenseBreakdown(
+      label: 'Grupales',
+      breakdown: expenseBreakdown(
         'Gastos grupales',
         'statistics-group',
         group,
@@ -261,88 +242,133 @@ function StatisticsResults({ period, onYears, slide, onSlideChange }) {
       ),
     },
   ]
+  const onTabKeyDown = (event) => {
+    const next = { ArrowLeft: tab - 1, ArrowRight: tab + 1 }[event.key]
+    if (next >= 0 && next < tabs.length) {
+      onTabChange(next)
+      document.getElementById(`statistics-tab-${tabs[next].key}`)?.focus()
+    }
+  }
 
   return (
     <>
       {notices}
       <section className="statistics-comparison" aria-labelledby="statistics-comparison">
         <h2 id="statistics-comparison">Ingresos y gastos de {name}</h2>
-        <div className="statistics-comparison__body">
-          {chartItems.length > 0 && (
-            <PieChart
-              items={chartItems}
-              label={`Ingresos contra gastos: ${chartItems.map((item) => item.detail).join('; ')}`}
+        <div
+          className="statistics-bar"
+          role="img"
+          aria-label={`Ingresos ${comparisonItems[0].amount} (${comparisonItems[0].percentage}) y gastos ${comparisonItems[1].amount} (${comparisonItems[1].percentage})`}
+        >
+          {comparisonItems
+            .filter((item) => item.value > 0)
+            .map((item) => (
+              <span
+                key={item.key}
+                className={`statistics-bar__segment statistics-bar__segment--${item.key}`}
+                style={{ width: `${share(item.value)}%` }}
+              >
+                {item.percentage}
+              </span>
+            ))}
+        </div>
+        <dl className="statistics-comparison__figures">
+          <div className="statistics-comparison__income">
+            <dt>Ingresos</dt>
+            <dd>{comparisonItems[0].amount}</dd>
+          </div>
+          <div className="statistics-comparison__expenses">
+            <dt>Gastos</dt>
+            <dd>{comparisonItems[1].amount}</dd>
+          </div>
+          <div
+            className={`statistics-balance${balanceNumber < 0 ? ' is-negative' : ' is-positive'}`}
+          >
+            <dt>Balance del período</dt>
+            <dd>{balanceText}</dd>
+            {balanceNumber < 0 && <small>Los gastos superan a los ingresos</small>}
+          </div>
+        </dl>
+        <small className="statistics-comparison__currency">
+          Importes en {currencyLabel(currency)} ({currency})
+        </small>
+      </section>
+
+      <div className="statistics-columns">
+        <div className="statistics-column">
+          <div className="statistics-tabs" aria-hidden="true">
+            <span className="statistics-tabs__label">Personales</span>
+          </div>
+          {noIncome ? (
+            <section className="statistics-breakdown" aria-labelledby="statistics-income">
+              <h2 id="statistics-income">Ingresos personales</h2>
+              <p className="statistics-breakdown__empty" role="status">
+                No registraste ingresos efectivizados en {name}.{' '}
+                <Link to="/incomes/new">Registrar un ingreso</Link>
+              </p>
+            </section>
+          ) : (
+            <Breakdown
+              title="Ingresos personales"
+              titleId="statistics-income"
+              breakdown={income}
+              currency={currency}
+              emptyMessage=""
+              options={INCOME_CATEGORY_OPTIONS}
+              colorOf={incomeCategoryColor}
             />
           )}
-          <ul className="statistics-legend" aria-label="Ingresos y gastos del período">
-            {comparisonItems.map((item) => (
-              <li key={item.key}>
-                <span
-                  className="statistics-legend__swatch"
-                  style={{ background: item.color }}
-                  aria-hidden="true"
-                />
-                <span className="statistics-legend__name">{item.label}</span>
-                <span className="statistics-legend__amount">{item.amount}</span>
-                <span className="statistics-legend__percentage">{item.percentage}</span>
-              </li>
-            ))}
-          </ul>
         </div>
-        <div className="statistics-comparison__summary">
-          <p className={`statistics-balance${balanceNumber < 0 ? ' is-negative' : ''}`}>
-            <span>Balance del período</span>
-            <strong>{balanceText}</strong>
-            {balanceNumber < 0 && <small>Los gastos superan a los ingresos</small>}
-          </p>
-          <small>
-            Importes en {currencyLabel(currency)} ({currency})
-          </small>
+        <div className="statistics-column">
+          {noExpenses ? (
+            <section className="statistics-breakdown" aria-labelledby="statistics-expenses">
+              <h2 id="statistics-expenses">Gastos</h2>
+              <p className="statistics-breakdown__empty" role="status">
+                No registraste gastos en {name}. <Link to="/expenses/new">Registrar un gasto</Link>
+              </p>
+            </section>
+          ) : (
+            <>
+              <div className="statistics-tabs" role="tablist" aria-label="Tipo de gasto">
+                {tabs.map((item, index) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    role="tab"
+                    id={`statistics-tab-${item.key}`}
+                    aria-selected={index === tab}
+                    aria-controls="statistics-expenses-panel"
+                    tabIndex={index === tab ? 0 : -1}
+                    onClick={() => onTabChange(index)}
+                    onKeyDown={onTabKeyDown}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <div
+                id="statistics-expenses-panel"
+                role="tabpanel"
+                aria-labelledby={`statistics-tab-${tabs[tab].key}`}
+              >
+                {tabs[tab].breakdown}
+              </div>
+            </>
+          )}
         </div>
-      </section>
-      {noExpenses ? (
-        <p className="statistics-breakdown__empty" role="status">
-          No registraste gastos en {name}. <Link to="/expenses/new">Registrar un gasto</Link>
-        </p>
-      ) : (
-        <Carousel
-          slides={slides}
-          index={slide}
-          onIndexChange={onSlideChange}
-          ariaLabel="Gastos del período"
-        />
-      )}
-      {noIncome ? (
-        <section className="statistics-breakdown">
-          <h2>Ingresos personales</h2>
-          <p className="statistics-breakdown__empty" role="status">
-            No registraste ingresos efectivizados en {name}.{' '}
-            <Link to="/incomes/new">Registrar un ingreso</Link>
-          </p>
-        </section>
-      ) : (
-        <Breakdown
-          title="Ingresos personales"
-          titleId="statistics-income"
-          breakdown={income}
-          currency={currency}
-          emptyMessage=""
-          options={INCOME_CATEGORY_OPTIONS}
-          colorOf={incomeCategoryColor}
-        />
-      )}
+      </div>
     </>
   )
 }
 
-// Pantalla de estadísticas (032 y 034): comparación de ingresos y gastos, carrusel
-// de gastos personales y grupales e ingresos personales por categoría, de a un mes. El período vive en la dirección, reemplazando la
+// Pantalla de estadísticas (032 y 034): comparación de ingresos y gastos en una barra, dos columnas
+// de ingresos y gastos (personales o grupales) por categoría, de a un mes. El período vive en la dirección, reemplazando la
 // entrada del historial para no llenar "Atrás".
 export default function StatisticsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const period = periodFromParams(searchParams)
   const [years, setYears] = useState([])
-  const [slide, setSlide] = useState(0)
+  const [tab, setTab] = useState(0)
 
   const navigate = (next) => setSearchParams(paramsOf(next), { replace: true })
 
@@ -382,8 +408,8 @@ export default function StatisticsPage() {
         key={`${period.year}-${period.month}`}
         period={period}
         onYears={setYears}
-        slide={slide}
-        onSlideChange={setSlide}
+        tab={tab}
+        onTabChange={setTab}
       />
     </main>
   )

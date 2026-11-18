@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
@@ -93,11 +93,10 @@ function renderPage(entry = '/statistics') {
 const monthSelect = () => screen.getByRole('combobox', { name: 'Mes' })
 const yearSelect = () => screen.getByRole('combobox', { name: 'Año' })
 const location = () => screen.getByTestId('location')
-const legend = (name) => screen.getByRole('list', { name: `Categorías de ${name}`, hidden: true })
-const rowsOf = (name) =>
-  within(legend(name))
-    .getAllByRole('listitem')
-    .map((row) => row.textContent)
+const slicesOf = (name) =>
+  within(screen.getByRole('group', { name: new RegExp(`^${name}:`) }))
+    .getAllByRole('img')
+    .map((slice) => slice.getAttribute('aria-label'))
 const ready = () => screen.findByRole('heading', { name: /^Ingresos y gastos de/ })
 
 beforeEach(() => {
@@ -107,7 +106,7 @@ beforeEach(() => {
 })
 
 describe('StatisticsPage (032, 034)', () => {
-  it('hace un único pedido y ordena selectores, comparación, carrusel de gastos e ingresos', async () => {
+  it('hace un único pedido y ordena selectores, barra comparativa y dos columnas', async () => {
     renderPage()
 
     expect(screen.getByText('Cargando…')).toBeInTheDocument()
@@ -117,62 +116,127 @@ describe('StatisticsPage (032, 034)', () => {
     expect(monthSelect()).toHaveValue(MONTH)
     expect(yearSelect()).toHaveValue(YEAR)
 
+    const income = screen.getByRole('heading', { name: 'Ingresos personales' })
+    const expenses = screen.getByRole('heading', { name: 'Gastos personales' })
     const order = [
       monthSelect(),
       screen.getByRole('heading', { name: `Ingresos y gastos de ${PERIOD}` }),
-      screen.getByRole('region', { name: 'Gastos del período' }),
-      screen.getByRole('heading', { name: 'Ingresos personales' }),
+      income,
+      expenses,
     ]
     for (let index = 1; index < order.length; index += 1) {
       expect(
         order[index - 1].compareDocumentPosition(order[index]) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy()
     }
+    const columns = document.querySelector('.statistics-columns')
+    expect(columns.children).toHaveLength(2)
+    expect(columns.children[0]).toContainElement(income)
+    expect(columns.children[1]).toContainElement(expenses)
     expect(screen.getByText('Importes en Peso argentino (ARS)')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Gastos del período' })).not.toBeInTheDocument()
   })
 
-  it('el carrusel empieza en gastos personales y el segundo slide son los grupales', async () => {
+  it('la columna de gastos empieza en personales y la pestaña Grupales muestra los grupales', async () => {
     const user = userEvent.setup()
     renderPage()
     await ready()
 
-    expect(screen.getByRole('button', { name: /Gastos personales \(1 de 2\)/ }))
-      .toHaveAttribute('aria-current', 'true')
-    expect(rowsOf('gastos personales')).toEqual([
-      'ViviendaARS 45.000,0045,0 %',
-      'AlimentosARS 35.000,0035,0 %',
-      'TransporteARS 20.000,0020,0 %',
+    expect(screen.getByRole('tab', { name: 'Personales' })).toHaveAttribute('aria-selected', 'true')
+    expect(slicesOf('Gastos personales')).toEqual([
+      'Vivienda · ARS 45.000,00 · 45,0 %',
+      'Alimentos · ARS 35.000,00 · 35,0 %',
+      'Transporte · ARS 20.000,00 · 20,0 %',
     ])
-    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await user.click(screen.getByRole('tab', { name: 'Grupales' }))
 
-    expect(screen.getByRole('button', { name: /Gastos grupales \(2 de 2\)/ }))
-      .toHaveAttribute('aria-current', 'true')
-    expect(rowsOf('gastos grupales')).toEqual([
-      'AlimentosARS 30.000,0050,0 %',
-      'OcioARS 30.000,0050,0 %',
+    expect(screen.getByRole('tab', { name: 'Grupales' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tabpanel')).toHaveAccessibleName('Grupales')
+    expect(slicesOf('Gastos grupales')).toEqual([
+      'Alimentos · ARS 30.000,00 · 50,0 %',
+      'Ocio · ARS 30.000,00 · 50,0 %',
     ])
+    expect(screen.queryByRole('group', { name: /^Gastos personales:/ })).not.toBeInTheDocument()
+  })
+
+  it('las flechas del teclado cambian de pestaña sin salirse de los extremos', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+
+    screen.getByRole('tab', { name: 'Personales' }).focus()
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByRole('tab', { name: 'Personales' })).toHaveAttribute('aria-selected', 'true')
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Grupales' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: 'Grupales' })).toHaveFocus()
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Grupales' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('muestra el bloque de ingresos por categoría', async () => {
     renderPage()
     await ready()
 
-    expect(rowsOf('ingresos personales')).toEqual([
-      'SueldoARS 800.000,0080,0 %',
-      'FreelanceARS 200.000,0020,0 %',
+    expect(slicesOf('Ingresos personales')).toEqual([
+      'Sueldo · ARS 800.000,00 · 80,0 %',
+      'Freelance · ARS 200.000,00 · 20,0 %',
     ])
     expect(screen.getByText('ARS 1.000.000,00', { selector: 'strong' })).toBeInTheDocument()
   })
 
-  it('la dona comparativa muestra ingresos, gastos y el balance con signo', async () => {
-    renderPage()
+  it('la barra comparativa muestra proporciones, montos y el balance con signo', async () => {
+    const { container } = renderPage()
     await ready()
 
-    expect(screen.getByRole('img', { name: /^Ingresos · ARS 1.000.000,00 · 86,2 %/ }))
-      .toBeInTheDocument()
-    expect(screen.getByRole('img', { name: /^Gastos · ARS 160.000,00 · 13,8 %/ })).toBeInTheDocument()
+    expect(screen.getByRole('img', {
+      name: 'Ingresos ARS 1.000.000,00 (86,2 %) y gastos ARS 160.000,00 (13,8 %)',
+    })).toBeInTheDocument()
+    const segments = [...container.querySelectorAll('.statistics-bar__segment')]
+    expect(segments.map((segment) => segment.textContent)).toEqual(['86,2 %', '13,8 %'])
+    expect(segments[0]).toHaveClass('statistics-bar__segment--income')
+    expect(segments[1]).toHaveClass('statistics-bar__segment--expenses')
+    expect(segments[0].style.width).toMatch(/^86\.2/)
+    const figures = container.querySelector('.statistics-comparison__figures')
+    expect(within(figures).getByText('ARS 1.000.000,00')).toBeInTheDocument()
+    expect(within(figures).getByText('ARS 160.000,00')).toBeInTheDocument()
     expect(screen.getByText('Balance del período')).toBeInTheDocument()
     expect(screen.getByText('+ARS 840.000,00')).toBeInTheDocument()
+    expect(container.querySelector('.statistics-comparison .pie-chart')).toBeNull()
+    expect(container.querySelector('.statistics-comparison .statistics-legend')).toBeNull()
+  })
+
+  it('con un solo tipo con importe la barra tiene un único segmento', async () => {
+    getStatisticsSummary.mockResolvedValue(
+      statistics({ comparison: { expenses: '0.00', balance: '1000000.00' } }),
+    )
+    const { container } = renderPage()
+    await ready()
+
+    const segments = container.querySelectorAll('.statistics-bar__segment')
+    expect(segments).toHaveLength(1)
+    expect(segments[0].textContent).toBe('100,0 %')
+  })
+
+  it('las categorías y los porcentajes no se escriben ni debajo ni sobre las tortas', async () => {
+    const { container } = renderPage()
+    await ready()
+
+    expect(container.querySelector('.statistics-legend')).toBeNull()
+    expect(screen.queryByText('Sueldo')).not.toBeInTheDocument()
+    expect(container.querySelector('.pie-chart__percentage')).toBeNull()
+    expect(container.querySelector('.pie-chart text')).toBeNull()
+  })
+
+  it('la columna de ingresos dice Personales como la de gastos y el balance tiene el mismo tamaño que los totales', async () => {
+    const { container } = renderPage()
+    await ready()
+
+    const columns = container.querySelector('.statistics-columns')
+    expect(within(columns.children[0]).getByText('Personales')).toBeInTheDocument()
+    expect(within(columns.children[1]).getByRole('tab', { name: 'Personales' })).toBeInTheDocument()
+    const figures = container.querySelector('.statistics-comparison__figures')
+    expect(figures.lastElementChild).toHaveClass('statistics-balance')
   })
 
   it('un balance negativo lleva signo y un texto que lo explica', async () => {
@@ -186,7 +250,7 @@ describe('StatisticsPage (032, 034)', () => {
     expect(screen.getByText('Los gastos superan a los ingresos')).toBeInTheDocument()
   })
 
-  it('cada porción tiene su color en la torta y en la lista, con paleta propia para ingresos', async () => {
+  it('cada categoría tiene su color en la torta, con paleta propia para ingresos', async () => {
     const { container } = renderPage()
     await ready()
 
@@ -195,15 +259,23 @@ describe('StatisticsPage (032, 034)', () => {
     )
     expect(fills).toEqual([
       'var(--color-ingreso-salary)',
-      'var(--color-categoria-shopping)',
+      'var(--color-ingreso-freelance)',
       'var(--color-categoria-housing)',
       'var(--color-categoria-food)',
       'var(--color-categoria-transport)',
-      'var(--color-categoria-food)',
-      'var(--color-categoria-leisure)',
-      'var(--color-ingreso-salary)',
-      'var(--color-ingreso-freelance)',
     ])
+  })
+
+  it('al pasar el cursor por una porción muestra categoría, monto y porcentaje', async () => {
+    renderPage()
+    await ready()
+
+    fireEvent.mouseEnter(screen.getByRole('img', { name: /^Sueldo · ARS 800.000,00 · 80,0 %$/ }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/^Sueldo · ARS 800.000,00 · 80,0 %$/)
+    fireEvent.mouseLeave(screen.getByRole('img', { name: /^Sueldo/ }))
+    fireEvent.click(screen.getByRole('img', { name: /^Vivienda/ }))
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/^Vivienda · ARS 45.000,00 · 45,0 %$/)
+    expect(document.querySelector('.pie-chart figcaption')).toBeNull()
   })
 
   it('ofrece el año actual, los años del resumen y el de la dirección, de más reciente a más antiguo', async () => {
@@ -217,11 +289,11 @@ describe('StatisticsPage (032, 034)', () => {
     expect(monthSelect()).toHaveValue('3')
   })
 
-  it('cambiar el mes o el año consulta de inmediato, guarda el período en la dirección y conserva el slide', async () => {
+  it('cambiar el mes o el año consulta de inmediato, guarda el período en la dirección y conserva la pestaña', async () => {
     const user = userEvent.setup()
     renderPage()
     await ready()
-    await user.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await user.click(screen.getByRole('tab', { name: 'Grupales' }))
     const otherMonth = MONTH === '10' ? '9' : '10'
 
     await user.selectOptions(monthSelect(), otherMonth)
@@ -229,8 +301,7 @@ describe('StatisticsPage (032, 034)', () => {
       expect(getStatisticsSummary).toHaveBeenLastCalledWith({ year: YEAR, month: otherMonth }))
     expect(location()).toHaveTextContent(new RegExp(`^/statistics\\?month=${otherMonth}$`))
     await ready()
-    expect(screen.getByRole('button', { name: /Gastos grupales \(2 de 2\)/ }))
-      .toHaveAttribute('aria-current', 'true')
+    expect(screen.getByRole('tab', { name: 'Grupales' })).toHaveAttribute('aria-selected', 'true')
 
     await user.selectOptions(yearSelect(), '2024')
     await waitFor(() =>
@@ -266,7 +337,7 @@ describe('StatisticsPage (032, 034)', () => {
     expect(screen.queryByText('+ARS 999,00')).not.toBeInTheDocument()
   })
 
-  it('sin gastos ni ingresos lo dice, ofrece registrarlos y no dibuja carrusel ni dona', async () => {
+  it('sin gastos ni ingresos lo dice, ofrece registrarlos y no dibuja barra ni columnas', async () => {
     getStatisticsSummary.mockResolvedValue(
       statistics({
         expenses: { total: '0.00', personal: EMPTY, group: EMPTY },
@@ -281,11 +352,11 @@ describe('StatisticsPage (032, 034)', () => {
       .toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Registrar un gasto' })).toHaveAttribute('href', '/expenses/new')
     expect(screen.getByRole('link', { name: 'Registrar un ingreso' })).toHaveAttribute('href', '/incomes/new')
-    expect(screen.queryByRole('region', { name: 'Gastos del período' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 
-  it('sin gastos pero con ingresos omite el carrusel y conserva el resto', async () => {
+  it('sin gastos pero con ingresos muestra el vacío en la columna de gastos y conserva el resto', async () => {
     getStatisticsSummary.mockResolvedValue(
       statistics({
         expenses: { total: '0.00', personal: EMPTY, group: EMPTY },
@@ -297,8 +368,8 @@ describe('StatisticsPage (032, 034)', () => {
 
     expect(await screen.findByText(`No registraste gastos en ${PERIOD}.`, { exact: false }))
       .toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Gastos del período' })).not.toBeInTheDocument()
-    expect(rowsOf('ingresos personales')).toHaveLength(2)
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(slicesOf('Ingresos personales')).toHaveLength(2)
   })
 
   it('sin ingresos efectivizados lo dice en su bloque y ofrece registrar uno', async () => {
@@ -311,21 +382,24 @@ describe('StatisticsPage (032, 034)', () => {
     expect(await screen.findByText(`No registraste ingresos efectivizados en ${PERIOD}.`, { exact: false }))
       .toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Registrar un ingreso' })).toHaveAttribute('href', '/incomes/new')
-    expect(screen.getByRole('region', { name: 'Gastos del período' })).toBeInTheDocument()
+    expect(screen.getByRole('tablist', { name: 'Tipo de gasto' })).toBeInTheDocument()
   })
 
-  it('con un solo tipo de gasto muestra el mensaje del otro en su slide', async () => {
+  it('con un solo tipo de gasto muestra el mensaje del otro en su pestaña', async () => {
     getStatisticsSummary.mockResolvedValueOnce(statistics({ expenses: { group: EMPTY } }))
     const { unmount } = renderPage()
 
-    expect(await screen.findByText(`No tuviste gastos grupales en ${PERIOD}.`)).toBeInTheDocument()
-    expect(legend('gastos personales')).toBeInTheDocument()
+    await ready()
+    expect(slicesOf('Gastos personales')).toHaveLength(3)
+    await userEvent.click(screen.getByRole('tab', { name: 'Grupales' }))
+    expect(screen.getByText(`No tuviste gastos grupales en ${PERIOD}.`)).toBeInTheDocument()
     unmount()
 
     getStatisticsSummary.mockResolvedValueOnce(statistics({ expenses: { personal: EMPTY } }))
     renderPage()
     expect(await screen.findByText(`No registraste gastos personales en ${PERIOD}.`)).toBeInTheDocument()
-    expect(legend('gastos grupales')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('tab', { name: 'Grupales' }))
+    expect(slicesOf('Gastos grupales')).toHaveLength(2)
   })
 
   it('avisa por separado los gastos y los ingresos que no se pudieron convertir', async () => {
@@ -355,7 +429,7 @@ describe('StatisticsPage (032, 034)', () => {
     renderPage()
 
     expect(await screen.findByText(STATISTICS_ERROR_MESSAGE)).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Gastos del período' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Ingresos personales' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Reintentar' }))
 

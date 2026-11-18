@@ -8,8 +8,8 @@
   gap: 0.5rem;
 
   svg {
+    display: block;
     width: 100%;
-    max-width: 220px;
     height: auto;
     overflow: visible;
   }
@@ -37,9 +37,27 @@
   opacity: 0.55;
 }
 
-.pie-chart__detail {
-  min-height: 1.4em;
-  color: var(--color-texto-suave);
-  font-size: 0.9rem;
+.pie-chart__canvas {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+}
+
+.pie-chart__tooltip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: 100%;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radio-control);
+  background: var(--color-texto);
+  color: var(--color-superficie);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.25;
   text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  z-index: 1;
 }

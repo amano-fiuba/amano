@@ -3,8 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import PieChart from './PieChart'
 
-const HINT = 'Pasá el cursor o tocá una porción para ver su detalle'
-
 const ITEMS = [
   { key: 'HOUSING', label: 'Vivienda', color: 'red', value: 50, detail: 'Vivienda · ARS 50,00 · 50,0 %' },
   { key: 'FOOD', label: 'Alimentos', color: 'blue', value: 30, detail: 'Alimentos · ARS 30,00 · 30,0 %' },
@@ -26,7 +24,8 @@ describe('PieChart (032)', () => {
     expect(paths).toHaveLength(3)
     expect([...paths].map((path) => path.getAttribute('fill'))).toEqual(['red', 'blue', 'green'])
     expect(slice(ITEMS[0].detail)).toHaveAttribute('tabindex', '0')
-    expect(screen.getByText(HINT)).toBeInTheDocument()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Pasá el cursor/)).not.toBeInTheDocument()
   })
 
   it('empieza arriba y la primera porción de la mitad termina abajo', () => {
@@ -61,35 +60,59 @@ describe('PieChart (032)', () => {
     expect(container.querySelectorAll('path')).toHaveLength(1)
   })
 
-  it('muestra el detalle al pasar el mouse y lo quita al salir', () => {
+  it('muestra el tooltip con nombre e importe al pasar el mouse y lo quita al salir', () => {
     renderChart()
 
     fireEvent.mouseEnter(slice(ITEMS[1].detail))
-    expect(screen.getByText(ITEMS[1].detail)).toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/^Alimentos · ARS 30,00 · 30,0 %$/)
     expect(slice(ITEMS[1].detail)).toHaveClass('is-active')
 
     fireEvent.mouseLeave(slice(ITEMS[1].detail))
-    expect(screen.getByText(HINT)).toBeInTheDocument()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('muestra el detalle al enfocar con el teclado o tocar una porción', async () => {
+  it('muestra el tooltip al enfocar con el teclado o tocar una porción', async () => {
     const user = userEvent.setup()
     renderChart()
 
     await user.tab()
-    expect(screen.getByText(ITEMS[0].detail)).toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Vivienda · ARS 50,00 · 50,0 %')
     await user.tab()
-    expect(screen.getByText(ITEMS[1].detail)).toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Alimentos · ARS 30,00 · 30,0 %')
     await user.tab()
     await user.tab()
-    expect(screen.getByText(HINT)).toBeInTheDocument()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
 
-    fireEvent.click(slice(ITEMS[2].detail))
-    expect(screen.getByText(ITEMS[2].detail)).toBeInTheDocument()
+    fireEvent.click(slice(ITEMS[1].detail))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Alimentos · ARS 30,00 · 30,0 %')
+  })
+
+  it('un ítem con tooltip propio lo muestra en lugar del detalle', () => {
+    renderChart()
+
+    renderChart([{ ...ITEMS[2], tooltip: 'Mascotas · ARS 20,00' }])
+    fireEvent.mouseEnter(screen.getAllByRole('img', { name: ITEMS[2].detail }).at(-1))
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent(/^Mascotas · ARS 20,00$/)
+  })
+
+  it('no escribe texto de ayuda ni leyenda debajo del gráfico', () => {
+    const { container } = renderChart()
+
+    expect(container.querySelector('figcaption')).toBeNull()
+    expect(container.querySelector('ul')).toBeNull()
+  })
+
+  it('el tooltip de un círculo completo queda sobre el centro', () => {
+    renderChart([ITEMS[0]])
+
+    fireEvent.mouseEnter(slice(ITEMS[0].detail))
+
+    expect(screen.getByRole('tooltip')).toHaveStyle({ left: '50%', top: '50%' })
   })
 })
 
-describe('PieChart aplicado a la comparación de ingresos y gastos (034)', () => {
+describe('PieChart con dos porciones (034)', () => {
   const INCOME = {
     key: 'income',
     label: 'Ingresos',
@@ -127,6 +150,6 @@ describe('PieChart aplicado a la comparación de ingresos y gastos (034)', () =>
 
     await user.tab()
 
-    expect(screen.getByText(INCOME.detail, { selector: 'figcaption' })).toBeInTheDocument()
+    expect(screen.getByRole('tooltip')).toHaveTextContent(INCOME.detail)
   })
 })
