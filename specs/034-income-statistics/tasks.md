@@ -76,10 +76,10 @@ description: "Task list for Estadísticas y analíticas de ingresos personales"
 
 ## Fase 5: Polish & Cobertura
 
-- [ ] T033 Revisar accesibilidad de la pantalla completa: orden de foco, nombres accesibles de carrusel, puntos, flechas y porciones, anuncio del slide activo y del signo del balance, contraste de colores de ingreso en ambos temas y información nunca solo por color (FR-022, FR-025, FR-030, SC-009)
+- [X] T033 Revisar accesibilidad de la pantalla completa: orden de foco, nombres accesibles de carrusel, puntos, flechas y porciones, anuncio del slide activo y del signo del balance, contraste de colores de ingreso en ambos temas y información nunca solo por color (FR-022, FR-025, FR-030, SC-009)
 - [ ] T034 Validar el comportamiento táctil y responsive en pantalla angosta: swipe sin scroll horizontal de la página, scroll vertical intacto, un slide por vez, torta y lista apiladas y torta comparativa con su balance legibles (FR-025, FR-031)
-- [ ] T035 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; corregir lo que falle e informar la cobertura alcanzada (≥ 85 %, SC-007). Incluir la verificación cronometrada de performance de SC-008: con 1000 ingresos y gastos en el período, la pantalla y sus gráficos deben mostrarse en menos de 2 s desde que se elige el período, sin recargar la página
-- [ ] T036 Revisar la trazabilidad FR → tarea y la consistencia entre spec.md, plan.md, contracts/statistics-summary-api.md y este archivo (endpoint, nombres de campos, carrusel y fases); confirmar que la regresión incluye `GET /api/balance` (033) y los saldos, presupuestos y propuestas de liquidación grupales; actualizar `checklists/requirements.md` si cambió alguna clarificación (FR-028, SC-006, constitución II)
+- [X] T035 Ejecutar `mvn -B verify` en backend/ y `npm run lint && npm run test:coverage && npm run build` en frontend/; corregir lo que falle e informar la cobertura alcanzada (≥ 85 %, SC-007). Incluir la verificación cronometrada de performance de SC-008: con 1000 ingresos y gastos en el período, la pantalla y sus gráficos deben mostrarse en menos de 2 s desde que se elige el período, sin recargar la página
+- [X] T036 Revisar la trazabilidad FR → tarea y la consistencia entre spec.md, plan.md, contracts/statistics-summary-api.md y este archivo (endpoint, nombres de campos, carrusel y fases); confirmar que la regresión incluye `GET /api/balance` (033) y los saldos, presupuestos y propuestas de liquidación grupales; actualizar `checklists/requirements.md` si cambió alguna clarificación (FR-028, SC-006, constitución II)
 
 ---
 
