@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,13 @@ vi.mock('../auth/AuthContext', () => ({ useAuth }))
 vi.mock('../api/groupsClient', () => ({
   GROUPS_NETWORK_ERROR_MESSAGE: 'Error de grupos',
   listGroups,
+}))
+vi.mock('../api/incomeClient', () => ({
+  BALANCE_ERROR_MESSAGE: 'Error de balance',
+  getBalance: vi.fn().mockResolvedValue({
+    ok: true,
+    balance: { currency: 'ARS', income: '1500.00', expenses: '400.00', net: '1100.00' },
+  }),
 }))
 vi.mock('../api/expenseClient', () => ({
   RECENT_EXPENSES_ERROR_MESSAGE: 'Error de gastos',
@@ -65,6 +72,19 @@ beforeEach(() => {
   listGroups.mockResolvedValue({ ok: true, groups: [] })
   listRecentExpenses.mockResolvedValue({ ok: true, expenses: [] })
   listReceived.mockResolvedValue({ ok: true, requests: [] })
+})
+
+describe('MainPage: balance del mes', () => {
+  it('muestra la tarjeta de balance inmediatamente debajo del perfil', async () => {
+    renderPage()
+
+    const profile = section('Ana Pérez')
+    const card = await screen.findByRole('region', { name: /^Balance de / })
+    expect(profile.nextElementSibling).toBe(card)
+    await waitFor(() => expect(within(card).getByTestId('monthly-income')).toHaveTextContent('+1.500,00 ARS'))
+    expect(within(card).getByTestId('monthly-expenses')).toHaveTextContent('-400,00 ARS')
+    expect(within(card).getByTestId('monthly-net')).toHaveTextContent('+1.100,00 ARS')
+  })
 })
 
 describe('MainPage (015, US1)', () => {

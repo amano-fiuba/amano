@@ -1,3 +1,4 @@
+import MonthlyBalanceSummaryCard from '../components/main/MonthlyBalanceSummaryCard'
 import PendingRequestsPanel from '../components/main/PendingRequestsPanel'
 import PersonalActivity from '../components/main/PersonalActivity'
 import ProfileSummary from '../components/main/ProfileSummary'
@@ -10,7 +11,10 @@ export default function MainPage() {
   return (
     <main className="main-page">
       <h1 className="main-page__title">Inicio</h1>
-      <ProfileSummary />
+      <div className="main-page__profile-column">
+        <ProfileSummary />
+        <MonthlyBalanceSummaryCard />
+      </div>
       <RecentGroups />
       <div className="main-page__side">
         <PersonalActivity />
