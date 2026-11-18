@@ -165,6 +165,45 @@ export function getPendingDebts(groupId) {
   return getJson(`/api/groups/${groupId}/debts/pending`)
 }
 
+/**
+ * 030: POST /api/groups/{id}/debts/{debtId}/whistle — the creditor's manual notice.
+ * Returns { ok: true, data } on 201; { ok: false, status, detail, fields, code,
+ * retryAfterSeconds } on 4xx and on 503 (the server's own "no se pudo enviar"
+ * message); { ok: false, network: true } on other 5xx or a network failure.
+ * retryAfterSeconds (429) comes from properties.retryAfterSeconds or, when absent,
+ * from the Retry-After header.
+ */
+export async function whistleDebt(groupId, debtId) {
+  try {
+    const response = await fetch(`/api/groups/${groupId}/debts/${debtId}/whistle`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (response.ok) {
+      return { ok: true, data: await response.json() }
+    }
+    if (response.status >= 500 && response.status !== 503) {
+      return { ok: false, network: true }
+    }
+    const problem = await problemOf(response)
+    const header = Number(response.headers?.get?.('Retry-After'))
+    const fromBody = Number(problem.properties?.retryAfterSeconds)
+    let retryAfterSeconds = null
+    if (Number.isFinite(fromBody) && fromBody > 0) retryAfterSeconds = fromBody
+    else if (Number.isFinite(header) && header > 0) retryAfterSeconds = header
+    return {
+      ok: false,
+      status: response.status,
+      detail: typeof problem.detail === 'string' ? problem.detail : '',
+      fields: safeFields(problem.properties?.fields),
+      code: problem.properties?.code ?? null,
+      retryAfterSeconds,
+    }
+  } catch {
+    return { ok: false, network: true }
+  }
+}
+
 /** GET /api/groups/{id}/balances (022 T012): balances by currency → { ok, data }. */
 export function getGroupBalances(groupId) {
   return getJson(`/api/groups/${groupId}/balances`)

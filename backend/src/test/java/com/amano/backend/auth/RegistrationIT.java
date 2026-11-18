@@ -10,15 +10,11 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.amano.backend.support.AbstractIntegrationIT;
 
 /**
  * Contract integration tests for POST /api/auth/register after feature 003
@@ -30,17 +26,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * FR-018, FR-021, FR-022, SC-002. The GreenMail delivery is covered by
  * RegistrationVerificationIT (task T016).
  */
-@SpringBootTest(properties = {
-        // SecurityConfig (T011) requires a valid JWT_SECRET to bootstrap JwtService.
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class RegistrationIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
+class RegistrationIT extends AbstractIntegrationIT {
 
     @Autowired
     private MockMvc mockMvc;

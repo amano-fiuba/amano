@@ -15,6 +15,8 @@ import {
 } from './NavIcons'
 
 const EXPENSE_LABEL = 'Registrar gasto'
+// specs/033-income-management: the personal income form, one tap from the (+) menu.
+const INCOME_LABEL = 'Registrar ingreso'
 
 // specs/027-expense-entry-modes, FR-001: the three ways to register an expense.
 // "Gasto con amigo" and "Gasto grupal" open a chooser before the form.
@@ -58,7 +60,8 @@ function moveFocus(event, list) {
 }
 
 // Botón "+" fijo abajo a la izquierda (specs/015-main-screen, US4). Desde la
-// 027, "Registrar gasto" abre un submenú con las formas de registrar un gasto.
+// 027, "Registrar gasto" abre un submenú con las formas de registrar un gasto; desde
+// la 033, "Registrar ingreso" lleva directo al alta de un ingreso personal.
 export default function QuickActionsButton() {
   const { user } = useAuth() ?? {}
   const [isOpen, setIsOpen] = useState(false)
@@ -275,6 +278,11 @@ export default function QuickActionsButton() {
               {expenseOptions}
             </ul>
           )}
+        </li>
+        <li role="none">
+          <Link to="/incomes/new" role="menuitem" className="quick-actions__item" onClick={close}>
+            {INCOME_LABEL}
+          </Link>
         </li>
         <li role="none">
           <Link

@@ -1,6 +1,10 @@
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('../../auth/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 7 }, setUser: vi.fn() }),
+}))
 import DebtStatusBadge from './DebtStatusBadge'
 import ExpenseDebtList, { NO_DEBTS_MESSAGE } from './ExpenseDebtList'
 import ExpenseSharePreview, {
@@ -106,6 +110,42 @@ describe('ExpenseDebtList con "Registrar pago" (018)', () => {
   it('sin groupId ni expenseId la lista sigue siendo de solo lectura', () => {
     renderList({ debts: [{ ...debt(31, 'Juan Pérez', 'PENDING'), canRegisterPayment: true }] })
     expect(screen.queryByRole('link', { name: 'Registrar pago' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ExpenseDebtList con "Avisar" (030 T012)', () => {
+  function renderList(props) {
+    return render(
+      <MemoryRouter>
+        <ExpenseDebtList groupId="3" expenseId="12" {...props} />
+      </MemoryRouter>,
+    )
+  }
+  const whistle = (row) => within(row).queryByRole('button', { name: /^Avisar a / })
+
+  it('aparece en las deudas avisables cuyo acreedor es la persona de la sesión', () => {
+    renderList({
+      debts: [
+        debt(31, 'Juan Pérez', 'PENDING'),
+        debt(32, 'Carla', 'OVERDUE'),
+        debt(33, 'Tío', 'PAID', '0.00'),
+        debt(34, 'Primo', 'PAYMENT_REPORTED'),
+        { ...debt(35, 'Ana López', 'PENDING'), creditor: { userId: 15, name: 'Juan Pérez' } },
+        { ...debt(36, 'Abuela', 'PARTIALLY_PAID', '1000.00'), debtor: { type: 'SIMULATED', simulatedProfileId: 4, name: 'Abuela' } },
+      ],
+    })
+    const rows = screen.getAllByTestId('debt-row')
+    expect(whistle(rows[0])).toHaveAccessibleName('Avisar a Juan Pérez')
+    expect(whistle(rows[1])).toBeEnabled()
+    expect(whistle(rows[2])).not.toBeInTheDocument()
+    expect(whistle(rows[3])).not.toBeInTheDocument()
+    expect(whistle(rows[4])).not.toBeInTheDocument()
+    expect(whistle(rows[5])).toBeDisabled()
+  })
+
+  it('sin groupId ni expenseId no ofrece avisar', () => {
+    render(<MemoryRouter><ExpenseDebtList debts={[debt(31, 'Juan Pérez', 'PENDING')]} /></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: /^Avisar a / })).not.toBeInTheDocument()
   })
 })
 

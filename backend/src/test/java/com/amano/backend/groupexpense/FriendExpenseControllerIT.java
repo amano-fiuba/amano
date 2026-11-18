@@ -19,22 +19,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
 import com.amano.backend.friendship.DirectDebtPort;
-import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
 import com.amano.backend.groupexpense.overdue.OverdueDebtJob;
+import com.amano.backend.support.AbstractGroupExpenseIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.ObjectMapper;
@@ -44,18 +37,9 @@ import tools.jackson.databind.ObjectMapper;
  * a friend, their direct debt and its isolation from every group flow. Ana and Juan
  * are friends and also share a group; Otra is a stranger.
  */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@AutoConfigureMockMvc
-@Testcontainers
-class FriendExpenseControllerIT {
+class FriendExpenseControllerIT extends AbstractGroupExpenseIntegrationIT {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -74,10 +58,6 @@ class FriendExpenseControllerIT {
 
     @Autowired
     private OverdueDebtJob overdueDebtJob;
-
-    /** A friend expense never converts: any call to the BCRA is a failure. */
-    @MockitoBean
-    private BcraExchangeRateClient bcraExchangeRateClient;
 
     private long ana;
     private long juan;

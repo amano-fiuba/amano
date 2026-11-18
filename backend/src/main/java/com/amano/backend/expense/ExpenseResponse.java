@@ -16,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  *
  * <p>The personal activity screen also wants the amount in the user's preferred
  * currencies: {@link #conversions} is only attached by
- * {@link ExpenseService#listHistory(Long)} and stays {@code null} (thus omitted)
+ * {@link ExpenseService#withConversions(Long, java.util.List)} and stays {@code null} (thus omitted)
  * everywhere else, so the other responses keep their previous shape.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)

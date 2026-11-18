@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.amano.backend.groupexpense.RecurringActivityDetails;
 import com.amano.backend.user.User;
 
 import tools.jackson.databind.ObjectMapper;
@@ -175,6 +176,46 @@ public class ActivityEventService {
         map.put("daysRemaining", daysRemaining);
         map.put("pendingTotals", pendingTotals == null ? List.of() : pendingTotals);
         return record(groupId, GroupActivity.GroupActivityType.PAYER_DUE_NOTICE_SENT, null, map);
+    }
+
+    /**
+     * 030 FR-011: records {@code DEBT_WHISTLED} once the creditor's manual
+     * notice was delivered. {@code outstanding} is the debt balance at whistle
+     * time; {@code fromName} is the debtor and {@code toName} the creditor, the
+     * same keys the history already uses for debt events.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordDebtWhistled(Long groupId, Long creditorUserId, Long whistleId, Long debtId,
+            Long expenseId, BigDecimal outstanding, String currency, String debtorName, String creditorName,
+            String concept) {
+        String normalizedCurrency = validatedCurrency(outstanding, currency);
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("whistleId", whistleId);
+        map.put("debtId", debtId);
+        map.put("expenseId", expenseId);
+        map.put("amount", outstanding.toPlainString());
+        map.put("currency", normalizedCurrency);
+        map.put("fromName", blankToNull(debtorName));
+        map.put("toName", blankToNull(creditorName));
+        map.put("description", blankToNull(concept));
+        return record(groupId, GroupActivity.GroupActivityType.DEBT_WHISTLED, creditorUserId, map);
+    }
+
+    /**
+     * 029 FR-018: records a recurrence state change (pause, resume or finish)
+     * with the member that performed it.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public GroupActivity recordRecurrenceChange(Long groupId, Long actorUserId,
+            GroupActivity.GroupActivityType type, RecurringActivityDetails details) {
+        if (details == null) {
+            throw new IllegalArgumentException("Faltan los datos del gasto recurrente");
+        }
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("expenseId", details.expenseId());
+        map.put("description", blankToNull(details.description()));
+        map.put("status", blankToNull(details.status()));
+        return record(groupId, type, actorUserId, map);
     }
 
     /**

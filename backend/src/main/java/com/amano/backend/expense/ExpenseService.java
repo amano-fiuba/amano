@@ -95,17 +95,27 @@ public class ExpenseService {
     }
 
     /**
-     * Personal activity screen: the user's last 200 expenses, newest first. Each
-     * expense also carries its equivalent in the user's preferred currencies
-     * (ARS when none is configured), skipping its own currency. A missing quote
-     * only omits that conversion, it never fails the page.
+     * Representations of the user's expenses as the personal activity shows them
+     * (031 search and detail): each one also carries its equivalent in the user's
+     * preferred currencies (ARS when none is configured), skipping its own
+     * currency. A missing quote only omits that conversion, it never fails the page.
      */
-    @Transactional(readOnly = true)
-    public List<ExpenseResponse> listHistory(Long userId) {
+    public List<ExpenseResponse> withConversions(Long userId, List<Expense> expenses) {
         Set<Currency> preferred = preferredCurrencies(userId);
-        return expenseRepository.findTop200ByUserIdOrderByCreatedAtDescIdDesc(userId).stream()
+        return expenses.stream()
                 .map(expense -> ExpenseResponse.from(expense, conversionsOf(expense, preferred)))
                 .toList();
+    }
+
+    /**
+     * Detail of one of the user's expenses with its conversions (031, FR-014). A
+     * missing or foreign id is the same neutral 404 (FR-016).
+     */
+    @Transactional(readOnly = true)
+    public ExpenseResponse getExpense(Long userId, Long expenseId) {
+        Expense expense = expenseRepository.findByIdAndUserId(expenseId, userId)
+                .orElseThrow(ExpenseNotFoundException::new);
+        return ExpenseResponse.from(expense, conversionsOf(expense, preferredCurrencies(userId)));
     }
 
     /** Preferred currencies of the account, defaulting to ARS at read time (002 FR-011). */

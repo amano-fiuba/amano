@@ -64,6 +64,16 @@ export function ActivityIcon() {
   )
 }
 
+// Torta con una porción separada: estadísticas (032).
+export function StatisticsIcon() {
+  return (
+    <Icon>
+      <path d="M11 4a8 8 0 1 0 8 8h-8z" />
+      <path d="M14 2.5A8 8 0 0 1 21.5 10H14z" />
+    </Icon>
+  )
+}
+
 export function BellIcon() {
   return (
     <Icon>

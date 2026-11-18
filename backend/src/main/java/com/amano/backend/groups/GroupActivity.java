@@ -21,7 +21,7 @@ import jakarta.persistence.Table;
 @Table(name = "group_activity")
 public class GroupActivity {
 
-    /** Same value set as the V28 CHECK; kept in sync everywhere in the module. */
+    /** Same value set as the V37 CHECK; kept in sync everywhere in the module. */
     public enum GroupActivityType {
         MEMBER_ADDED,
         MEMBER_REMOVED,
@@ -38,7 +38,11 @@ public class GroupActivity {
         DEBT_OVERDUE,
         LIQUIDATION_PROPOSED,
         DEBT_REMINDER_SENT,
-        PAYER_DUE_NOTICE_SENT
+        PAYER_DUE_NOTICE_SENT,
+        RECURRENCE_PAUSED,
+        RECURRENCE_RESUMED,
+        RECURRENCE_FINISHED,
+        DEBT_WHISTLED
     }
 
     @Id

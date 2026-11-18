@@ -560,6 +560,7 @@ fieldset {
   border: 1px solid var(--color-borde);
   border-radius: var(--radio-tarjeta);
   background: var(--color-superficie);
+  box-shadow: 0px 5px 24px color-mix(in srgb, var(--color-sombra) 17%, transparent);
 
   p {
     margin: 0;
@@ -574,9 +575,18 @@ fieldset {
   gap: 0.5rem;
 }
 
-.recurring-item__dates {
+.recurring-item__dates,
+.recurring-item__accumulated {
   color: var(--color-texto-suave);
   font-size: 0.9rem;
+}
+
+.recurring-item__divider {
+  width: 100%;
+  margin: 0.85rem 0 0.35rem;
+  border: 0;
+  border-top: 2px dashed var(--color-texto-suave);
+  opacity: 0.6;
 }
 
 .recurring-item__actions,
@@ -584,8 +594,45 @@ fieldset {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 0.4rem;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.recurring-item__actions {
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.recurring-item__frequency-block {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  label {
+    font-weight: 650;
+  }
+}
+
+.recurring-item__frequency {
+  padding: 0.5rem 0.7rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  background: var(--color-fondo);
+  color: var(--color-texto);
+}
+
+.recurring-item__action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  margin-top: -3px;
+}
+
+.recurring-item__action {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
 }
 
 .recurring-item__confirm p {

@@ -1,30 +1,63 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../api/authClient', () => ({
   me: vi.fn(),
 }))
+vi.mock('../api/expenseClient', async (importOriginal) => ({
+  ...await importOriginal(),
+  createExpense: vi.fn(),
+}))
+vi.mock('../api/currencyClient', () => ({
+  getCurrencyQuote: vi.fn().mockResolvedValue({ ok: false }),
+  listCurrencies: vi.fn().mockResolvedValue({ ok: true, currencies: [] }),
+}))
 
 import { me } from '../api/authClient'
+import { createExpense } from '../api/expenseClient'
+import { SnackbarProvider } from '../components/Snackbar'
 import { AuthProvider } from '../auth/AuthContext'
 import { AppRoutes } from '../App'
 import NewExpensePage, { PROFILE_FALLBACK_NOTICE } from './NewExpensePage'
 import { currentDateIn, deviceTimeZone } from '../hooks/useCurrentDate'
 
+function ActivityProbe() {
+  const location = useLocation()
+  return (
+    <output data-testid="activity">
+      {`actividad:${location.state?.refreshBalance ? 'refrescar' : 'sin-refresco'}${location.search}`}
+    </output>
+  )
+}
+
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/', '/expenses/new']} initialIndex={1}>
-      <Routes>
-        <Route path="/" element={<p>Pantalla principal</p>} />
-        <Route path="/expenses/new" element={<NewExpensePage />} />
-      </Routes>
-    </MemoryRouter>,
+    <SnackbarProvider>
+      <MemoryRouter initialEntries={['/', '/expenses/new']} initialIndex={1}>
+        <Routes>
+          <Route path="/" element={<p>Pantalla principal</p>} />
+          <Route path="/expenses/new" element={<NewExpensePage />} />
+          <Route path="/activity" element={<ActivityProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </SnackbarProvider>,
   )
+}
+
+async function fillAndConfirm(user) {
+  await user.type(screen.getByLabelText('Monto'), '1000')
+  await user.selectOptions(screen.getByLabelText('Categoría'), 'FOOD')
+  await user.selectOptions(screen.getByLabelText('Tipo de gasto'), 'ONE_TIME')
+  await user.selectOptions(screen.getByLabelText('Medio de pago'), 'CASH')
+  await user.click(screen.getByRole('button', { name: 'Guardar' }))
+  await user.click(await screen.findByRole('button', { name: 'Confirmar' }))
 }
 
 beforeEach(() => {
   me.mockReset()
+  createExpense.mockReset()
   vi.unstubAllGlobals()
 })
 
@@ -54,6 +87,32 @@ describe('NewExpensePage (T027/T031)', () => {
 
     await waitFor(() => expect(me).toHaveBeenCalledTimes(1))
     expect(screen.getByLabelText('Moneda')).toHaveValue('ARS')
+  })
+
+  it('al guardar con éxito va a /activity?view=expenses con state.refreshBalance', async () => {
+    me.mockResolvedValue({ ok: true, profile: { currencies: [] } })
+    createExpense.mockResolvedValue({ ok: true, expense: { id: 1 } })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(me).toHaveBeenCalled())
+
+    await fillAndConfirm(user)
+
+    expect(await screen.findByTestId('activity')).toHaveTextContent('actividad:refrescar?view=expenses')
+    expect(createExpense).toHaveBeenCalledTimes(1)
+  })
+
+  it('si guardar falla se queda en el formulario', async () => {
+    me.mockResolvedValue({ ok: true, profile: { currencies: [] } })
+    createExpense.mockResolvedValue({ ok: false, network: true })
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(me).toHaveBeenCalled())
+
+    await fillAndConfirm(user)
+
+    expect(await screen.findByTestId('expense-error')).toBeInTheDocument()
+    expect(screen.queryByTestId('activity')).not.toBeInTheDocument()
   })
 
   it('sin conexión usa ARS y muestra un aviso no bloqueante', async () => {

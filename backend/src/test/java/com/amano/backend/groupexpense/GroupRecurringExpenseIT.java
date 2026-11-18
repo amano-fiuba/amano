@@ -1,5 +1,6 @@
 package com.amano.backend.groupexpense;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,35 +14,21 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.amano.backend.config.JwtService;
 import com.amano.backend.expense.RecurrenceFrequency;
+import com.amano.backend.support.AbstractIntegrationIT;
 
 import jakarta.servlet.http.Cookie;
 import tools.jackson.databind.ObjectMapper;
 
 /** 028: listing and management of the recurring series of a group. */
-@SpringBootTest(properties = {
-        "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c"
-})
-@Testcontainers
-@AutoConfigureMockMvc
-class GroupRecurringExpenseIT {
+class GroupRecurringExpenseIT extends AbstractIntegrationIT {
 
     private static final ZoneId ZONE = ZoneId.of("America/Argentina/Buenos_Aires");
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:18-alpine");
 
     @Autowired
     private MockMvc mockMvc;
@@ -102,12 +89,12 @@ class GroupRecurringExpenseIT {
         return jdbc.queryForObject("""
                 INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
                     expense_date, description, idempotency_key, expense_type, category, payment_method,
-                    recurrence_frequency, recurrence_status, recurrence_next_date)
+                    recurrence_frequency, recurrence_status, recurrence_next_date, recurrence_anchor_date)
                 VALUES (?, ?, ?, 100.00, 'ARS', ?, ?, gen_random_uuid(), 'RECURRING', 'FOOD', 'CASH',
-                    ?, ?, ?)
+                    ?, ?, ?, ?)
                 RETURNING id
                 """, Long.class, groupId, creatorId, creatorId, java.sql.Date.valueOf(date), description,
-                frequency, status, java.sql.Date.valueOf(date));
+                frequency, status, java.sql.Date.valueOf(date), java.sql.Date.valueOf(date));
     }
 
     private Cookie session(long userId) {
@@ -145,17 +132,27 @@ class GroupRecurringExpenseIT {
                         .content(json(Map.of("status", "PAUSED"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PAUSED"))
-                .andExpect(jsonPath("$.nextOccurrenceDate").value("2026-11-02"));
+                .andExpect(jsonPath("$.nextOccurrenceDate").doesNotExist());
 
-        LocalDate expected = RecurrenceFrequency.WEEKLY.firstOnOrAfter(LocalDate.of(2026, 11, 2),
-                LocalDate.now(ZONE));
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate expectedNext = RecurrenceFrequency.WEEKLY.firstAfter(today, today);
         mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
                         .cookie(session(creatorId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("status", "ACTIVE"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
-                .andExpect(jsonPath("$.nextOccurrenceDate").value(expected.toString()));
+                .andExpect(jsonPath("$.nextOccurrenceDate").value(expectedNext.toString()));
+
+        // 029 FR-003: resuming creates an immediate occurrence for today.
+        mockMvc.perform(get("/api/groups/{id}/expenses/{expenseId}", groupId,
+                        jdbc.queryForObject("""
+                                SELECT id FROM group_expenses
+                                WHERE recurrence_source_id = ? AND expense_date = ?
+                                """, Long.class, seriesId, java.sql.Date.valueOf(today)))
+                        .cookie(session(creatorId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.date").value(today.toString()));
     }
 
     @Test
@@ -185,7 +182,7 @@ class GroupRecurringExpenseIT {
         mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
                         .cookie(session(creatorId))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("status", "FINISHED"))))
+                        .content(json(Map.of("status", "STOPPED"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.properties.fields.status")
                         .value(GroupRecurringExpenseService.RECURRENCE_STATUS_INVALID));
@@ -215,9 +212,9 @@ class GroupRecurringExpenseIT {
         long occurrenceId = jdbc.queryForObject("""
                 INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
                     expense_date, description, idempotency_key, expense_type, category, payment_method,
-                    recurrence_source_id)
+                    recurrence_source_id, recurrence_created_via)
                 VALUES (?, ?, ?, 100.00, 'ARS', DATE '2026-11-09', 'Ocurrencia', gen_random_uuid(),
-                    'RECURRING', 'FOOD', 'CASH', ?)
+                    'RECURRING', 'FOOD', 'CASH', ?, 'JOB')
                 RETURNING id
                 """, Long.class, groupId, creatorId, creatorId, seriesId);
 
@@ -237,5 +234,99 @@ class GroupRecurringExpenseIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.frequency").value("YEARLY"))
                 .andExpect(jsonPath("$.status").value("PAUSED"));
+    }
+
+    @Test
+    void finishingAnActiveSeriesIsDefinitive() throws Exception {
+        mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
+                        .cookie(session(creatorId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("status", "FINISHED"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.nextOccurrenceDate").doesNotExist());
+
+        assertThat(activityEvent(seriesId)).isEqualTo("RECURRENCE_FINISHED");
+    }
+
+    @Test
+    void aFinishedSeriesCannotBeModified() throws Exception {
+        jdbc.update("UPDATE group_expenses SET recurrence_status = 'FINISHED', recurrence_next_date = NULL WHERE id = ?",
+                seriesId);
+
+        mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
+                        .cookie(session(creatorId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("status", "ACTIVE"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.properties.code").value("RECURRENCE_FINISHED"));
+    }
+
+    @Test
+    void anotherMemberCannotFinishTheSeries() throws Exception {
+        mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
+                        .cookie(session(otherId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("status", "FINISHED"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void pausingAndResumingAreRecordedWithActor() throws Exception {
+        mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
+                        .cookie(session(creatorId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("status", "PAUSED"))))
+                .andExpect(status().isOk());
+        assertThat(activityEvent(seriesId)).isEqualTo("RECURRENCE_PAUSED");
+
+        mockMvc.perform(patch("/api/groups/{id}/recurring-expenses/{expenseId}", groupId, seriesId)
+                        .cookie(session(creatorId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("status", "ACTIVE"))))
+                .andExpect(status().isOk());
+        assertThat(activityEvent(seriesId)).isEqualTo("RECURRENCE_RESUMED");
+    }
+
+    @Test
+    void listIncludesAccumulatedAmountAndNextDueDate() throws Exception {
+        jdbc.update("""
+                INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
+                    expense_date, due_date, description, idempotency_key, expense_type, category, payment_method,
+                    recurrence_source_id, recurrence_created_via)
+                VALUES (?, ?, ?, 100.00, 'ARS', DATE '2026-11-09', DATE '2026-11-09', 'Ocurrencia', gen_random_uuid(),
+                    'RECURRING', 'FOOD', 'CASH', ?, 'JOB')
+                """, groupId, creatorId, creatorId, seriesId);
+
+        mockMvc.perform(get("/api/groups/{id}/recurring-expenses", groupId).cookie(session(otherId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[1].accumulatedAmount").value("200.00"))
+                .andExpect(jsonPath("$[1].nextDueDate").value("2026-11-02"));
+    }
+
+    @Test
+    void generatedOccurrenceDetailShowsRecurrenceOrigin() throws Exception {
+        long occurrenceId = jdbc.queryForObject("""
+                INSERT INTO group_expenses (group_id, created_by_user_id, payer_user_id, amount, currency,
+                    expense_date, description, idempotency_key, expense_type, category, payment_method,
+                    recurrence_source_id, recurrence_created_via)
+                VALUES (?, ?, ?, 100.00, 'ARS', DATE '2026-11-09', 'Ocurrencia', gen_random_uuid(),
+                    'RECURRING', 'FOOD', 'CASH', ?, 'JOB')
+                RETURNING id
+                """, Long.class, groupId, creatorId, creatorId, seriesId);
+
+        mockMvc.perform(get("/api/groups/{id}/expenses/{expenseId}", groupId, occurrenceId)
+                        .cookie(session(otherId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recurrence.seriesId").value(seriesId))
+                .andExpect(jsonPath("$.recurrence.origin").value("SISTEMA"));
+    }
+
+    private String activityEvent(long expenseId) {
+        return jdbc.queryForObject("""
+                SELECT event_type FROM group_activity
+                WHERE details_json::jsonb ->> 'expenseId' = ?
+                ORDER BY created_at DESC LIMIT 1
+                """, String.class, String.valueOf(expenseId));
     }
 }

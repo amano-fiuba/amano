@@ -4,10 +4,14 @@ import {
   CATEGORY_OPTIONS,
   CURRENCY_OPTIONS,
   FREQUENCY_OPTIONS,
+  INCOME_CATEGORY_OPTIONS,
+  INCOME_PAYMENT_METHOD_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
   STATUS_OPTIONS,
   TYPE_OPTIONS,
+  categoryColor,
   codesOf,
+  incomeCategoryColor,
   labelOf,
 } from './expenseCatalog'
 
@@ -81,5 +85,46 @@ describe('expenseCatalog', () => {
     expect(labelOf(STATUS_OPTIONS, 'ACTIVE')).toBe('Activo')
     expect(labelOf(STATUS_OPTIONS, 'PAUSED')).toBe('Pausado')
     expect(labelOf(STATUS_OPTIONS, 'FINISHED')).toBe('Finalizado')
+  })
+
+  it('fixes the income category codes and their Spanish labels (033)', () => {
+    expect(codesOf(INCOME_CATEGORY_OPTIONS)).toEqual([
+      'SALARY',
+      'FREELANCE',
+      'SALE',
+      'REFUND',
+      'OTHER',
+    ])
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'SALARY')).toBe('Sueldo')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'FREELANCE')).toBe('Freelance')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'SALE')).toBe('Venta')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'REFUND')).toBe('Reembolso')
+    expect(labelOf(INCOME_CATEGORY_OPTIONS, 'OTHER')).toBe('Otros')
+  })
+
+  it('fixes the income payment method codes, without the card methods (033)', () => {
+    expect(codesOf(INCOME_PAYMENT_METHOD_OPTIONS)).toEqual([
+      'CASH',
+      'TRANSFER',
+      'VIRTUAL_WALLET',
+      'OTHER',
+    ])
+    expect(labelOf(INCOME_PAYMENT_METHOD_OPTIONS, 'TRANSFER')).toBe('Transferencia')
+    expect(labelOf(INCOME_PAYMENT_METHOD_OPTIONS, 'DEBIT_CARD')).toBe('')
+    expect(Object.isFrozen(INCOME_CATEGORY_OPTIONS)).toBe(true)
+    expect(Object.isFrozen(INCOME_PAYMENT_METHOD_OPTIONS)).toBe(true)
+  })
+})
+
+describe('colores de las estadísticas (032, 034)', () => {
+  it('cada categoría de ingreso usa su variable CSS, distinta de la de gastos', () => {
+    expect(incomeCategoryColor('SALARY')).toBe('var(--color-ingreso-salary)')
+    const colors = INCOME_CATEGORY_OPTIONS.map((option) => incomeCategoryColor(option.code))
+    expect(new Set(colors).size).toBe(INCOME_CATEGORY_OPTIONS.length)
+    expect(colors).not.toContain(categoryColor('OTHER'))
+  })
+
+  it('la categoría de gasto sigue usando su variable CSS', () => {
+    expect(categoryColor('FOOD')).toBe('var(--color-categoria-food)')
   })
 })
