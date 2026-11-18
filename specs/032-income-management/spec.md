@@ -146,7 +146,7 @@ Un usuario malicioso o un cliente defectuoso intenta datos inválidos o acceder 
 2. **Given** faltan campos obligatorios (monto, moneda, fecha, categoría, medio de cobro), **When** se envía, **Then** recibe `400` indicando cada campo.
 3. **Given** una categoría fuera del catálogo o una fecha inválida, **When** se envía, **Then** recibe `400`.
 4. **Given** un ingreso de otra persona, **When** se pide `GET`, **Then** recibe `404` idéntico al de un id inexistente o no numérico (no revela existencia).
-5. **Given** una solicitud sin sesión, **Then** recibe `401`; con cuenta no verificada, `403`.
+5. **Given** una solicitud sin sesión, **Then** recibe `401`; con cuenta no verificada también `401`, igual que el resto de la API personal (la regla de cuenta verificada de `/api/expenses`).
 6. **Given** exceso de solicitudes, **Then** recibe `429`; ante indisponibilidad de cotizaciones, `503`.
 7. **Given** cualquier ingreso personal, **When** se consultan balances, presupuestos y propuesta de liquidación de un grupo, **Then** los resultados son idénticos a los de antes de la funcionalidad.
 
@@ -181,7 +181,7 @@ Un usuario malicioso o un cliente defectuoso intenta datos inválidos o acceder 
 - **FR-010**: El sistema MUST calcular el **balance neto personal** del período elegido como suma de ingresos efectivizados menos suma de gastos personales, ambos convertidos a la moneda principal, y devolver también los totales por separado y el total proyectado.
 - **FR-011**: El alta de un ingreso MUST reflejarse en el balance en la siguiente consulta, sin pasos manuales.
 - **FR-012**: La conversión MUST usar la cotización de la fecha de cada movimiento (cotizaciones del sistema, `/api/currencies/quote`); si no están disponibles MUST responder `503` en lugar de un balance incompleto.
-- **FR-013**: Los errores MUST usar ProblemDetail en español: `400` (datos), `401` (sin sesión), `403` (cuenta no verificada), `404` neutral, `405` (método no permitido sobre un ingreso), `422` (reutilización de una `Idempotency-Key` con otro cuerpo), `429` y `503`. Una moneda fuera del catálogo es un error de datos (`400`, campo `currency`).
+- **FR-013**: Los errores MUST usar ProblemDetail en español: `400` (datos), `401` (sin sesión o cuenta no verificada, como en gastos), `404` neutral, `405` (método no permitido sobre un ingreso), `422` (reutilización de una `Idempotency-Key` con otro cuerpo), `429` y `503`. Una moneda fuera del catálogo es un error de datos (`400`, campo `currency`).
 - **FR-014**: Los ingresos personales MUST NOT alterar saldos de grupo, presupuestos grupales, deudas ni propuestas de liquidación.
 - **FR-015**: La actividad personal MUST ofrecer una vista "Ingresos" con el buscador, selectores y paginación de 031, y una tarjeta de balance neto visible en ambas vistas.
 - **FR-016**: El detalle del ingreso MUST mostrar monto en su moneda, equivalente en moneda principal, fecha, categoría, medio de cobro, descripción y estado proyectado/efectivizado, sin acciones de editar ni eliminar.
@@ -201,7 +201,7 @@ Un usuario malicioso o un cliente defectuoso intenta datos inválidos o acceder 
 - **Ubicación**: "Actividad personal" gana un control segmentado **Gastos | Ingresos** arriba de la lista; conserva la búsqueda y filtros en la dirección (año, mes, texto, página) como en 031. El botón primario cambia según la vista: "Nuevo gasto" / "Nuevo ingreso".
 - **Tarjeta de balance neto**: sobre el buscador, siempre visible en ambas vistas, para el período elegido. Muestra tres cifras (Ingresos, Gastos, **Balance neto**) en la moneda principal; el neto es la cifra destacada, con signo explícito y color/ícono distintos para positivo y negativo (no solo color, por accesibilidad). Muestra una línea secundaria "Proyectado: +X" cuando hay ingresos futuros. Estado de carga y de error con reintento si no hay cotización.
 - **Fila de ingreso**: tarjeta con borde y flecha (igual que gastos), con descripción o categoría, fecha, monto en moneda original y equivalente; insignia "Proyectado" para fechas futuras.
-- **Formulario**: monto, moneda (catálogo), fecha, categoría, medio de cobro, descripción opcional; errores por campo; la fecha futura muestra un aviso "Se contará en el balance a partir de esa fecha".
+- **Formulario**: Reutiliza el componente DatePickerField utilizado en el registro de gastos para la selección de la fecha del movimiento, sugiriendo por defecto la fecha del día actual. A diferencia de gastos, en el modo ingresos no impone la restricción 'max' a la fecha de hoy, permitiendo seleccionar fechas futuras hasta 1 año adelante (FR-009). Si la fecha elegida es posterior a hoy, muestra el aviso de estado 'Se contará en el balance a partir de esa fecha'.
 - **Vacíos**: sin ingresos, texto invitando a registrar el primero.
 - **Responsive/accesibilidad**: la tarjeta se apila en una columna en pantallas angostas; controles con etiquetas y navegación por teclado.
 

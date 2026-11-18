@@ -2,7 +2,7 @@
 
 Base: `/api` (sin `/v1`). Todos los endpoints requieren la cookie HttpOnly `amano_auth` de una cuenta verificada. El dueño sale siempre de la sesión. Errores en ProblemDetail (RFC 9457), en español, con `properties.fields` para errores por campo.
 
-Errores comunes: `401` sin sesión · `403` cuenta no verificada · `404` neutral (id inexistente, ajeno o no numérico; mismo cuerpo) · `429` exceso de solicitudes · `503` cotizaciones no disponibles.
+Errores comunes: `401` sin sesión o con cuenta no verificada (la misma regla de cuenta verificada que `/api/expenses`) · `404` neutral (id inexistente, ajeno o no numérico; mismo cuerpo) · `429` exceso de solicitudes · `503` cotizaciones no disponibles.
 
 ## Catálogo de categorías
 

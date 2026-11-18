@@ -28,7 +28,7 @@ Con `$K` un UUID nuevo y `-b cookies-A.txt` la sesión de A:
 6. **Búsqueda (US2)**: `GET /api/incomes/search?q=sueldo&year=<año>&page=1&size=20` y `GET /api/incomes/years`.
 7. **Balance**: con gastos cargados, `GET /api/balance?year=<año>` → `net = income − expenses`; crear un ingreso con fecha futura → aparece en `projectedIncome` y no cambia `net` (US4).
 8. **Otra moneda (US4)**: ingreso en USD → `conversions` y balance en la moneda principal.
-9. **Seguridad**: llamada sin cookie → `401`; con cuenta no verificada → `403`.
+9. **Seguridad**: llamada sin cookie → `401`; con cuenta no verificada → `401` (igual que `/api/expenses`).
 10. **Grupos (SC-006)**: `GET /api/groups/{id}/balances` antes y después de crear ingresos → respuestas idénticas.
 
 ## Escenarios en la interfaz

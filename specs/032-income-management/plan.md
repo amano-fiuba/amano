@@ -151,11 +151,11 @@ public record BalanceResponse(String currency, String income,
 
 | Método y ruta | Éxito | Errores |
 |---------------|-------|---------|
-| `POST /api/incomes` (`Idempotency-Key` UUID) | `201` nuevo · `200` reintento idéntico | `400` datos/clave · `401` · `403` · `422` clave reutilizada con otro cuerpo (`properties.code = IDEMPOTENCY_KEY_REUSED`) · `429` |
-| `GET /api/incomes/{id}` | `200` | `401` · `403` · `404` neutral (inexistente, ajeno, no numérico) |
-| `GET /api/incomes/search?q&year&month&from&to&page&size` | `200` | `400` (`properties.fields`) · `401` · `403` |
-| `GET /api/incomes/years` | `200` | `401` · `403` |
-| `GET /api/balance?year&month&from&to` | `200` | `400` · `401` · `403` · `503` cotización no disponible |
+| `POST /api/incomes` (`Idempotency-Key` UUID) | `201` nuevo · `200` reintento idéntico | `400` datos/clave · `401` · `422` clave reutilizada con otro cuerpo (`properties.code = IDEMPOTENCY_KEY_REUSED`) · `429` |
+| `GET /api/incomes/{id}` | `200` | `401` · `404` neutral (inexistente, ajeno, no numérico) |
+| `GET /api/incomes/search?q&year&month&from&to&page&size` | `200` | `400` (`properties.fields`) · `401` |
+| `GET /api/incomes/years` | `200` | `401` |
+| `GET /api/balance?year&month&from&to` | `200` | `400` · `401` · `503` cotización no disponible |
 | `PATCH`/`PUT`/`DELETE /api/incomes/{id}`, y cualquier otro método sobre las rutas anteriores | — | `405` (no hay mapeo) |
 
 Una moneda fuera del catálogo es `400` con `fields.currency`. Los gastos no cambian (`/api/expenses/**` es inmutable, sin `PATCH`/`PUT`/`DELETE` de edición o borrado; `PATCH /api/expenses/{id}/status` es el cambio de estado de series recurrentes de 009 y queda fuera de esta feature).
@@ -176,7 +176,7 @@ sequenceDiagram
     U->>F: Guardar → resumen → Confirmar
     F->>F: Genera Idempotency-Key (UUID) si no hay una pendiente
     F->>C: POST /api/incomes + cookie amano_auth + Idempotency-Key
-    C->>C: Sesión → userId (401 sin sesión, 403 sin verificar)
+    C->>C: Sesión → userId (401 sin sesión o sin verificar, como gastos)
     C->>C: Parsea Idempotency-Key (400 si no es UUID)
     C->>S: registerIncome(userId, key, request)
     S->>S: Valida y normaliza todos los campos (400 con fields)
@@ -219,7 +219,7 @@ sequenceDiagram
 | Modificar | `config/SecurityConfig.java`: agregar `/api/incomes/**` y `/api/balance/**` al matcher `verifiedAccount`; `common/ProblemDetailExceptionHandler.java`: handler de `IncomeNotFoundException` → `404` neutral "Ingreso no encontrado" |
 | Nueva migración | `resources/db/migration/V38__create_incomes.sql` |
 | `ExpenseRepository` | agregar una consulta agregada de gastos por `(moneda, fecha)` y período (aditiva; no cambia las existentes) |
-| Pruebas | `IncomeServiceTest`, `IncomeSearchServiceTest`, `IncomeSchemaIT`, `RegisterIncomeIT`, `IncomeSearchIT`, `BalanceIT`, `IncomeAccessIT` (ajeno → 404, sin verificar → 403, `PATCH/PUT/DELETE` → 405), regresión de grupos (SC-006) |
+| Pruebas | `IncomeServiceTest`, `IncomeSearchServiceTest`, `IncomeSchemaIT`, `RegisterIncomeIT`, `IncomeSearchIT`, `BalanceIT`, `IncomeAccessIT` (ajeno → 404, sin verificar → 401, `PATCH/PUT/DELETE` → 405), regresión de grupos (SC-006) |
 
 ### Frontend (`frontend/src`)
 
