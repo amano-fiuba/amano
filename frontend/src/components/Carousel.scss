@@ -1,0 +1,62 @@
+// Carrusel de un slide visible (034): swipe horizontal sin bloquear el scroll vertical.
+.carousel {
+  margin-bottom: 1rem;
+}
+
+.carousel__viewport {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.carousel__track {
+  display: flex;
+  transition: transform 200ms ease;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.carousel__slide {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+.carousel__controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.carousel__dots {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.carousel__dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  min-width: 0;
+  padding: 0;
+  border: 2px solid var(--color-texto-suave);
+  border-radius: 50%;
+  background: transparent;
+
+  &[aria-current='true'] {
+    background: var(--color-texto);
+    border-color: var(--color-texto);
+  }
+}
+
+// Anuncia el slide activo a lectores de pantalla sin ocupar lugar visual.
+.carousel__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

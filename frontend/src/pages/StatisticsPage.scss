@@ -13,6 +13,13 @@
   --color-categoria-shopping: #e34948;
   --color-categoria-pets: #0e8fa8;
   --color-categoria-other: #8b8f8e;
+
+  // Ingresos (034): paleta propia, distinta de la de gastos (FR-022).
+  --color-ingreso-salary: #0b7a75;
+  --color-ingreso-freelance: #7a4fb5;
+  --color-ingreso-sale: #b8860b;
+  --color-ingreso-refund: #3a6ea5;
+  --color-ingreso-other: #7d8a86;
 }
 
 :root[data-theme='dark'] {
@@ -26,6 +33,12 @@
   --color-categoria-shopping: #e66767;
   --color-categoria-pets: #1fa5c0;
   --color-categoria-other: #8a9a9f;
+
+  --color-ingreso-salary: #2fb5ae;
+  --color-ingreso-freelance: #a98ae0;
+  --color-ingreso-sale: #d9a62e;
+  --color-ingreso-refund: #6a9fd8;
+  --color-ingreso-other: #9aa7a3;
 }
 
 .statistics-page {
@@ -139,4 +152,75 @@
   .statistics-filters select {
     flex: 1 1 0;
   }
+}
+
+// Bloque comparativo y carrusel (034).
+.statistics-comparison {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  background: var(--color-superficie);
+
+  h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.15rem;
+  }
+}
+
+.statistics-comparison__body {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+
+  .pie-chart {
+    flex: 0 0 auto;
+  }
+
+  .statistics-legend {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+.statistics-comparison__summary {
+  margin-top: 0.75rem;
+
+  small {
+    color: var(--color-texto-suave);
+  }
+}
+
+@media (max-width: 720px) {
+  .statistics-comparison__body {
+    flex-direction: column;
+  }
+
+  .statistics-comparison__body .statistics-legend {
+    width: 100%;
+  }
+}
+
+.statistics-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 0 0.5rem;
+
+  span {
+    color: var(--color-texto-suave);
+  }
+
+  strong {
+    font-size: 1.5rem;
+  }
+
+  &.is-negative strong {
+    color: var(--color-categoria-shopping);
+  }
+}
+
+.statistics-page > .statistics-breakdown,
+.statistics-page > .carousel {
+  margin-bottom: 1rem;
 }

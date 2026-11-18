@@ -1,21 +1,6 @@
 import { useState } from 'react'
+import { CENTER, RADIUS, SIZE, slicePath } from './geometry'
 import './PieChart.scss'
-
-const SIZE = 200
-const CENTER = SIZE / 2
-const RADIUS = 92
-
-function pointAt(angle) {
-  return [CENTER + RADIUS * Math.cos(angle), CENTER + RADIUS * Math.sin(angle)]
-}
-
-/** SVG path of the slice between two angles (radians, 0 = right, clockwise). */
-function slicePath(start, end) {
-  const [x1, y1] = pointAt(start)
-  const [x2, y2] = pointAt(end)
-  const largeArc = end - start > Math.PI ? 1 : 0
-  return `M ${CENTER} ${CENTER} L ${x1} ${y1} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${x2} ${y2} Z`
-}
 
 /**
  * Pie chart drawn with plain SVG (specs/032-estadisticas-gastos, plan D13). One

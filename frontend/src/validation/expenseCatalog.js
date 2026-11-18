@@ -113,6 +113,14 @@ export const INCOME_CATEGORY_OPTIONS = Object.freeze([
   { code: 'OTHER', label: 'Otros' },
 ])
 
+/**
+ * Fixed color of an income category in the statistics (034, FR-022, plan D15),
+ * distinct from the expense palette. The values live in StatisticsPage.scss.
+ */
+export function incomeCategoryColor(code) {
+  return `var(--color-ingreso-${String(code).toLowerCase()})`
+}
+
 // A payment received: the card methods of expenses do not apply.
 export const INCOME_PAYMENT_METHOD_OPTIONS = Object.freeze([
   { code: 'CASH', label: 'Efectivo' },
