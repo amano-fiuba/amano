@@ -1,4 +1,4 @@
-# Research: Ingresos personales y balance neto (032)
+# Research: Ingresos personales y balance neto (033)
 
 Todas las decisiones salen de inspeccionar el código existente; no hubo incógnitas externas.
 

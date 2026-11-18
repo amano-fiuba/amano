@@ -1,11 +1,11 @@
 ---
 
-description: "Lista de tareas de la feature 032: ingresos personales y balance neto"
+description: "Lista de tareas de la feature 033: ingresos personales y balance neto"
 ---
 
 # Tasks: Ingresos personales y balance neto
 
-**Input**: Documentos de diseño en `/specs/032-income-management/`
+**Input**: Documentos de diseño en `/specs/033-income-management/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/personal-incomes-api.md, quickstart.md
 
@@ -121,10 +121,10 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 **Independent Test**: dos cuentas A y B; B no puede ver ingresos de A (`404` idéntico al de un id inexistente); `401` sin sesión o con cuenta no verificada; grupos sin cambios.
 
-- [ ] T042 [US5] Agregar `getIncome(userId, incomeId)` a `BE/income/IncomeService.java` (`findByIdAndUserId` → `IncomeNotFoundException`) y `GET /api/incomes/{id}` a `BE/income/IncomeController.java` con el id como `String` (no numérico → el mismo `404`). Depende de T009, T015
-- [ ] T043 [P] [US5] Crear `BT/income/IncomeAccessIT.java`: ingreso ajeno, inexistente y `/api/incomes/abc` devuelven `404` con cuerpo idéntico; sin sesión `401`; cuenta no verificada `401` (la regla de cuenta verificada responde 401, como en gastos) en `POST`, `GET` y `/api/balance`; cada campo faltante del alta (`amount`, `currency`, `date`, `category`, `paymentMethod`) da `400` con su campo
-- [ ] T044 [P] [US5] Crear `BT/income/IncomeGroupIsolationIT.java`: tras crear ingresos del usuario, `GET /api/groups/{id}/balances` y `GET /api/groups/{id}/settlement-proposal` devuelven exactamente lo mismo que antes (SC-006, FR-014)
-- [ ] T045 [P] [US5] Agregar `getIncome(id)` a `FE/api/incomeClient.js` (`200` → `{ok, income}`, `404`/`401` → `{ok:false, status}`, 5xx/red → `network`) y su prueba en `FE/api/incomeClient.test.js`
+- [x] T042 [US5] Agregar `getIncome(userId, incomeId)` a `BE/income/IncomeService.java` (`findByIdAndUserId` → `IncomeNotFoundException`) y `GET /api/incomes/{id}` a `BE/income/IncomeController.java` con el id como `String` (no numérico → el mismo `404`). Depende de T009, T015
+- [x] T043 [P] [US5] Crear `BT/income/IncomeAccessIT.java`: ingreso ajeno, inexistente y `/api/incomes/abc` devuelven `404` con cuerpo idéntico; sin sesión `401`; cuenta no verificada `401` (la regla de cuenta verificada responde 401, como en gastos) en `POST`, `GET` y `/api/balance`; cada campo faltante del alta (`amount`, `currency`, `date`, `category`, `paymentMethod`) da `400` con su campo
+- [x] T044 [P] [US5] Crear `BT/income/IncomeGroupIsolationIT.java`: tras crear ingresos del usuario, `GET /api/groups/{id}/balances` y `GET /api/groups/{id}/settlement-proposal` devuelven exactamente lo mismo que antes (SC-006, FR-014)
+- [x] T045 [P] [US5] Agregar `getIncome(id)` a `FE/api/incomeClient.js` (`200` → `{ok, income}`, `404`/`401` → `{ok:false, status}`, 5xx/red → `network`) y su prueba en `FE/api/incomeClient.test.js`
 
 **Checkpoint**: US1 + US5 listas; la feature es segura para integrar.
 
@@ -138,24 +138,24 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 ### Backend
 
-- [ ] T046 [P] [US2] Crear `BE/income/IncomeSearchLabels.java`: etiquetas en español de `IncomeCategory` (Sueldo, Freelance, Venta, Reembolso, Otros) y normalización sin tildes ni mayúsculas, siguiendo `BE/expense/ExpenseSearchLabels.java`
-- [ ] T047 [P] [US2] Crear `BE/income/IncomeSearchResponse.java` (`incomes`, `page`, `size`, `totalElements`, `totalPages`) y `IncomeYearsResponse(List<Integer> years)`
-- [ ] T048 [US2] Agregar `withConversions(userId, incomes)` a `BE/income/IncomeService.java` (equivalente en las monedas preferidas, ARS si no hay; una cotización faltante omite esa conversión, igual que `ExpenseService.withConversions`) y usarlo en `getIncome` (T042). Depende de T042
-- [ ] T049 [US2] Crear `BE/income/IncomeSearchService.java`: valida `q` (2–100 caracteres tras recortar, `%` y `_` literales), `IncomePeriod`, `page` ≥ 1 y `size` 1–50 (por defecto 20) con los mensajes de contracts/personal-incomes-api.md; busca en descripción y etiqueta de categoría sin tildes (`translate`, sin extensión `unaccent`, como `ExpenseSearchService`); orden `income_date DESC, id DESC`; página fuera de rango devuelve la última; `years(userId)`. Depende de T006, T016, T046–T048
-- [ ] T050 [US2] Agregar `GET /api/incomes/search` y `GET /api/incomes/years` a `BE/income/IncomeController.java`. Depende de T049
-- [ ] T051 [P] [US2] Crear `BT/income/IncomeSearchLabelsTest.java` y `BT/income/IncomeSearchServiceTest.java`: normalización, `q` de 1 y de 101 caracteres, `%`/`_` literales, mes sin año, `from` > `to`, intersección rango + año/mes, paginación y página fuera de rango
-- [ ] T052 [P] [US2] Crear `BT/income/IncomeSearchIT.java`: búsqueda por descripción y por categoría ("proyec", "sueldo"), filtros de año/mes/rango, orden, paginación, `years`, conversiones en la respuesta, solo ingresos propios, `400` con `properties.fields`
+- [x] T046 [P] [US2] Crear `BE/income/IncomeSearchLabels.java`: etiquetas en español de `IncomeCategory` (Sueldo, Freelance, Venta, Reembolso, Otros) y normalización sin tildes ni mayúsculas, siguiendo `BE/expense/ExpenseSearchLabels.java`
+- [x] T047 [P] [US2] Crear `BE/income/IncomeSearchResponse.java` (`incomes`, `page`, `size`, `totalElements`, `totalPages`) y `IncomeYearsResponse(List<Integer> years)`
+- [x] T048 [US2] Agregar `withConversions(userId, incomes)` a `BE/income/IncomeService.java` (equivalente en las monedas preferidas, ARS si no hay; una cotización faltante omite esa conversión, igual que `ExpenseService.withConversions`) y usarlo en `getIncome` (T042). Depende de T042
+- [x] T049 [US2] Crear `BE/income/IncomeSearchService.java`: valida `q` (2–100 caracteres tras recortar, `%` y `_` literales), `IncomePeriod`, `page` ≥ 1 y `size` 1–50 (por defecto 20) con los mensajes de contracts/personal-incomes-api.md; busca en descripción y etiqueta de categoría sin tildes (`translate`, sin extensión `unaccent`, como `ExpenseSearchService`); orden `income_date DESC, id DESC`; página fuera de rango devuelve la última; `years(userId)`. Depende de T006, T016, T046–T048
+- [x] T050 [US2] Agregar `GET /api/incomes/search` y `GET /api/incomes/years` a `BE/income/IncomeController.java`. Depende de T049
+- [x] T051 [P] [US2] Crear `BT/income/IncomeSearchLabelsTest.java` y `BT/income/IncomeSearchServiceTest.java`: normalización, `q` de 1 y de 101 caracteres, `%`/`_` literales, mes sin año, `from` > `to`, intersección rango + año/mes, paginación y página fuera de rango
+- [x] T052 [P] [US2] Crear `BT/income/IncomeSearchIT.java`: búsqueda por descripción y por categoría ("proyec", "sueldo"), filtros de año/mes/rango, orden, paginación, `years`, conversiones en la respuesta, solo ingresos propios, `400` con `properties.fields`
 
 ### Frontend
 
-- [ ] T053 [P] [US2] Agregar `searchIncomes({term, year, month, page, size})` y `listIncomeYears()` a `FE/api/incomeClient.js` (misma forma de retorno que `searchExpenses` y `listExpenseYears`) y probarlos en `FE/api/incomeClient.test.js`
-- [ ] T054 [US2] Crear `FE/pages/IncomeDetailPage.jsx` (`/incomes/:id`): monto y moneda, equivalentes, fecha, categoría, medio de cobro, descripción ("Sin descripción" si falta), insignia "Proyectado" si corresponde, `404` → "No encontramos ese ingreso", error con mensaje, "Volver" a `state.from` o `/activity`; **sin** botones de editar ni eliminar. Registrar la ruta protegida en `FE/App.jsx`. Depende de T045
-- [ ] T055 [US2] Refactor sin cambio de comportamiento: extraer de `FE/pages/ActivityPage.jsx` a `FE/components/activity/` solo lo que la vista de ingresos también necesita (`SearchFilters` con buscador, mes y año; `Pagination`; helpers `pagesOf`, `pageSizeFor`, `rowHeightOf`). Justificación en `plan.md` → "Justificación de la extracción en ActivityPage". `FE/pages/ActivityPage.test.jsx` debe pasar **sin ninguna modificación** antes de seguir
-- [ ] T056 [US2] En `FE/pages/ActivityPage.jsx` agregar el control segmentado **Gastos | Ingresos** con el parámetro `view=incomes` en la URL (por defecto Gastos; se conserva junto con `q`, `year`, `month`, `page` y al limpiar la búsqueda) y hacer que el botón primario sea "Nuevo gasto" o "Nuevo ingreso" según la vista. Depende de T037, T055
-- [ ] T057 [US2] Crear `FE/components/activity/IncomeResults.jsx`: consulta con `searchIncomes`, filas-tarjeta con flecha hacia `/incomes/:id` (descripción o categoría, fecha, monto y moneda original), insignia "Proyectado", "Buscando…", error, "No se encontraron resultados" y vacío con el enlace "Registrar un ingreso". Depende de T053, T054, T055
-- [ ] T058 [US2] Conectar `IncomeResults` en la vista Ingresos de `FE/pages/ActivityPage.jsx`: años de `listIncomeYears` más el año actual, selector de mes deshabilitado con "Todos los años", paginación compartida; `BalanceCard` sigue visible en ambas vistas. Depende de T056, T057
-- [ ] T059 [P] [US2] Crear `FE/pages/IncomeDetailPage.test.jsx`: datos, proyectado, "Sin descripción", `404`, error, "Volver" conserva la búsqueda
-- [ ] T060 [US2] Ampliar `FE/pages/ActivityPage.test.jsx`: cambio de pestaña conserva texto/año/mes en la URL, búsqueda de ingresos, sin resultados, paginación, filas con enlace, botón "Nuevo ingreso" solo en la vista Ingresos, la vista Gastos sigue pasando
+- [x] T053 [P] [US2] Agregar `searchIncomes({term, year, month, page, size})` y `listIncomeYears()` a `FE/api/incomeClient.js` (misma forma de retorno que `searchExpenses` y `listExpenseYears`) y probarlos en `FE/api/incomeClient.test.js`
+- [x] T054 [US2] Crear `FE/pages/IncomeDetailPage.jsx` (`/incomes/:id`): monto y moneda, equivalentes, fecha, categoría, medio de cobro, descripción ("Sin descripción" si falta), insignia "Proyectado" si corresponde, `404` → "No encontramos ese ingreso", error con mensaje, "Volver" a `state.from` o `/activity`; **sin** botones de editar ni eliminar. Registrar la ruta protegida en `FE/App.jsx`. Depende de T045
+- [x] T055 [US2] Refactor sin cambio de comportamiento: extraer de `FE/pages/ActivityPage.jsx` a `FE/components/activity/` solo lo que la vista de ingresos también necesita (`SearchFilters` con buscador, mes y año; `Pagination`; helpers `pagesOf`, `pageSizeFor`, `rowHeightOf`). Justificación en `plan.md` → "Justificación de la extracción en ActivityPage". `FE/pages/ActivityPage.test.jsx` debe pasar **sin ninguna modificación** antes de seguir
+- [x] T056 [US2] En `FE/pages/ActivityPage.jsx` agregar el control segmentado **Gastos | Ingresos** con el parámetro `view=incomes` en la URL (por defecto Gastos; se conserva junto con `q`, `year`, `month`, `page` y al limpiar la búsqueda) y hacer que el botón primario sea "Nuevo gasto" o "Nuevo ingreso" según la vista. Depende de T037, T055
+- [x] T057 [US2] Crear `FE/components/activity/IncomeResults.jsx`: consulta con `searchIncomes`, filas-tarjeta con flecha hacia `/incomes/:id` (descripción o categoría, fecha, monto y moneda original), insignia "Proyectado", "Buscando…", error, "No se encontraron resultados" y vacío con el enlace "Registrar un ingreso". Depende de T053, T054, T055
+- [x] T058 [US2] Conectar `IncomeResults` en la vista Ingresos de `FE/pages/ActivityPage.jsx`: años de `listIncomeYears` más el año actual, selector de mes deshabilitado con "Todos los años", paginación compartida; `BalanceCard` sigue visible en ambas vistas. Depende de T056, T057
+- [x] T059 [P] [US2] Crear `FE/pages/IncomeDetailPage.test.jsx`: datos, proyectado, "Sin descripción", `404`, error, "Volver" conserva la búsqueda
+- [x] T060 [US2] Ampliar `FE/pages/ActivityPage.test.jsx`: cambio de pestaña conserva texto/año/mes en la URL, búsqueda de ingresos, sin resultados, paginación, filas con enlace, botón "Nuevo ingreso" solo en la vista Ingresos, la vista Gastos sigue pasando
 
 **Checkpoint**: US1, US5 y US2 funcionan; la actividad personal muestra gastos e ingresos.
 
@@ -196,9 +196,9 @@ NO hay tareas de endpoints ni de interfaz para editar (`PATCH`/`PUT`) ni elimina
 
 - [ ] T070 Ejecutar `mvn -B verify` en `backend/` y confirmar verde con cobertura de líneas ≥ 85 % (JaCoCo); informar el porcentaje real
 - [ ] T071 Ejecutar `npm run lint && npm run test:coverage && npm run build` en `frontend/` y confirmar verde con cobertura ≥ 85 %; informar el porcentaje real
-- [ ] T072 Recorrer `specs/032-income-management/quickstart.md` (curl y pantallas) contra el entorno local y anotar el resultado de cada escenario
+- [ ] T072 Recorrer `specs/033-income-management/quickstart.md` (curl y pantallas) contra el entorno local y anotar el resultado de cada escenario
 - [ ] T073 Revisar el diff: sin código de depuración, imports sin uso ni cambios en `/api/expenses/**`, `/api/groups/**` ni en tablas existentes; confirmar con `git diff --stat` que solo hay archivos de la feature y que no hay `PATCH`/`PUT`/`DELETE` nuevos
-- [ ] T074 Actualizar los casilleros de `specs/032-income-management/checklists/requirements.md` si algún requisito cambió durante la implementación, y marcar las tareas completadas en este archivo
+- [ ] T074 Actualizar los casilleros de `specs/033-income-management/checklists/requirements.md` si algún requisito cambió durante la implementación, y marcar las tareas completadas en este archivo
 
 ---
 

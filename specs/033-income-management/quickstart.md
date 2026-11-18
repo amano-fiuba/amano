@@ -1,4 +1,4 @@
-# Quickstart: validar ingresos personales (032)
+# Quickstart: validar ingresos personales (033)
 
 Guía para comprobar la feature de punta a punta. Detalle de campos y errores en [contracts/personal-incomes-api.md](./contracts/personal-incomes-api.md); esquema en [data-model.md](./data-model.md).
 

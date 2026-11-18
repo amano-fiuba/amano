@@ -1,4 +1,4 @@
-# Contrato: ingresos personales y balance neto (032)
+# Contrato: ingresos personales y balance neto (033)
 
 Base: `/api` (sin `/v1`). Todos los endpoints requieren la cookie HttpOnly `amano_auth` de una cuenta verificada. El dueño sale siempre de la sesión. Errores en ProblemDetail (RFC 9457), en español, con `properties.fields` para errores por campo.
 

@@ -2,7 +2,7 @@
 
 **Branch**: `feat/income-management` | **Date**: 2026-11-17 | **Spec**: [spec.md](./spec.md)
 
-**Input**: Feature specification from `/specs/032-income-management/spec.md`
+**Input**: Feature specification from `/specs/033-income-management/spec.md`
 
 ## Summary
 
@@ -77,7 +77,7 @@ Archivo: `backend/src/main/resources/db/migration/V38__create_incomes.sql`
 
 ```sql
 -- V38__create_incomes.sql
--- Feature 032-income-management (specs/032-income-management/data-model.md).
+-- Feature 033-income-management (specs/033-income-management/data-model.md).
 -- Ingresos personales inmutables: sin UPDATE/DELETE desde la aplicación.
 -- Sin DELETE (regla del equipo): solo CREATE TABLE.
 
@@ -249,7 +249,7 @@ sequenceDiagram
 ### Documentation (this feature)
 
 ```text
-specs/032-income-management/
+specs/033-income-management/
 ├── plan.md
 ├── research.md
 ├── data-model.md
