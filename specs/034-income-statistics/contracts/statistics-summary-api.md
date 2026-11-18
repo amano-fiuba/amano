@@ -134,9 +134,6 @@ pedido falla, el frontend no muestra bloques parciales (FR-027).
 **401**: sin sesión o cuenta no verificada, con el mismo cuerpo que el resto de las
 rutas protegidas.
 
-**429**: si se supera el límite de pedidos configurado para la aplicación, con el
-mismo cuerpo que el resto de las rutas.
-
 ## Compatibilidad
 
 `GET /api/expenses/statistics` (032) y `GET /api/balance` (033) no cambian: mismo
