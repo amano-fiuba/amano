@@ -88,3 +88,45 @@ describe('PieChart (032)', () => {
     expect(screen.getByText(ITEMS[2].detail)).toBeInTheDocument()
   })
 })
+
+describe('PieChart aplicado a la comparación de ingresos y gastos (034)', () => {
+  const INCOME = {
+    key: 'income',
+    label: 'Ingresos',
+    color: 'teal',
+    value: 750,
+    detail: 'Ingresos · ARS 750,00 · 75,0 %',
+  }
+  const EXPENSES = {
+    key: 'expenses',
+    label: 'Gastos',
+    color: 'orange',
+    value: 250,
+    detail: 'Gastos · ARS 250,00 · 25,0 %',
+  }
+
+  it('dibuja dos porciones proporcionales con su detalle accesible', () => {
+    const { container } = render(<PieChart items={[INCOME, EXPENSES]} label="Ingresos contra gastos" />)
+
+    expect(container.querySelectorAll('path')).toHaveLength(2)
+    expect(container.querySelector('path').getAttribute('d')).toContain(' 0 1 1 ')
+    expect(screen.getByRole('img', { name: INCOME.detail })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: EXPENSES.detail })).toBeInTheDocument()
+  })
+
+  it('con un solo importe es un círculo completo', () => {
+    const { container } = render(<PieChart items={[EXPENSES]} label="Ingresos contra gastos" />)
+
+    expect(container.querySelector('path')).toBeNull()
+    expect(container.querySelector('circle')).toHaveAttribute('fill', 'orange')
+  })
+
+  it('muestra el detalle de la porción enfocada', async () => {
+    const user = userEvent.setup()
+    render(<PieChart items={[INCOME, EXPENSES]} label="Ingresos contra gastos" />)
+
+    await user.tab()
+
+    expect(screen.getByText(INCOME.detail, { selector: 'figcaption' })).toBeInTheDocument()
+  })
+})
