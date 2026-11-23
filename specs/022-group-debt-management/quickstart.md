@@ -12,7 +12,7 @@
 - Docker (PostgreSQL 18 runs as `postgres:18-alpine`, and the backend tests use Testcontainers).
 - Internet access to `https://api.bcra.gob.ar` for the multi-currency scenario (public API, no credentials).
 
-See [first-steps.md](../../first-steps.md) for the full environment.
+See [README.md](../../README.md) for the full environment.
 
 ## Setup
 

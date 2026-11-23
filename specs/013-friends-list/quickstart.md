@@ -6,7 +6,7 @@
 
 - Rama: `feat/visualizar-listado-amigos` (desde `sprint-3`, con 011 y 012).
 - **Sin migración nueva**: alcanza con la `V12` de 011. Si tu base local tiene aplicada la antigua `V6__create_friendship_requests`, recreala (`docker compose down -v`).
-- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `first-steps.md` §7) y frontend (`cd frontend && npm run dev`).
+- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `README.md`, sección «Cómo levantarlo») y frontend (`cd frontend && npm run dev`).
 
 ### Pruebas automatizadas de la feature
 

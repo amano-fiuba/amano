@@ -8,7 +8,7 @@ Guía paso a paso. La primera vez lleva unos 20-30 minutos (casi todo es descarg
 
 | Herramienta | Versión | Para qué |
 |---|---|---|
-| Node.js / npm | 24 (la de first-steps; mínimo 22) | compilar la web y correr Capacitor |
+| Node.js / npm | 24 (la del README; mínimo 22) | compilar la web y correr Capacitor |
 | Android Studio | Otter 2025.2.1 o posterior | SDK de Android y emulador |
 | JDK | 21 (`openjdk-21-jdk`), además del 25 del backend | Gradle de Android no compila con Java 25 |
 | Teléfono Android | 7.0 o superior | correr la app |
@@ -91,7 +91,7 @@ Necesitás que el backend de producción esté arriba y tener una cuenta verific
 
 ### Usar tu backend local (desarrollo)
 
-1. Levantá el stack completo como dice first-steps §9: `docker compose up -d --build` (queda en `http://localhost:8081`).
+1. Levantá el stack completo como dice el README: `docker compose up -d --build` (queda en `http://localhost:8081`).
 2. Creá `frontend/.env.android.local` (git lo ignora):
 
    ```

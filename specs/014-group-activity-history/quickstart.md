@@ -6,7 +6,7 @@
 
 - Rama: `feat/historial-actividad-grupal` (desde `sprint-3`).
 - **Sin migración nueva**: alcanza con `V10` (010). La próxima migración libre sigue siendo `V13`.
-- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `first-steps.md`) y frontend (`cd frontend && npm run dev`).
+- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `README.md`, sección «Cómo levantarlo») y frontend (`cd frontend && npm run dev`).
 - Para agregar amigos registrados a un grupo hace falta una amistad aceptada (011/012): desde el fix de 010 del 2026-11-04, grupos usa las amistades reales (`AcceptedFriendshipPort`). Para la validación manual de 014 alcanza con perfiles simulados.
 
 ### Pruebas automatizadas de la feature
