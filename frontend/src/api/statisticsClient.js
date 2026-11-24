@@ -20,12 +20,16 @@ function breakdownOf(value) {
 }
 
 /**
- * GET /api/stats/summary?year=&month=: { ok: true, statistics } on 200,
+ * GET /api/stats/summary?year=&month= ({ ok: true, statistics } on 200,
  * { ok: false, status } on 4xx (400 invalid period, 401 no session) and
- * { ok: false, network: true } on 5xx or network failures (plan D11).
+ * { ok: false, network: true } on 5xx or network failures, plan D11). `month` is
+ * left out when "Todos los meses" is chosen, so the backend sums the whole year.
  */
 export async function getStatisticsSummary({ year, month }) {
-  const params = new URLSearchParams({ year: String(year), month: String(month) })
+  const params = new URLSearchParams({ year: String(year) })
+  if (month !== '' && month != null) {
+    params.set('month', String(month))
+  }
   try {
     const response = await fetch(`/api/stats/summary?${params}`, { credentials: 'include' })
     if (response.ok) {

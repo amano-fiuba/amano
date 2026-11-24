@@ -285,7 +285,7 @@ describe('StatisticsPage (032, 034)', () => {
     expect(getStatisticsSummary).toHaveBeenCalledWith({ year: '2019', month: '3' })
     const options = within(yearSelect()).getAllByRole('option').map((option) => option.textContent)
     expect(options).toEqual([YEAR, '2024', '2019'])
-    expect(within(monthSelect()).getAllByRole('option')).toHaveLength(12)
+    expect(within(monthSelect()).getAllByRole('option')).toHaveLength(13)
     expect(monthSelect()).toHaveValue('3')
   })
 
@@ -312,6 +312,35 @@ describe('StatisticsPage (032, 034)', () => {
     await user.selectOptions(yearSelect(), YEAR)
     await user.selectOptions(monthSelect(), MONTH)
     await waitFor(() => expect(location()).toHaveTextContent(/^\/statistics$/))
+  })
+
+  it('ofrece "Todos los meses" y con él consulta y grafica el año entero', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await ready()
+
+    expect(within(monthSelect()).getAllByRole('option')[0]).toHaveTextContent('Todos los meses')
+    await user.selectOptions(monthSelect(), '')
+
+    await waitFor(() =>
+      expect(getStatisticsSummary).toHaveBeenLastCalledWith({ year: YEAR, month: '' }))
+    expect(location()).toHaveTextContent(/^\/statistics\?month=$/)
+    expect(screen.getByRole('heading', { name: `Ingresos y gastos de todo el año ${YEAR}` }))
+      .toBeInTheDocument()
+    expect(slicesOf('Ingresos personales')).toHaveLength(2)
+
+    await user.selectOptions(monthSelect(), MONTH)
+    await waitFor(() => expect(location()).toHaveTextContent(/^\/statistics$/))
+  })
+
+  it('al llegar con month= en la dirección muestra todos los meses del año pedido', async () => {
+    renderPage('/statistics?year=2024&month=')
+    await ready()
+
+    expect(getStatisticsSummary).toHaveBeenCalledWith({ year: '2024', month: '' })
+    expect(monthSelect()).toHaveValue('')
+    expect(screen.getByRole('heading', { name: 'Ingresos y gastos de todo el año 2024' }))
+      .toBeInTheDocument()
   })
 
   it('un mes o un año inválido en la dirección se toma como el actual', async () => {

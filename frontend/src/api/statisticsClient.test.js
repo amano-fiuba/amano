@@ -53,6 +53,18 @@ describe('getStatisticsSummary (034)', () => {
     })
   })
 
+  it('con todos los meses omite el parámetro month para que el resumen sea del año entero', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ ok: true, body: BODY }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await getStatisticsSummary({ year: '2026', month: '' })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/stats/summary?year=2026', {
+      credentials: 'include',
+    })
+    expect(result.ok).toBe(true)
+  })
+
   it('completa con valores neutros lo que falta en la respuesta', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ ok: true, body: null })))
 

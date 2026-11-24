@@ -3,7 +3,6 @@ package com.amano.backend.statistics;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.Comparator;
 import java.util.List;
@@ -36,12 +35,12 @@ public class StatisticsSummaryService {
 
     @Transactional(readOnly = true)
     public StatisticsSummaryResponse summary(Long userId, String rawYear, String rawMonth) {
-        // Validates the period and fixes the single calculation currency.
-        ExpenseStatisticsResponse expenses = expenseStatisticsService.statistics(userId, rawYear,
-                rawMonth);
-        YearMonth period = YearMonth.of(expenses.year(), expenses.month());
-        IncomeStatisticsResponse income = incomeStatisticsService.statistics(userId, period,
-                expenses.currency());
+        // Validates the period and fixes the single calculation currency. A blank month
+        // spans the whole year for both kinds of movements.
+        StatisticsPeriod period = StatisticsPeriod.of(rawYear, rawMonth);
+        ExpenseStatisticsResponse expenses = expenseStatisticsService.statistics(userId, period);
+        IncomeStatisticsResponse income = incomeStatisticsService.statistics(userId, period.start(),
+                period.end(), expenses.currency());
 
         // The balance uses the rounded totals, so it matches what is shown (plan D7).
         BigDecimal balance = new BigDecimal(income.total()).subtract(new BigDecimal(expenses.total()));
@@ -56,7 +55,7 @@ public class StatisticsSummaryService {
                 .sorted(Comparator.reverseOrder())
                 .toList();
 
-        return new StatisticsSummaryResponse(expenses.year(), expenses.month(), expenses.currency(),
+        return new StatisticsSummaryResponse(period.year(), period.month(), expenses.currency(),
                 new StatisticsSummaryResponse.ExpensesSummary(expenses.total(),
                         expenses.excludedCount(), expenses.personal(), expenses.group()),
                 income, comparison, years);
