@@ -104,7 +104,7 @@ export default function NotificationsPage() {
         <div className="notifications-page__actions">
           <button
             type="button"
-            className="notifications-page__button notifications-page__button--primary"
+            className="notifications-page__action"
             onClick={markEverything}
             disabled={busy || unreadCount === 0}
           >
@@ -112,7 +112,7 @@ export default function NotificationsPage() {
           </button>
           <button
             type="button"
-            className="notifications-page__button"
+            className="notifications-page__action"
             aria-expanded={modalOpen}
             onClick={() => setModalOpen((open) => !open)}
           >
@@ -177,7 +177,7 @@ export default function NotificationsPage() {
       {status === 'ready' && nextCursor && (
         <button
           type="button"
-          className="notifications-page__button notifications-page__button--more"
+          className="notifications-page__action notifications-page__action--more"
           onClick={() => load(nextCursor)}
         >
           {LOAD_MORE_LABEL}

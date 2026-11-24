@@ -1,7 +1,6 @@
 .notifications-page {
   --notif-ui-hover-bg: #f0faf8;
   --notif-ui-hover-text: #12343b;
-  --notif-ui-active-bg: #e3f2f0;
 
   max-width: 52rem;
   margin: 0 auto;
@@ -22,9 +21,39 @@
   &__actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.5rem 1.25rem;
   }
 
+  // Acciones de la pantalla como enlaces, sin caja ni relieve.
+  &__action,
+  &__action:hover,
+  &__action:active {
+    padding: 0.35rem 0;
+    border: 0;
+    background: none;
+    color: var(--color-acento-oscuro);
+    font-size: 0.875rem;
+    font-weight: 600;
+    transform: none;
+  }
+
+  &__action:hover:not(:disabled) {
+    text-decoration: underline;
+  }
+
+  &__action:focus-visible,
+  &__tab:focus-visible {
+    border-radius: var(--radio-control);
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
+  }
+
+  &__action--more {
+    display: flex;
+    margin: 0.75rem auto 0;
+  }
+
+  // Botones de formulario: preferencias y reintento.
   &__button {
     display: inline-flex;
     align-items: center;
@@ -64,56 +93,46 @@
         color: #ffffff;
       }
     }
-
-    &--more {
-      margin: 1rem auto 0;
-    }
   }
 
   &__filters {
     display: flex;
-    gap: 0.4rem;
+    gap: 1.25rem;
     margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--color-borde);
   }
 
-  &__tab {
-    padding: 0.4rem 0.85rem;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    background: transparent;
-    color: var(--notif-ui-hover-text);
-    font-size: 0.875rem;
+  &__tab,
+  &__tab:hover,
+  &__tab:active {
+    margin-bottom: -1px;
+    padding: 0.5rem 0.1rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: none;
+    color: var(--color-texto-suave);
+    font-size: 0.9rem;
     font-weight: 600;
-    cursor: pointer;
+    transform: none;
+  }
 
-    &:hover,
-    &:focus-visible {
-      background: var(--notif-ui-hover-bg);
-      color: var(--notif-ui-hover-text);
-      outline: none;
-    }
+  &__tab:hover {
+    color: var(--color-texto);
+  }
 
-    &.is-active {
-      border-color: #0b7f82;
-      background: var(--notif-ui-active-bg);
-      color: var(--notif-ui-hover-text);
-    }
+  &__tab.is-active {
+    border-bottom-color: var(--color-acento);
+    color: var(--color-texto);
   }
 
   &__list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    list-style: none;
     margin: 0;
     padding: 0;
-
-    // El bloque "hace x • No leída • Marcar como leída" va a la derecha.
-    .notification-row__footer {
-      justify-content: flex-end;
-    }
+    overflow: hidden;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radio-tarjeta);
+    list-style: none;
   }
 
   &__state {
@@ -136,7 +155,6 @@
 :root[data-theme='dark'] .notifications-page {
   --notif-ui-hover-bg: #1d323a;
   --notif-ui-hover-text: #ffffff;
-  --notif-ui-active-bg: #203841;
 
   &__button {
     background: #16262f;
@@ -155,23 +173,11 @@
       }
     }
   }
-
-  &__tab.is-active {
-    border-color: #2fb3c0;
-  }
 }
 
 @media (max-width: 600px) {
   .notifications-page__header {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .notifications-page__actions {
-    width: 100%;
-
-    .notifications-page__button {
-      flex: 1 1 auto;
-    }
   }
 }

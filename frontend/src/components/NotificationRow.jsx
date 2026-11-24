@@ -11,6 +11,7 @@ export default function NotificationRow({
   showStatus = true,
 }) {
   const unread = !notification.readAt
+  const hasFooter = showTime || (unread && (showStatus || showMarkRead))
   return (
     <li
       className={`notification-row${unread ? ' notification-row--unread' : ''}`}
@@ -22,31 +23,30 @@ export default function NotificationRow({
         aria-label={`${notification.title}. ${unread ? 'No leída' : 'Leída'}. Abrir`}
         onClick={() => onOpen(notification)}
       >
-        <strong className="notification-row__title">{notification.title}</strong>
+        <span className="notification-row__title">{notification.title}</span>
         <span className="notification-row__message">{notification.message}</span>
       </button>
-      <div className="notification-row__footer">
-        {showTime && <span className="notification-row__meta">{notificationDate(notification.createdAt)}</span>}
-        {unread && showStatus && (
-          <span className="notification-row__label">
-            {showTime && <span className="notification-row__separator" aria-hidden="true"> • </span>}
-            No leída
-          </span>
-        )}
-        {unread && showMarkRead && (
-          <>
-            <span className="notification-row__separator" aria-hidden="true">•</span>
+      {hasFooter && (
+        <div className="notification-row__footer">
+          {showTime && <span className="notification-row__meta">{notificationDate(notification.createdAt)}</span>}
+          {unread && showStatus && (
+            <span className="notification-row__label">
+              {showTime && <span className="notification-row__separator" aria-hidden="true">• </span>}
+              No leída
+            </span>
+          )}
+          {unread && showMarkRead && (
             <button
               type="button"
-              className="btn-link-inline"
+              className="notification-row__mark"
               aria-label={`Marcar como leída: ${notification.title}`}
               onClick={() => onMarkRead(notification.id)}
             >
               Marcar como leída
             </button>
-          </>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </li>
   )
 }

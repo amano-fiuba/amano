@@ -1,168 +1,131 @@
+// Fila plana de una lista: separadores en lugar de tarjetas y sin relieve. Sus
+// botones están exceptuados del efecto tecla en detalles.scss ($quietos).
 .notification-row {
-  --notify-hover-bg: #f0faf8;
-  --notify-hover-text: #12343b;
-
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--color-borde);
-  border-radius: var(--radio-tarjeta, 8px);
-  background: var(--color-superficie, #fff);
+  gap: 0.3rem;
+  padding: 0.8rem 1rem 0.8rem 1.9rem;
   color: var(--color-texto);
+  transition: background-color 120ms ease;
 
-  &--unread {
-    background: #e3f2f0;
-    border-color: #9ccfc9;
+  & + & {
+    border-top: 1px solid var(--color-borde);
   }
 
-  &__body {
+  &--unread {
+    background: color-mix(in srgb, var(--color-acento) 7%, transparent);
+
+    // Punto de no leída, centrado con la línea del título.
+    &::before {
+      position: absolute;
+      top: 1.15rem;
+      left: 0.8rem;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--color-acento);
+      content: "";
+    }
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-acento) 13%, transparent);
+  }
+
+  // El fondo, el color y el desplazamiento se fijan en cada estado porque el
+  // `button` global los cambia en :hover y :active.
+  &__body,
+  &__body:hover,
+  &__body:active {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    align-items: flex-start;
+    gap: 0.1rem;
     width: 100%;
     padding: 0;
     border: 0;
     background: none;
     color: inherit;
-    font: inherit;
+    font-weight: 400;
     text-align: left;
-    cursor: pointer;
+    overflow-wrap: anywhere;
+    transform: none;
+  }
 
-    &:focus-visible {
-      outline: 2px solid #0b7f82;
-      outline-offset: 3px;
-      border-radius: var(--radio-control, 4px);
+  // Toda la fila abre la notificación, no solo el texto.
+  &__body::after {
+    position: absolute;
+    inset: 0;
+    content: "";
+  }
+
+  &__body:focus-visible {
+    outline: none;
+
+    &::after {
+      outline: 2px solid var(--color-acento);
+      outline-offset: -2px;
     }
   }
 
   &__title {
-    color: var(--notify-hover-text);
     font-size: 0.95rem;
-    line-height: 1.25;
-  }
-
-  &__message {
-    color: var(--notify-hover-text);
-    font-size: 0.85rem;
+    font-weight: 600;
     line-height: 1.35;
   }
 
-  // Pie en una sola línea: fecha • estado • acción inline.
-  &__footer {
-    display: flex;
-    align-items: center;
-    flex-wrap: nowrap;
-    gap: 0.35rem;
-    min-width: 0;
-    color: var(--notify-hover-text);
-    font-size: 0.75rem;
-  }
-
-  &__meta {
-    flex: 0 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    color: var(--notify-hover-text);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__label {
-    color: #0a5f66;
+  &--unread &__title {
     font-weight: 700;
   }
 
-  &__separator {
-    flex: 0 0 auto;
-    align-self: center;
-    color: var(--notify-hover-text);
-    line-height: 1;
-    opacity: 0.6;
+  &__message {
+    color: var(--color-texto-suave);
+    font-size: 0.875rem;
+    line-height: 1.4;
   }
 
-  // Fondo claro y texto oscuro: el hover aclara la tarjeta en lugar de
-  // teñirla de verde oscuro, y el foco mantiene la misma legibilidad.
-  &:hover,
-  &:focus-within {
-    background: var(--notify-hover-bg);
-    border-color: #0b7f82;
-    color: var(--notify-hover-text);
-
-    .notification-row__title,
-    .notification-row__message,
-    .notification-row__meta,
-    .notification-row__label,
-    .notification-row__separator {
-      color: var(--notify-hover-text);
-    }
-  }
-}
-
-:root[data-theme='dark'] .notification-row {
-  --notify-hover-bg: #1d323a;
-  --notify-hover-text: #ffffff;
-
-  background: #16262f;
-  border-color: #2e4652;
-
-  &--unread {
-    background: #203841;
-    border-color: #3d6a70;
+  &__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.1rem 0.35rem;
+    color: var(--color-texto-suave);
+    font-size: 0.78rem;
   }
 
   &__label {
-    color: #7fd6de;
+    color: var(--color-acento-oscuro);
+    font-weight: 600;
   }
 
-  &:hover,
-  &:focus-within {
-    border-color: #2fb3c0;
+  &__separator {
+    color: var(--color-texto-suave);
   }
-}
 
-// Acción discreta tipo enlace, alineada con la metadata de la notificación.
-.btn-link-inline {
-  --notify-link-color: #0a5f66;
+  // Enlace discreto, por encima del área clickeable de la fila.
+  &__mark,
+  &__mark:hover,
+  &__mark:active {
+    position: relative;
+    z-index: 1;
+    margin-left: auto;
+    padding: 0.15rem 0;
+    border: 0;
+    background: none;
+    color: var(--color-acento-oscuro);
+    font-size: inherit;
+    font-weight: 600;
+    transform: none;
+  }
 
-  // Elemento inline puro: sin caja propia en ningún estado.
-  flex: 0 0 auto;
-  appearance: none;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  color: var(--notify-link-color);
-  font: inherit;
-  font-size: inherit;
-  font-weight: 600;
-  line-height: inherit;
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-
-  // Solo cambia el color y el subrayado: ni fondo, ni borde, ni sombra,
-  // ni desplazamiento que modifique el alto de la tarjeta.
-  &:hover,
-  &:focus-visible {
-    color: #0b7f82;
+  &__mark:hover {
     text-decoration: underline;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    outline: none;
   }
-}
 
-:root[data-theme='dark'] .btn-link-inline {
-  --notify-link-color: #7fd6de;
-
-  &:hover,
-  &:focus-visible {
-    color: #2fb3c0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
+  &__mark:focus-visible {
+    border-radius: var(--radio-control);
+    outline: 2px solid var(--color-acento);
+    outline-offset: 2px;
   }
 }
