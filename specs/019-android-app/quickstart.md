@@ -131,7 +131,7 @@ Recorré esta lista con una cuenta verificada. Cada punto corresponde a una feat
 - [ ] **US3** El enlace a GitHub de la portada abre el navegador.
 - [ ] **US2** "Cerrar sesión" → `/profile` redirige al acceso.
 - [ ] **015** Pantalla principal: resumen de perfil, grupos recientes, actividad personal y solicitudes pendientes.
-- [ ] **015** Barra superior: buscador global, notificaciones y ajustes.
+- [ ] **015** Barra superior: buscador global, notificaciones, íconos de tema y cierre de sesión.
 - [ ] **015** Botón "+" de acciones rápidas: no queda tapado por la barra de gestos.
 - [ ] **016** Eliminar un amigo.
 - [ ] **017/022** Estados de deuda y gestión de deudas del grupo.

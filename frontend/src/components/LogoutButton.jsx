@@ -2,6 +2,7 @@ import { startTransition } from 'react'
 import { useNavigate } from 'react-router'
 import { logout } from '../api/authClient'
 import { useAuth } from '../auth/AuthContext'
+import { LogoutIcon } from './NavIcons'
 
 // Cerrar sesión en la barra global (pedido fuera de specs): con el backend
 // expirando la cookie HttpOnly, la sesión local se limpia pase lo que pase
@@ -22,7 +23,7 @@ export default function LogoutButton() {
     }
     // React Router aplica el cambio de URL dentro de una transición. Si
     // setUser(null) fuera urgente, se renderizaría antes con la URL vieja y
-    // ProtectedRoute mandaría al login con state.from (p. ej. /settings), así
+    // ProtectedRoute mandaría al login con state.from (p. ej. /profile), así
     // que el próximo login volvería ahí en vez de a la pantalla principal.
     // Las dos actualizaciones van en la misma transición para aplicarse juntas.
     startTransition(() => {
@@ -32,8 +33,14 @@ export default function LogoutButton() {
   }
 
   return (
-    <button type="button" className="site-nav__logout" onClick={handleLogout}>
-      Cerrar sesión
+    <button
+      type="button"
+      className="app-header__action"
+      onClick={handleLogout}
+      aria-label="Cerrar sesión"
+      title="Cerrar sesión"
+    >
+      <LogoutIcon />
     </button>
   )
 }

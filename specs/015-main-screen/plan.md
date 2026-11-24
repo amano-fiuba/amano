@@ -19,7 +19,7 @@ Frontend en React 19, React Router y SCSS con Vitest. Backend en Spring Boot con
 ## Etapas
 
 1. Backend: `lastActivityAt` y `GET /api/expenses/recent`.
-2. Barra superior, `/settings` y botón "+".
+2. Barra superior (con los íconos de tema y cierre de sesión) y botón "+".
 3. Buscador global y `?q=` en `/users/search`.
 4. Pantalla principal y rutas de entrada.
 

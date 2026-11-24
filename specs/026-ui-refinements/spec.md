@@ -65,14 +65,14 @@ Una persona verifica su correo o está en una pantalla secundaria y llega a la p
 
 **Why this priority**: La pantalla principal de 015 es el punto de partida; mandar a `/groups` tras la verificación y no ofrecer una vuelta directa la dejaba de lado.
 
-**Independent Test**: Abrir un enlace de verificación válido y llegar a `/` con el snackbar. Desde Amigos, Mis grupos y Ajustes, usar "Ir a Pantalla principal".
+**Independent Test**: Abrir un enlace de verificación válido y llegar a `/` con el snackbar. Desde Amigos y Mis grupos, usar "Ir a Pantalla principal".
 
 **Acceptance Scenarios**:
 
 1. **Given** un enlace de verificación válido, **When** se abre, **Then** se inicia sesión, se llega a `/` y se ve el snackbar "Cuenta verificada".
 2. **Given** una sesión, **When** se abre `/groups`, **Then** no se ve el mensaje de bienvenida de la verificación.
-3. **Given** Actividad, Amigos, Mi perfil, Gastos recurrentes, Ajustes, Buscar usuarios o Mis grupos, **When** se usa "Ir a Pantalla principal", **Then** se llega a `/`.
-4. **Given** una sesión en una pantalla protegida (por ejemplo `/settings`), **When** se cierra sesión y se vuelve a iniciar, **Then** se llega a `/` y no a la pantalla en la que estaba.
+3. **Given** Actividad, Amigos, Mi perfil, Gastos recurrentes, Buscar usuarios o Mis grupos, **When** se usa "Ir a Pantalla principal", **Then** se llega a `/`.
+4. **Given** una sesión en una pantalla protegida (por ejemplo `/profile`), **When** se cierra sesión y se vuelve a iniciar, **Then** se llega a `/` y no a la pantalla en la que estaba.
 
 ---
 
@@ -228,7 +228,7 @@ Una persona edita su perfil, cambia la contraseña o crea un grupo y encuentra C
 - **FR-001**: Tras verificar el correo, la app MUST llevar a `/` reemplazando la entrada del historial.
 - **FR-002**: La verificación MUST avisarse con un snackbar "Cuenta verificada".
 - **FR-003**: `/groups` MUST NOT mostrar el mensaje de bienvenida de la verificación.
-- **FR-004**: Actividad, Amigos, Mi perfil, Gastos recurrentes, Ajustes, Buscar usuarios y Mis grupos MUST mostrar el link "Ir a Pantalla principal".
+- **FR-004**: Actividad, Amigos, Mi perfil, Gastos recurrentes, Buscar usuarios y Mis grupos MUST mostrar el link "Ir a Pantalla principal".
 - **FR-004a**: Cerrar sesión MUST limpiar la sesión y navegar a `/login` en una misma actualización, para que el siguiente login lleve a `/` y no a la pantalla protegida anterior.
 
 **Paleta**
