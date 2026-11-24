@@ -6,7 +6,7 @@
 
 Catálogo para el diálogo "Ver más".
 
-- **Autenticación**: cookie `amano_auth`. Sin sesión → `401`.
+- **Autenticación**: ninguna; el catálogo es datos públicos del BCRA y también se consulta desde el registro.
 - **Parámetros**: ninguno. La búsqueda se hace en el cliente (≤ 32 entradas).
 
 ### Respuesta `200 OK`
