@@ -3,7 +3,7 @@
 // Se importa después de los estilos de cada pantalla.
 
 $quietos: ".text-button, .member-menu__item, .member-menu__trigger, .group-danger, .debt-card__toggle, .app-header__action, .quick-actions__toggle, .quick-actions__item, .date-field__toggle, .date-field__nav, .date-field__day, .group-photo__change, .form-success, .friend-card__delete, .confirm-modal__close, .people-chip button, .notification-row__body, .notification-row__mark, .notifications-page__action, .notifications-page__tab";
-$secundarios: ".group-action, .home-cta--secondary, .theme-toggle, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .delete-friend-dialog__cancel, .choice-dialog__cancel, .choice-dialog__retry, .expense-actions__cancel";
+$secundarios: ".group-action, .home-cta--secondary, .user-card__action, .friend-request-card__reject, .friends-requests__retry, .main-request__reject, .delete-friend-dialog__cancel, .choice-dialog__cancel, .choice-dialog__retry, .expense-actions__cancel";
 $primarios: "button:not(#{$quietos}, #{$secundarios}), .buttonLink, .home-cta:not(.home-cta--secondary)";
 $tiempo: 120ms;
 

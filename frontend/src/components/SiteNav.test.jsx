@@ -49,6 +49,10 @@ describe('SiteNav', () => {
       '/register',
     )
     expect(screen.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /cambiar a modo (claro|oscuro)/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/^modo (claro|oscuro)$/i)).not.toBeInTheDocument()
   })
 
   it('con sesión muestra la barra de la app y no los accesos públicos (015, FR-003)', () => {

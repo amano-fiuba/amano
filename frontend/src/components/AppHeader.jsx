@@ -56,7 +56,7 @@ export default function AppHeader() {
           <FriendsIcon />
         </ActionLink>
         <NotificationsMenu />
-        <ThemeToggle iconOnly />
+        <ThemeToggle />
         <LogoutButton />
       </nav>
     </header>

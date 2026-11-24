@@ -197,7 +197,7 @@ ul {
   margin: 0;
 }
 
-// Barra global de navegación (visible en todas las páginas)
+// Barra global sin sesión: misma estética que la barra con sesión (015).
 .site-nav {
   position: sticky;
   top: 0;
@@ -207,36 +207,27 @@ ul {
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-  padding: 0.7rem 1rem;
-  background: color-mix(in srgb, var(--color-superficie) 94%, transparent);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--color-borde);
-
-  // El toggle de tema deja de flotar: vive dentro de la barra.
-  .theme-toggle {
-    position: static;
-    top: auto;
-    right: auto;
-    z-index: auto;
-  }
+  padding: 0.55rem 1.25rem;
+  background: var(--color-barra);
+  color: #fff;
 }
 
 .site-nav__brand {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--color-texto);
+  color: #fff;
   font-size: 1rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   white-space: nowrap;
 
   &:hover {
-    color: var(--color-acento-oscuro);
+    color: #fff;
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-acento);
+    outline: 2px solid #fff;
     outline-offset: 2px;
   }
 }
@@ -253,52 +244,60 @@ ul {
 .site-nav__links {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.35rem;
   flex-wrap: wrap;
   margin: 0;
 }
 
+// Los accesos públicos son botones de la barra, igual que los íconos con sesión.
 .site-nav__link {
-  padding: 0.45rem 0.8rem;
-  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border: 0;
   border-radius: var(--radio-control);
-  color: var(--color-texto);
+  background: rgb(255 255 255 / 14%);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: none;
 
-  &:hover {
-    background: var(--color-superficie-fuerte);
-    color: var(--color-texto);
+  &:hover,
+  &.is-active {
+    background: rgb(255 255 255 / 28%);
+    box-shadow: inset 0 0 0 2px var(--color-naranja-claro);
+    color: #fff;
   }
 
   &:focus-visible {
-    outline: 2px solid var(--color-acento);
+    outline: 2px solid #fff;
     outline-offset: 2px;
-  }
-
-  &.is-active {
-    background: var(--color-acento);
-    color: #fff;
   }
 }
 
 @media (max-width: 560px) {
   .site-nav {
-    padding: 0.6rem 0.75rem;
-  }
-
-  .site-nav__brand {
-    font-size: 0.95rem;
+    padding: 0.5rem 0.75rem;
   }
 
   .site-nav__links {
     order: 3;
     justify-content: center;
     width: 100%;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .site-nav__link {
-    padding: 0.4rem 0.6rem;
-    font-size: 0.9rem;
+    min-height: 2.25rem;
+    padding: 0 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .site-nav .app-header__action {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 
@@ -519,30 +518,6 @@ fieldset {
   color: var(--color-texto-suave);
   font-size: 0.8rem;
   font-weight: 400;
-}
-
-// Toggle de modo claro/oscuro (fijo, visible en todas las rutas)
-
-.theme-toggle {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 1000;
-  border: 1px solid var(--color-borde);
-  color: var(--color-texto);
-  background: var(--color-superficie);
-  gap: 0.5rem;
-
-  &:hover {
-    background: var(--color-superficie-fuerte);
-    color: var(--color-texto);
-  }
-
-  svg {
-    width: 1rem;
-    height: 1rem;
-    fill: currentColor;
-  }
 }
 
 // Gastos recurrentes (specs/009-pause-recurring-expense, FR-012/FR-013)
