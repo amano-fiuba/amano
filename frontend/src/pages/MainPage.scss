@@ -304,11 +304,17 @@ button.main-request__reject {
   font-weight: 700;
 }
 
-// Tarjeta de balance neto (033): ingresos, gastos y balance en una fila; en pantallas
-// angostas se apila en una columna. El neto es la cifra destacada, con signo explícito,
-// ícono y texto para el caso negativo (no solo color).
+// Tarjeta de balance neto (033): ingresos, gastos y balance en una fila, con el neto
+// a la derecha; en pantallas angostas se apila en una columna. Ingresos en verde,
+// gastos en rojo y neto verde (positivo) o rojo (negativo). El neto es la cifra
+// destacada, con signo explícito, ícono y texto para el caso negativo (no solo color).
 .balance-card {
+  --color-ingreso: #1b7a3a;
   margin: 0 0 1rem;
+}
+
+:root[data-theme='dark'] .balance-card {
+  --color-ingreso: #5fd08a;
 }
 
 .balance-card__figures {
@@ -330,11 +336,20 @@ button.main-request__reject {
   }
 }
 
+.balance-card__income {
+  color: var(--color-ingreso);
+}
+
+.balance-card__expenses {
+  color: var(--color-error);
+}
+
 .balance-card__net {
-  flex: 1 1 12rem;
+  margin-left: auto;
+  text-align: right;
 
   dd {
-    color: var(--color-acento-oscuro);
+    color: var(--color-ingreso);
     font-size: 1.35rem;
   }
 }
