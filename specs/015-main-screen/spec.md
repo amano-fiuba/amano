@@ -6,7 +6,7 @@
 
 **Status**: Implemented (pendiente validación manual)
 
-**Input**: User description: "Gran cambio de UI inspirado en el layout de una red social: barra superior con logo, buscador e íconos (perfil, amigos, notificaciones, FAQ, ajustes) y una pantalla principal con resumen de perfil, grupos recientes y actividad personal."
+**Input**: User description: "Gran cambio de UI inspirado en el layout de una red social: barra superior con logo, buscador e íconos (perfil, amigos, notificaciones, ajustes) y una pantalla principal con resumen de perfil, grupos recientes y actividad personal."
 
 ## Relación con otras especificaciones
 
@@ -27,7 +27,6 @@ Los identificadores FR-### y SC-### de esta especificación son propios de 015.
 - Q: ¿Qué se ve en `/`? → A: Sin sesión, la landing actual. Con sesión, la pantalla principal nueva.
 - Q: ¿La barra nueva es global? → A: Sí, en todas las pantallas con sesión.
 - Q: ¿Dónde quedan tema y cierre de sesión? → A: En una pantalla `/settings` mínima.
-- Q: ¿Qué hace el acceso a FAQ? → A: Lleva a `/faq`, una pantalla "Próximamente".
 - Q: ¿Qué muestra la campanita? → A: Por ahora solo solicitudes de amistad pendientes. Otros tipos de notificación se sumarán en el futuro.
 - Q: ¿Qué busca el buscador? → A: Personas (buscador de 008) y solo los grupos de los que la persona es miembro.
 - Q: ¿Cómo se eligen los grupos? → A: Los 5 con actividad más reciente, informada por el backend.
@@ -63,7 +62,7 @@ Una persona con sesión entra a `/` y ve de un vistazo su perfil, sus grupos má
 
 ### User Story 2 - Barra superior global (Priority: P1)
 
-Con sesión, cada pantalla muestra el logo, el buscador y los accesos a perfil, amigos, notificaciones, FAQ y ajustes.
+Con sesión, cada pantalla muestra el logo, el buscador y los accesos a perfil, amigos, notificaciones y ajustes.
 
 **Why this priority**: Reemplaza la navegación actual; sin ella las pantallas quedan sin accesos.
 
@@ -72,7 +71,7 @@ Con sesión, cada pantalla muestra el logo, el buscador y los accesos a perfil, 
 **Acceptance Scenarios**:
 
 1. **Given** una persona con sesión, **When** presiona el logo, **Then** va a `/`.
-2. **Given** una persona con sesión, **When** presiona perfil, amigos, FAQ o ajustes, **Then** va a `/profile`, `/friends`, `/faq` o `/settings`.
+2. **Given** una persona con sesión, **When** presiona perfil, amigos o ajustes, **Then** va a `/profile`, `/friends` o `/settings`.
 3. **Given** solicitudes pendientes, **When** se muestra la barra, **Then** la campanita indica la cantidad.
 4. **Given** la campanita, **When** se presiona, **Then** se despliega la lista con un acceso a `/friends`; sin solicitudes muestra "No tenés notificaciones".
 5. **Given** el desplegable abierto, **When** se presiona Escape o se hace clic afuera, **Then** se cierra.
@@ -133,7 +132,7 @@ Un botón fijo en la esquina inferior izquierda despliega las acciones de creaci
 - **FR-006**: `/users/search` MUST ejecutar la búsqueda indicada por `?q=`.
 - **FR-007**: `GET /api/groups` MUST incluir `lastActivityAt` para cada grupo, sin cambiar el orden ni los demás campos.
 - **FR-008**: `GET /api/expenses/recent` MUST devolver los últimos 5 gastos propios por fecha de registro, y nunca gastos ajenos.
-- **FR-009**: `/settings` MUST ofrecer el cambio de tema y el cierre de sesión; `/faq` MUST mostrar "Próximamente". Ambas son rutas protegidas.
+- **FR-009**: `/settings` MUST ofrecer el cambio de tema y el cierre de sesión. Es una ruta protegida.
 - **FR-010**: El botón "+" MUST estar disponible en todas las pantallas con sesión.
 - **FR-011**: La interfaz MUST funcionar en modo claro y oscuro y adaptarse a una sola columna en pantallas angostas.
 
@@ -143,13 +142,13 @@ Sin entidades ni migraciones nuevas. `lastActivityAt` se deriva de `group_activi
 
 ## Success Criteria *(mandatory)*
 
-- **SC-001**: Desde la pantalla principal se llega en un paso a perfil, amigos, grupos, FAQ, ajustes y a las tres acciones de creación.
+- **SC-001**: Desde la pantalla principal se llega en un paso a perfil, amigos, grupos, ajustes y a las tres acciones de creación.
 - **SC-002**: Ningún dato de otra cuenta aparece en "Actividad personal", y ningún grupo ajeno aparece en el buscador.
 - **SC-003**: Los tests de frontend y backend pasan, con cobertura mínima de líneas del 85 %.
 
 ## Out of Scope
 
-- Sistema de notificaciones en backend, contenido del FAQ y otros ajustes.
+- Sistema de notificaciones en backend y otros ajustes.
 - Saldos y deudas en la pantalla principal.
 - Paginación de los últimos gastos y perfil público de otras personas.
 - Rediseño de las demás pantallas.

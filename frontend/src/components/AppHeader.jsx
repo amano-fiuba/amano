@@ -7,7 +7,6 @@ import {
   ActivityIcon,
   FriendsIcon,
   GroupsIcon,
-  HelpIcon,
   SettingsIcon,
   StatisticsIcon,
 } from './NavIcons'
@@ -25,7 +24,7 @@ function ActionLink({ to, label, children }) {
 }
 
 // Barra superior con sesión (specs/015-main-screen, US2): logo, buscador y
-// accesos a perfil, actividad, estadísticas (032), grupos, amigos, notificaciones, FAQ y ajustes.
+// accesos a perfil, actividad, estadísticas (032), grupos, amigos, notificaciones y ajustes.
 export default function AppHeader() {
   const { user } = useAuth()
 
@@ -55,9 +54,6 @@ export default function AppHeader() {
           <FriendsIcon />
         </ActionLink>
         <NotificationsMenu />
-        <ActionLink to="/faq" label="Preguntas frecuentes">
-          <HelpIcon />
-        </ActionLink>
         <ActionLink to="/settings" label="Ajustes">
           <SettingsIcon />
         </ActionLink>

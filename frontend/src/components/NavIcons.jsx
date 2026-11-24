@@ -83,16 +83,6 @@ export function BellIcon() {
   )
 }
 
-export function HelpIcon() {
-  return (
-    <Icon>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.8" />
-      <path d="M12 17.2h.01" />
-    </Icon>
-  )
-}
-
 export function SettingsIcon() {
   return (
     <Icon>

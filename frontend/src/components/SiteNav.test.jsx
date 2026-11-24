@@ -58,7 +58,6 @@ describe('SiteNav', () => {
     expect(screen.getByRole('link', { name: 'Actividad personal' })).toHaveAttribute('href', '/activity')
     expect(screen.getByRole('link', { name: 'Estadísticas' })).toHaveAttribute('href', '/statistics')
     expect(screen.getByRole('link', { name: 'Amigos' })).toHaveAttribute('href', '/friends')
-    expect(screen.getByRole('link', { name: 'Preguntas frecuentes' })).toHaveAttribute('href', '/faq')
     expect(screen.getByRole('link', { name: 'Ajustes' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Registrarse' })).not.toBeInTheDocument()

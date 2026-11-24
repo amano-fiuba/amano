@@ -9,7 +9,6 @@ import { SnackbarProvider } from './components/Snackbar'
 const HomePage = lazy(() => import('./pages/HomePage'))
 const MainPage = lazy(() => import('./pages/MainPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const FaqPage = lazy(() => import('./pages/FaqPage'))
 const ActivityPage = lazy(() => import('./pages/ActivityPage'))
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
 const ExpenseDetailPage = lazy(() => import('./pages/ExpenseDetailPage'))
@@ -232,7 +231,7 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        {/* Ajustes y FAQ (specs/015-main-screen, FR-009). */}
+        {/* Ajustes (specs/015-main-screen, FR-009). */}
         <Route
           path="/settings"
           element={
@@ -262,14 +261,6 @@ export function AppRoutes() {
           element={
             <ProtectedRoute>
               <ExpenseDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/faq"
-          element={
-            <ProtectedRoute>
-              <FaqPage />
             </ProtectedRoute>
           }
         />

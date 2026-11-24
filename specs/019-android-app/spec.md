@@ -55,7 +55,7 @@ Una persona instala la app en su teléfono Android, se registra o inicia sesión
 **Acceptance Scenarios**:
 
 1. **Given** la app instalada y una cuenta verificada, **When** la persona inicia sesión, **Then** entra a la pantalla principal igual que en la web.
-2. **Given** una sesión iniciada, **When** recorre la pantalla principal, el buscador, "Grupos", "Registrar gasto", "Gastos recurrentes", "Mi perfil", "Amigos", notificaciones, preguntas frecuentes y ajustes, **Then** cada pantalla carga sus datos y permite las mismas acciones que la web.
+2. **Given** una sesión iniciada, **When** recorre la pantalla principal, el buscador, "Grupos", "Registrar gasto", "Gastos recurrentes", "Mi perfil", "Amigos", notificaciones y ajustes, **Then** cada pantalla carga sus datos y permite las mismas acciones que la web.
 3. **Given** una cuenta nueva, **When** completa el registro en la app, **Then** ve "Revisa tu correo" igual que en la web.
 4. **Given** cualquier error de validación o de negocio definido en 001 a 014, **When** ocurre en la app, **Then** se muestra el mismo mensaje que en la web.
 
