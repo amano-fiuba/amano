@@ -212,11 +212,14 @@ JOIN users us ON us.email = i.email
 CROSS JOIN demo_today t;
 
 -- ===================================================================== grupos
-INSERT INTO groups (name, description, primary_currency, debt_due_days, created_at, updated_at)
+-- reminder_send_days / reminder_message: configuración de 025 para probar el
+-- modal "Deudas y recordatorios" y los recordatorios antes del vencimiento.
+INSERT INTO groups (name, description, primary_currency, debt_due_days,
+                    reminder_send_days, reminder_message, created_at, updated_at)
 VALUES
-    ('[Demo] Depto Palermo',  'Gastos del departamento compartido',        'ARS', 10,   now() - interval '70 days', now()),
-    ('[Demo] Viaje a Río',    'Viaje de verano, cuentas en dólares',       'USD', 15,   now() - interval '55 days', now()),
-    ('[Demo] Cumple de Sofi', 'Regalo y torta, validación de pagos activa','ARS', 7,    now() - interval '25 days', now());
+    ('[Demo] Depto Palermo',  'Gastos del departamento compartido',        'ARS', 10, 5, 'Revisá tus deudas del depto antes del vencimiento.', now() - interval '70 days', now()),
+    ('[Demo] Viaje a Río',    'Viaje de verano, cuentas en dólares',       'USD', 15, 3, NULL, now() - interval '55 days', now()),
+    ('[Demo] Cumple de Sofi', 'Regalo y torta, validación de pagos activa','ARS', 7,  1, 'Mañana vence el pago del cumple.', now() - interval '25 days', now());
 
 INSERT INTO group_members (user_id, group_id, role, joined_at, left_at)
 SELECT us.id, g.id, m.role, now() - m.joined, CASE WHEN m.left_ago IS NULL THEN NULL ELSE now() - m.left_ago END
@@ -270,6 +273,12 @@ VALUES
     ('[Demo] Depto Palermo', NULL, 'tomas@amano.demo',     120, 'USD', 1180.50, 18, 'Muebles online',      'SHOPPING', 'CREDIT_CARD',ARRAY['lucia@amano.demo','martin@amano.demo','tomas@amano.demo'], 'ONE_TIME', NULL),
     ('[Demo] Depto Palermo', NULL, 'lucia@amano.demo',   62000, 'ARS', NULL,  6, 'Pizza y cine (con Carlos)', 'LEISURE','CASH',       ARRAY['lucia@amano.demo','martin@amano.demo','carlos@sim.demo'], 'ONE_TIME', NULL),
     ('[Demo] Depto Palermo', NULL, 'lucia@amano.demo',   33000, 'ARS', NULL,  1, 'Limpieza profunda',      'SERVICES', 'TRANSFER',   ARRAY['lucia@amano.demo','martin@amano.demo','sofia@amano.demo','tomas@amano.demo'], 'ONE_TIME', NULL),
+    -- ---- gastos con vencimiento en el futuro: recordatorios 025 "antes de vencer"
+    -- days_ago negativo => fecha futura; con 10 días de plazo y aviso a los 5 días,
+    -- "Expensas adelantadas" queda para más adelante y "Compra del mes" queda
+    -- con send_date = hoy para que el job del backend envíe los mails.
+    ('[Demo] Depto Palermo', NULL, 'sofia@amano.demo',   95000, 'ARS', NULL, -15, 'Expensas adelantadas', 'SERVICES', 'TRANSFER',   ARRAY['lucia@amano.demo','martin@amano.demo','sofia@amano.demo','tomas@amano.demo'], 'ONE_TIME', NULL),
+    ('[Demo] Depto Palermo', NULL, 'lucia@amano.demo',   48000, 'ARS', NULL,  6, 'Compra del mes (recordatorio pendiente)', 'FOOD', 'DEBIT_CARD', ARRAY['lucia@amano.demo','martin@amano.demo','sofia@amano.demo','tomas@amano.demo'], 'ONE_TIME', NULL),
     -- serie recurrente del depto (las repeticiones se generan más abajo)
     ('[Demo] Depto Palermo', NULL, 'lucia@amano.demo',   28000, 'ARS', NULL, 75, 'Internet del depto',     'SERVICES', 'DEBIT_CARD', ARRAY['lucia@amano.demo','martin@amano.demo','sofia@amano.demo','tomas@amano.demo'], 'RECURRING', 'MONTHLY'),
     -- ---- Viaje a Río (USD)
@@ -278,6 +287,8 @@ VALUES
     ('[Demo] Viaje a Río', NULL, 'joaquin@amano.demo',    900, 'BRL', 0.18500000, 28, 'Cena en Ipanema',   'FOOD',     'CASH',       ARRAY['lucia@amano.demo','valentina@amano.demo','joaquin@amano.demo','martin@amano.demo'], 'ONE_TIME', NULL),
     ('[Demo] Viaje a Río', NULL, 'martin@amano.demo',     150, 'EUR', 1.08500000, 27, 'Excursión al Pan de Azúcar','LEISURE','CREDIT_CARD',ARRAY['lucia@amano.demo','valentina@amano.demo','joaquin@amano.demo','martin@amano.demo'], 'ONE_TIME', NULL),
     ('[Demo] Viaje a Río', NULL, 'lucia@amano.demo',    35000, 'ARS', 0.00079000, 12, 'Traslado al aeropuerto','TRANSPORT','CASH',     ARRAY['lucia@amano.demo','valentina@amano.demo','joaquin@amano.demo','martin@amano.demo'], 'ONE_TIME', NULL),
+    -- vencimiento futuro: con 15 días de plazo y aviso a los 3, queda SCHEDULED
+    ('[Demo] Viaje a Río', NULL, 'valentina@amano.demo',  800, 'USD', NULL, -10, 'Reserva del próximo viaje', 'HOUSING', 'CREDIT_CARD', ARRAY['lucia@amano.demo','valentina@amano.demo','joaquin@amano.demo','martin@amano.demo'], 'ONE_TIME', NULL),
     -- ---- Cumple de Sofi (ARS)
     ('[Demo] Cumple de Sofi', NULL, 'lucia@amano.demo', 48000, 'ARS', NULL, 14, 'Regalo',                  'SHOPPING', 'CREDIT_CARD',ARRAY['lucia@amano.demo','sofia@amano.demo','valentina@amano.demo'], 'ONE_TIME', NULL),
     ('[Demo] Cumple de Sofi', NULL, 'valentina@amano.demo', 27000, 'ARS', NULL, 13, 'Torta y bebidas',     'FOOD',     'VIRTUAL_WALLET', ARRAY['lucia@amano.demo','sofia@amano.demo','valentina@amano.demo'], 'ONE_TIME', NULL),
@@ -382,15 +393,17 @@ JOIN group_expenses ge ON ge.id = p.ge_id
 WHERE p.pos > 0;
 
 -- =========================================== estados de deuda y pagos / liquidaciones
--- plan: PAID | VERIFIED | REPORTED | PARTIAL | OVERDUE | REJECTED (resto queda PENDING)
+-- plan: PAID | VERIFIED | REPORTED | PARTIAL | REJECTED (resto queda PENDING).
+-- Las deudas vencidas NO se marcan acá: se dejan PENDING con vencimiento en el
+-- pasado para que OverdueDebtJob las pase a OVERDUE y envíe la notificación/mail.
 CREATE TEMP TABLE seed_plan (descr text, debtor_email text, plan text) ON COMMIT DROP;
 INSERT INTO seed_plan VALUES
     ('Alquiler (mes pasado)',        'martin@amano.demo',    'VERIFIED'),
     ('Alquiler (mes pasado)',        'sofia@amano.demo',     'PAID'),
-    ('Alquiler (mes pasado)',        'tomas@amano.demo',     'OVERDUE'),
+    ('Alquiler (mes pasado)',        'tomas@amano.demo',     'PENDING'),
     ('Supermercado grande',          'lucia@amano.demo',     'VERIFIED'),
     ('Supermercado grande',          'sofia@amano.demo',     'REPORTED'),
-    ('Supermercado grande',          'tomas@amano.demo',     'OVERDUE'),
+    ('Supermercado grande',          'tomas@amano.demo',     'PENDING'),
     ('Luz y gas',                    'lucia@amano.demo',     'REPORTED'),
     ('Luz y gas',                    'martin@amano.demo',    'PARTIAL'),
     ('Muebles online',               'martin@amano.demo',    'REJECTED'),
@@ -435,11 +448,74 @@ WHERE p.plan <> 'OVERDUE';
 UPDATE debts d SET
     status = CASE p.plan WHEN 'VERIFIED' THEN 'VERIFIED' WHEN 'PAID' THEN 'PAID'
                          WHEN 'PARTIAL' THEN 'PARTIALLY_PAID' WHEN 'REPORTED' THEN 'PAYMENT_REPORTED'
-                         WHEN 'OVERDUE' THEN 'OVERDUE' ELSE 'PENDING' END,
+                         ELSE 'PENDING' END,
     paid_amount = CASE p.plan WHEN 'VERIFIED' THEN d.amount WHEN 'PAID' THEN d.amount
                               WHEN 'PARTIAL' THEN round(d.amount / 2, 2) ELSE 0 END,
     updated_at = now()
 FROM seed_pay p WHERE p.debt_id = d.id;
+
+-- ============================================================ recordatorios (025)
+-- Los datos se arman relativos al día en que corre el seed: los recordatorios
+-- de "Compra del mes" quedan SCHEDULED con send_date = hoy, así que el job del
+-- backend (ReminderJob / REMINDERS_CRON) los envía y escribe sent_at, subject y
+-- body. Los de vencimiento lejano quedan programados para más adelante y una
+-- deuda saldada tiene su recordatorio CANCELLED. Las deudas vencidas tampoco se
+-- marcan acá: las pasa a OVERDUE el job OverdueDebtJob / OVERDUE_CRON.
+CREATE TEMP TABLE seed_reminder_ctx ON COMMIT DROP AS
+SELECT ge.id AS expense_id, ge.group_id, ge.description, ge.due_date,
+       g.reminder_send_days, (ge.due_date - g.reminder_send_days) AS send_date,
+       d.id AS debt_id, d.status AS debt_status
+FROM group_expenses ge
+JOIN groups g ON g.id = ge.group_id
+JOIN debts d ON d.expense_id = ge.id
+WHERE ge.description IN ('Expensas adelantadas', 'Compra del mes (recordatorio pendiente)',
+                         'Reserva del próximo viaje', 'Limpieza profunda', 'Alquiler (mes pasado)');
+
+-- Recordatorios programados: la fecha de envío aún no llegó (antes de vencer).
+INSERT INTO reminders (group_id, kind, debt_id, send_date, status)
+SELECT r.group_id, 'DEBT', r.debt_id, r.send_date, 'SCHEDULED'
+FROM seed_reminder_ctx r
+CROSS JOIN demo_today t
+WHERE r.description IN ('Expensas adelantadas', 'Reserva del próximo viaje', 'Limpieza profunda')
+  AND r.send_date > t.d
+  AND r.debt_status IN ('PENDING', 'PARTIALLY_PAID', 'PAYMENT_REPORTED');
+
+INSERT INTO reminders (group_id, kind, expense_id, send_date, status)
+SELECT r.group_id, 'PAYER_NOTICE', r.expense_id, max(r.send_date), 'SCHEDULED'
+FROM seed_reminder_ctx r
+CROSS JOIN demo_today t
+WHERE r.description IN ('Expensas adelantadas', 'Reserva del próximo viaje', 'Limpieza profunda')
+  AND r.send_date > t.d
+GROUP BY r.group_id, r.expense_id;
+
+-- Recordatorios listos para enviar: la fecha de envío es hoy (o la fecha
+-- calculada si cae en el futuro), pero el gasto todavía no vence. El job los
+-- reclama y envía; acá NO se escribe sent_at/subject/body para que el envío lo
+-- haga el programa y se vea en la casilla de enviados del mail.
+INSERT INTO reminders (group_id, kind, debt_id, send_date, status)
+SELECT r.group_id, 'DEBT', r.debt_id, least(r.send_date, t.d), 'SCHEDULED'
+FROM seed_reminder_ctx r
+CROSS JOIN demo_today t
+WHERE r.description = 'Compra del mes (recordatorio pendiente)'
+  AND r.due_date >= t.d
+  AND r.debt_status IN ('PENDING', 'PARTIALLY_PAID', 'PAYMENT_REPORTED');
+
+INSERT INTO reminders (group_id, kind, expense_id, send_date, status)
+SELECT r.group_id, 'PAYER_NOTICE', r.expense_id, least(max(r.send_date), max(t.d)), 'SCHEDULED'
+FROM seed_reminder_ctx r
+CROSS JOIN demo_today t
+WHERE r.description = 'Compra del mes (recordatorio pendiente)'
+  AND r.due_date >= t.d
+GROUP BY r.group_id, r.expense_id;
+
+-- Cancelado: la deuda ya se saldó, así que el materializador no lo reprograma.
+INSERT INTO reminders (group_id, kind, debt_id, send_date, status)
+SELECT r.group_id, 'DEBT', r.debt_id, r.send_date, 'CANCELLED'
+FROM seed_reminder_ctx r
+WHERE r.description = 'Alquiler (mes pasado)'
+  AND r.debt_status IN ('PAID', 'VERIFIED')
+ORDER BY r.debt_id
+LIMIT 1;
 
 -- ================================================================== actividad
 INSERT INTO group_activity (group_id, event_type, actor_user_id, details_json, created_at)
@@ -469,13 +545,16 @@ INSERT INTO group_activity (group_id, event_type, actor_user_id, details_json, c
 SELECT p.group_id, 'LIQUIDATION_PROPOSED', p.registered_by_user_id, NULL, p.created_at
 FROM payments p WHERE p.status = 'REPORTED' AND p.group_id IN (SELECT id FROM seed_groups);
 
-INSERT INTO group_activity (group_id, event_type, actor_user_id, details_json, created_at)
-SELECT d.group_id, 'DEBT_OVERDUE', d.creditor_user_id, NULL, now() - interval '2 days'
-FROM debts d WHERE d.status = 'OVERDUE' AND d.group_id IN (SELECT id FROM seed_groups);
+-- Los eventos DEBT_OVERDUE, DEBT_REMINDER_SENT y PAYER_DUE_NOTICE_SENT (con su
+-- details_json) los escribe el backend cuando ejecuta los jobs. Si el seed los
+-- insertara, el historial y las notificaciones quedarían "ya enviados" y no
+-- se generaría ningún mail.
 
 -- ======================================== notificaciones y preferencias (035)
 -- Datos para ver el popover (badge "9+"), la bandeja, los filtros, los deep links
--- y el modal de preferencias sin tener que generar eventos a mano.
+-- y el modal de preferencias sin tener que generar eventos a mano. Los avisos de
+-- recordatorio y de vencimiento NO se siembran: los publica el backend cuando
+-- ejecuta los jobs, junto con el mail (ahí se ve el envío real).
 INSERT INTO user_notification_preferences
         (user_id, in_app, email, reminders_whistles, debt_due_collections,
          group_activity, friend_activity, updated_at)
@@ -496,9 +575,6 @@ SELECT
     (SELECT id FROM groups WHERE name = '[Demo] Viaje a Río') AS viaje_id,
     (SELECT id FROM debts
       WHERE group_id = (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo')
-        AND status = 'OVERDUE' ORDER BY id LIMIT 1) AS overdue_debt_id,
-    (SELECT id FROM debts
-      WHERE group_id = (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo')
       ORDER BY id LIMIT 1) AS depto_debt_id,
     (SELECT id FROM group_expenses
       WHERE group_id = (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo')
@@ -515,17 +591,16 @@ INSERT INTO notifications (user_id, type, title, message, target_kind,
                            created_at, read_at)
 SELECT u.id, n.type, n.title, n.message, n.target_kind,
        CASE n.target_kind WHEN 'GROUP' THEN c.depto_id WHEN 'DEBT' THEN c.depto_id END,
-       CASE n.target_kind WHEN 'DEBT' THEN COALESCE(c.overdue_debt_id, c.depto_debt_id) END,
+       CASE n.target_kind WHEN 'DEBT' THEN c.depto_debt_id END,
        CASE n.target_kind WHEN 'GROUP' THEN c.depto_expense_id END,
        CASE n.target_kind WHEN 'FRIEND_REQUEST' THEN COALESCE(c.lucia_request_id, c.pending_request_id) END,
        now() - n.minutes_ago * interval '1 minute',
        CASE WHEN n.unread THEN NULL ELSE now() - n.minutes_ago * interval '1 minute' END
 FROM (VALUES
-    -- Lucía: 11 sin leer (el badge debe mostrar "9+") y una leída al final.
+    -- Lucía: más de 9 sin leer (el badge debe mostrar "9+") y una leída al final.
     ('lucia@amano.demo', 'GROUP_EXPENSE',    'Nuevo gasto en el depto',        'Martín registró un gasto en el grupo.',            'GROUP',          2, true),
     ('lucia@amano.demo', 'REMINDER',         'Recordatorio de cobro',          'Tenés un cobro pendiente en el grupo.',            'GROUP',         15, true),
     ('lucia@amano.demo', 'DEBT_WHISTLE',     'Silbato de cobro',               'Un compañero te silbó una deuda.',                 'DEBT',          40, true),
-    ('lucia@amano.demo', 'DEBT_OVERDUE',     'Deuda vencida',                  'Hay una deuda vencida en el grupo.',               'DEBT',          90, true),
     ('lucia@amano.demo', 'PAYER_DUE_NOTICE', 'Aviso para pagador',             'Se acerca el vencimiento de tu pago.',             'DEBT',         180, true),
     ('lucia@amano.demo', 'FRIEND_REQUEST',   'Solicitud de amistad',           'Tomás quiere ser tu amigo.',                      'FRIEND_REQUEST', 300, true),
     ('lucia@amano.demo', 'FRIEND_ACTIVITY',  'Actividad social',               'Martín aceptó una solicitud de amistad.',         'FRIEND_REQUEST', 600, true),
@@ -535,14 +610,12 @@ FROM (VALUES
     ('lucia@amano.demo', 'REMINDER',         'Recordatorio semanal',           'Revisá tus deudas del grupo.',                    'GROUP',        2200, true),
     ('lucia@amano.demo', 'GROUP_EXPENSE',    'Pizza y cine',                   'Gasto del grupo ya revisado.',                    'GROUP',        3000, false),
     -- Martín: actividad de grupo desactivada en sus preferencias.
-    ('martin@amano.demo', 'DEBT_OVERDUE',    'Deuda vencida',                  'Tenés una deuda vencida en el depto.',            'DEBT',          20, true),
     ('martin@amano.demo', 'FRIEND_REQUEST',  'Solicitud pendiente',            'Tenés una solicitud de amistad para responder.',  'FRIEND_REQUEST', 240, true),
     ('martin@amano.demo', 'GROUP_EXPENSE',   'Supermercado grande',            'Gasto registrado por Sofía.',                    'GROUP',         900, false),
     -- Sofía, Valentina, Joaquín y Tomás: el resto de los tipos y estados.
     ('sofia@amano.demo',  'FRIEND_REQUEST',  'Solicitud de amistad',           'Valentina quiere ser tu amiga.',                  'FRIEND_REQUEST',  60, true),
     ('sofia@amano.demo',  'PAYMENT_RECORDED','Pago confirmado',                'Confirmaron un pago en el grupo.',                'DEBT',         480, false),
     ('valentina@amano.demo','GROUP_EXPENSE', 'Nuevo gasto del viaje',          'Lucía cargó el hotel del viaje.',                 'GROUP',         30, true),
-    ('valentina@amano.demo','DEBT_OVERDUE',  'Cobro pendiente',                'Hay un cobro pendiente en el viaje.',             'DEBT',         720, true),
     ('joaquin@amano.demo','PAYER_DUE_NOTICE','Aviso de pago',                  'Tu pago vence en pocos días.',                    'DEBT',         120, false),
     ('tomas@amano.demo',  'DEBT_WHISTLE',    'Silbato recibido',               'Te silbaron una deuda en el depto.',              'DEBT',          10, true)
 ) AS n(user_email, type, title, message, target_kind, minutes_ago, unread)
@@ -575,3 +648,22 @@ SELECT u.email,
        (SELECT p.email FROM user_notification_preferences p WHERE p.user_id = u.id) AS correo_activo,
        (SELECT p.group_activity FROM user_notification_preferences p WHERE p.user_id = u.id) AS actividad_grupo
 FROM users u WHERE u.email LIKE '%@amano.demo' ORDER BY u.email;
+
+\echo
+\echo 'Recordatorios y vencimientos demo (025/022):'
+\echo 'SCHEDULED con send_date <= hoy los envía ReminderJob (REMINDERS_CRON);'
+\echo 'las deudas PENDING con vencimiento pasado las pasa a OVERDUE OverdueDebtJob (OVERDUE_CRON).'
+SELECT g.name AS grupo, g.reminder_send_days AS aviso_dias,
+       count(*) FILTER (WHERE d.status = 'OVERDUE') AS deudas_vencidas,
+       count(*) FILTER (WHERE d.status = 'PENDING'
+                          AND ge.due_date < (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date)
+           AS a_vencer
+FROM groups g
+LEFT JOIN debts d ON d.group_id = g.id
+LEFT JOIN group_expenses ge ON ge.id = d.expense_id
+WHERE g.name LIKE '[Demo] %' GROUP BY g.id ORDER BY g.id;
+
+SELECT kind, status, count(*) AS recordatorios, min(send_date) AS primer_envio,
+       count(*) FILTER (WHERE status = 'SCHEDULED' AND send_date <=
+           (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date) AS a_enviar
+FROM reminders GROUP BY kind, status ORDER BY kind, status;
