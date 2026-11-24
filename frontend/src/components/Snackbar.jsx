@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import './Snackbar.scss'
 
 export const SNACKBAR_VISIBLE_MS = 5000
+// Avisos de error de navegación de notificaciones (035 FR-019): 4 segundos.
+export const SNACKBAR_ERROR_MS = 4000
 
 // Sin provider (componentes montados aislados) mostrar un aviso no hace nada.
 const SnackbarContext = createContext(() => {})
@@ -14,16 +16,16 @@ export function SnackbarProvider({ children }) {
   const [snackbar, setSnackbar] = useState(null)
   const lastId = useRef(0)
 
-  const showSnackbar = useCallback((message) => {
+  const showSnackbar = useCallback((message, duration = SNACKBAR_VISIBLE_MS) => {
     lastId.current += 1
-    setSnackbar({ id: lastId.current, message })
+    setSnackbar({ id: lastId.current, message, duration })
   }, [])
 
   useEffect(() => {
     if (!snackbar) {
       return undefined
     }
-    const timer = setTimeout(() => setSnackbar(null), SNACKBAR_VISIBLE_MS)
+    const timer = setTimeout(() => setSnackbar(null), snackbar.duration ?? SNACKBAR_VISIBLE_MS)
     return () => clearTimeout(timer)
   }, [snackbar])
 

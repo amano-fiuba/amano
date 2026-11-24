@@ -11,6 +11,7 @@ const MainPage = lazy(() => import('./pages/MainPage'))
 const SettingsPage = lazy(() => import('./pages/SettingsPage'))
 const FaqPage = lazy(() => import('./pages/FaqPage'))
 const ActivityPage = lazy(() => import('./pages/ActivityPage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
 const ExpenseDetailPage = lazy(() => import('./pages/ExpenseDetailPage'))
 const StatisticsPage = lazy(() => import('./pages/StatisticsPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
@@ -127,6 +128,15 @@ export function AppRoutes() {
           element={
             <ProtectedRoute>
               <UsersSearchPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Bandeja de notificaciones in-app (specs/035-in-app-notifications, US2). */}
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           }
         />

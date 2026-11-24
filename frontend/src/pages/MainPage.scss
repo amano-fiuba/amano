@@ -649,3 +649,10 @@ button.main-request__reject {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+// Deep link de notificación de deuda (035 FR-017): resaltado efímero de 2 s.
+.expense-rows li[data-highlighted='true'] {
+  outline: 2px solid var(--color-primario, #356);
+  outline-offset: 2px;
+  background: var(--color-fondo-sutil, transparent);
+}

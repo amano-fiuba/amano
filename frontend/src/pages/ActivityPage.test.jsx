@@ -643,6 +643,22 @@ describe('ActivityPage: balance neto y nuevo ingreso (033)', () => {
   })
 })
 
+describe('ActivityPage: deep link de deuda (035 FR-017)', () => {
+  it('hace scroll y resalta durante 2 s la transacción indicada por ?debt=', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+
+    renderPage('/activity?debt=1')
+
+    const title = await screen.findByText('Pizza')
+    const row = title.closest('li')
+    expect(row).toHaveAttribute('data-debt-id', '1')
+    expect(row).toHaveAttribute('data-highlighted', 'true')
+    expect(scrollIntoView).toHaveBeenCalled()
+    await waitFor(() => expect(row).not.toHaveAttribute('data-highlighted'), { timeout: 3000 })
+  })
+})
+
 describe('ActivityPage: vista Ingresos (033, US2)', () => {
   const incomesButton = () => screen.getByRole('button', { name: 'Ingresos' })
   const expensesButton = () => screen.getByRole('button', { name: 'Gastos' })

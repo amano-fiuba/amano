@@ -34,6 +34,10 @@ DELETE FROM reminders      WHERE group_id IN (SELECT id FROM old_groups)
                               OR expense_id IN (SELECT id FROM old_expenses);
 DELETE FROM debt_whistles  WHERE group_id IN (SELECT id FROM old_groups)
                               OR debt_id IN (SELECT id FROM old_debts);
+-- 035: bandeja y preferencias de los usuarios demo (las FK a users también
+-- cascadean, pero se limpia explícitamente para repetir el seed sin duplicados).
+DELETE FROM notifications WHERE user_id IN (SELECT id FROM old_users);
+DELETE FROM user_notification_preferences WHERE user_id IN (SELECT id FROM old_users);
 DELETE FROM payments       WHERE group_id IN (SELECT id FROM old_groups)
                               OR debt_id IN (SELECT id FROM old_debts)
                               OR payer_user_id IN (SELECT id FROM old_users)
@@ -469,6 +473,82 @@ INSERT INTO group_activity (group_id, event_type, actor_user_id, details_json, c
 SELECT d.group_id, 'DEBT_OVERDUE', d.creditor_user_id, NULL, now() - interval '2 days'
 FROM debts d WHERE d.status = 'OVERDUE' AND d.group_id IN (SELECT id FROM seed_groups);
 
+-- ======================================== notificaciones y preferencias (035)
+-- Datos para ver el popover (badge "9+"), la bandeja, los filtros, los deep links
+-- y el modal de preferencias sin tener que generar eventos a mano.
+INSERT INTO user_notification_preferences
+        (user_id, in_app, email, reminders_whistles, debt_due_collections,
+         group_activity, friend_activity, updated_at)
+SELECT u.id,
+       true,
+       CASE WHEN u.email = 'lucia@amano.demo' THEN false ELSE true END,
+       true,
+       true,
+       CASE WHEN u.email = 'martin@amano.demo' THEN false ELSE true END,
+       true,
+       now() - interval '1 day'
+FROM users u
+WHERE u.email LIKE '%@amano.demo' AND u.email_verified_at IS NOT NULL;
+
+CREATE TEMP TABLE notify_ctx ON COMMIT DROP AS
+SELECT
+    (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo') AS depto_id,
+    (SELECT id FROM groups WHERE name = '[Demo] Viaje a Río') AS viaje_id,
+    (SELECT id FROM debts
+      WHERE group_id = (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo')
+        AND status = 'OVERDUE' ORDER BY id LIMIT 1) AS overdue_debt_id,
+    (SELECT id FROM debts
+      WHERE group_id = (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo')
+      ORDER BY id LIMIT 1) AS depto_debt_id,
+    (SELECT id FROM group_expenses
+      WHERE group_id = (SELECT id FROM groups WHERE name = '[Demo] Depto Palermo')
+      ORDER BY id LIMIT 1) AS depto_expense_id,
+    (SELECT id FROM friendship_requests
+      WHERE status = 'PENDING'
+        AND recipient_id = (SELECT id FROM users WHERE email = 'lucia@amano.demo')
+      ORDER BY id LIMIT 1) AS lucia_request_id,
+    (SELECT id FROM friendship_requests WHERE status = 'PENDING' ORDER BY id LIMIT 1)
+        AS pending_request_id;
+
+INSERT INTO notifications (user_id, type, title, message, target_kind,
+                           group_id, debt_id, expense_id, friend_request_id,
+                           created_at, read_at)
+SELECT u.id, n.type, n.title, n.message, n.target_kind,
+       CASE n.target_kind WHEN 'GROUP' THEN c.depto_id WHEN 'DEBT' THEN c.depto_id END,
+       CASE n.target_kind WHEN 'DEBT' THEN COALESCE(c.overdue_debt_id, c.depto_debt_id) END,
+       CASE n.target_kind WHEN 'GROUP' THEN c.depto_expense_id END,
+       CASE n.target_kind WHEN 'FRIEND_REQUEST' THEN COALESCE(c.lucia_request_id, c.pending_request_id) END,
+       now() - n.minutes_ago * interval '1 minute',
+       CASE WHEN n.unread THEN NULL ELSE now() - n.minutes_ago * interval '1 minute' END
+FROM (VALUES
+    -- Lucía: 11 sin leer (el badge debe mostrar "9+") y una leída al final.
+    ('lucia@amano.demo', 'GROUP_EXPENSE',    'Nuevo gasto en el depto',        'Martín registró un gasto en el grupo.',            'GROUP',          2, true),
+    ('lucia@amano.demo', 'REMINDER',         'Recordatorio de cobro',          'Tenés un cobro pendiente en el grupo.',            'GROUP',         15, true),
+    ('lucia@amano.demo', 'DEBT_WHISTLE',     'Silbato de cobro',               'Un compañero te silbó una deuda.',                 'DEBT',          40, true),
+    ('lucia@amano.demo', 'DEBT_OVERDUE',     'Deuda vencida',                  'Hay una deuda vencida en el grupo.',               'DEBT',          90, true),
+    ('lucia@amano.demo', 'PAYER_DUE_NOTICE', 'Aviso para pagador',             'Se acerca el vencimiento de tu pago.',             'DEBT',         180, true),
+    ('lucia@amano.demo', 'FRIEND_REQUEST',   'Solicitud de amistad',           'Tomás quiere ser tu amigo.',                      'FRIEND_REQUEST', 300, true),
+    ('lucia@amano.demo', 'FRIEND_ACTIVITY',  'Actividad social',               'Martín aceptó una solicitud de amistad.',         'FRIEND_REQUEST', 600, true),
+    ('lucia@amano.demo', 'PAYMENT_RECORDED', 'Pago registrado',                'Se registró un pago que te involucra.',            'DEBT',         1200, true),
+    ('lucia@amano.demo', 'GROUP_EXPENSE',    'Limpieza profunda',              'Se agregó un gasto al grupo.',                    'GROUP',        1500, true),
+    ('lucia@amano.demo', 'GROUP_EXPENSE',    'Aviso sin destino',              'Demo: el grupo ya no existe (muestra snackbar).',   'NONE',         1800, true),
+    ('lucia@amano.demo', 'REMINDER',         'Recordatorio semanal',           'Revisá tus deudas del grupo.',                    'GROUP',        2200, true),
+    ('lucia@amano.demo', 'GROUP_EXPENSE',    'Pizza y cine',                   'Gasto del grupo ya revisado.',                    'GROUP',        3000, false),
+    -- Martín: actividad de grupo desactivada en sus preferencias.
+    ('martin@amano.demo', 'DEBT_OVERDUE',    'Deuda vencida',                  'Tenés una deuda vencida en el depto.',            'DEBT',          20, true),
+    ('martin@amano.demo', 'FRIEND_REQUEST',  'Solicitud pendiente',            'Tenés una solicitud de amistad para responder.',  'FRIEND_REQUEST', 240, true),
+    ('martin@amano.demo', 'GROUP_EXPENSE',   'Supermercado grande',            'Gasto registrado por Sofía.',                    'GROUP',         900, false),
+    -- Sofía, Valentina, Joaquín y Tomás: el resto de los tipos y estados.
+    ('sofia@amano.demo',  'FRIEND_REQUEST',  'Solicitud de amistad',           'Valentina quiere ser tu amiga.',                  'FRIEND_REQUEST',  60, true),
+    ('sofia@amano.demo',  'PAYMENT_RECORDED','Pago confirmado',                'Confirmaron un pago en el grupo.',                'DEBT',         480, false),
+    ('valentina@amano.demo','GROUP_EXPENSE', 'Nuevo gasto del viaje',          'Lucía cargó el hotel del viaje.',                 'GROUP',         30, true),
+    ('valentina@amano.demo','DEBT_OVERDUE',  'Cobro pendiente',                'Hay un cobro pendiente en el viaje.',             'DEBT',         720, true),
+    ('joaquin@amano.demo','PAYER_DUE_NOTICE','Aviso de pago',                  'Tu pago vence en pocos días.',                    'DEBT',         120, false),
+    ('tomas@amano.demo',  'DEBT_WHISTLE',    'Silbato recibido',               'Te silbaron una deuda en el depto.',              'DEBT',          10, true)
+) AS n(user_email, type, title, message, target_kind, minutes_ago, unread)
+JOIN users u ON u.email = n.user_email
+CROSS JOIN notify_ctx c;
+
 COMMIT;
 
 \set QUIET off
@@ -486,3 +566,12 @@ SELECT g.name AS grupo, g.primary_currency AS moneda,
        (SELECT count(*) FROM debts d WHERE d.group_id = g.id)          AS deudas,
        (SELECT count(*) FROM payments p WHERE p.group_id = g.id)       AS pagos
 FROM groups g WHERE g.name LIKE '[Demo] %' ORDER BY g.id;
+
+\echo
+\echo 'Notificaciones demo (035):'
+SELECT u.email,
+       (SELECT count(*) FROM notifications n WHERE n.user_id = u.id) AS notificaciones,
+       (SELECT count(*) FROM notifications n WHERE n.user_id = u.id AND n.read_at IS NULL) AS sin_leer,
+       (SELECT p.email FROM user_notification_preferences p WHERE p.user_id = u.id) AS correo_activo,
+       (SELECT p.group_activity FROM user_notification_preferences p WHERE p.user_id = u.id) AS actividad_grupo
+FROM users u WHERE u.email LIKE '%@amano.demo' ORDER BY u.email;

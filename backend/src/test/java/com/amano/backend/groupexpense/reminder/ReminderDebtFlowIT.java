@@ -1,6 +1,9 @@
 package com.amano.backend.groupexpense.reminder;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -15,7 +18,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
 import com.amano.backend.support.AbstractClockIntegrationIT;
 import com.icegreen.greenmail.util.GreenMailUtil;
 
@@ -37,9 +43,13 @@ class ReminderDebtFlowIT extends AbstractClockIntegrationIT {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @MockitoSpyBean
+    private NotificationEventPublisher publisher;
+
     @BeforeEach
     void setUp() throws Exception {
         when(clock.getZone()).thenReturn(ZONE);
+        clearInvocations(publisher);
         at("2026-11-15");
         greenMail.purgeEmailFromAllMailboxes();
     }
@@ -66,6 +76,8 @@ class ReminderDebtFlowIT extends AbstractClockIntegrationIT {
 
         assertThat(reminderStatus(debtId, "DEBT")).isEqualTo("SENT");
         assertThat(eventCount(groupId, "DEBT_REMINDER_SENT")).isEqualTo(1);
+        verify(publisher).publishSafely(argThat(event ->
+                event.type() == NotificationType.REMINDER && event.userId().equals(debtorId)));
         String details = jdbc.queryForObject("""
                 SELECT details_json FROM group_activity
                 WHERE group_id = ? AND event_type = 'DEBT_REMINDER_SENT'

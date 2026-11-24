@@ -3,6 +3,7 @@ package com.amano.backend.friendship;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
@@ -33,13 +36,33 @@ class FriendshipRequestServiceTest {
 
     private FriendshipRequestRepository requestRepository;
     private UserRepository userRepository;
+    private NotificationEventPublisher notificationPublisher;
     private FriendshipRequestService service;
 
     @BeforeEach
     void setUp() {
         requestRepository = Mockito.mock(FriendshipRequestRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
-        service = new FriendshipRequestService(requestRepository, userRepository);
+        notificationPublisher = Mockito.mock(NotificationEventPublisher.class);
+        service = new FriendshipRequestService(requestRepository, userRepository, notificationPublisher);
+    }
+
+    @Test
+    void sendingAPendingRequestPublishesAFriendRequestEvent() {
+        User recipient = sender();
+        recipient.setId(99L);
+        recipient.setEmailVerifiedAt(OffsetDateTime.now());
+        when(userRepository.findById(99L)).thenReturn(Optional.of(recipient));
+        when(requestRepository.saveAndFlush(any(FriendshipRequest.class))).thenAnswer(invocation -> {
+            FriendshipRequest saved = invocation.getArgument(0);
+            saved.setId(REQUEST_ID);
+            return saved;
+        });
+
+        service.send(SENDER_ID, 99L);
+
+        verify(notificationPublisher).publishSafely(argThat(event ->
+                event.type() == NotificationType.FRIEND_REQUEST && event.userId().equals(99L)));
     }
 
     private static User sender() {
@@ -87,6 +110,8 @@ class FriendshipRequestServiceTest {
         assertThat(response.sender().email()).isEqualTo("bruno@example.com");
         assertThat(response.sender().lastName()).isNull();
         verify(userRepository, never()).save(any(User.class));
+        verify(notificationPublisher).publishSafely(argThat(event ->
+                event.type() == NotificationType.FRIEND_ACTIVITY && event.userId().equals(SENDER_ID)));
     }
 
     @Test
