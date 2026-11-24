@@ -142,20 +142,6 @@ button.quick-actions__toggle {
   }
 }
 
-button.app-header__action {
-  box-shadow: inset 0 1px 0 var(--tecla-luz), 0 2px 0 color-mix(in srgb, black 28%, transparent);
-  transition: box-shadow $tiempo ease, transform $tiempo ease;
-
-  &:hover {
-    box-shadow: inset 0 0 0 2px var(--color-naranja-claro);
-  }
-
-  &:active {
-    box-shadow: none;
-    transform: translateY(2px);
-  }
-}
-
 .group-photo__change {
   box-shadow: inset 0 1px 0 var(--tecla-luz), 0 2px 0 var(--tecla-borde);
 
@@ -175,8 +161,8 @@ button.app-header__action {
 
 // ---- Detalles en naranja ----
 
-a.app-header__action:hover,
-a.app-header__action.is-active {
+.app-header__action:hover,
+.app-header__action.is-active {
   box-shadow: inset 0 0 0 2px var(--color-naranja-claro);
 }
 
@@ -237,8 +223,7 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   #{$primarios},
   #{$secundarios},
-  button.quick-actions__toggle,
-  button.app-header__action {
+  button.quick-actions__toggle {
     transition: none;
   }
 }
