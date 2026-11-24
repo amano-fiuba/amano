@@ -3,6 +3,7 @@ package com.amano.backend.groupexpense.whistle;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -46,6 +47,8 @@ import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
 import com.amano.backend.groups.GroupNotFoundException;
 import com.amano.backend.groups.GroupRepository;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
@@ -77,6 +80,7 @@ class DebtWhistleServiceTest {
     private ReminderRecipients recipients;
     private ReminderMailService mailService;
     private ActivityEventService activityEventService;
+    private NotificationEventPublisher notificationPublisher;
     private DebtWhistleService service;
     private final List<DebtWhistle> saved = new ArrayList<>();
 
@@ -91,10 +95,12 @@ class DebtWhistleServiceTest {
         recipients = mock(ReminderRecipients.class);
         mailService = mock(ReminderMailService.class);
         activityEventService = mock(ActivityEventService.class);
+        notificationPublisher = mock(NotificationEventPublisher.class);
         Clock clock = Clock.fixed(NOW.toInstant(), ZONE);
         service = new DebtWhistleService(groupRepository, groupMemberRepository, debtRepository,
                 expenseRepository, userRepository, whistleRepository, recipients, new ReminderMessageBuilder(),
-                mailService, activityEventService, clock, mock(PlatformTransactionManager.class));
+                mailService, activityEventService, clock, mock(PlatformTransactionManager.class),
+                notificationPublisher);
         saved.clear();
 
         when(groupRepository.findById(GROUP)).thenReturn(Optional.of(group()));
@@ -138,6 +144,8 @@ class DebtWhistleServiceTest {
             assertThat(whistle.getDebtorUserId()).isEqualTo(JUAN);
         });
         verify(mailService).send(eq("juan@example.com"), any(ReminderMessageBuilder.Mail.class));
+        verify(notificationPublisher).publishSafely(argThat(event -> event.type() == NotificationType.DEBT_WHISTLE
+                && JUAN.equals(event.userId())));
         verify(whistleRepository).markSent(7L, NOW);
         verify(whistleRepository, never()).markFailed(anyLong(), any());
         assertThat(debt.getStatus()).isEqualTo(status);

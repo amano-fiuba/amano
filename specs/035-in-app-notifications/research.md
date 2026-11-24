@@ -32,7 +32,7 @@
 
 ## R4. Correo resiliente y sin duplicados
 
-**Decision**: `NotificationMailService.send` es `@Async` y captura `MessagingException | RuntimeException` con `log.warn`, sin propagar. El evento incluye `emailPolicy`: `NONE` para `REMINDER` y `DEBT_WHISTLE` (sus flujos ya envían correo de negocio en 025/030), `SUBSCRIBABLE` para el resto. Cada canal se evalúa en su propio `try/catch`.
+**Decision**: `NotificationMailService.send` es `@Async` y captura `MessagingException | RuntimeException` con `log.warn`, sin propagar. El evento incluye `emailPolicy`, con la política canónica de FR-026: `ALWAYS` para `DEBT_OVERDUE` (crítico), `SUBSCRIBABLE` para `GROUP_EXPENSE`, `PAYMENT_RECORDED`, `FRIEND_REQUEST` y `FRIEND_ACTIVITY`, y `NONE` para `DEBT_WHISTLE`, `REMINDER` y `PAYER_DUE_NOTICE` (025/030 ya envían esos correos; evitar duplicados es un criterio de regresión verificado por DebtWhistleIT). Cada canal se evalúa en su propio `try/catch`.
 
 **Rationale**: `VerificationMailService` y `PasswordResetMailService` ya siguen el patrón "atrapan y no propagan"; `ReminderMailService` y `DebtWhistleService` tienen sus propias reglas de fallo (`FAILED`/503) que no deben cambiar. Evitar una segunda copia respeta la constitución IV y la suposición documentada en la spec.
 

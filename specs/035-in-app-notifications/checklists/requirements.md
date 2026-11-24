@@ -41,3 +41,7 @@
 - Validación ejecutada: FR-001..FR-036 y SC-001..SC-010 consecutivos, sin referencias a IDs inexistentes en spec/plan/tasks y sin placeholders pendientes.
 - La especificación está lista para `/speckit.plan`. Artefactos de diseño generados y alineados el 2026-11-23: `plan.md` (arquitectura, constitution check, DoR), `research.md`, `data-model.md`, `quickstart.md`, `contracts/notifications-api.md` y `tasks.md` (44 tareas con pruebas unitarias/de integración por funcionalidad).
 - Corrección de consistencia aplicada: las preferencias tienen **seis** booleanos (2 canales + 4 tipos de evento), no ocho; todos los artefactos usan ese valor.
+- Política de correo canónica alineada en todos los artefactos: `ALWAYS` para `DEBT_OVERDUE`, `SUBSCRIBABLE` para actividad de grupo, pagos y actividad social, `NONE` para `DEBT_WHISTLE`/`REMINDER`/`PAYER_DUE_NOTICE` (025/030 ya envían esos correos; los ITs de silbato exigen un único correo).
+- Verificación final 2026-11-23: `./mvnw -B verify` en backend (688 unitarios + 586 IT, JaCoCo ≥ 85 %) y `npm ci`, `npm run lint` (0 errores), `npm run test` (1423), `npm run test:coverage` (95,68 % líneas) y `npm run build` en frontend: todo en verde.
+- Estado de cierre: **44/44 tareas completadas**. Publicación de eventos en los 6 puntos de enganche, IT de preferencias/resiliencia/regresión y revisión de accesibilidad/responsive finalizados.
+- Verificación final: backend 692 unitarios + 594 IT en verde con JaCoCo ≥ 85 %; frontend 1426 tests, 95,67 % de líneas, lint sin errores y build OK.

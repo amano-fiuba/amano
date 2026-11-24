@@ -10,10 +10,17 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import com.amano.backend.groups.ActivityEventService;
+import com.amano.backend.notification.NotificationEvent;
+import com.amano.backend.notification.NotificationEvent.EmailPolicy;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
+import com.amano.backend.notification.dto.NotificationTargetResponse;
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
 import com.amano.backend.groupexpense.GroupExpense;
@@ -46,12 +53,26 @@ public class ReminderDispatcher {
     private final UserRepository userRepository;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final NotificationEventPublisher notificationPublisher;
 
+    /** Constructor kept for the existing integration tests (no notification publishing). */
     public ReminderDispatcher(ReminderRepository reminderRepository, ReminderRecipients recipients,
             ReminderMessageBuilder messageBuilder, ReminderMailService mailService,
             ActivityEventService activityEventService, DebtRepository debtRepository,
             GroupExpenseRepository groupExpenseRepository, UserRepository userRepository,
             Clock clock, PlatformTransactionManager transactionManager) {
+        this(reminderRepository, recipients, messageBuilder, mailService, activityEventService, debtRepository,
+                groupExpenseRepository, userRepository, clock, transactionManager,
+                NotificationEventPublisher.noOp());
+    }
+
+    @Autowired
+    public ReminderDispatcher(ReminderRepository reminderRepository, ReminderRecipients recipients,
+            ReminderMessageBuilder messageBuilder, ReminderMailService mailService,
+            ActivityEventService activityEventService, DebtRepository debtRepository,
+            GroupExpenseRepository groupExpenseRepository, UserRepository userRepository,
+            Clock clock, PlatformTransactionManager transactionManager,
+            NotificationEventPublisher notificationPublisher) {
         this.reminderRepository = reminderRepository;
         this.recipients = recipients;
         this.messageBuilder = messageBuilder;
@@ -62,6 +83,7 @@ public class ReminderDispatcher {
         this.userRepository = userRepository;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.notificationPublisher = notificationPublisher;
     }
 
     public void dispatchGroup(Group group, LocalDate today) {
@@ -127,11 +149,26 @@ public class ReminderDispatcher {
                 activityEventService.recordDebtReminderSent(group.getId(), reminder.getId(), debt.getId(),
                         debt.getExpenseId(), debt.getAmount(), debt.getCurrency().name(),
                         debt.getDebtorName(), target.creditorName(), target.dueDate());
+                if (debt.getDebtorUserId() != null) {
+                    notificationPublisher.publishSafely(new NotificationEvent(
+                            debt.getDebtorUserId(), NotificationType.REMINDER,
+                            target.mail().subject(), target.mail().body(),
+                            new NotificationTargetResponse("DEBT", group.getId(), debt.getId(),
+                                    debt.getExpenseId(), null), EmailPolicy.NONE));
+                }
             }
             else {
                 activityEventService.recordPayerDueNoticeSent(group.getId(), reminder.getId(),
                         target.expense().getId(), target.payerName(), target.concept(), target.dueDate(),
                         target.daysRemaining(), target.pendingTotals());
+                Long payerId = target.expense().getPayerUserId();
+                if (payerId != null) {
+                    notificationPublisher.publishSafely(new NotificationEvent(
+                            payerId, NotificationType.PAYER_DUE_NOTICE,
+                            target.mail().subject(), target.mail().body(),
+                            new NotificationTargetResponse("GROUP", group.getId(), null,
+                                    target.expense().getId(), null), EmailPolicy.NONE));
+                }
             }
         });
     }

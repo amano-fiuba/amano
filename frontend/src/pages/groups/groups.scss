@@ -1147,6 +1147,13 @@
   justify-content: space-between;
 }
 
+// Deep link de una notificación de deuda (035 FR-017).
+.group-debts__debt.is-highlighted {
+  outline: 2px solid var(--color-primario, #356);
+  outline-offset: 2px;
+  background: var(--color-fondo-sutil, transparent);
+}
+
 .group-debts__actions {
   display: flex;
   flex-wrap: wrap;

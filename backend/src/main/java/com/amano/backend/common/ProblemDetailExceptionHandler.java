@@ -32,6 +32,8 @@ import com.amano.backend.friendship.FriendshipRequestNotFoundException;
 import com.amano.backend.friendship.PendingDirectDebtException;
 import com.amano.backend.friendship.PendingFriendshipRequestExistsException;
 import com.amano.backend.income.IncomeNotFoundException;
+import com.amano.backend.notification.InvalidNotificationPreferencesException;
+import com.amano.backend.notification.NotificationNotFoundException;
 import com.amano.backend.expense.RecurringExpenseFinishedException;
 import com.amano.backend.expense.RecurringExpenseNotFoundException;
 import com.amano.backend.groupexpense.whistle.DebtNotWhistleableException;
@@ -220,6 +222,25 @@ public class ProblemDetailExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND, exception.getMessage());
         problem.setTitle("Ingreso no encontrado");
+        return problem;
+    }
+
+    /** 035 FR-031: missing or foreign notification id — one neutral 404 for both cases. */
+    @ExceptionHandler(NotificationNotFoundException.class)
+    public ProblemDetail handleNotificationNotFound(NotificationNotFoundException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND, exception.getMessage());
+        problem.setTitle("Notificación no encontrada");
+        return problem;
+    }
+
+    /** 035 contract: incomplete preferences payload — 400 with per-field messages. */
+    @ExceptionHandler(InvalidNotificationPreferencesException.class)
+    public ProblemDetail handleInvalidNotificationPreferences(InvalidNotificationPreferencesException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Validación fallida");
+        problem.setProperty("properties", Map.of(FIELDS_PROPERTY, exception.getFields()));
         return problem;
     }
 

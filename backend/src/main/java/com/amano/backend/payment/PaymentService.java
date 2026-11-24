@@ -10,10 +10,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.notification.NotificationEvent;
+import com.amano.backend.notification.NotificationEvent.EmailPolicy;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
+import com.amano.backend.notification.dto.NotificationTargetResponse;
 import com.amano.backend.expense.ExpenseAmountNormalizer;
 import com.amano.backend.expense.ExpenseDateValidator;
 import com.amano.backend.expense.IdempotencyConflictException;
@@ -63,11 +69,24 @@ public class PaymentService {
     private final UserRepository userRepository;
     private final ActivityEventService activityEventService;
     private final GroupPermissionsRepository groupPermissionsRepository;
+    private final NotificationEventPublisher notificationPublisher;
 
+    /** Constructor kept for the existing unit tests (no notification publishing). */
     public PaymentService(DebtRepository debtRepository, PaymentRepository paymentRepository,
             GroupExpenseRepository expenseRepository, GroupMemberRepository groupMemberRepository,
             GroupPermissionChecker permissionChecker, UserRepository userRepository,
             ActivityEventService activityEventService, GroupPermissionsRepository groupPermissionsRepository) {
+        this(debtRepository, paymentRepository, expenseRepository, groupMemberRepository, permissionChecker,
+                userRepository, activityEventService, groupPermissionsRepository,
+                NotificationEventPublisher.noOp());
+    }
+
+    @Autowired
+    public PaymentService(DebtRepository debtRepository, PaymentRepository paymentRepository,
+            GroupExpenseRepository expenseRepository, GroupMemberRepository groupMemberRepository,
+            GroupPermissionChecker permissionChecker, UserRepository userRepository,
+            ActivityEventService activityEventService, GroupPermissionsRepository groupPermissionsRepository,
+            NotificationEventPublisher notificationPublisher) {
         this.debtRepository = debtRepository;
         this.paymentRepository = paymentRepository;
         this.expenseRepository = expenseRepository;
@@ -76,6 +95,7 @@ public class PaymentService {
         this.userRepository = userRepository;
         this.activityEventService = activityEventService;
         this.groupPermissionsRepository = groupPermissionsRepository;
+        this.notificationPublisher = notificationPublisher;
     }
 
     /** Result of a registration: the representation plus whether a payment was inserted. */
@@ -157,7 +177,24 @@ public class PaymentService {
                     payment.getReceiverName(), debt.getExpenseId(), debt.getId()));
         }
 
+        publishPaymentNotice(debt.getCreditorUserId(), debt, payment);
+        if (debt.getDebtorUserId() != null && !debt.getDebtorUserId().equals(debt.getCreditorUserId())) {
+            publishPaymentNotice(debt.getDebtorUserId(), debt, payment);
+        }
         return new Registration(toResponse(payment, debt, caller), true);
+    }
+
+    /** Publishing is best-effort: publishSafely never fails the payment transaction. */
+    private void publishPaymentNotice(Long userId, Debt debt, Payment payment) {
+        if (userId == null) {
+            return;
+        }
+        notificationPublisher.publishSafely(new NotificationEvent(
+                userId, NotificationType.PAYMENT_RECORDED, "Pago registrado",
+                "Se registró un pago por " + payment.getAmount() + " " + payment.getCurrency(),
+                new NotificationTargetResponse("DEBT", debt.getGroupId(), debt.getId(),
+                        debt.getExpenseId(), null),
+                EmailPolicy.SUBSCRIBABLE));
     }
 
     /**

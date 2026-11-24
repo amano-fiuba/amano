@@ -80,7 +80,8 @@ Las entidades de destino pueden desaparecer: los campos `group_id`, `debt_id`, `
 | Sí | Sí | Sí | `SUBSCRIBABLE` | Fila en `notifications` + correo asíncrono |
 | Sí | Sí | No | — | Solo fila en `notifications` |
 | Sí | No | Sí | `SUBSCRIBABLE` | Solo correo asíncrono |
-| Sí | Sí/No | Sí | `NONE` | Solo fila (si In-App activo); el correo de negocio ya lo envió el flujo originador |
+| Sí | Sí/No | Sí/No | `ALWAYS` | Correo asíncrono aunque el toggle esté apagado; fila si In-App está activo |
+| Sí | Sí/No | — | `NONE` | Solo fila (si In-App activo); el correo de negocio ya lo envió el flujo originador |
 
 Un fallo en cualquier rama se captura y registra sin propagar (FR-032).
 
@@ -94,8 +95,8 @@ Un fallo en cualquier rama se captura y registra sin propagar (FR-032).
 |-------|-----------------------------|---------------------|---------------|
 | `REMINDER` | `reminders_whistles` | `GROUP` | `NONE` |
 | `DEBT_WHISTLE` | `reminders_whistles` | `DEBT` | `NONE` |
-| `DEBT_OVERDUE` | `debt_due_collections` | `DEBT` | `SUBSCRIBABLE` |
-| `PAYER_DUE_NOTICE` | `debt_due_collections` | `DEBT` | `SUBSCRIBABLE` |
+| `DEBT_OVERDUE` | `debt_due_collections` | `DEBT` | `ALWAYS` |
+| `PAYER_DUE_NOTICE` | `debt_due_collections` | `DEBT` | `NONE` |
 | `GROUP_EXPENSE` | `group_activity` | `GROUP` | `SUBSCRIBABLE` |
 | `PAYMENT_RECORDED` | `group_activity` | `DEBT` | `SUBSCRIBABLE` |
 | `FRIEND_REQUEST` | `friend_activity` | `FRIEND_REQUEST` | `SUBSCRIBABLE` |

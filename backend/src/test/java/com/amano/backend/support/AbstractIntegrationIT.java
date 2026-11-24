@@ -51,6 +51,10 @@ import com.icegreen.greenmail.util.ServerSetup;
 @SpringBootTest(properties = {
         "jwt.secret=2b7e151628aed2a6abf7158809cf4f3c2b7e151628aed2a6abf7158809cf4f3c",
         "spring.mail.host=localhost",
+        // Neutralize any MAIL_USERNAME/MAIL_PASSWORD exported in the developer shell:
+        // GreenMail runs without AUTH, so inherited real credentials make every mail IT fail.
+        "spring.mail.username=",
+        "spring.mail.password=",
         "spring.mail.properties.mail.smtp.starttls.enable=false",
         "spring.mail.properties.mail.smtp.auth=false",
         "app.base-url=http://localhost:5173",
@@ -95,6 +99,8 @@ public abstract class AbstractIntegrationIT {
 
     /** Single source of truth for the reset; guarded by {@code TruncateCoverageIT}. */
     public static final List<String> TRUNCATED_TABLES = List.of(
+            "notifications",
+            "user_notification_preferences",
             "debt_whistles",
             "reminders",
             "payments",

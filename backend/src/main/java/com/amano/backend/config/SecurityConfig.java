@@ -68,7 +68,8 @@ public class SecurityConfig {
                                 "/api/auth/login", "/api/auth/logout", "/api/auth/resend-verification",
                                 "/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
                         .requestMatchers("/api/users/**", "/api/expenses/**", "/api/groups/**", "/api/payments/**",
-                                "/api/currencies/**", "/api/incomes/**", "/api/balance/**", "/api/stats/**")
+                                "/api/currencies/**", "/api/incomes/**", "/api/balance/**", "/api/stats/**",
+                                "/api/v1/notifications/**")
                                 .access(verifiedAccount(userRepository))
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
 import com.amano.backend.groups.ActivityEventService;
+import com.amano.backend.notification.NotificationEvent;
+import com.amano.backend.notification.NotificationEvent.EmailPolicy;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
+import com.amano.backend.notification.dto.NotificationTargetResponse;
 import com.amano.backend.groups.Group;
 import com.amano.backend.groups.GroupRepository;
 import com.amano.backend.user.User;
@@ -46,14 +52,25 @@ public class OverdueDebtJob {
     private final UserRepository userRepository;
     private final ActivityEventService activityEventService;
     private final Clock clock;
+    private final NotificationEventPublisher notificationPublisher;
 
+    /** Constructor kept for the existing integration tests (no notification publishing). */
     public OverdueDebtJob(GroupRepository groupRepository, DebtRepository debtRepository,
             UserRepository userRepository, ActivityEventService activityEventService, Clock clock) {
+        this(groupRepository, debtRepository, userRepository, activityEventService, clock,
+                NotificationEventPublisher.noOp());
+    }
+
+    @Autowired
+    public OverdueDebtJob(GroupRepository groupRepository, DebtRepository debtRepository,
+            UserRepository userRepository, ActivityEventService activityEventService, Clock clock,
+            NotificationEventPublisher notificationPublisher) {
         this.groupRepository = groupRepository;
         this.debtRepository = debtRepository;
         this.userRepository = userRepository;
         this.activityEventService = activityEventService;
         this.clock = clock;
+        this.notificationPublisher = notificationPublisher;
     }
 
     /** Marks the due PENDING debts as OVERDUE; a second run changes nothing. */
@@ -78,6 +95,13 @@ public class OverdueDebtJob {
                             debt.getCurrency().name(),
                             debt.getDebtorName(),
                             creditorNames.get(debt.getCreditorUserId()));
+                    if (debt.getDebtorUserId() != null) {
+                        notificationPublisher.publishSafely(new NotificationEvent(
+                                debt.getDebtorUserId(), NotificationType.DEBT_OVERDUE,
+                                "Deuda vencida", "Tenés una deuda vencida en el grupo.",
+                                new NotificationTargetResponse("DEBT", group.getId(), debt.getId(),
+                                        debt.getExpenseId(), null), EmailPolicy.ALWAYS));
+                    }
                 }
             }
         }

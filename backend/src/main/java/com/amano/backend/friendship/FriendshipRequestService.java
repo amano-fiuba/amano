@@ -8,11 +8,17 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.amano.backend.common.FieldValidationException;
+import com.amano.backend.notification.NotificationEvent;
+import com.amano.backend.notification.NotificationEvent.EmailPolicy;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
+import com.amano.backend.notification.dto.NotificationTargetResponse;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
@@ -35,11 +41,20 @@ public class FriendshipRequestService {
 
     private final FriendshipRequestRepository requestRepository;
     private final UserRepository userRepository;
+    private final NotificationEventPublisher notificationPublisher;
 
+    /** Constructor kept for the existing unit tests (no notification publishing). */
     public FriendshipRequestService(FriendshipRequestRepository requestRepository,
             UserRepository userRepository) {
+        this(requestRepository, userRepository, NotificationEventPublisher.noOp());
+    }
+
+    @Autowired
+    public FriendshipRequestService(FriendshipRequestRepository requestRepository,
+            UserRepository userRepository, NotificationEventPublisher notificationPublisher) {
         this.requestRepository = requestRepository;
         this.userRepository = userRepository;
+        this.notificationPublisher = notificationPublisher;
     }
 
     /** Sends a pending request (US1/US2) and returns the created row. */
@@ -77,6 +92,11 @@ public class FriendshipRequestService {
             // Flush so the partial unique index answers a concurrent race here,
             // inside this transaction, instead of at commit time (FR-009).
             FriendshipRequest saved = requestRepository.saveAndFlush(request);
+            notificationPublisher.publishSafely(new NotificationEvent(
+                    recipientId, NotificationType.FRIEND_REQUEST, "Solicitud de amistad",
+                    "Tenés una solicitud de amistad pendiente.",
+                    new NotificationTargetResponse("FRIEND_REQUEST", null, null, null, saved.getId()),
+                    EmailPolicy.SUBSCRIBABLE));
             return FriendshipRequestResponse.from(saved, recipient);
         }
         catch (DataIntegrityViolationException exception) {
@@ -137,6 +157,11 @@ public class FriendshipRequestService {
                     .orElseThrow(FriendshipRequestNotFoundException::new);
             User sender = userRepository.findById(request.getSenderId())
                     .orElseThrow(FriendshipRequestNotFoundException::new);
+            notificationPublisher.publishSafely(new NotificationEvent(
+                    request.getSenderId(), NotificationType.FRIEND_ACTIVITY,
+                    "Respuesta a tu solicitud de amistad", "Tu solicitud de amistad fue respondida.",
+                    new NotificationTargetResponse("FRIEND_REQUEST", null, null, null, request.getId()),
+                    EmailPolicy.SUBSCRIBABLE));
             return AnsweredFriendshipRequestResponse.from(request, sender);
         }
 
