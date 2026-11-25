@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BALANCE_ERROR_MESSAGE, getBalance } from '../../api/incomeClient'
+import { BALANCE_ERROR_MESSAGE } from '../../api/incomeClient'
+import { getStatisticsSummary } from '../../api/statisticsClient'
 import { currentDateIn, deviceTimeZone } from '../../hooks/useCurrentDate'
 import { MONTH_NAMES } from '../../validation/months'
 import { formatAmount } from '../../validation/expenseFormat'
@@ -18,10 +19,17 @@ function formatSigned(canonical, prefix) {
   return negative ? `−${formatted}` : `${prefix}${formatted}`
 }
 
+/** The statistics comparison as { currency, income, expenses, net }. */
+function balanceOf(statistics) {
+  const { income, expenses, balance } = statistics.comparison
+  return { currency: statistics.currency, income, expenses, net: balance }
+}
+
 /**
  * Monthly balance of the current month on the main screen: income (green, "+"),
- * expenses (red, "-") and the net balance, in the account's main currency, from
- * `GET /api/balance` of the month in force. Shows a skeleton while loading and a
+ * expenses (red, "-") and the net balance of the month in force. It uses the same
+ * comparison as the statistics page (`GET /api/stats/summary`), so the expenses
+ * include personal and group expenses and both screens show the same balance. Shows a skeleton while loading and a
  * message with "Reintentar" when the balance cannot be obtained.
  */
 export default function MonthlyBalanceSummaryCard() {
@@ -32,11 +40,11 @@ export default function MonthlyBalanceSummaryCard() {
 
   useEffect(() => {
     let cancelled = false
-    getBalance({ year: period.year, month: period.month }).then((result) => {
+    getStatisticsSummary({ year: period.year, month: period.month }).then((result) => {
       if (!cancelled) {
         setAnswer(
           result.ok
-            ? { attempt, status: 'ready', balance: result.balance }
+            ? { attempt, status: 'ready', balance: balanceOf(result.statistics) }
             : { attempt, status: 'error', balance: null },
         )
       }

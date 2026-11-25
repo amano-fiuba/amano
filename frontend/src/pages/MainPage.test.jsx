@@ -22,9 +22,14 @@ vi.mock('../api/groupsClient', () => ({
 vi.mock('../api/incomeClient', () => ({
   BALANCE_ERROR_MESSAGE: 'Error de balance',
   searchIncomes,
-  getBalance: vi.fn().mockResolvedValue({
+}))
+vi.mock('../api/statisticsClient', () => ({
+  getStatisticsSummary: vi.fn().mockResolvedValue({
     ok: true,
-    balance: { currency: 'ARS', income: '1500.00', expenses: '400.00', net: '1100.00' },
+    statistics: {
+      currency: 'ARS',
+      comparison: { income: '1500.00', expenses: '400.00', balance: '1100.00' },
+    },
   }),
 }))
 vi.mock('../api/expenseClient', () => ({
