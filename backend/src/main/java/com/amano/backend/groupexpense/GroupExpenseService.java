@@ -39,6 +39,11 @@ import com.amano.backend.groupexpense.exchange.BcraExchangeRateClient;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
 import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
 import com.amano.backend.groups.ActivityEventService;
+import com.amano.backend.notification.NotificationEvent;
+import com.amano.backend.notification.NotificationEvent.EmailPolicy;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
+import com.amano.backend.notification.dto.NotificationTargetResponse;
 import com.amano.backend.groups.ExpenseActivityDetails;
 import com.amano.backend.groups.Group;
 import com.amano.backend.groups.GroupMember;
@@ -121,6 +126,7 @@ public class GroupExpenseService {
     private final ActivityEventService activityEventService;
     private final ExchangeRateProvider exchangeRateProvider;
     private final Clock clock;
+    private final NotificationEventPublisher notificationPublisher;
 
     @Autowired
     public GroupExpenseService(GroupExpenseRepository expenseRepository,
@@ -134,7 +140,8 @@ public class GroupExpenseService {
             UserRepository userRepository,
             ActivityEventService activityEventService,
             ExchangeRateProvider exchangeRateProvider,
-            Clock clock) {
+            Clock clock,
+            NotificationEventPublisher notificationPublisher) {
         this.expenseRepository = expenseRepository;
         this.shareRepository = shareRepository;
         this.debtRepository = debtRepository;
@@ -147,6 +154,7 @@ public class GroupExpenseService {
         this.activityEventService = activityEventService;
         this.exchangeRateProvider = exchangeRateProvider;
         this.clock = clock;
+        this.notificationPublisher = notificationPublisher;
     }
 
     /** 017 constructor kept for existing unit tests without multi-currency mocks. */
@@ -162,7 +170,26 @@ public class GroupExpenseService {
         this(expenseRepository, shareRepository, debtRepository, null, groupMemberRepository,
                 groupPermissionsRepository, permissionChecker, simulatedProfileRepository,
                 userRepository, activityEventService, null,
-                Clock.system(ZoneId.of("America/Argentina/Buenos_Aires")));
+                Clock.system(ZoneId.of("America/Argentina/Buenos_Aires")),
+                NotificationEventPublisher.noOp());
+    }
+
+    /** Legacy constructor extended with the notification publisher for unit tests. */
+    public GroupExpenseService(GroupExpenseRepository expenseRepository,
+            GroupExpenseShareRepository shareRepository,
+            DebtRepository debtRepository,
+            GroupMemberRepository groupMemberRepository,
+            GroupPermissionsRepository groupPermissionsRepository,
+            GroupPermissionChecker permissionChecker,
+            SimulatedProfileRepository simulatedProfileRepository,
+            UserRepository userRepository,
+            ActivityEventService activityEventService,
+            NotificationEventPublisher notificationPublisher) {
+        this(expenseRepository, shareRepository, debtRepository, null, groupMemberRepository,
+                groupPermissionsRepository, permissionChecker, simulatedProfileRepository,
+                userRepository, activityEventService, null,
+                Clock.system(ZoneId.of("America/Argentina/Buenos_Aires")),
+                notificationPublisher);
     }
 
     /** Result of a registration: the representation plus whether rows were inserted. */
@@ -220,6 +247,24 @@ public class GroupExpenseService {
         activityEventService.recordExpenseCreated(groupId, callerId, new ExpenseActivityDetails(
                 saved.getId(), saved.getAmount(), saved.getCurrency().name(), saved.getDescription(),
                 saved.getPayerUserId(), normalized.payerName()));
+
+        Set<Long> recipients = new HashSet<>();
+        for (Debt debt : persisted.debts()) {
+            if (debt.getDebtorUserId() != null) {
+                recipients.add(debt.getDebtorUserId());
+            }
+        }
+        if (saved.getPayerUserId() != null) {
+            recipients.add(saved.getPayerUserId());
+        }
+        String detail = saved.getDescription() == null || saved.getDescription().isBlank()
+                ? "Se registró un gasto en el grupo." : saved.getDescription();
+        for (Long userId : recipients) {
+            notificationPublisher.publishSafely(new NotificationEvent(
+                    userId, NotificationType.GROUP_EXPENSE, "Nuevo gasto en el grupo", detail,
+                    new NotificationTargetResponse("GROUP", groupId, null, saved.getId(), null),
+                    EmailPolicy.SUBSCRIBABLE));
+        }
 
         return new Registration(toResponse(saved, persisted.shares(), persisted.debts(), caller, groupCurrency),
                 true);

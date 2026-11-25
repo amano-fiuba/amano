@@ -1,111 +1,106 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import NotificationsMenu, {
   NOTIFICATIONS_ERROR_MESSAGE,
   NO_NOTIFICATIONS_MESSAGE,
 } from './NotificationsMenu'
 
-const { listReceivedFriendshipRequests } = vi.hoisted(() => ({
-  listReceivedFriendshipRequests: vi.fn(),
+const { getNotifications, markRead } = vi.hoisted(() => ({
+  getNotifications: vi.fn(),
+  markRead: vi.fn(),
 }))
 
-vi.mock('../api/friendsClient', () => ({
-  FRIEND_REQUESTS_CHANGED_EVENT: 'friend-requests-changed',
-  listReceivedFriendshipRequests,
-}))
+vi.mock('../api/notificationsClient', () => ({ getNotifications, markRead }))
+vi.mock('../api/friendsClient', () => ({ FRIEND_REQUESTS_CHANGED_EVENT: 'friend-requests-changed' }))
 
-const REQUEST = { id: 1, sender: { firstName: 'Ana', lastName: 'Pérez' } }
-const REQUEST_WITHOUT_LASTNAME = { id: 2, sender: { firstName: 'Juan', lastName: null } }
+const notice = (id, type = 'GROUP_EXPENSE', unread = true) => ({
+  id,
+  type,
+  title: `Aviso ${id}`,
+  message: 'Texto del aviso',
+  createdAt: new Date(Date.now() - id * 60000).toISOString(),
+  readAt: unread ? null : new Date().toISOString(),
+  target: { kind: 'GROUP', groupId: 42 },
+})
 
 function renderMenu() {
   return render(
-    <MemoryRouter>
-      <NotificationsMenu />
-      <p>Afuera</p>
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<><NotificationsMenu /><p>Afuera</p></>} />
+        <Route path="/notifications" element={<p>Bandeja</p>} />
+        <Route path="/groups/:id" element={<p>Grupo 42</p>} />
+      </Routes>
     </MemoryRouter>,
   )
 }
 
 beforeEach(() => {
-  listReceivedFriendshipRequests.mockReset()
-  listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [] })
+  for (const mock of [getNotifications, markRead]) mock.mockReset()
+  getNotifications.mockResolvedValue({
+    ok: true, notifications: [notice(1)], unreadCount: 1, nextCursor: null,
+  })
+  markRead.mockResolvedValue({ ok: true, notification: notice(1, 'GROUP_EXPENSE', false) })
 })
 
-describe('NotificationsMenu (015, US2)', () => {
-  it('muestra la foto de quien envía o el avatar por defecto', async () => {
-    const user = userEvent.setup()
-    listReceivedFriendshipRequests.mockResolvedValue({
+describe('NotificationsMenu (035 US1, US3, US4)', () => {
+  it('muestra el contador de no leídas y hasta cinco avisos recientes', async () => {
+    getNotifications.mockResolvedValue({
       ok: true,
-      requests: [
-        { id: 1, sender: { firstName: 'Ana', lastName: null, avatarUrl: '/api/users/4/avatar' } },
-        { id: 2, sender: { firstName: 'Bruno', lastName: null, avatarUrl: null } },
-      ],
-    })
-    renderMenu()
-
-    await user.click(await screen.findByRole('button', { name: /Notificaciones, 2 sin leer/ }))
-
-    const [ana, bruno] = screen.getAllByRole('listitem')
-    expect(ana.querySelector('img')).toHaveAttribute('src', '/api/users/4/avatar')
-    expect(bruno.querySelector('img')).toHaveAttribute('src', '/avatar-default.png')
-  })
-
-  it('indica la cantidad y lista las solicitudes con acceso a Amigos', async () => {
-    listReceivedFriendshipRequests.mockResolvedValue({
-      ok: true,
-      requests: [REQUEST, REQUEST_WITHOUT_LASTNAME],
+      notifications: Array.from({ length: 7 }, (_, index) => notice(index + 1)),
+      unreadCount: 12,
+      nextCursor: null,
     })
     const user = userEvent.setup()
     renderMenu()
 
-    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 2 sin leer' }))
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 12 sin leer' }))
 
-    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument()
-    expect(screen.getByText('Juan')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Ver solicitudes' })).toHaveAttribute('href', '/friends')
+    expect(getNotifications).toHaveBeenCalledWith({ limit: 5, order: 'unread-first' })
+    expect(screen.getAllByRole('listitem')).toHaveLength(5)
+    expect(screen.getByText('9+')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Marcar como leída/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/hace \d+ (min|h)/)).not.toBeInTheDocument()
+    expect(screen.queryByText('No leída')).not.toBeInTheDocument()
   })
 
-  it('muestra el singular y limita el indicador a 9+', async () => {
-    listReceivedFriendshipRequests.mockResolvedValue({ ok: true, requests: [REQUEST] })
-    const { unmount } = renderMenu()
-    expect(
-      await screen.findByRole('button', { name: 'Notificaciones, 1 sin leer' }),
-    ).toBeInTheDocument()
-    unmount()
-
-    listReceivedFriendshipRequests.mockResolvedValue({
-      ok: true,
-      requests: Array.from({ length: 12 }, (_, id) => ({ ...REQUEST, id })),
-    })
-    renderMenu()
-    expect(await screen.findByText('9+')).toBeInTheDocument()
-  })
-
-  it('sin solicitudes muestra el estado vacío', async () => {
+  it('pide los avisos con orden unread-first y muestra el estado vacío', async () => {
+    getNotifications.mockResolvedValue({ ok: true, notifications: [], unreadCount: 0, nextCursor: null })
     const user = userEvent.setup()
     renderMenu()
 
-    await user.click(screen.getByRole('button', { name: 'Notificaciones' }))
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
 
     expect(await screen.findByText(NO_NOTIFICATIONS_MESSAGE)).toBeInTheDocument()
+    expect(getNotifications).toHaveBeenCalledWith({ limit: 5, order: 'unread-first' })
   })
 
   it('informa el error de carga sin romper la barra', async () => {
-    listReceivedFriendshipRequests.mockResolvedValue({ ok: false, network: true })
+    getNotifications.mockResolvedValue({ ok: false, network: true })
     const user = userEvent.setup()
     renderMenu()
 
-    await user.click(screen.getByRole('button', { name: 'Notificaciones' }))
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(NOTIFICATIONS_ERROR_MESSAGE)
+  })
+
+  it('el pie solo ofrece "Ver todas las notificaciones"', async () => {
+    const user = userEvent.setup()
+    renderMenu()
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 1 sin leer' }))
+
+    const link = screen.getByRole('link', { name: 'Ver todas las notificaciones' })
+    expect(link).toHaveAttribute('href', '/notifications')
+    expect(screen.queryByRole('button', { name: 'Configuración' })).not.toBeInTheDocument()
   })
 
   it('se cierra con Escape y con un clic afuera', async () => {
     const user = userEvent.setup()
     renderMenu()
-    const button = screen.getByRole('button', { name: 'Notificaciones' })
+    const button = await screen.findByRole('button', { name: 'Notificaciones, 1 sin leer' })
 
     await user.click(button)
     expect(button).toHaveAttribute('aria-expanded', 'true')
@@ -117,17 +112,23 @@ describe('NotificationsMenu (015, US2)', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('se actualiza cuando se responde una solicitud en otra pantalla (FR-004)', async () => {
-    listReceivedFriendshipRequests.mockResolvedValueOnce({ ok: true, requests: [REQUEST] })
+  it('marca como leída y navega al grupo al pulsar un aviso', async () => {
+    const user = userEvent.setup()
+    renderMenu()
+    await user.click(await screen.findByRole('button', { name: 'Notificaciones, 1 sin leer' }))
+
+    await user.click(screen.getByRole('button', { name: /Aviso 1. No leída. Abrir/ }))
+
+    await waitFor(() => expect(markRead).toHaveBeenCalledWith(1))
+    expect(await screen.findByText('Grupo 42')).toBeInTheDocument()
+  })
+
+  it('se recarga cuando se responde una solicitud en otra pantalla', async () => {
     renderMenu()
     await screen.findByRole('button', { name: 'Notificaciones, 1 sin leer' })
 
-    act(() => {
-      window.dispatchEvent(new Event('friend-requests-changed'))
-    })
+    act(() => window.dispatchEvent(new Event('friend-requests-changed')))
 
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Notificaciones' })).toBeInTheDocument(),
-    )
+    await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(2))
   })
 })

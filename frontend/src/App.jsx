@@ -8,9 +8,8 @@ import { SnackbarProvider } from './components/Snackbar'
 
 const HomePage = lazy(() => import('./pages/HomePage'))
 const MainPage = lazy(() => import('./pages/MainPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const FaqPage = lazy(() => import('./pages/FaqPage'))
 const ActivityPage = lazy(() => import('./pages/ActivityPage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
 const ExpenseDetailPage = lazy(() => import('./pages/ExpenseDetailPage'))
 const StatisticsPage = lazy(() => import('./pages/StatisticsPage'))
 const RegisterPage = lazy(() => import('./pages/RegisterPage'))
@@ -130,6 +129,15 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        {/* Bandeja de notificaciones in-app (specs/035-in-app-notifications, US2). */}
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Amigos y solicitudes pendientes (specs/011-send-friend-request, FR-010). */}
         <Route
           path="/friends"
@@ -222,15 +230,6 @@ export function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        {/* Ajustes y FAQ (specs/015-main-screen, FR-009). */}
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/activity"
           element={
@@ -252,14 +251,6 @@ export function AppRoutes() {
           element={
             <ProtectedRoute>
               <ExpenseDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/faq"
-          element={
-            <ProtectedRoute>
-              <FaqPage />
             </ProtectedRoute>
           }
         />

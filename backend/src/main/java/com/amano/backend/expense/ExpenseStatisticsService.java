@@ -2,12 +2,9 @@ package com.amano.backend.expense;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,24 +12,25 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
 import com.amano.backend.statistics.StatisticsConverter;
+import com.amano.backend.statistics.StatisticsPeriod;
 import com.amano.backend.user.Currency;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
 /**
- * Statistics of one month (specs/032-estadisticas-gastos): the personal expenses
- * by their amount and the person's shares in group and friend expenses, each
- * summed by category after converting every subtotal to the calculation currency
- * with the quote of its expense date (FR-005..FR-012, plan D2..D8).
+ * Statistics of a period (specs/032-estadisticas-gastos): the personal expenses by
+ * their amount and the person's shares in group and friend expenses, each summed by
+ * category after converting every subtotal to the calculation currency with the
+ * quote of its expense date (FR-005..FR-012, plan D2..D8). Without a month the whole
+ * year is included, like the personal activity.
  */
 @Service
 public class ExpenseStatisticsService {
 
-    static final String YEAR_INVALID = ExpenseSearchService.YEAR_INVALID;
-    static final String MONTH_INVALID = ExpenseSearchService.MONTH_INVALID;
+    static final String YEAR_INVALID = StatisticsPeriod.YEAR_INVALID;
+    static final String MONTH_INVALID = StatisticsPeriod.MONTH_INVALID;
 
     private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
@@ -52,52 +50,27 @@ public class ExpenseStatisticsService {
 
     @Transactional(readOnly = true)
     public ExpenseStatisticsResponse statistics(Long userId, String rawYear, String rawMonth) {
-        YearMonth period = validate(rawYear, rawMonth);
-        LocalDate from = period.atDay(1);
-        LocalDate to = period.atEndOfMonth();
+        return statistics(userId, StatisticsPeriod.of(rawYear, rawMonth));
+    }
+
+    /** Statistics of the period in force; a blank month covers the whole year. */
+    @Transactional(readOnly = true)
+    public ExpenseStatisticsResponse statistics(Long userId, StatisticsPeriod period) {
         StatisticsConverter converter = new StatisticsConverter(calculationCurrency(userId),
                 exchangeRateProvider);
 
         ExpenseStatisticsResponse.Breakdown personal = breakdown(
-                expenseRepository.sumByCategoryCurrencyAndDate(userId, from, to), converter);
+                expenseRepository.sumByCategoryCurrencyAndDate(userId, period.start(), period.end()),
+                converter);
         ExpenseStatisticsResponse.Breakdown group = breakdown(
-                sharedRepository.sumSharesByCategoryCurrencyAndDate(userId, from, to), converter);
+                sharedRepository.sumSharesByCategoryCurrencyAndDate(userId, period.start(),
+                        period.end()), converter);
         // The combined total adds the rounded totals, so it matches what is shown (plan D7).
         BigDecimal total = new BigDecimal(personal.total()).add(new BigDecimal(group.total()));
 
-        return new ExpenseStatisticsResponse(period.getYear(), period.getMonthValue(),
-                converter.target(), money(total), converter.excluded(), personal, group,
+        return new ExpenseStatisticsResponse(period.year(), period.month(), converter.target(),
+                money(total), converter.excluded(), personal, group,
                 sharedRepository.findYears(userId));
-    }
-
-    /** Both parameters are required: year 1..9999 and month 1..12 (FR-013, plan D10). */
-    static YearMonth validate(String rawYear, String rawMonth) {
-        Map<String, String> errors = new LinkedHashMap<>();
-        Integer year = integer(rawYear, 1, 9999);
-        Integer month = integer(rawMonth, 1, 12);
-        if (year == null) {
-            errors.put("year", YEAR_INVALID);
-        }
-        if (month == null) {
-            errors.put("month", MONTH_INVALID);
-        }
-        if (!errors.isEmpty()) {
-            throw new FieldValidationException(errors);
-        }
-        return YearMonth.of(year, month);
-    }
-
-    private static Integer integer(String raw, int min, int max) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            int value = Integer.parseInt(raw.strip());
-            return value >= min && value <= max ? value : null;
-        }
-        catch (NumberFormatException invalid) {
-            return null;
-        }
     }
 
     /**

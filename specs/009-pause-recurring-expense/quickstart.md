@@ -6,7 +6,7 @@ Guía para verificar de punta a punta la recurrencia, la pausa y la finalizació
 
 ## Prerrequisitos
 
-- Entorno de desarrollo de `first-steps.md` (base en Docker, backend con `mvn spring-boot:run`, frontend con `npm run dev`).
+- Entorno de desarrollo del `README.md` (base en Docker, backend con `mvn spring-boot:run`, frontend con `npm run dev`).
 - Una cuenta **verificada**.
 - **Reiniciar el backend** después de actualizar la rama: Flyway aplica `V5__expense_recurrence.sql` al arrancar.
 

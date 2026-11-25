@@ -19,9 +19,10 @@ import com.amano.backend.income.IncomeRepository;
 import com.amano.backend.user.Currency;
 
 /**
- * Received incomes of one month by category (specs/034-income-statistics,
+ * Received incomes of a period by category (specs/034-income-statistics,
  * FR-008..FR-013): each subtotal is converted with the quote of its income date,
- * summed per category, and rounded only at the end.
+ * summed per category, and rounded only at the end. A whole-year period aggregates
+ * every month of the year.
  */
 @Service
 public class IncomeStatisticsService {
@@ -39,11 +40,18 @@ public class IncomeStatisticsService {
 
     @Transactional(readOnly = true)
     public IncomeStatisticsResponse statistics(Long userId, YearMonth period, Currency target) {
+        return statistics(userId, period.atDay(1), period.atEndOfMonth(), target);
+    }
+
+    /** Statistics of an inclusive date range, which may span the whole year. */
+    @Transactional(readOnly = true)
+    public IncomeStatisticsResponse statistics(Long userId, LocalDate from, LocalDate to,
+            Currency target) {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         StatisticsConverter converter = new StatisticsConverter(target, exchangeRateProvider);
         Map<IncomeCategory, BigDecimal> sums = new EnumMap<>(IncomeCategory.class);
         for (IncomeCategorySubtotal subtotal : incomeRepository.sumByCategoryCurrencyAndDate(
-                userId, period.atDay(1), period.atEndOfMonth(), today)) {
+                userId, from, to, today)) {
             converter.convert(subtotal.currency(), subtotal.date(), subtotal.amount(),
                     subtotal.count())
                     .ifPresent(amount -> sums.merge(subtotal.category(), amount, BigDecimal::add));

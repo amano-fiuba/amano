@@ -16,7 +16,7 @@ Hacer los pasos 1 y 2 en modo claro y en modo oscuro.
 2. **Patrón**: en varias pantallas, el patrón se ve detrás del contenido, nunca sobre las tarjetas, y no bloquea clics.
 3. **Foto en solicitudes**: Ana le envía una solicitud a Bruno. Bruno ve la foto de Ana en la campanita y en "Amigos". Con la solicitud pendiente, Ana pide `/api/users/{id de Bruno}/avatar` y recibe 404.
 4. **Rechazo**: Bruno rechaza la solicitud. La foto de Ana vuelve a responder 404 para Bruno.
-5. **Barra**: el orden es perfil, actividad personal, grupos, amigos, notificaciones, preguntas frecuentes y ajustes.
+5. **Barra**: el orden es perfil, actividad personal, grupos, amigos, notificaciones, tema y cierre de sesión.
 6. **Actividad**: con gastos, `/activity` los lista de más nuevo a más viejo. "Ver todo" de la pantalla principal lleva ahí. Con una cuenta sin gastos se ofrece registrar el primero.
 7. **Grupo**: con más de 960px se ven miembros, gastos y actividad en tres columnas. Con 960px o menos se apilan en ese orden.
 8. **Celular**: a 360px no hay scroll horizontal, y el panel de la campanita entra completo.

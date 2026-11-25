@@ -6,7 +6,7 @@
 
 - Rama: `feat-crear-estadoss-deudas` (desde `sprint-4`, `223a768`). La spec y el backend de US1–US2 nacieron en `feat/estados-deuda` (desde `89c4339`).
 - **Migración nueva**: `V13__create_group_expenses_and_debts.sql`. Si tu base local tiene aplicada una `V13` de un borrador anterior (por ejemplo `V13__create_debts.sql`), Flyway va a fallar al arrancar con un error de checksum o de migración faltante: recreá la base (`docker compose down -v && docker compose up -d db`). Antes de correr las pruebas, hacé `./mvnw clean` para que no quede una `V13` vieja en `target/classes`.
-- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `first-steps.md`) y frontend (`cd frontend && npm run dev`).
+- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `README.md`, sección «Cómo levantarlo») y frontend (`cd frontend && npm run dev`).
 - Datos: una cuenta **A** (Ana) y una cuenta **B** (Juan), amigas (011/012). Un grupo "Depto" creado por A con B como miembro y un perfil simulado "Abuela".
 
 ### Pruebas automatizadas de la feature

@@ -55,7 +55,7 @@ Una persona instala la app en su teléfono Android, se registra o inicia sesión
 **Acceptance Scenarios**:
 
 1. **Given** la app instalada y una cuenta verificada, **When** la persona inicia sesión, **Then** entra a la pantalla principal igual que en la web.
-2. **Given** una sesión iniciada, **When** recorre la pantalla principal, el buscador, "Grupos", "Registrar gasto", "Gastos recurrentes", "Mi perfil", "Amigos", notificaciones, preguntas frecuentes y ajustes, **Then** cada pantalla carga sus datos y permite las mismas acciones que la web.
+2. **Given** una sesión iniciada, **When** recorre la pantalla principal, el buscador, "Grupos", "Registrar gasto", "Gastos recurrentes", "Mi perfil", "Amigos", notificaciones, cambio de tema y cierre de sesión, **Then** cada pantalla carga sus datos y permite las mismas acciones que la web.
 3. **Given** una cuenta nueva, **When** completa el registro en la app, **Then** ve "Revisa tu correo" igual que en la web.
 4. **Given** cualquier error de validación o de negocio definido en 001 a 014, **When** ocurre en la app, **Then** se muestra el mismo mensaje que en la web.
 
@@ -176,7 +176,7 @@ Cuando la web incorpora funcionalidades nuevas, el equipo actualiza la app recom
 - **SC-001**: El 100 % de las rutas de `frontend/src/App.jsx` funciona en la app instalada (checklist de quickstart §5).
 - **SC-002**: El 0 % de los archivos del backend cambia.
 - **SC-003**: Las pruebas del frontend siguen pasando con cobertura ≥ 85 %.
-- **SC-004**: Una persona del equipo con el entorno de first-steps instala la app en su teléfono siguiendo quickstart en menos de 30 minutos la primera vez.
+- **SC-004**: Una persona del equipo con el entorno del README instala la app en su teléfono siguiendo quickstart en menos de 30 minutos la primera vez.
 - **SC-005**: Actualizar la app tras un cambio del frontend requiere un solo comando.
 - **SC-006**: La sesión se conserva tras cerrar y abrir la app.
 - **SC-007**: El 100 % de las imágenes protegidas que se ven en la web se ven también en la app.
@@ -184,7 +184,7 @@ Cuando la web incorpora funcionalidades nuevas, el equipo actualiza la app recom
 ## Assumptions
 
 - El equipo usa Android Studio (Otter 2025.2.1 o posterior) y un teléfono con Android 7.0 (API 24) o superior y depuración USB habilitada.
-- Node 24 de first-steps cumple el mínimo de Capacitor 8 (Node 22).
+- Node 24 del README cumple el mínimo de Capacitor 8 (Node 22).
 - El backend de producción está accesible por HTTPS en el dominio de `.env.example`.
 - La app se distribuye solo en modo desarrollo (sin firma de release ni Play Store).
 - Los textos siguen en español con voseo; no se agregan textos nuevos a las pantallas.

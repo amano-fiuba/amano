@@ -91,10 +91,29 @@ function paramsOf({ term, year, month, page, view }) {
 }
 
 // Each expense is a card with a chevron, like the rows of "Mis grupos" (FR-013).
-function ExpenseItem({ expense, from }) {
+function ExpenseItem({ expense, from, highlightDebtId }) {
   const category = labelOf(CATEGORY_OPTIONS, expense.category)
+  const rowRef = useRef(null)
+  const targetsDebt = highlightDebtId != null
+    && String(expense.debtId ?? expense.id) === String(highlightDebtId)
+
+  // Deep link de una notificación de deuda sin grupo (035 FR-017): scroll y
+  // resaltado efímero de 2 s sobre la transacción correspondiente. Se manipula
+  // el atributo del DOM para no disparar renders desde el efecto.
+  useEffect(() => {
+    if (!targetsDebt) return undefined
+    const node = rowRef.current
+    node?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    node?.setAttribute('data-highlighted', 'true')
+    const timer = setTimeout(() => node?.removeAttribute('data-highlighted'), 2000)
+    return () => {
+      clearTimeout(timer)
+      node?.removeAttribute('data-highlighted')
+    }
+  }, [targetsDebt])
+
   return (
-    <li>
+    <li ref={rowRef} data-debt-id={expense.debtId ?? expense.id}>
       <Link to={`/expenses/${expense.id}`} state={{ from }} className="group-row expense-row">
         <span className="group-row__body">
           <span className="group-row__title">
@@ -139,7 +158,8 @@ function emptyMessageOf(year, month) {
  * overwrites a newer one (D9); while another page loads the previous one stays
  * visible, dimmed, so the pagination does not jump.
  */
-function ActivityResults({ term, year, month, page, size, from, onPage, onPageResolved, onListShown }) {
+function ActivityResults({ term, year, month, page, size, from, highlightDebtId,
+  onPage, onPageResolved, onListShown }) {
   const { setUser } = useAuth()
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState({ key: null, status: 'loading', data: null })
@@ -223,7 +243,7 @@ function ActivityResults({ term, year, month, page, size, from, onPage, onPageRe
       )}
       <ul ref={listRef} className="group-rows expense-rows" aria-label="Gastos">
         {data.expenses.map((expense) => (
-          <ExpenseItem key={expense.id} expense={expense} from={from} />
+          <ExpenseItem key={expense.id} expense={expense} from={from} highlightDebtId={highlightDebtId} />
         ))}
       </ul>
       {data.totalPages > 1 && (
@@ -442,6 +462,7 @@ export default function ActivityPage() {
           page={criteria.page}
           size={pageSize}
           from={from}
+          highlightDebtId={searchParams.get('debt')}
           onPage={handlePage}
           onPageResolved={handlePageResolved}
           onListShown={handleListShown}

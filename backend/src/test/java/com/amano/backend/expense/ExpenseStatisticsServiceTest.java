@@ -20,6 +20,7 @@ import org.mockito.Mockito;
 
 import com.amano.backend.common.FieldValidationException;
 import com.amano.backend.groupexpense.exchange.ExchangeRateProvider;
+import com.amano.backend.statistics.StatisticsPeriod;
 import com.amano.backend.groupexpense.exchange.ExchangeRateQuote;
 import com.amano.backend.groupexpense.exchange.ExchangeRateUnavailableException;
 import com.amano.backend.user.Currency;
@@ -84,24 +85,32 @@ class ExpenseStatisticsServiceTest {
     // ----- Validation ---------------------------------------------------------
 
     @Test
-    void validateAcceptsTrimmedYearAndMonth() {
-        assertThat(ExpenseStatisticsService.validate(" 2026 ", "3").getMonthValue()).isEqualTo(3);
-        assertThat(ExpenseStatisticsService.validate("1", "12").getYear()).isEqualTo(1);
-        assertThat(ExpenseStatisticsService.validate("9999", "1").getYear()).isEqualTo(9999);
+    void periodAcceptsTrimmedValuesAndABlankMonthAsTheWholeYear() {
+        assertThat(StatisticsPeriod.of(" 2026 ", "3").month()).isEqualTo(3);
+        assertThat(StatisticsPeriod.of("1", "12").year()).isEqualTo(1);
+        assertThat(StatisticsPeriod.of("9999", "1").year()).isEqualTo(9999);
+
+        StatisticsPeriod wholeYear = StatisticsPeriod.of("2026", " ");
+        assertThat(wholeYear.month()).isNull();
+        assertThat(wholeYear.allMonths()).isTrue();
+        assertThat(wholeYear.start()).isEqualTo(LocalDate.parse("2026-01-01"));
+        assertThat(wholeYear.end()).isEqualTo(LocalDate.parse("2026-12-31"));
     }
 
     @Test
-    void validateRejectsMissingOrInvalidValues() {
+    void periodRejectsMissingOrInvalidValues() {
         for (String[] invalid : new String[][] {
                 {null, null}, {"", " "}, {"abc", "x"}, {"0", "0"}, {"10000", "13"}, {"-1", "-1"}}) {
-            assertThatThrownBy(() -> ExpenseStatisticsService.validate(invalid[0], invalid[1]))
+            assertThatThrownBy(() -> StatisticsPeriod.of(invalid[0], invalid[1]))
                     .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
-                            .containsEntry("year", ExpenseStatisticsService.YEAR_INVALID)
-                            .containsEntry("month", ExpenseStatisticsService.MONTH_INVALID));
+                            .containsEntry("year", StatisticsPeriod.YEAR_INVALID));
         }
-        assertThatThrownBy(() -> ExpenseStatisticsService.validate("2026", "13"))
-                .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
-                        .containsOnlyKeys("month"));
+        for (String month : new String[] {"x", "0", "13", "-1"}) {
+            assertThatThrownBy(() -> StatisticsPeriod.of("2026", month))
+                    .isInstanceOfSatisfying(FieldValidationException.class, e -> assertThat(e.getFields())
+                            .containsOnlyKeys("month")
+                            .containsEntry("month", StatisticsPeriod.MONTH_INVALID));
+        }
     }
 
     // ----- Calculation currency -----------------------------------------------
@@ -153,6 +162,24 @@ class ExpenseStatisticsServiceTest {
         assertThat(response.group().categories()).containsExactly(
                 new ExpenseStatisticsResponse.CategoryAmount(ExpenseCategory.FOOD, "30000.00", "50.0"),
                 new ExpenseStatisticsResponse.CategoryAmount(ExpenseCategory.LEISURE, "30000.00", "50.0"));
+    }
+
+    @Test
+    void aBlankMonthSumsTheWholeYearAndLeavesTheMonthOutOfTheResponse() {
+        preferred(Currency.ARS);
+        LocalDate first = LocalDate.parse("2026-01-01");
+        LocalDate last = LocalDate.parse("2026-12-31");
+        when(expenseRepository.sumByCategoryCurrencyAndDate(USER_ID, first, last)).thenReturn(
+                List.of(subtotal(ExpenseCategory.FOOD, Currency.ARS, "2026-03-01", "100.00", 1)));
+        when(sharedRepository.sumSharesByCategoryCurrencyAndDate(USER_ID, first, last))
+                .thenReturn(List.of());
+
+        ExpenseStatisticsResponse response = service.statistics(USER_ID, "2026", "");
+
+        assertThat(response.year()).isEqualTo(2026);
+        assertThat(response.month()).isNull();
+        assertThat(response.total()).isEqualTo("100.00");
+        verify(expenseRepository).sumByCategoryCurrencyAndDate(USER_ID, first, last);
     }
 
     @Test

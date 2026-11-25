@@ -107,7 +107,7 @@ Una persona entra a sus grupos o a su actividad desde cualquier pantalla con la 
 
 **Acceptance Scenarios**:
 
-1. **Given** una sesión activa, **When** se mira la barra, **Then** el orden es perfil, actividad personal, grupos, amigos, notificaciones, preguntas frecuentes y ajustes.
+1. **Given** una sesión activa, **When** se mira la barra, **Then** el orden es perfil, actividad personal, grupos, amigos, notificaciones, tema y cierre de sesión.
 2. **Given** gastos registrados, **When** se abre `/activity`, **Then** se listan con descripción o categoría, fecha y monto, sin gastos de otras cuentas.
 3. **Given** ningún gasto, **When** se abre `/activity`, **Then** se ofrece registrar el primero.
 4. **Given** un error de conexión, **When** se abre `/activity`, **Then** se informa el error.

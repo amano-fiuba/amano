@@ -8,9 +8,9 @@ import com.amano.backend.user.Currency;
 /**
  * One response for the whole statistics screen (specs/034-income-statistics,
  * contracts/statistics-summary-api.md): expenses, income, their comparison and the
- * years of the selector.
+ * years of the selector. A null month means the whole year.
  */
-public record StatisticsSummaryResponse(int year, int month, Currency currency,
+public record StatisticsSummaryResponse(int year, Integer month, Currency currency,
         ExpensesSummary expenses, IncomeStatisticsResponse income, Comparison comparison,
         List<Integer> years) {
 

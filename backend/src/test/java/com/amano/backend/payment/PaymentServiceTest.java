@@ -7,6 +7,7 @@ import static com.amano.backend.payment.PaymentFixtures.JUAN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -43,6 +44,8 @@ import com.amano.backend.groups.GroupPermissions;
 import com.amano.backend.groups.GroupPermissionsRepository;
 import com.amano.backend.groups.GroupPermissionDeniedException;
 import com.amano.backend.groups.PaymentActivityDetails;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
@@ -65,6 +68,7 @@ class PaymentServiceTest {
     private UserRepository userRepository;
     private ActivityEventService activityEventService;
     private GroupPermissionsRepository groupPermissionsRepository;
+    private NotificationEventPublisher notificationPublisher;
     private PaymentService service;
     private Debt debt;
 
@@ -77,8 +81,10 @@ class PaymentServiceTest {
         userRepository = mock(UserRepository.class);
         activityEventService = mock(ActivityEventService.class);
         groupPermissionsRepository = mock(GroupPermissionsRepository.class);
+        notificationPublisher = mock(NotificationEventPublisher.class);
         service = new PaymentService(debtRepository, paymentRepository, expenseRepository, groupMemberRepository,
-                new GroupPermissionChecker(), userRepository, activityEventService, groupPermissionsRepository);
+                new GroupPermissionChecker(), userRepository, activityEventService, groupPermissionsRepository,
+                notificationPublisher);
 
         debt = PaymentFixtures.juanDebt();
         when(debtRepository.findByIdForUpdate(31L)).thenReturn(Optional.of(debt));
@@ -290,6 +296,8 @@ class PaymentServiceTest {
         service.register(JUAN, KEY, pay("3333.33"));
 
         assertThat(debt.getStatus()).isEqualTo(DebtStatus.PAID);
+        verify(notificationPublisher, org.mockito.Mockito.atLeastOnce()).publishSafely(argThat(event ->
+                event.type() == NotificationType.PAYMENT_RECORDED));
     }
 
     @Test

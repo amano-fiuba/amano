@@ -80,16 +80,6 @@ describe('App / con sesión (specs/015-main-screen)', () => {
     expect(await screen.findByRole('heading', { name: 'Grupos' })).toBeInTheDocument()
   })
 
-  it('/faq y /settings son pantallas protegidas disponibles (FR-009)', async () => {
-    const { unmount } = renderAt('/faq')
-    expect(await screen.findByText('Próximamente')).toBeInTheDocument()
-    unmount()
-
-    renderAt('/settings')
-    expect(await screen.findByRole('heading', { name: 'Ajustes' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /cambiar a modo/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
-  })
 })
 
 describe('App rutas (T005/T009, specs/002-user-profile)', () => {

@@ -7,7 +7,7 @@
 - Rama: `feat/delete-friend` (desde `sprint-4`, con 011, 012 y 013 integradas).
 - **Sin migración nueva**: alcanza con la `V12` de 011.
 - El módulo de deudas directas no existe: `NoOpDirectDebtPort` informa siempre "sin deuda". El bloqueo por deuda se valida con pruebas unitarias (mock del puerto); de punta a punta se prueba el camino sin deuda.
-- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `first-steps.md` §7) y frontend (`cd frontend && npm run dev`).
+- Levantar: base (`docker compose up -d db`), backend (`cd backend && (set -a; source ../.env; set +a; ./mvnw spring-boot:run)`, ver `README.md`, sección «Cómo levantarlo») y frontend (`cd frontend && npm run dev`).
 
 ### Pruebas automatizadas de la feature
 

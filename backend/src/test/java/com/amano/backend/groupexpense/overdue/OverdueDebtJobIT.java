@@ -1,6 +1,9 @@
 package com.amano.backend.groupexpense.overdue;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -14,9 +17,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.amano.backend.groupexpense.Debt;
 import com.amano.backend.groupexpense.DebtRepository;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
 import com.amano.backend.support.AbstractClockIntegrationIT;
 
 /**
@@ -37,12 +43,16 @@ class OverdueDebtJobIT extends AbstractClockIntegrationIT {
     @Autowired
     private DebtRepository debtRepository;
 
+    @MockitoSpyBean
+    private NotificationEventPublisher publisher;
+
     private long debtorId;
     private long creditorId;
 
     @BeforeEach
     void setUp() {
         when(clock.getZone()).thenReturn(ZONE);
+        clearInvocations(publisher);
         at("2026-11-10");
         debtorId = user("Deudor", "Test");
         creditorId = user("Acreedor", "Test");
@@ -153,6 +163,8 @@ class OverdueDebtJobIT extends AbstractClockIntegrationIT {
         at("2026-11-11"); // first day after the deadline
         job.markOverdueDebts();
         assertThat(statusOf(debtId)).isEqualTo("OVERDUE");
+        verify(publisher).publishSafely(argThat(event ->
+                event.type() == NotificationType.DEBT_OVERDUE && event.userId().equals(debtorId)));
     }
 
     @Test

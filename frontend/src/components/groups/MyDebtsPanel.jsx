@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthContext'
 import { getPendingDebts } from '../../api/groupExpensesClient'
@@ -49,7 +49,7 @@ const STALE_STATUSES = [400, 404, 409]
 // the original and converted amounts, their state and "Registrar pago" for the
 // payable ones (partial or total payment). One Idempotency-Key per attempt: it is created
 // when the confirmation opens and survives a network retry, never a rejection.
-export default function MyDebtsPanel({ groupId, requiresValidation, refreshKey, onChanged }) {
+export default function MyDebtsPanel({ groupId, requiresValidation, refreshKey, onChanged, highlightDebtId }) {
   const auth = useAuth()
   const currentUserId = auth?.user?.id ?? null
   const setUser = auth?.setUser
@@ -58,9 +58,22 @@ export default function MyDebtsPanel({ groupId, requiresValidation, refreshKey, 
   const resource = useGroupResource(loader, refreshKey)
   const [attempt, setAttempt] = useState(null) // { debt, key, busy, error }
   const [panelError, setPanelError] = useState('')
+  const [highlighted, setHighlighted] = useState(null)
   const trigger = useRef(null)
+  const rowRefs = useRef({})
 
   const debts = Array.isArray(resource.data) ? resource.data : []
+
+  // 035 FR-017: scroll to the debt of the notification and highlight it for 2 s.
+  useEffect(() => {
+    if (!highlightDebtId) return undefined
+    const row = rowRefs.current[String(highlightDebtId)]
+    if (!row) return undefined
+    row.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    setHighlighted(String(highlightDebtId))
+    const timer = setTimeout(() => setHighlighted(null), 2000)
+    return () => clearTimeout(timer)
+  }, [highlightDebtId, resource.data])
 
   function open(debt, button) {
     trigger.current = button
@@ -120,7 +133,15 @@ export default function MyDebtsPanel({ groupId, requiresValidation, refreshKey, 
       <ResourceState resource={resource} isEmpty={debts.length === 0} emptyMessage={NO_OPEN_DEBTS_MESSAGE}>
         <ul className="group-debts__list" aria-label="Mis deudas pendientes">
           {debts.map((debt) => (
-            <li key={debt.debtId} className="group-debts__debt" data-testid="my-debt-row">
+            <li
+              key={debt.debtId}
+              ref={(node) => {
+                rowRefs.current[String(debt.debtId)] = node
+              }}
+              className={`group-debts__debt${highlighted === String(debt.debtId) ? ' is-highlighted' : ''}`}
+              data-highlighted={highlighted === String(debt.debtId) ? 'true' : undefined}
+              data-testid="my-debt-row"
+            >
               <span className="group-debts__who">{describe(debt)}</span>
               <ConvertedAmount
                 amount={moneyText(debt.amount)}

@@ -9,6 +9,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,6 +24,11 @@ import com.amano.backend.groupexpense.reminder.ReminderMailService;
 import com.amano.backend.groupexpense.reminder.ReminderMessageBuilder;
 import com.amano.backend.groupexpense.reminder.ReminderRecipients;
 import com.amano.backend.groups.ActivityEventService;
+import com.amano.backend.notification.NotificationEvent;
+import com.amano.backend.notification.NotificationEvent.EmailPolicy;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
+import com.amano.backend.notification.dto.NotificationTargetResponse;
 import com.amano.backend.groups.Group;
 import com.amano.backend.groups.GroupMember;
 import com.amano.backend.groups.GroupMemberRepository;
@@ -68,12 +74,26 @@ public class DebtWhistleService {
     private final ActivityEventService activityEventService;
     private final Clock clock;
     private final TransactionTemplate transactionTemplate;
+    private final NotificationEventPublisher notificationPublisher;
 
+    /** Constructor kept for the existing unit tests (no notification publishing). */
     public DebtWhistleService(GroupRepository groupRepository, GroupMemberRepository groupMemberRepository,
             DebtRepository debtRepository, GroupExpenseRepository expenseRepository, UserRepository userRepository,
             DebtWhistleRepository whistleRepository, ReminderRecipients recipients,
             ReminderMessageBuilder messageBuilder, ReminderMailService mailService,
             ActivityEventService activityEventService, Clock clock, PlatformTransactionManager transactionManager) {
+        this(groupRepository, groupMemberRepository, debtRepository, expenseRepository, userRepository,
+                whistleRepository, recipients, messageBuilder, mailService, activityEventService, clock,
+                transactionManager, NotificationEventPublisher.noOp());
+    }
+
+    @Autowired
+    public DebtWhistleService(GroupRepository groupRepository, GroupMemberRepository groupMemberRepository,
+            DebtRepository debtRepository, GroupExpenseRepository expenseRepository, UserRepository userRepository,
+            DebtWhistleRepository whistleRepository, ReminderRecipients recipients,
+            ReminderMessageBuilder messageBuilder, ReminderMailService mailService,
+            ActivityEventService activityEventService, Clock clock, PlatformTransactionManager transactionManager,
+            NotificationEventPublisher notificationPublisher) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.debtRepository = debtRepository;
@@ -86,6 +106,7 @@ public class DebtWhistleService {
         this.activityEventService = activityEventService;
         this.clock = clock;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.notificationPublisher = notificationPublisher;
     }
 
     /** Whistles {@code debtId} of {@code groupId} on behalf of {@code callerId}. */
@@ -117,6 +138,13 @@ public class DebtWhistleService {
             activityEventService.recordDebtWhistled(groupId, callerId, whistleId, debt.getId(), debt.getExpenseId(),
                     claim.outstanding(), debt.getCurrency().name(), debt.getDebtorName(), claim.creditorName(),
                     claim.concept());
+            if (debt.getDebtorUserId() != null) {
+                notificationPublisher.publishSafely(new NotificationEvent(
+                        debt.getDebtorUserId(), NotificationType.DEBT_WHISTLE,
+                        claim.mail().subject(), claim.mail().body(),
+                        new NotificationTargetResponse("DEBT", groupId, debt.getId(), debt.getExpenseId(), null),
+                        EmailPolicy.NONE));
+            }
         });
         return new DebtWhistleResponse(whistleId, debtId, claim.debt().getDebtorName(), sentAt,
                 claim.whistle().getCreatedAt().plus(WINDOW));

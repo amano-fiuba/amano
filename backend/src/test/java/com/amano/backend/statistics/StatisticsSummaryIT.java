@@ -2,6 +2,7 @@ package com.amano.backend.statistics;
 
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.empty;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -142,6 +143,26 @@ class StatisticsSummaryIT extends AbstractIntegrationIT {
                 .andExpect(jsonPath("$.comparison.expenses").value("160000.00"))
                 .andExpect(jsonPath("$.comparison.balance").value("840000.00"))
                 .andExpect(jsonPath("$.years").value(contains(2026)));
+    }
+
+    @Test
+    void aBlankMonthAggregatesTheWholeYearAndOtherYearsAreLeftOut() throws Exception {
+        long ana = verifiedUser("Ana");
+        expense(ana, "100", "ARS", "2026-02-02", "FOOD");
+        expense(ana, "200", "ARS", "2026-09-03", "TRANSPORT");
+        expense(ana, "500", "ARS", "2025-09-03", "FOOD");
+        income(ana, "1000", "ARS", "2026-01-02", "SALARY");
+        income(ana, "2000", "ARS", "2026-10-03", "FREELANCE");
+        income(ana, "9000", "ARS", "2025-10-03", "SALARY");
+
+        mockMvc.perform(get("/api/stats/summary").param("year", "2026")
+                        .cookie(new Cookie("amano_auth", jwtService.issueToken(ana))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2026))
+                .andExpect(jsonPath("$.month").value(nullValue()))
+                .andExpect(jsonPath("$.expenses.total").value("300.00"))
+                .andExpect(jsonPath("$.income.total").value("3000.00"))
+                .andExpect(jsonPath("$.comparison.balance").value("2700.00"));
     }
 
     @Test
