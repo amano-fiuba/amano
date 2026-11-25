@@ -33,11 +33,9 @@ public class CurrencyController {
         this.groupExpenseService = groupExpenseService;
     }
 
+    /** Catálogo público: también se consulta desde el registro, sin sesión. */
     @GetMapping(path = "/api/currencies", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> list() {
-        if (currentUserId() == null) {
-            return unauthorized();
-        }
         List<CurrencyCatalogEntry> currencies = catalogProvider.getCatalog();
         return ResponseEntity.ok(Map.of("currencies", currencies));
     }

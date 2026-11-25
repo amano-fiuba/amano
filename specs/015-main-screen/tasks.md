@@ -10,7 +10,7 @@
 
 - [x] T004 [US2] `AppHeader` con accesos y rama con sesión de `SiteNav` (FR-003)
 - [x] T005 [US2] `NotificationsMenu` y evento de cambios en `friendsClient` (FR-004)
-- [x] T006 [US2] `SettingsPage` y `FaqPage` con rutas protegidas (FR-009)
+- [x] T006 [US2] Íconos de cambio de tema y cierre de sesión en `AppHeader` (FR-009)
 - [x] T007 [US4] `QuickActionsButton` (FR-010)
 
 ## Etapa 3: Buscador

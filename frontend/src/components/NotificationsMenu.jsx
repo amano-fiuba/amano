@@ -1,32 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router'
-import {
-  FRIEND_REQUESTS_CHANGED_EVENT,
-  listReceivedFriendshipRequests,
-} from '../api/friendsClient'
+import { Link, useLocation, useNavigate } from 'react-router'
+import { FRIEND_REQUESTS_CHANGED_EVENT } from '../api/friendsClient'
+import { getNotifications, markRead } from '../api/notificationsClient'
 import { useDismiss } from '../hooks/useDismiss'
+import { MARK_READ_ERROR_MESSAGE, openNotification } from '../utils/notificationTarget'
 import { BellIcon } from './NavIcons'
-
-const DEFAULT_AVATAR = '/avatar-default.png'
+import NotificationRow from './NotificationRow'
+import { SNACKBAR_ERROR_MS, useSnackbar } from './Snackbar'
 
 export const NO_NOTIFICATIONS_MESSAGE = 'No tenés notificaciones'
 export const NOTIFICATIONS_ERROR_MESSAGE = 'No se pudieron cargar tus notificaciones'
-
-function senderName({ firstName, lastName }) {
-  return lastName ? `${firstName} ${lastName}` : firstName
-}
 
 function buttonLabel(count) {
   if (count === 0) return 'Notificaciones'
   return count === 1 ? 'Notificaciones, 1 sin leer' : `Notificaciones, ${count} sin leer`
 }
 
-// Campanita (specs/015-main-screen, FR-004). Por ahora las notificaciones son
-// las solicitudes de amistad pendientes; se recargan al navegar y al responder
-// una solicitud desde cualquier pantalla.
+/** Header bell and quick popover of feature 035 (US1, US3, US4). */
 export default function NotificationsMenu() {
   const { pathname } = useLocation()
-  const [requests, setRequests] = useState([])
+  const navigate = useNavigate()
+  const showSnackbar = useSnackbar()
+  const [items, setItems] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const [failed, setFailed] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
@@ -37,10 +33,12 @@ export default function NotificationsMenu() {
 
   useEffect(() => {
     let cancelled = false
-    listReceivedFriendshipRequests().then((result) => {
+    getNotifications({ limit: 5, order: 'unread-first' }).then((result) => {
       if (cancelled) return
       setFailed(!result.ok)
-      setRequests(result.ok ? result.requests : [])
+      if (!result.ok) return
+      setItems(result.notifications.slice(0, 5))
+      setUnreadCount(result.unreadCount)
     })
     return () => {
       cancelled = true
@@ -53,10 +51,31 @@ export default function NotificationsMenu() {
     return () => window.removeEventListener(FRIEND_REQUESTS_CHANGED_EVENT, reload)
   }, [])
 
+  const applyRead = useCallback((id, readAt) => {
+    setItems((current) => current.map((item) => item.id === id
+      ? { ...item, readAt: readAt ?? new Date().toISOString() }
+      : item))
+    setUnreadCount((current) => Math.max(0, current - 1))
+  }, [])
+
+  const markAsRead = useCallback(async (id) => {
+    const result = await markRead(id)
+    if (result.ok) applyRead(id, result.notification?.readAt)
+    else showSnackbar?.(MARK_READ_ERROR_MESSAGE, SNACKBAR_ERROR_MS)
+    return result
+  }, [applyRead, showSnackbar])
+
+  const handleOpen = async (notification) => {
+    const opened = await openNotification(notification, {
+      navigate,
+      markRead: markAsRead,
+      notify: (message) => showSnackbar?.(message, SNACKBAR_ERROR_MS),
+    })
+    if (opened) close()
+  }
+
   const handleToggle = () => {
-    if (!isOpen) {
-      setReloadToken((token) => token + 1)
-    }
+    if (!isOpen) setReloadToken((token) => token + 1)
     setIsOpen(!isOpen)
   }
 
@@ -65,15 +84,15 @@ export default function NotificationsMenu() {
       <button
         type="button"
         className="app-header__action"
-        aria-label={buttonLabel(requests.length)}
+        aria-label={buttonLabel(unreadCount)}
         aria-expanded={isOpen}
         title="Notificaciones"
         onClick={handleToggle}
       >
         <BellIcon />
-        {requests.length > 0 && (
+        {unreadCount > 0 && (
           <span className="app-header__badge" aria-hidden="true">
-            {requests.length > 9 ? '9+' : requests.length}
+            {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
@@ -82,28 +101,24 @@ export default function NotificationsMenu() {
         <div className="app-menu__panel app-menu__panel--end" aria-label="Notificaciones" role="region">
           <h2>Notificaciones</h2>
           {failed && <p role="alert">{NOTIFICATIONS_ERROR_MESSAGE}</p>}
-          {!failed && requests.length === 0 && <p>{NO_NOTIFICATIONS_MESSAGE}</p>}
-          {requests.length > 0 && (
-            <ul>
-              {requests.map((request) => (
-                <li key={request.id} className="app-notification">
-                  <img
-                    src={request.sender.avatarUrl || DEFAULT_AVATAR}
-                    alt=""
-                    width={36}
-                    height={36}
-                  />
-                  <span>
-                    <strong>{senderName(request.sender)}</strong> te envió una solicitud de
-                    amistad
-                  </span>
-                </li>
+          {!failed && items.length === 0 && <p>{NO_NOTIFICATIONS_MESSAGE}</p>}
+          {!failed && items.length > 0 && (
+            <ul className="notifications-menu__list">
+              {items.map((notification) => (
+                <NotificationRow
+                  key={notification.id}
+                  notification={notification}
+                  onOpen={handleOpen}
+                  showMarkRead={false}
+                  showTime={false}
+                  showStatus={false}
+                />
               ))}
             </ul>
           )}
-          <Link to="/friends" onClick={close}>
-            Ver solicitudes
-          </Link>
+          <div className="notifications-menu__footer">
+            <Link to="/notifications" onClick={close}>Ver todas las notificaciones</Link>
+          </div>
         </div>
       )}
     </div>

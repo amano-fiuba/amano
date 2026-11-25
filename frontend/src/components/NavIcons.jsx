@@ -83,21 +83,33 @@ export function BellIcon() {
   )
 }
 
-export function HelpIcon() {
+// Luna para pasar a modo oscuro y sol para volver al claro.
+export function MoonIcon() {
   return (
     <Icon>
-      <circle cx="12" cy="12" r="9" />
-      <path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.2-2.5 3.8" />
-      <path d="M12 17.2h.01" />
+      <path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1Z" />
     </Icon>
   )
 }
 
-export function SettingsIcon() {
+export function SunIcon() {
   return (
     <Icon>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-2.8 1.2v.2a2 2 0 1 1-4 0V21a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1A1.7 1.7 0 0 0 3 14H2.8a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.2-2.9l-.1-.1A2 2 0 1 1 7 4.1l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5v-.2a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 2.9 1.2l.1-.1A2 2 0 1 1 19.9 7l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1h.2a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.6 1Z" />
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </Icon>
+  )
+}
+
+// Persona saliendo por una puerta: cierre de sesión.
+export function LogoutIcon() {
+  return (
+    <Icon>
+      <path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4" />
+      <path d="M17 12H9" />
+      <path d="m12 9-3 3 3 3" />
+      <circle cx="19" cy="7" r="1.8" />
+      <path d="M16 20c.4-3 1.5-4.5 3-4.5s2.6 1.5 3 4.5" />
     </Icon>
   )
 }
@@ -131,8 +143,7 @@ export function HistoryIcon() {
   )
 }
 
-// Dos engranajes chicos: la configuración de un grupo, distinta del engranaje
-// único de "Ajustes" de la barra.
+// Dos engranajes chicos: la configuración de un grupo.
 export function GroupSettingsIcon() {
   return (
     <Icon>

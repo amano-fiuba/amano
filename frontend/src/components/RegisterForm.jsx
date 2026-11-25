@@ -175,6 +175,10 @@ export default function RegisterForm({ onRegistered }) {
         {...bindField('cbuCvu', rules(validateCbu))}
       />
 
+      {/* US3 optional parts (FR-003): empty ⇒ nothing persisted, never blocking. */}
+      <AvatarUploader onFileSelected={setAvatarFile} />
+      <CurrencySelector onChange={setCurrencies} />
+
       <div>
         <label>
           <input
@@ -185,10 +189,6 @@ export default function RegisterForm({ onRegistered }) {
         </label>
         {errors.acceptTerms && <p role="alert">{errors.acceptTerms.message}</p>}
       </div>
-
-      {/* US3 optional parts (FR-003): empty ⇒ nothing persisted, never blocking. */}
-      <AvatarUploader onFileSelected={setAvatarFile} />
-      <CurrencySelector onChange={setCurrencies} />
 
       {formError && (
         <p role="alert" data-testid="form-error">

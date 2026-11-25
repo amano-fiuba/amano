@@ -56,8 +56,12 @@ class CurrencyControllerIT extends AbstractIntegrationIT {
     }
 
     @Test
-    void withoutSessionIsUnauthorized() throws Exception {
-        mockMvc.perform(get("/api/currencies")).andExpect(status().isUnauthorized());
+    void withoutSessionReturnsTheCatalog() throws Exception {
+        when(catalogProvider.getCatalog()).thenReturn(List.of(new CurrencyCatalogEntry("ARS", "PESO")));
+
+        mockMvc.perform(get("/api/currencies"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currencies[0].code").value("ARS"));
     }
 
     @Test

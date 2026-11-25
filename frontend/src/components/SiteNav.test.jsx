@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SiteNav from './SiteNav'
 
 const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }))
@@ -13,6 +14,11 @@ vi.mock('../api/friendsClient', () => ({
 
 beforeEach(() => {
   useAuth.mockReturnValue({ user: null, loading: false })
+})
+
+afterEach(() => {
+  localStorage.clear()
+  delete document.documentElement.dataset.theme
 })
 
 function renderNav(entry = '/') {
@@ -43,6 +49,10 @@ describe('SiteNav', () => {
       '/register',
     )
     expect(screen.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /cambiar a modo (claro|oscuro)/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/^modo (claro|oscuro)$/i)).not.toBeInTheDocument()
   })
 
   it('con sesión muestra la barra de la app y no los accesos públicos (015, FR-003)', () => {
@@ -58,10 +68,23 @@ describe('SiteNav', () => {
     expect(screen.getByRole('link', { name: 'Actividad personal' })).toHaveAttribute('href', '/activity')
     expect(screen.getByRole('link', { name: 'Estadísticas' })).toHaveAttribute('href', '/statistics')
     expect(screen.getByRole('link', { name: 'Amigos' })).toHaveAttribute('href', '/friends')
-    expect(screen.getByRole('link', { name: 'Preguntas frecuentes' })).toHaveAttribute('href', '/faq')
-    expect(screen.getByRole('link', { name: 'Ajustes' })).toHaveAttribute('href', '/settings')
     expect(screen.getByRole('button', { name: 'Notificaciones' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Registrarse' })).not.toBeInTheDocument()
+  })
+
+  it('el ícono de tema cambia entre modo oscuro y claro', async () => {
+    useAuth.mockReturnValue({ user: { id: 7 }, loading: false })
+    renderNav()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cambiar a modo oscuro' }))
+    expect(document.documentElement.dataset.theme).toBe('dark')
+    expect(
+      screen.getByRole('button', { name: 'Cambiar a modo claro' }),
+    ).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cambiar a modo claro' }))
+    expect(document.documentElement.dataset.theme).toBe('light')
   })
 
   it('muestra la foto de perfil en el acceso a Mi perfil', () => {

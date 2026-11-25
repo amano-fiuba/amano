@@ -18,30 +18,42 @@ import './MainPage.scss'
 import './groups/groups.scss'
 import './StatisticsPage.scss'
 
+// Same "all months" value as the personal activity filters: an explicit empty
+// month parameter, so it can be told apart from the default current month.
+const ALL_MONTHS = ''
+
 function today() {
   const now = new Date()
   return { year: String(now.getFullYear()), month: String(now.getMonth() + 1) }
 }
 
-/** Period in the address (`?year=&month=`, plan D11); a missing or invalid value is the current one. */
+/**
+ * Period in the address (`?year=&month=`, plan D11). A missing or invalid value is
+ * the current one; an explicit `month=` means "Todos los meses" (all of them).
+ */
 function periodFromParams(params) {
   const current = today()
   const rawYear = params.get('year') ?? ''
-  const rawMonth = params.get('month') ?? ''
+  const rawMonth = params.get('month')
+  const month = rawMonth === null
+    ? current.month
+    : rawMonth === ALL_MONTHS || /^(1[0-2]|[1-9])$/.test(rawMonth)
+      ? rawMonth
+      : current.month
   return {
     year: /^\d{4}$/.test(rawYear) ? rawYear : current.year,
-    month: /^(1[0-2]|[1-9])$/.test(rawMonth) ? rawMonth : current.month,
+    month,
   }
 }
 
-/** Address of a period: the current year and month are left out. */
+/** Address of a period: the current year and month are left out; all months is `month=`. */
 function paramsOf({ year, month }) {
   const current = today()
   const params = {}
   if (year !== current.year) {
     params.year = year
   }
-  if (month !== current.month) {
+  if (month === ALL_MONTHS || month !== current.month) {
     params.month = month
   }
   return params
@@ -54,7 +66,9 @@ function yearOptionsOf(years, selected) {
 }
 
 function periodName({ year, month }) {
-  return `${MONTH_NAMES[Number(month) - 1].toLowerCase()} de ${year}`
+  return month === ALL_MONTHS
+    ? `todo el año ${year}`
+    : `${MONTH_NAMES[Number(month) - 1].toLowerCase()} de ${year}`
 }
 
 function formatPercentage(value) {
@@ -362,8 +376,8 @@ function StatisticsResults({ period, onYears, tab, onTabChange }) {
 }
 
 // Pantalla de estadísticas (032 y 034): comparación de ingresos y gastos en una barra, dos columnas
-// de ingresos y gastos (personales o grupales) por categoría, de a un mes. El período vive en la dirección, reemplazando la
-// entrada del historial para no llenar "Atrás".
+// de ingresos y gastos (personales o grupales) por categoría, de un mes o de todo el año ("Todos los
+// meses"). El período vive en la dirección, reemplazando la entrada del historial para no llenar "Atrás".
 export default function StatisticsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const period = periodFromParams(searchParams)
@@ -384,6 +398,7 @@ export default function StatisticsPage() {
           value={period.month}
           onChange={(event) => navigate({ ...period, month: event.target.value })}
         >
+          <option value={ALL_MONTHS}>Todos los meses</option>
           {MONTH_NAMES.map((name, index) => (
             <option key={name} value={String(index + 1)}>
               {name}

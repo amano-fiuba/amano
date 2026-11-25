@@ -8,7 +8,7 @@ Guía paso a paso. La primera vez lleva unos 20-30 minutos (casi todo es descarg
 
 | Herramienta | Versión | Para qué |
 |---|---|---|
-| Node.js / npm | 24 (la de first-steps; mínimo 22) | compilar la web y correr Capacitor |
+| Node.js / npm | 24 (la del README; mínimo 22) | compilar la web y correr Capacitor |
 | Android Studio | Otter 2025.2.1 o posterior | SDK de Android y emulador |
 | JDK | 21 (`openjdk-21-jdk`), además del 25 del backend | Gradle de Android no compila con Java 25 |
 | Teléfono Android | 7.0 o superior | correr la app |
@@ -91,7 +91,7 @@ Necesitás que el backend de producción esté arriba y tener una cuenta verific
 
 ### Usar tu backend local (desarrollo)
 
-1. Levantá el stack completo como dice first-steps §9: `docker compose up -d --build` (queda en `http://localhost:8081`).
+1. Levantá el stack completo como dice el README: `docker compose up -d --build` (queda en `http://localhost:8081`).
 2. Creá `frontend/.env.android.local` (git lo ignora):
 
    ```
@@ -131,7 +131,7 @@ Recorré esta lista con una cuenta verificada. Cada punto corresponde a una feat
 - [ ] **US3** El enlace a GitHub de la portada abre el navegador.
 - [ ] **US2** "Cerrar sesión" → `/profile` redirige al acceso.
 - [ ] **015** Pantalla principal: resumen de perfil, grupos recientes, actividad personal y solicitudes pendientes.
-- [ ] **015** Barra superior: buscador global, notificaciones, preguntas frecuentes y ajustes.
+- [ ] **015** Barra superior: buscador global, notificaciones, íconos de tema y cierre de sesión.
 - [ ] **015** Botón "+" de acciones rápidas: no queda tapado por la barra de gestos.
 - [ ] **016** Eliminar un amigo.
 - [ ] **017/022** Estados de deuda y gestión de deudas del grupo.

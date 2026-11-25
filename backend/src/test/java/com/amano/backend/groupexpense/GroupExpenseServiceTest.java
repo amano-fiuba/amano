@@ -3,6 +3,7 @@ package com.amano.backend.groupexpense;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -42,6 +43,8 @@ import com.amano.backend.groups.GroupPermissions;
 import com.amano.backend.groups.GroupPermissionsRepository;
 import com.amano.backend.groups.SimulatedProfile;
 import com.amano.backend.groups.SimulatedProfileRepository;
+import com.amano.backend.notification.NotificationEventPublisher;
+import com.amano.backend.notification.NotificationType;
 import com.amano.backend.user.User;
 import com.amano.backend.user.UserRepository;
 
@@ -71,6 +74,7 @@ class GroupExpenseServiceTest {
     private UserRepository userRepository;
     private ActivityEventService activityEventService;
     private GroupPermissions permissions;
+    private NotificationEventPublisher notificationPublisher;
     private GroupExpenseService service;
 
     private final List<GroupExpenseShare> savedShares = new ArrayList<>();
@@ -85,9 +89,10 @@ class GroupExpenseServiceTest {
         simulatedProfileRepository = Mockito.mock(SimulatedProfileRepository.class);
         userRepository = Mockito.mock(UserRepository.class);
         activityEventService = Mockito.mock(ActivityEventService.class);
+        notificationPublisher = Mockito.mock(NotificationEventPublisher.class);
         service = new GroupExpenseService(expenseRepository, shareRepository, debtRepository,
                 groupMemberRepository, groupPermissionsRepository, new GroupPermissionChecker(),
-                simulatedProfileRepository, userRepository, activityEventService);
+                simulatedProfileRepository, userRepository, activityEventService, notificationPublisher);
 
         GroupMember ana = new GroupMember(ANA, GROUP_ID, GroupMember.ROLE_ADMIN);
         GroupMember juan = new GroupMember(JUAN, GROUP_ID, GroupMember.ROLE_MEMBER);
@@ -267,6 +272,10 @@ class GroupExpenseServiceTest {
         assertThat(response.debts()).extracting(GroupExpenseResponse.DebtView::status)
                 .containsExactly("PENDING", "PENDING");
         assertThat(response.debts().get(0).outstanding()).isEqualTo("3333.33");
+        verify(notificationPublisher).publishSafely(argThat(event ->
+                event.type() == NotificationType.GROUP_EXPENSE && event.userId().equals(ANA)));
+        verify(notificationPublisher).publishSafely(argThat(event ->
+                event.type() == NotificationType.GROUP_EXPENSE && event.userId().equals(JUAN)));
     }
 
     @Test

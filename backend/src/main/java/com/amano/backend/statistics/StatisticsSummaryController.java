@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Statistics summary of the session user for one month
+ * Statistics summary of the session user for a month or a whole year
  * (specs/034-income-statistics/contracts/statistics-summary-api.md). Under
  * {@code /api/stats/**}, which {@code SecurityConfig} restricts to verified accounts;
  * validation errors (400) are mapped by {@code ProblemDetailExceptionHandler}.

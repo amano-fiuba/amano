@@ -2,10 +2,11 @@ package com.amano.backend.statistics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.YearMonth;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -41,7 +42,7 @@ class StatisticsSummaryServiceTest {
     private void expenses(String personal, String group, long excluded, Integer... years) {
         String total = new java.math.BigDecimal(personal).add(new java.math.BigDecimal(group))
                 .toPlainString();
-        when(expenseService.statistics(USER_ID, "2026", "11")).thenReturn(
+        when(expenseService.statistics(eq(USER_ID), any(StatisticsPeriod.class))).thenReturn(
                 new ExpenseStatisticsResponse(2026, 11, Currency.USD, total, excluded,
                         breakdown(personal), breakdown(group), List.of(years)));
     }
@@ -53,7 +54,8 @@ class StatisticsSummaryServiceTest {
     }
 
     private void income(String total, long excluded) {
-        when(incomeService.statistics(USER_ID, YearMonth.of(2026, 11), Currency.USD)).thenReturn(
+        when(incomeService.statistics(eq(USER_ID), eq(LocalDate.parse("2026-11-01")),
+                eq(LocalDate.parse("2026-11-30")), eq(Currency.USD))).thenReturn(
                 new IncomeStatisticsResponse(total, excluded, "0.00".equals(total) ? List.of() : List.of(
                         new IncomeStatisticsResponse.CategoryAmount(IncomeCategory.SALARY, total, "100.0"))));
     }
@@ -74,7 +76,26 @@ class StatisticsSummaryServiceTest {
         assertThat(response.expenses().group().total()).isEqualTo("60000.00");
         assertThat(response.income().total()).isEqualTo("1000000.00");
         assertThat(response.income().excludedCount()).isEqualTo(1);
-        verify(incomeService).statistics(USER_ID, YearMonth.of(2026, 11), Currency.USD);
+        verify(incomeService).statistics(USER_ID, LocalDate.parse("2026-11-01"),
+                LocalDate.parse("2026-11-30"), Currency.USD);
+    }
+
+    @Test
+    void aBlankMonthAsksBothServicesForTheWholeYear() {
+        when(expenseService.statistics(eq(USER_ID), any(StatisticsPeriod.class))).thenReturn(
+                new ExpenseStatisticsResponse(2026, null, Currency.ARS, "100.00", 0,
+                        breakdown("100.00"), breakdown("0.00"), List.of(2026)));
+        when(incomeService.statistics(eq(USER_ID), eq(LocalDate.parse("2026-01-01")),
+                eq(LocalDate.parse("2026-12-31")), eq(Currency.ARS)))
+                .thenReturn(new IncomeStatisticsResponse("200.00", 0, List.of()));
+
+        StatisticsSummaryResponse response = service.summary(USER_ID, "2026", "");
+
+        assertThat(response.year()).isEqualTo(2026);
+        assertThat(response.month()).isNull();
+        assertThat(response.comparison().balance()).isEqualTo("100.00");
+        verify(incomeService).statistics(USER_ID, LocalDate.parse("2026-01-01"),
+                LocalDate.parse("2026-12-31"), Currency.ARS);
     }
 
     @Test

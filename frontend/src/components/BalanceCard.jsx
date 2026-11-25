@@ -17,10 +17,12 @@ function signedAmount(canonical, { explicitPlus = false } = {}) {
 
 /**
  * Personal balance card (specs/033-income-management, FR-015): income, expenses and
- * the net balance of the period in the account's main currency. The net is the
- * highlighted figure, with an explicit sign plus a distinct icon and wording for a
- * negative one (never only colour). It asks `GET /api/balance` every time it mounts
- * and whenever `year`, `month` or `refreshKey` change; it keeps no cache of its own,
+ * the net balance of the period in the account's main currency. Income is green and
+ * expenses red; the net sits on the right of the card, green when positive and red
+ * when negative. The net is the highlighted figure, with an explicit sign plus a
+ * distinct icon and wording for a negative one (never only colour). It asks
+ * `GET /api/balance` every time it mounts and whenever `year`, `month` or
+ * `refreshKey` change; it keeps no cache of its own,
  * so a new `refreshKey` (left by the new income screen) always recalculates. A
  * failure shows a message with "Reintentar". `year` is omitted for "all years".
  */
@@ -75,14 +77,18 @@ export default function BalanceCard({ year, month, refreshKey }) {
       <dl className="balance-card__figures">
         <div>
           <dt>Ingresos</dt>
-          <dd>{loading ? '…' : `${signedAmount(balance.income)}${currency}`}</dd>
+          <dd className="balance-card__income">
+            {loading ? '…' : `${signedAmount(balance.income)}${currency}`}
+          </dd>
         </div>
         <div>
           <dt>Gastos</dt>
-          <dd>{loading ? '…' : `${signedAmount(balance.expenses)}${currency}`}</dd>
+          <dd className="balance-card__expenses">
+            {loading ? '…' : `${signedAmount(balance.expenses)}${currency}`}
+          </dd>
         </div>
         <div
-          className={`balance-card__net${negative ? ' balance-card__net--negative' : ''}`}
+          className={`balance-card__net${negative ? ' balance-card__net--negative' : ' balance-card__net--positive'}`}
           data-testid="balance-net"
         >
           <dt>{BALANCE_TITLE}</dt>

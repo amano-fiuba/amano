@@ -2,15 +2,15 @@ import { Link, NavLink } from 'react-router'
 import { useAuth } from '../auth/AuthContext'
 import { userAvatarUrl } from '../auth/userAvatar'
 import GlobalSearch from './GlobalSearch'
+import LogoutButton from './LogoutButton'
 import NotificationsMenu from './NotificationsMenu'
 import {
   ActivityIcon,
   FriendsIcon,
   GroupsIcon,
-  HelpIcon,
-  SettingsIcon,
   StatisticsIcon,
 } from './NavIcons'
+import ThemeToggle from './ThemeToggle'
 import './AppHeader.scss'
 
 const linkClass = ({ isActive }) =>
@@ -25,7 +25,8 @@ function ActionLink({ to, label, children }) {
 }
 
 // Barra superior con sesión (specs/015-main-screen, US2): logo, buscador y
-// accesos a perfil, actividad, estadísticas (032), grupos, amigos, notificaciones, FAQ y ajustes.
+// accesos a perfil, actividad, estadísticas (032), grupos, amigos, notificaciones,
+// cambio de tema y cierre de sesión.
 export default function AppHeader() {
   const { user } = useAuth()
 
@@ -55,12 +56,8 @@ export default function AppHeader() {
           <FriendsIcon />
         </ActionLink>
         <NotificationsMenu />
-        <ActionLink to="/faq" label="Preguntas frecuentes">
-          <HelpIcon />
-        </ActionLink>
-        <ActionLink to="/settings" label="Ajustes">
-          <SettingsIcon />
-        </ActionLink>
+        <ThemeToggle />
+        <LogoutButton />
       </nav>
     </header>
   )

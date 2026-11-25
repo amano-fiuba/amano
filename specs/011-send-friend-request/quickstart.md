@@ -7,7 +7,7 @@ comandos y escenarios observables.
 
 ## Prerrequisitos
 
-- Entorno de desarrollo de `first-steps.md` (base en Docker, backend con `mvn spring-boot:run`,
+- Entorno de desarrollo del `README.md` (base en Docker, backend con `mvn spring-boot:run`,
   frontend con `npm run dev`).
 - **Dos cuentas verificadas** (A y B) para probar emisor y destinatario.
 - **Reiniciar el backend** después de actualizar la rama: Flyway aplica

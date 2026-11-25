@@ -96,9 +96,9 @@ const PARTIAL = debt({ debtId: 34, status: 'PARTIALLY_PAID', paidAmount: 1000, o
 
 const ok = (data) => ({ ok: true, data })
 
-function renderView() {
+function renderView(initialEntry = '/groups/3/debts') {
   return render(
-    <MemoryRouter initialEntries={['/groups/3/debts']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/groups/:id/debts" element={<GroupDebtsView />} />
         <Route path="/groups/:id/expenses/:expenseId" element={<p>Detalle del gasto</p>} />
@@ -703,5 +703,22 @@ describe('GroupDebtsView: pagos por validar (022 T075)', () => {
     await user.click(tab('Saldos'))
     await user.click(tab('Pagos por validar'))
     expect(await screen.findByTestId('debts-error')).toBeInTheDocument()
+  })
+})
+
+describe('GroupDebtsView: deep link de deudas (035 FR-017)', () => {
+  it('resalta y hace scroll a la deuda indicada por ?debt=', async () => {
+    const scrollIntoView = vi.fn()
+    // jsdom does not implement scrollIntoView: provide it for this scenario.
+    Element.prototype.scrollIntoView = scrollIntoView
+    getPendingDebts.mockResolvedValue(ok([OWE, OWED_USD]))
+
+    renderView('/groups/3/debts?debt=32')
+
+    const rows = await screen.findAllByTestId('my-debt-row')
+    expect(rows).toHaveLength(2)
+    await waitFor(() => expect(rows[1]).toHaveAttribute('data-highlighted', 'true'))
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(within(rows[1]).getByText(/Juan Pérez te debe/)).toBeInTheDocument()
   })
 })

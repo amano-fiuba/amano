@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Statistics of the session user's expenses for one month
+ * Statistics of the session user's expenses for a month or a whole year
  * (specs/032-estadisticas-gastos/contracts/expense-statistics-api.md). Under
  * {@code /api/expenses/**}, so {@code SecurityConfig} already requires a verified
  * account (FR-019, plan D1); validation errors (400) are mapped by

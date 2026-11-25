@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { getGroup } from '../../api/groupsClient'
 import { useAuth } from '../../auth/AuthContext'
 import BalancesPanel from '../../components/groups/BalancesPanel'
@@ -26,7 +26,10 @@ const VALIDATION_TAB = { id: 'validation', label: 'Pagos por validar' }
 // bumps `refreshKey`, so the visible panel reloads and the others reload when opened.
 export default function GroupDebtsView({ groupId: groupIdProp }) {
   const params = useParams()
+  const [searchParams] = useSearchParams()
   const groupId = groupIdProp ?? params.id
+  // Deep link from a debt notification (035 FR-017): highlight that row.
+  const highlightDebtId = searchParams.get('debt')
   const setUser = useAuth()?.setUser
   const [load, setLoad] = useState({ status: 'loading', group: null, error: '' })
   const [retryToken, setRetryToken] = useState(0)
@@ -143,6 +146,7 @@ export default function GroupDebtsView({ groupId: groupIdProp }) {
                 requiresValidation={requiresValidation}
                 refreshKey={refreshKey}
                 onChanged={bump}
+                highlightDebtId={highlightDebtId}
               />
             )}
             {activeTab === 'balances' && <BalancesPanel groupId={groupId} refreshKey={refreshKey} />}
